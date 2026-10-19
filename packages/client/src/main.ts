@@ -7,6 +7,7 @@ import { pickPlayerClip } from './anim';
 import { Input } from './input';
 import { Character } from './render/character';
 import { Crowd } from './render/crowd';
+import { PickupView } from './render/pickups';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
 import { pickBackend } from './render/backend';
@@ -19,7 +20,7 @@ const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
 function loadSettings(): Settings {
-  const def: Settings = { renderer: 'webgl', aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
+  const def: Settings = { music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
   try {
     return { ...def, ...(JSON.parse(localStorage.getItem('wrh.settings') ?? '{}') as Partial<Settings>) };
   } catch {
@@ -40,6 +41,8 @@ stage.scene.add(crowd.group);
 const ragdolls = await RagdollPool.create(14);
 await ragdolls.preload([...ENEMY_TYPES]);
 stage.scene.add(ragdolls.group);
+const pickups = new PickupView();
+stage.scene.add(pickups.group);
 
 const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.1, 0.7), new THREE.MeshBasicMaterial({ color: '#fff0a8' }), MAX_BULLETS);
 bulletMesh.frustumCulled = false;
@@ -71,6 +74,7 @@ stage.scene.add(grenadeMesh, spitMesh);
 
 function applySettings(): void {
   audio.setVolume(settings.volume);
+  audio.setMusicVolume(settings.music);
   stage.setShadowQuality(settings.shadows);
   stage.setScale(settings.scale);
   stage.setBounce(settings.bounce);
@@ -92,6 +96,7 @@ let localSlot = 0;
 let names: string[] = [];
 let lobbySig = '';
 let over = false;
+let paused = false;
 let recorder: Recorder | null = null;
 let playback: Replay | null = null;
 const dev = {
@@ -118,9 +123,12 @@ const ui = new Ui(
     onLeave: () => location.reload(),
     onCard: (i) => input.queueButton([Buttons.Card1, Buttons.Card2, Buttons.Card3][i]!),
     onAgain: () => location.reload(),
+    onUiSound: (n) => audio.ui(n),
+    onResume: () => setPaused(false),
     onReplay: () => downloadReplay(),
     onSetting: (key, value) => {
       if (key === 'volume') settings = { ...settings, volume: value as number };
+      else if (key === 'music') settings = { ...settings, music: value as number };
       else if (key === 'shadows') settings = { ...settings, shadows: value as 0 | 1 | 2 };
       else if (key === 'scale') settings = { ...settings, scale: value as number };
       else if (key === 'renderer') {
@@ -222,6 +230,7 @@ function handleEvent(e: SimEvent): void {
   switch (e.type) {
     case 'enemyHit':
       crowd.hit(e.id);
+      if (Math.random() < 0.6) damageNumber(e.x, e.y, e.damage);
       break;
     case 'waveStart':
       ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${ui.lang === 'tr' ? 'Dalga' : 'Wave'} ${e.wave}`, '', e.boss ? 3500 : 1800);
@@ -234,6 +243,7 @@ function handleEvent(e: SimEvent): void {
       break;
     case 'gameOver':
       over = true;
+      setTimeout(() => audio.stopMusic(), 4000);
       setTimeout(() => world && ui.showGameOver(world, recorder !== null), 1800);
       break;
     default:
@@ -241,8 +251,38 @@ function handleEvent(e: SimEvent): void {
   }
 }
 
+function setPaused(p: boolean): void {
+  if (!world || over) return;
+  if (mode !== 'solo') {
+    ui.toggleSettings();
+    return;
+  }
+  paused = p;
+  input.enabled = !p;
+  if (p) ui.showPause();
+  else ui.clearScreen();
+}
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') setPaused(!paused);
+});
+window.addEventListener('blur', () => {
+  if (mode === 'solo' && world && !over && !paused && !dev.auto && !dev.perf) setPaused(true);
+});
+
+const _p = new THREE.Vector3();
+/** Floating damage numbers for hits (thinned out when the screen is full of them). */
+function damageNumber(x: number, y: number, damage: number): void {
+  if (damage < 1) return;
+  _p.set(x, 1.7, -y).project(stage.camera);
+  const px = ((_p.x + 1) / 2) * app.clientWidth;
+  const py = ((1 - _p.y) / 2) * app.clientHeight;
+  if (px < 0 || py < 0 || px > app.clientWidth || py > app.clientHeight) return;
+  ui.popNumber(px, py, String(Math.round(damage)), damage >= 25);
+}
+
 // ---- starting a game ----
 function beginPlaying(w: World, slot: number): void {
+  audio.startMusic();
   world = w;
   localSlot = slot;
   ui.clearScreen();
@@ -384,7 +424,9 @@ function frame(nowMs: number): void {
     }
   }
 
-  if (world && mode === 'solo') {
+  if (world && mode === 'solo' && paused) {
+    acc = 0;
+  } else if (world && mode === 'solo') {
     acc += dt;
     while (acc >= TICK_DT) {
       acc -= TICK_DT;
@@ -464,9 +506,12 @@ function frame(nowMs: number): void {
     const fy0 = prevY[target]! + (curY[target]! - prevY[target]!) * alpha;
     stage.follow(fx0, -fy0, fx.shake);
 
+    audio.setListener(fx0, fy0);
+    audio.tick(w, localSlot, dt);
     crowd.update(w, alpha, nowSec);
     fx.update(dt);
     ragdolls.update(dt);
+    pickups.update(w, nowSec);
 
     let n = 0;
     for (let i = 0; i < MAX_BULLETS; i++) {
@@ -503,6 +548,7 @@ function frame(nowMs: number): void {
     spitMesh.count = sn;
     spitMesh.instanceMatrix.needsUpdate = true;
     ui.update(w, localSlot, fx.hurt, nowMs, names);
+    ui.drawMinimap(w, localSlot, nowMs);
   } else {
     fx.update(dt);
     stage.follow(0, 0);

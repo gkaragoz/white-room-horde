@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, OBSTACLES, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 
 export type Lang = 'en' | 'tr';
@@ -29,10 +29,13 @@ const T = {
     over: 'Game over',
     reached: 'Reached wave',
     again: 'Play again',
+    paused: 'Paused',
+    resume: 'Resume',
     replay: 'Save replay',
     pick: 'Level up! Pick a card',
     settings: 'Settings',
     volume: 'Volume',
+    music: 'Music',
     shadows: 'Shadows',
     renderer: 'Renderer (WebGPU falls back to WebGL2 if unavailable)',
     aa: 'Anti-aliasing',
@@ -87,10 +90,13 @@ const T = {
     over: 'Oyun bitti',
     reached: 'Ulaşılan dalga',
     again: 'Tekrar oyna',
+    paused: 'Duraklatıldı',
+    resume: 'Devam et',
     replay: 'Tekrarı kaydet',
     pick: 'Seviye atladın! Bir kart seç',
     settings: 'Ayarlar',
     volume: 'Ses',
+    music: 'Müzik',
     shadows: 'Gölgeler',
     renderer: 'Çizim motoru (WebGPU yoksa WebGL2 kullanılır)',
     aa: 'Kenar yumuşatma',
@@ -131,11 +137,14 @@ export interface UiHandlers {
   onLeave(): void;
   onCard(index: number): void;
   onAgain(): void;
+  onResume(): void;
   onReplay(): void;
-  onSetting(key: 'volume' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'renderer', value: number | string | boolean): void;
+  onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
+  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'renderer', value: number | string | boolean): void;
 }
 
 export interface Settings {
+  music: number;
   renderer: 'webgl' | 'webgpu';
   aa: 'off' | 'msaa' | 'smaa';
   bounce: boolean;
@@ -191,6 +200,9 @@ const CSS = `
 .wrh-gear{position:absolute;right:12px;top:10px;pointer-events:auto;cursor:pointer;width:34px;height:34px;border-radius:50%;background:rgba(250,244,232,.9);border:2px solid #cdbfa5;text-align:center;line-height:30px;font-size:18px}
 .wrh-hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;opacity:.7;text-shadow:0 1px 0 #fff}
 .wrh-warn{position:absolute;left:50%;top:60px;transform:translateX(-50%);color:#fff;background:#d8362e;padding:4px 12px;border-radius:8px;font-weight:700}
+.wrh-mini{position:absolute;right:14px;bottom:52px;width:180px;height:120px;border:2px solid #cdbfa5;border-radius:8px;background:rgba(250,244,232,.78);box-shadow:0 3px 10px rgba(60,45,20,.25)}
+.wrh-dmg{position:absolute;font-weight:800;font-size:15px;color:#fff;text-shadow:0 0 3px #7d0d14,0 0 3px #7d0d14,0 1px 0 #7d0d14;pointer-events:none;will-change:transform,opacity}
+.wrh-low{color:#d8362e}
 .wrh-hud-dev{position:absolute;left:12px;top:10px;font-size:12px;line-height:1.5}
 `;
 
@@ -227,6 +239,15 @@ export class Ui {
     this.hud.style.cssText = 'position:absolute;inset:0;pointer-events:none';
     this.dev.className = 'wrh-hud-dev';
     this.root.append(this.hud, this.dev, this.screen, this.settingsEl);
+    // every button gets a click sound; the important ones a confirmation
+    this.root.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('button, .wrh-card, .wrh-gear');
+      if (!b) return;
+      if (b.classList.contains('wrh-gear')) this.h.onUiSound('open');
+      else if (['wrh-solo', 'wrh-host', 'wrh-join', 'wrh-start', 'wrh-again'].includes(b.id) || b.classList.contains('wrh-card')) this.h.onUiSound('confirm');
+      else if (['wrh-leave', 's-close'].includes(b.id)) this.h.onUiSound('back');
+      else this.h.onUiSound('click');
+    });
     parent.appendChild(this.root);
   }
 
@@ -288,6 +309,38 @@ export class Ui {
     q('wrh-join').onclick = () => this.h.onJoin(name(), q<HTMLInputElement>('wrh-code').value.trim().toUpperCase(), q<HTMLInputElement>('wrh-server').value.trim());
   }
 
+  /** Pause screen (solo only; online games keep running). */
+  showPause(): void {
+    const t = this.t;
+    this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center"><h1>${t.paused}</h1>
+      <button id="wrh-resume">${t.resume}</button><button id="wrh-pset" class="alt">${t.settings}</button><button id="wrh-leave" class="warn">${t.leave}</button></div>`;
+    this.screen.querySelector<HTMLElement>('#wrh-resume')!.onclick = () => this.h.onResume();
+    this.screen.querySelector<HTMLElement>('#wrh-pset')!.onclick = () => this.toggleSettings();
+    this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
+  }
+
+  private floaters = 0;
+
+  /** A damage number that rises from a screen position and fades out. */
+  popNumber(px: number, py: number, text: string, big: boolean): void {
+    if (this.floaters >= 18) return;
+    this.floaters++;
+    const el = document.createElement('div');
+    el.className = 'wrh-dmg';
+    el.textContent = text;
+    el.style.left = `${px}px`;
+    el.style.top = `${py}px`;
+    el.style.fontSize = big ? '22px' : '15px';
+    el.style.color = big ? '#ffd23a' : '#fff';
+    this.root.appendChild(el);
+    const dx = (Math.random() - 0.5) * 30;
+    const a = el.animate([{ transform: 'translate(-50%,0) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px),-46px) scale(${big ? 1.25 : 0.9})`, opacity: 0 }], { duration: 650, easing: 'ease-out' });
+    a.onfinish = () => {
+      el.remove();
+      this.floaters--;
+    };
+  }
+
   private weaponButtons(): string {
     const names = this.t.weapons as Record<string, string>;
     return WEAPON_IDS.map((w) => `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}">${names[w]}</button>`).join('');
@@ -340,6 +393,7 @@ export class Ui {
       <div class="wrh-hurt" id="h-hurt"></div>
       <div class="wrh-top"><div class="big" id="h-wave"></div><div class="wrh-bar"><i id="h-xp"></i></div><div class="wrh-bar boss" id="h-bossbar" style="display:none"><i id="h-boss"></i></div><div id="h-bosslabel" style="display:none;color:#d8362e"></div></div>
       <div class="wrh-squad" id="h-squad"></div>
+      <canvas class="wrh-mini" id="h-mini" width="360" height="240"></canvas>
       <div class="wrh-me" id="h-me"></div>
       <div class="wrh-banner" id="h-banner" style="display:none"></div>
       <div class="wrh-cards" id="h-cards" style="display:none"></div>
@@ -387,6 +441,7 @@ export class Ui {
     this.settingsEl.innerHTML = `<div class="wrh-panel wrh-center">
       <h1 style="font-size:22px">${t.settings}</h1>
       <label>${t.volume}</label><input id="s-vol" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}">
+      <label>${t.music}</label><input id="s-mus" type="range" min="0" max="100" value="${Math.round(s.music * 100)}">
       <label>${t.shadows}</label><input id="s-sh" type="range" min="0" max="2" step="1" value="${s.shadows}">
       <label>${t.quality} (${s.scale.toFixed(2)})</label><input id="s-sc" type="range" min="50" max="100" step="5" value="${Math.round(s.scale * 100)}">
       <label>${t.renderer} <small>(${t.reloads})</small></label><div class="wrh-row">${(['webgl', 'webgpu'] as const).map((m) => `<button class="wrh-wp${s.renderer === m ? ' on' : ''}" data-rd="${m}">${m === 'webgl' ? 'WebGL2' : 'WebGPU'}</button>`).join('')}</div>
@@ -397,6 +452,7 @@ export class Ui {
     </div>`;
     const q = <E extends HTMLInputElement>(id: string): E => this.settingsEl.querySelector<E>('#' + id)!;
     q('s-vol').oninput = (e) => this.h.onSetting('volume', Number((e.target as HTMLInputElement).value) / 100);
+    q('s-mus').oninput = (e) => this.h.onSetting('music', Number((e.target as HTMLInputElement).value) / 100);
     q('s-sh').oninput = (e) => this.h.onSetting('shadows', Number((e.target as HTMLInputElement).value));
     q('s-sc').oninput = (e) => this.h.onSetting('scale', Number((e.target as HTMLInputElement).value) / 100);
     this.settingsEl.querySelectorAll<HTMLElement>('[data-aa]').forEach((el) => {
@@ -419,11 +475,59 @@ export class Ui {
     this.lastCards = '';
   }
 
+  private mini: HTMLCanvasElement | null = null;
+  private lastMini = 0;
+
+  /** Radar of the whole arena: cover, enemies, loot and the squad (about 12 Hz). */
+  drawMinimap(world: World, slot: number, now: number): void {
+    if (now - this.lastMini < 80) return;
+    this.lastMini = now;
+    this.mini ??= this.hud.querySelector<HTMLCanvasElement>('#h-mini');
+    const c = this.mini;
+    if (!c) return;
+    const g = c.getContext('2d')!;
+    const W = c.width;
+    const H = c.height;
+    const sx = W / (ARENA_HALF_W * 2);
+    const sy = H / (ARENA_HALF_H * 2);
+    const X = (x: number): number => (x + ARENA_HALF_W) * sx;
+    const Y = (y: number): number => (ARENA_HALF_H - y) * sy;
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#8b7a5e';
+    for (const o of OBSTACLES) g.fillRect(X(o.x - o.w / 2), Y(o.y + o.h / 2), o.w * sx, o.h * sy);
+    for (let i = 0; i < MAX_PICKUPS; i++) {
+      if (!world.kActive[i]) continue;
+      g.fillStyle = ['#ffcf3a', '#3ddc6a', '#6b8f4a'][world.kType[i]!]!;
+      g.fillRect(X(world.kX[i]!) - 3, Y(world.kY[i]!) - 3, 6, 6);
+    }
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      if (!world.eActive[i]) continue;
+      const boss = world.eBoss[i] !== 0;
+      g.fillStyle = boss ? '#d8362e' : '#c0443c';
+      const r = boss ? 7 : 2.2;
+      g.beginPath();
+      g.arc(X(world.eX[i]!), Y(world.eY[i]!), r, 0, Math.PI * 2);
+      g.fill();
+    }
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      if (!world.pActive[s] || world.pState[s] === PlayerState.Dead) continue;
+      g.fillStyle = PLAYER_COLORS[s % PLAYER_COLORS.length]!;
+      g.strokeStyle = s === slot ? '#fff' : '#3a352d';
+      g.lineWidth = s === slot ? 3 : 1.5;
+      g.beginPath();
+      g.arc(X(world.pX[s]!), Y(world.pY[s]!), s === slot ? 6 : 4.5, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+    }
+  }
+
   /** Update the HUD from the world (throttled to ~12 Hz; cheap DOM writes only). */
   update(world: World, slot: number, hurt: number, now: number, names: string[]): void {
     if (!this.hudBuilt) this.buildHud();
     const hurtEl = this.hud.querySelector<HTMLElement>('#h-hurt')!;
-    hurtEl.style.opacity = String(Math.min(1, hurt));
+    const myHp = world.pActive[slot] && world.pState[slot] === PlayerState.Alive ? world.pHp[slot]! / world.pMaxHp[slot]! : 1;
+    const pulse = myHp < 0.3 ? 0.22 + 0.18 * Math.sin(now / 180) : 0;
+    hurtEl.style.opacity = String(Math.min(1, Math.max(hurt, pulse)));
     if (this.bannerUntil && now > this.bannerUntil) {
       this.bannerUntil = 0;
       this.hud.querySelector<HTMLElement>('#h-banner')!.style.display = 'none';
@@ -471,7 +575,9 @@ export class Ui {
     if (world.pActive[slot]) {
       const wid = WEAPON_IDS[world.pWeapon[slot]!]!;
       const ammo = world.pAmmo[slot]!;
-      set('h-me', `${(t.weapons as Record<string, string>)[wid]}${ammo >= 0 ? ` &middot; ${t.ammo} ${ammo}` : ' &infin;'} &middot; &#128163; ${world.pGren[slot]}`);
+      const maxAmmo = BALANCE.weapons[wid].ammo;
+      const low = maxAmmo > 0 && ammo < maxAmmo * 0.2;
+      set('h-me', `${(t.weapons as Record<string, string>)[wid]}${ammo >= 0 ? ` &middot; <span class="${low ? 'wrh-low' : ''}">${t.ammo} ${ammo}${low ? ' !' : ''}</span>` : ' &infin;'} &middot; &#128163; ${world.pGren[slot]}`);
       const st = world.pState[slot]!;
       if (st === PlayerState.Downed) {
         const sec = Math.ceil(world.pTimer[slot]!);

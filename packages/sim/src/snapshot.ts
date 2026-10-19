@@ -7,6 +7,7 @@ function arrays(w: World): ArrayBufferView[] {
     w.pActive, w.pX, w.pY, w.pAngle, w.pHp, w.pMaxHp, w.pState, w.pTimer, w.pRevive, w.pCooldown, w.pIFrames, w.pWeapon, w.pAmmo, w.pMoving, w.pGren, w.pGrenCharge, w.pGrenCd,
     w.eActive, w.eType, w.eBoss, w.eState, w.eStateTick, w.eX, w.eY, w.eAngle, w.eHp, w.eCooldown,
     w.gActive, w.gX, w.gY, w.gVx, w.gVy, w.gFuse, w.gOwner,
+    w.kActive, w.kType, w.kX, w.kY, w.kLife,
     w.sActive, w.sX, w.sY, w.sVx, w.sVy, w.sLife,
     w.bActive, w.bX, w.bY, w.bVx, w.bVy, w.bLife, w.bDamage, w.bOwner, w.bPierce, w.bHit,
     w.field.cost, w.field.dirX, w.field.dirY,

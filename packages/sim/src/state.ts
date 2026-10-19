@@ -1,4 +1,4 @@
-import { BALANCE, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT } from '@wrh/shared';
+import { BALANCE, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -8,12 +8,14 @@ import { SpatialHash } from './spatial';
 export type SimEvent =
   | { type: 'shot'; slot: number; weapon: number; x: number; y: number; angle: number }
   | { type: 'bulletGone'; x: number; y: number }
-  | { type: 'enemyHit'; id: number; etype: number; x: number; y: number }
+  | { type: 'enemyHit'; id: number; etype: number; x: number; y: number; damage: number }
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'grenadeThrown'; owner: number; x: number; y: number }
   | { type: 'spit'; x: number; y: number; angle: number }
+  | { type: 'pickupDrop'; kind: number; x: number; y: number }
+  | { type: 'pickup'; kind: number; slot: number; x: number; y: number }
   | { type: 'playerDown'; slot: number; x: number; y: number }
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
@@ -86,6 +88,12 @@ export interface World {
   gVy: Float64Array;
   gFuse: Float64Array;
   gOwner: Int32Array;
+  // pickups
+  kActive: Uint8Array;
+  kType: Uint8Array;
+  kX: Float64Array;
+  kY: Float64Array;
+  kLife: Float64Array;
   // spitter projectiles
   sActive: Uint8Array;
   sX: Float64Array;
@@ -166,6 +174,11 @@ export function createWorld(seed: number): World {
     gVy: new Float64Array(MAX_GRENADES),
     gFuse: new Float64Array(MAX_GRENADES),
     gOwner: new Int32Array(MAX_GRENADES),
+    kActive: new Uint8Array(MAX_PICKUPS),
+    kType: new Uint8Array(MAX_PICKUPS),
+    kX: new Float64Array(MAX_PICKUPS),
+    kY: new Float64Array(MAX_PICKUPS),
+    kLife: new Float64Array(MAX_PICKUPS),
     sActive: new Uint8Array(MAX_SPIT),
     sX: new Float64Array(MAX_SPIT),
     sY: new Float64Array(MAX_SPIT),

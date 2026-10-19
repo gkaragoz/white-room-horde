@@ -4,7 +4,8 @@ import { BOSS_TYPES, Crowd } from '../render/crowd';
 import { Fx } from '../render/fx';
 import { RagdollPool } from '../render/ragdoll';
 import * as THREE from 'three';
-import { Audio, BANK_FILES } from '../audio';
+import { Audio, BANK_FILES, MUSIC_FILES } from '../audio';
+import { PickupView } from '../render/pickups';
 import { Stage, type AaMode } from '../render/stage';
 import { webgpuSupported } from '../render/backend';
 import type { Ctx, QaTest } from './tests';
@@ -311,8 +312,8 @@ export const crowdTests: QaTest[] = [
       const a = new Audio();
       a.unlock();
       const { loaded, durations } = await a.whenLoaded();
-      const missing = BANK_FILES.filter((x) => !loaded.includes(x));
-      const long = Object.entries(durations).filter(([, d]) => d > 6 || d < 0.03);
+      const missing = [...BANK_FILES, ...MUSIC_FILES.map((m) => 'music:' + m)].filter((x) => !loaded.includes(x));
+      const long = Object.entries(durations).filter(([k, d]) => (k.startsWith('music:') ? d < 30 || d > 400 : d > 6 || d < 0.008));
       const problems: string[] = [];
       if (missing.length) problems.push(`not decoded: ${missing.join(', ')}`);
       if (long.length) problems.push(`odd lengths: ${long.map(([k, d]) => `${k} ${f(d)}s`).join(', ')}`);
@@ -446,6 +447,71 @@ export const crowdTests: QaTest[] = [
         div.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : notes.join('; ') };
+    },
+  },
+  {
+    id: 'audio.spatial',
+    title: 'Positional audio: left/right panning follows the screen, louder when close',
+    async run() {
+      const a = new Audio();
+      a.setListener(0, 0);
+      const problems: string[] = [];
+      const screenRight = { x: Math.cos((30 * Math.PI) / 180), y: Math.sin((30 * Math.PI) / 180) };
+      const right = a.spatial({ x: screenRight.x * 8, y: screenRight.y * 8 });
+      const left = a.spatial({ x: -screenRight.x * 8, y: -screenRight.y * 8 });
+      const near = a.spatial({ x: 0.5, y: 0 });
+      const far = a.spatial({ x: 25, y: 0 });
+      const here = a.spatial({ x: 0, y: 0 });
+      if (!(right.pan > 0.3)) problems.push(`source on the right pans ${f(right.pan)}`);
+      if (!(left.pan < -0.3)) problems.push(`source on the left pans ${f(left.pan)}`);
+      if (Math.abs(here.pan) > 0.01 || here.gain < 0.99) problems.push('a sound at the listener is not centred and full');
+      if (!(far.gain < near.gain * 0.3)) problems.push(`far ${f(far.gain, 3)} is not much quieter than near ${f(near.gain, 3)}`);
+      // moving the listener moves the stereo image
+      a.setListener(20, 0);
+      const moved = a.spatial({ x: 0, y: 0 });
+      if (!(moved.pan < -0.3)) problems.push('moving the listener right did not move the source to the left');
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `right ${f(right.pan)}, left ${f(left.pan)}, near ${f(near.gain, 2)}, far ${f(far.gain, 2)}` };
+    },
+  },
+  {
+    id: 'pickups.render',
+    title: 'Dropped loot is drawn (ammo, health, grenade) and disappears when collected',
+    async run(ctx) {
+      const w = createWorld(3);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, 0);
+      const view = new PickupView();
+      ctx.stage.scene.add(view.group);
+      const problems: string[] = [];
+      try {
+        ctx.stage.follow(0, 0);
+        view.update(w, 0.3);
+        ctx.stage.render();
+        const bg = grab(ctx);
+        const sizes: number[] = [];
+        for (const kind of [0, 1, 2]) {
+          w.kActive.fill(0);
+          w.kActive[0] = 1;
+          w.kType[0] = kind;
+          w.kX[0] = 0;
+          w.kY[0] = 0;
+          w.kLife[0] = 15;
+          view.update(w, 0.3);
+          ctx.stage.render();
+          const px = silhouette(grab(ctx), bg).count;
+          sizes.push(px);
+          if (px < 150) problems.push(`pickup kind ${kind} barely visible (${px} px)`);
+        }
+        w.kActive.fill(0);
+        view.update(w, 0.3);
+        ctx.stage.render();
+        const gone = silhouette(grab(ctx), bg).count;
+        if (gone > 30) problems.push(`${gone} px still drawn after the pickup was removed`);
+      } finally {
+        ctx.stage.scene.remove(view.group);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'ammo, health and grenade crates visible and removed cleanly' };
     },
   },
 ];

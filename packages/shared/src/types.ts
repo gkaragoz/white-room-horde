@@ -41,3 +41,6 @@ export const PlayerState = { Alive: 0, Downed: 1, Dead: 2 } as const;
 /** Team upgrade cards offered on level up (index = card id). */
 export const CARD_IDS = ['damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal'] as const;
 export type CardId = (typeof CARD_IDS)[number];
+
+/** Pickup kinds (kType). */
+export const PickupType = { Ammo: 0, Health: 1, Grenade: 2 } as const;

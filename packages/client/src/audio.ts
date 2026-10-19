@@ -1,23 +1,34 @@
-import { WEAPON_IDS } from '@wrh/shared';
-import type { SimEvent } from '@wrh/sim';
+import { ENEMY_TYPES, MAX_ENEMIES, MAX_PLAYERS, PlayerState, WEAPON_IDS } from '@wrh/shared';
+import type { SimEvent, World } from '@wrh/sim';
 import { asset } from './assets';
+import { SCREEN_RIGHT } from './controls';
 
-type Sfx = 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'throw' | 'heavyShot' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive' | 'level' | 'pick' | 'wave' | 'boss' | 'over';
+export type Sfx =
+  | 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'heavyShot' | 'throw' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive'
+  | 'level' | 'pick' | 'wave' | 'boss' | 'over' | 'zGroan' | 'zAttack' | 'zHit' | 'zDeath' | 'zScream' | 'step' | 'pickup' | 'pickupDrop' | 'spit'
+  | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
-const GAP: Record<Sfx, number> = { midShot: 0.04, bigShot: 0.05, cannonShot: 0.08, throw: 0.1, shot: 0.035, heavyShot: 0.05, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3, level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1 };
+const GAP: Record<Sfx, number> = {
+  shot: 0.035, midShot: 0.04, bigShot: 0.05, cannonShot: 0.08, heavyShot: 0.05, throw: 0.1, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3,
+  level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1, zGroan: 0.25, zAttack: 0.12, zHit: 0.05, zDeath: 0.06, zScream: 0.4, step: 0.12, pickup: 0.06, pickupDrop: 0.15, spit: 0.15,
+  uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
+};
+
+type Entry = { files: string[]; gain: number; rate: [number, number] };
+const n3 = (p: string): string[] => [0, 1, 2].map((i) => `${p}_00${i}`);
+const z = (...ids: number[]): string[] => ids.map((i) => `zombie-${i}`);
 
 /** Recorded effects (CC0, see public/sfx/CREDITS.md). Each name picks a random file and varies the pitch a little. */
-const n3 = (p: string): string[] => [0, 1, 2].map((i) => `${p}_00${i}`);
-const BANK: Partial<Record<Sfx, { files: string[]; gain: number; rate: [number, number] }>> = {
+const BANK: Partial<Record<Sfx, Entry>> = {
   shot: { files: ['shot_01', 'shot_02', 'shot_03'], gain: 0.55, rate: [0.95, 1.08] },
   midShot: { files: ['bang_01', 'bang_02', 'bang_03', 'bang_04', 'bang_05', 'bang_06'], gain: 0.6, rate: [0.95, 1.05] },
   bigShot: { files: ['bang_07', 'bang_08', 'bang_09', 'bang_10'], gain: 0.75, rate: [0.9, 1.0] },
   cannonShot: { files: ['cannon_01', 'cannon_02', 'cannon_03'], gain: 0.8, rate: [0.9, 1.0] },
   heavyShot: { files: ['bang_07', 'bang_08', 'cannon_01'], gain: 0.8, rate: [0.9, 1.0] },
   boom: { files: ['explosion', 'cannon_04', 'cannon_05'], gain: 1, rate: [0.8, 0.95] },
-  hit: { files: [...n3('impactPunch_medium'), ...n3('impactSoft_medium')], gain: 0.35, rate: [0.9, 1.2] },
-  death: { files: n3('impactSoft_heavy'), gain: 0.55, rate: [0.8, 1.05] },
+  hit: { files: [...n3('impactPunch_medium'), ...n3('impactSoft_medium')], gain: 0.3, rate: [0.9, 1.2] },
+  death: { files: n3('impactSoft_heavy'), gain: 0.45, rate: [0.8, 1.05] },
   hurt: { files: n3('impactPunch_heavy'), gain: 0.8, rate: [0.9, 1.0] },
   down: { files: n3('impactSoft_heavy'), gain: 0.9, rate: [0.6, 0.7] },
   throw: { files: n3('impactMetal_light'), gain: 0.7, rate: [0.9, 1.1] },
@@ -27,23 +38,56 @@ const BANK: Partial<Record<Sfx, { files: string[]; gain: number; rate: [number, 
   wave: { files: ['gong_01'], gain: 0.6, rate: [1, 1] },
   boss: { files: ['gong_02', 'cannon_05'], gain: 1, rate: [0.7, 0.7] },
   over: { files: ['gong_02'], gain: 0.9, rate: [0.55, 0.55] },
+  // zombies: long groans idle/spawn, short barks when hurting, grunts when swinging, gurgles when dying
+  zGroan: { files: z(16, 17, 18, 19, 20, 21), gain: 0.32, rate: [0.8, 1.15] },
+  zAttack: { files: z(1, 4, 8, 9, 12, 15, 23), gain: 0.5, rate: [0.85, 1.1] },
+  zHit: { files: z(2, 7, 10, 14, 22), gain: 0.28, rate: [0.9, 1.25] },
+  zDeath: { files: z(3, 5, 6, 11, 13, 24), gain: 0.5, rate: [0.75, 1.1] },
+  zScream: { files: z(16, 17), gain: 0.9, rate: [0.55, 0.7] },
+  step: { files: ['footstep_concrete_000', 'footstep_concrete_001', 'footstep_concrete_002', 'footstep_concrete_003', 'footstep_concrete_004'], gain: 0.22, rate: [0.9, 1.15] },
+  pickup: { files: ['ui_confirmation_002', 'ui_bong_001'], gain: 0.55, rate: [1, 1.2] },
+  pickupDrop: { files: ['ui_drop_001'], gain: 0.3, rate: [0.9, 1.2] },
+  spit: { files: ['ui_drop_001'], gain: 0.35, rate: [0.5, 0.65] },
+  uiClick: { files: ['ui_click_001', 'ui_click_002', 'ui_click_003'], gain: 0.5, rate: [0.97, 1.05] },
+  uiConfirm: { files: ['ui_confirmation_001'], gain: 0.55, rate: [1, 1] },
+  uiBack: { files: ['ui_back_001'], gain: 0.5, rate: [1, 1] },
+  uiError: { files: ['ui_error_001'], gain: 0.5, rate: [1, 1] },
+  uiOpen: { files: ['ui_maximize_001'], gain: 0.5, rate: [1, 1] },
+  uiClose: { files: ['ui_close_001'], gain: 0.5, rate: [1, 1] },
 };
+
+/** Sounds that come from a place in the arena (panned and quieter with distance). */
+const SPATIAL = new Set<Sfx>(['shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit']);
 
 /** Every file the bank refers to (QA checks they all decode). */
 export const BANK_FILES: string[] = [...new Set(Object.values(BANK).flatMap((b) => b.files))];
+export const MUSIC_FILES = ['determined_pursuit'];
+
+const MAX_VOICES = 28;
 
 /**
- * Recorded effects with a synthesised fallback (browser cannot decode ogg, or a file is missing). sound effects (WebAudio, no files). Real recorded effects from a free library replace these
- * later (docs/DESIGN.md section 10); this gives the game feedback, volume control and positional-free mixing now.
+ * Recorded effects with a synthesised fallback (browser cannot decode ogg, or a file is missing), positional pan and
+ * distance falloff, ambient zombie voices and footsteps driven by the world, looped music with ducking.
  */
 export class Audio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private music: AudioBufferSourceNode | null = null;
   private noise: AudioBuffer | null = null;
   private readonly last = new Map<Sfx, number>();
   private readonly buffers = new Map<string, AudioBuffer>();
   private loading = false;
+  private voices = 0;
+  private groanTimer = 0;
+  private stepTimer = 0;
+  private heartTimer = 0;
+  private duck = 1;
+  private duckTarget = 1;
+  private listenerX = 0;
+  private listenerY = 0;
   volume = 0.6;
+  musicVolume = 0.5;
   muted = false;
 
   /** Browsers require a user gesture before sound can start. */
@@ -59,6 +103,9 @@ export class Audio {
     this.master.gain.value = this.muted ? 0 : this.volume;
     const comp = this.ctx.createDynamicsCompressor();
     this.master.connect(comp).connect(this.ctx.destination);
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.gain.value = 0;
+    this.musicGain.connect(this.master);
     const len = this.ctx.sampleRate;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
@@ -66,29 +113,29 @@ export class Audio {
     void this.loadBank();
   }
 
+  private async load(name: string, url: string): Promise<void> {
+    try {
+      const res = await fetch(url);
+      this.buffers.set(name, await this.ctx!.decodeAudioData(await res.arrayBuffer()));
+    } catch {
+      /* synth fallback / no music */
+    }
+  }
+
   /** Fetch and decode every file of the bank once; failures just leave the synth fallback in place. */
   private async loadBank(): Promise<void> {
     if (this.loading || !this.ctx) return;
     this.loading = true;
-    const names = new Set<string>();
-    for (const b of Object.values(BANK)) for (const f of b.files) names.add(f);
-    await Promise.all(
-      [...names].map(async (n) => {
-        try {
-          const res = await fetch(asset(`sfx/${n}.ogg`));
-          const buf = await this.ctx!.decodeAudioData(await res.arrayBuffer());
-          this.buffers.set(n, buf);
-        } catch {
-          /* synth fallback */
-        }
-      }),
-    );
+    await Promise.all(BANK_FILES.map((n) => this.load(n, asset(`sfx/${n}.ogg`))));
+    await Promise.all(MUSIC_FILES.map((n) => this.load('music:' + n, asset(`music/${n}.ogg`))));
+    if (this.wantMusic) this.startMusic();
   }
 
   /** QA: wait until the bank is decoded (or time runs out) and report what loaded. */
-  async whenLoaded(ms = 6000): Promise<{ loaded: string[]; durations: Record<string, number> }> {
+  async whenLoaded(ms = 8000): Promise<{ loaded: string[]; durations: Record<string, number> }> {
+    const total = BANK_FILES.length + MUSIC_FILES.length;
     const t0 = performance.now();
-    while (this.buffers.size < BANK_FILES.length && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50));
+    while (this.buffers.size < total && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50));
     const durations: Record<string, number> = {};
     for (const [k, v] of this.buffers) durations[k] = v.duration;
     return { loaded: [...this.buffers.keys()], durations };
@@ -98,38 +145,14 @@ export class Audio {
     return this.buffers.size;
   }
 
-  private playBank(name: Sfx): boolean {
-    const b = BANK[name];
-    if (!b || !this.ctx || !this.master) return false;
-    const avail = b.files.filter((f) => this.buffers.has(f));
-    if (!avail.length) return false;
-    const file = avail[Math.floor(Math.random() * avail.length)]!;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.buffers.get(file)!;
-    src.playbackRate.value = b.rate[0] + Math.random() * (b.rate[1] - b.rate[0]);
-    const g = this.ctx.createGain();
-    g.gain.value = b.gain * (0.9 + Math.random() * 0.2);
-    src.connect(g).connect(this.master);
-    src.start();
-    // the big explosion and the boss roar layer a second sample
-    if (name === 'boom' || name === 'boss') {
-      const extra = avail[Math.floor(Math.random() * avail.length)]!;
-      if (extra !== file) {
-        const s2 = this.ctx.createBufferSource();
-        s2.buffer = this.buffers.get(extra)!;
-        s2.playbackRate.value = b.rate[0];
-        const g2 = this.ctx.createGain();
-        g2.gain.value = b.gain * 0.6;
-        s2.connect(g2).connect(this.master);
-        s2.start();
-      }
-    }
-    return true;
-  }
-
   setVolume(v: number): void {
     this.volume = v;
     if (this.master) this.master.gain.value = this.muted ? 0 : v;
+  }
+
+  setMusicVolume(v: number): void {
+    this.musicVolume = v;
+    this.applyMusicGain();
   }
 
   setMuted(m: boolean): void {
@@ -137,6 +160,49 @@ export class Audio {
     if (this.master) this.master.gain.value = m ? 0 : this.volume;
   }
 
+  setListener(x: number, y: number): void {
+    this.listenerX = x;
+    this.listenerY = y;
+  }
+
+  // ---- music ----
+  private wantMusic = false;
+
+  private applyMusicGain(): void {
+    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(this.musicVolume * 0.55 * this.duck, this.ctx.currentTime, 0.3);
+  }
+
+  startMusic(): void {
+    this.wantMusic = true;
+    if (!this.ctx || this.music) return;
+    const buf = this.buffers.get('music:determined_pursuit');
+    if (!buf) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(this.musicGain!);
+    src.start();
+    this.music = src;
+    this.applyMusicGain();
+  }
+
+  stopMusic(): void {
+    this.wantMusic = false;
+    if (this.music && this.ctx && this.musicGain) {
+      this.musicGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
+      const m = this.music;
+      this.music = null;
+      setTimeout(() => m.stop(), 1800);
+    }
+  }
+
+  /** Lower the music under big moments (boss roar, game over); it recovers on its own. */
+  duckMusic(level: number, seconds: number): void {
+    this.duckTarget = level;
+    setTimeout(() => (this.duckTarget = 1), seconds * 1000);
+  }
+
+  // ---- synth fallbacks ----
   private tone(freq: number, to: number, dur: number, type: OscillatorType, gain: number, delay = 0): void {
     const c = this.ctx!;
     const t = c.currentTime + delay;
@@ -169,29 +235,25 @@ export class Audio {
     s.stop(t + dur + 0.02);
   }
 
-  play(name: Sfx): void {
-    if (!this.ctx || this.muted) return;
-    const now = this.ctx.currentTime;
-    if (now - (this.last.get(name) ?? -1) < GAP[name]) return;
-    this.last.set(name, now);
-    if (this.playBank(name)) return;
+  private synth(name: Sfx): void {
     switch (name) {
-      case 'midShot':
-      case 'bigShot':
-      case 'cannonShot':
-      case 'throw':
       case 'shot':
+      case 'midShot':
         this.burst(0.09, 0.35, 5200);
         this.tone(220 + Math.random() * 40, 70, 0.07, 'square', 0.12);
         break;
+      case 'bigShot':
+      case 'cannonShot':
       case 'heavyShot':
         this.burst(0.22, 0.6, 3200);
         this.tone(120, 38, 0.2, 'sawtooth', 0.3);
         break;
       case 'hit':
+      case 'zHit':
         this.tone(160, 90, 0.05, 'triangle', 0.12);
         break;
       case 'death':
+      case 'zDeath':
         this.burst(0.18, 0.28, 1500);
         this.tone(140, 45, 0.18, 'sine', 0.22);
         break;
@@ -213,6 +275,8 @@ export class Audio {
         for (let i = 0; i < 4; i++) this.tone(392 * Math.pow(1.26, i), 392 * Math.pow(1.26, i), 0.18, 'triangle', 0.22, i * 0.07);
         break;
       case 'pick':
+      case 'pickup':
+      case 'uiConfirm':
         this.tone(523, 784, 0.15, 'triangle', 0.25);
         break;
       case 'wave':
@@ -220,36 +284,133 @@ export class Audio {
         this.tone(147, 147, 0.5, 'sawtooth', 0.2, 0.2);
         break;
       case 'boss':
+      case 'zScream':
         this.tone(70, 40, 1.2, 'sawtooth', 0.5);
         this.burst(1.0, 0.4, 600);
         break;
       case 'over':
         this.tone(220, 55, 1.5, 'sawtooth', 0.4);
         break;
+      case 'zGroan':
+      case 'zAttack':
+        this.tone(110 + Math.random() * 40, 60, 0.4, 'sawtooth', 0.12);
+        break;
+      case 'step':
+        this.burst(0.05, 0.12, 900);
+        break;
+      case 'heart':
+        this.tone(60, 40, 0.14, 'sine', 0.5);
+        this.tone(55, 38, 0.16, 'sine', 0.4, 0.2);
+        break;
+      case 'uiClick':
+      case 'uiOpen':
+      case 'uiClose':
+      case 'uiBack':
+        this.tone(900, 700, 0.04, 'square', 0.08);
+        break;
+      case 'uiError':
+        this.tone(200, 150, 0.2, 'square', 0.12);
+        break;
+      default:
+        break;
     }
+  }
+
+  // ---- playback ----
+  private playBank(name: Sfx, pan: number, gainMul: number): boolean {
+    const b = BANK[name];
+    if (!b || !this.ctx || !this.master) return false;
+    const avail = b.files.filter((f) => this.buffers.has(f));
+    if (!avail.length) return false;
+    if (this.voices >= MAX_VOICES && !name.startsWith('ui') && name !== 'boom' && name !== 'hurt') return true; // dropped, but handled
+    const file = avail[Math.floor(Math.random() * avail.length)]!;
+    this.voice(file, b.rate[0] + Math.random() * (b.rate[1] - b.rate[0]), b.gain * (0.9 + Math.random() * 0.2) * gainMul, pan);
+    // the big explosion and the boss roar layer a second sample
+    if (name === 'boom' || name === 'boss') {
+      const extra = avail[Math.floor(Math.random() * avail.length)]!;
+      if (extra !== file) this.voice(extra, b.rate[0], b.gain * 0.6 * gainMul, pan);
+    }
+    return true;
+  }
+
+  private voice(file: string, rate: number, gain: number, pan: number): void {
+    const c = this.ctx!;
+    const src = c.createBufferSource();
+    src.buffer = this.buffers.get(file)!;
+    src.playbackRate.value = rate;
+    const g = c.createGain();
+    g.gain.value = gain;
+    this.voices++;
+    src.onended = () => this.voices--;
+    if (pan !== 0 && typeof c.createStereoPanner === 'function') {
+      const p = c.createStereoPanner();
+      p.pan.value = pan;
+      src.connect(g).connect(p).connect(this.master!);
+    } else {
+      src.connect(g).connect(this.master!);
+    }
+    src.start();
+  }
+
+  /** Stereo pan (-1 left .. 1 right on screen) and distance gain for a sound at a sim position. */
+  spatial(at: { x: number; y: number }): { pan: number; gain: number } {
+    const dx = at.x - this.listenerX;
+    const dy = at.y - this.listenerY;
+    const right = dx * SCREEN_RIGHT.x + dy * SCREEN_RIGHT.y;
+    return { pan: Math.max(-0.85, Math.min(0.85, right / 14)), gain: 1 / (1 + (dx * dx + dy * dy) / 120) };
+  }
+
+  /** Play a sound; `at` (sim coordinates) makes it positional relative to the listener. */
+  play(name: Sfx, at?: { x: number; y: number }): void {
+    if (!this.ctx || this.muted) return;
+    let pan = 0;
+    let gainMul = 1;
+    if (at && SPATIAL.has(name)) {
+      const s = this.spatial(at);
+      pan = s.pan;
+      gainMul = s.gain;
+      if (gainMul < 0.05) return;
+    }
+    const now = this.ctx.currentTime;
+    if (now - (this.last.get(name) ?? -1) < GAP[name]) return;
+    this.last.set(name, now);
+    if (this.playBank(name, pan, gainMul)) return;
+    this.synth(name);
+  }
+
+  /** UI feedback (clicks, confirmations, errors). */
+  ui(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void {
+    this.play(('ui' + name[0]!.toUpperCase() + name.slice(1)) as Sfx);
   }
 
   onEvent(e: SimEvent, localSlot: number): void {
     switch (e.type) {
       case 'shot': {
-        if (e.slot !== localSlot && Math.random() < 0.5) return; // thin out the squad's gunfire
+        if (e.slot !== localSlot && Math.random() < 0.4) return; // thin out the squad's gunfire
         const w = WEAPON_IDS[e.weapon];
-        this.play(w === 'sniper' ? 'cannonShot' : w === 'shotgun' ? 'heavyShot' : w === 'hmg' ? 'bigShot' : w === 'ar' || w === 'minigun' ? 'midShot' : 'shot');
+        const kind: Sfx = w === 'sniper' ? 'cannonShot' : w === 'shotgun' ? 'heavyShot' : w === 'hmg' ? 'bigShot' : w === 'ar' || w === 'minigun' ? 'midShot' : 'shot';
+        this.play(kind, e.slot === localSlot ? undefined : e);
         break;
       }
       case 'grenadeThrown':
-        this.play('throw');
+        this.play('throw', e);
         break;
       case 'enemyHit':
-        this.play('hit');
+        this.play('hit', e);
+        if (Math.random() < 0.35) this.play('zHit', e);
         break;
       case 'enemyDeath':
-        this.play('death');
+        this.play('death', e);
+        this.play('zDeath', e);
+        break;
+      case 'spit':
+        this.play('spit', e);
         break;
       case 'explosion':
-        this.play('boom');
+        this.play('boom', e);
         break;
       case 'playerHit':
+        this.play('zAttack', e);
         if (e.slot === localSlot) this.play('hurt');
         break;
       case 'playerDown':
@@ -257,6 +418,12 @@ export class Audio {
         break;
       case 'playerRevive':
         this.play('revive');
+        break;
+      case 'pickupDrop':
+        this.play('pickupDrop', e);
+        break;
+      case 'pickup':
+        this.play('pickup', e.slot === localSlot ? undefined : e);
         break;
       case 'levelUp':
         this.play('level');
@@ -266,12 +433,66 @@ export class Audio {
         break;
       case 'waveStart':
         this.play(e.boss ? 'boss' : 'wave');
+        if (e.boss) {
+          this.play('zScream');
+          this.duckMusic(0.45, 4);
+        }
         break;
       case 'gameOver':
         this.play('over');
+        this.duckMusic(0.25, 8);
         break;
       default:
         break;
     }
   }
+
+  /**
+   * Ambient layer driven by the world each frame: groans from nearby zombies (more of them, more often), footsteps of
+   * players that are moving, and a heartbeat when the local player is hurt badly.
+   */
+  tick(w: World, localSlot: number, dt: number): void {
+    if (!this.ctx) return;
+    if (Math.abs(this.duck - this.duckTarget) > 0.01) {
+      this.duck += (this.duckTarget - this.duck) * Math.min(1, dt * 2);
+      this.applyMusicGain();
+    }
+    // zombie groans: pick a random living enemy near the listener
+    this.groanTimer -= dt;
+    if (this.groanTimer <= 0 && w.enemyCount > 0) {
+      const crowd = Math.min(1, w.enemyCount / 200);
+      this.groanTimer = 1.4 - crowd * 1.0 + Math.random() * 0.8;
+      for (let tries = 0; tries < 12; tries++) {
+        const i = Math.floor(Math.random() * MAX_ENEMIES);
+        if (!w.eActive[i]) continue;
+        const dx = w.eX[i]! - this.listenerX;
+        const dy = w.eY[i]! - this.listenerY;
+        if (dx * dx + dy * dy > 18 * 18) continue;
+        const heavy = ENEMY_TYPES[w.eType[i]!] === 'tank' || w.eBoss[i] !== 0;
+        this.play('zGroan', { x: w.eX[i]!, y: w.eY[i]! });
+        if (heavy) this.play('zGroan', { x: w.eX[i]!, y: w.eY[i]! });
+        break;
+      }
+    }
+    // footsteps
+    this.stepTimer -= dt;
+    if (this.stepTimer <= 0) {
+      this.stepTimer = 0.3;
+      for (let s = 0; s < MAX_PLAYERS; s++) {
+        if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive || !w.pMoving[s]) continue;
+        if (s !== localSlot && Math.random() < 0.5) continue;
+        this.play('step', s === localSlot ? undefined : { x: w.pX[s]!, y: w.pY[s]! });
+      }
+    }
+    // heartbeat when low
+    const hp = w.pActive[localSlot] && w.pState[localSlot] === PlayerState.Alive ? w.pHp[localSlot]! / w.pMaxHp[localSlot]! : 1;
+    if (hp < 0.3) {
+      this.heartTimer -= dt;
+      if (this.heartTimer <= 0) {
+        this.heartTimer = 0.55 + hp * 1.6;
+        this.play('heart');
+      }
+    }
+  }
 }
+

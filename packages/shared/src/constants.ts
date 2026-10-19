@@ -31,3 +31,5 @@ export const OBSTACLES: readonly { x: number; y: number; w: number; h: number }[
   { x: 22, y: -14, w: 2, h: 2 },
   { x: -24, y: 12, w: 2, h: 2 },
 ];
+
+export const MAX_PICKUPS = 64;

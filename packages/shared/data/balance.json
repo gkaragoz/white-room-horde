@@ -239,5 +239,23 @@
   "shielder": {
     "frontDot": -0.35,
     "frontMul": 0.15
+  },
+  "pickups": {
+    "lifeSeconds": 22,
+    "radius": 1.0,
+    "magnetRadius": 2.6,
+    "magnetSpeed": 7,
+    "chance": {
+      "ammo": 0.06,
+      "health": 0.03,
+      "grenade": 0.02
+    },
+    "lowAmmoBonus": 0.1,
+    "healthAmount": 30,
+    "bossDrops": {
+      "ammo": 2,
+      "health": 2,
+      "grenade": 1
+    }
   }
 }

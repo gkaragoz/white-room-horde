@@ -1,6 +1,7 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
+import { dropLoot } from './pickups';
 import { cellIndex } from './flowfield';
 import { out, pushOut, segmentBlocked } from './obstacles';
 import { SH_H, SH_W } from './spatial';
@@ -199,6 +200,7 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   w.enemyCount--;
   w.kills++;
   w.events.push({ type: 'enemyDeath', id: i, etype: type, x: w.eX[i]!, y: w.eY[i]!, dx, dy, power });
+  dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0);
   awardXp(w, w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]);
   if (type === T_EXPLODER) explode(w, i);
 }
@@ -210,7 +212,7 @@ export function damageEnemy(w: World, i: number, damage: number, dx: number, dy:
     killEnemy(w, i, dx, dy, damage);
     return true;
   }
-  w.events.push({ type: 'enemyHit', id: i, etype: w.eType[i]!, x: w.eX[i]!, y: w.eY[i]! });
+  w.events.push({ type: 'enemyHit', id: i, etype: w.eType[i]!, x: w.eX[i]!, y: w.eY[i]!, damage });
   return false;
 }
 

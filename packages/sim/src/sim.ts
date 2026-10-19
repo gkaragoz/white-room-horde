@@ -15,6 +15,7 @@ import { clamp, cos, sin, sqrt, TAU } from './detmath';
 import { bulletVsEnemies, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
 import { out, pushOut, segmentBlocked } from './obstacles';
 import { Crc32 } from './hash';
+import { updatePickups } from './pickups';
 import { updateCards } from './progression';
 import { createWorld, type World } from './state';
 
@@ -192,6 +193,7 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
 
   updateEnemies(w);
   updateProjectiles(w);
+  updatePickups(w);
 
   // bullets
   for (let i = 0; i < MAX_BULLETS; i++) {
@@ -244,6 +246,7 @@ export function hashWorld(w: World): number {
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);
   c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
+  c.typed(w.kActive).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);

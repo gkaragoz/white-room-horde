@@ -55,6 +55,7 @@ export interface ProgressionConfig {
 }
 
 export const BALANCE = data as unknown as {
+  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; chance: { ammo: number; health: number; grenade: number }; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number } };
   grenade: { max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
   spit: { speed: number; life: number; radius: number };
   shielder: { frontDot: number; frontMul: number };
