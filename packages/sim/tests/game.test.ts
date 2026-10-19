@@ -19,7 +19,7 @@ describe('life cycle', () => {
     const need = Math.ceil(BALANCE.player.reviveSeconds * 30) + 2;
     for (let t = 0; t < need; t++) step(w, [NONE, { ...NONE, buttons: Buttons.Revive }]);
     expect(w.pState[0]).toBe(PlayerState.Alive);
-    expect(w.pHp[0]).toBeCloseTo(BALANCE.player.hp * BALANCE.progression.revive.hpFraction);
+    expect(w.pHp[0]!).toBeCloseTo(BALANCE.player.hp * BALANCE.progression.revive.hpFraction, 0);
     expect(w.gameOver).toBe(0);
     // both down, nobody helps: dead and game over
     w.pHp[0] = 0;

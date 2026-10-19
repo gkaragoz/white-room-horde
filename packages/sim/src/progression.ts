@@ -1,4 +1,6 @@
 import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, MAX_PLAYERS, PlayerState, RARITY_WEIGHT, TICK_RATE, WEAPON_IDS, type PlayerInput } from '@wrh/shared';
+import { PERK } from '@wrh/shared';
+import { addPerk, perk, setPerk } from './features';
 import { giveMainWeapon, mainWeapon, refillAll } from './loadout';
 import type { World } from './state';
 
@@ -131,6 +133,39 @@ function applyCard(w: World, card: number, by: number): void {
       break;
     case 'ironskin':
       if (by >= 0) w.pModArmor[by] = Math.max(c.ironMin, w.pModArmor[by]! * c.ironskin);
+      break;
+    case 'regen':
+      if (by >= 0) addPerk(w, by, PERK.Regen, BALANCE.perks.cardRegen);
+      break;
+    case 'thorns':
+      if (by >= 0) addPerk(w, by, PERK.Thorns, BALANCE.perks.thorns);
+      break;
+    case 'shock':
+      if (by >= 0) setPerk(w, by, PERK.Shock, 1);
+      break;
+    case 'volatile':
+      if (by >= 0) addPerk(w, by, PERK.Volatile, BALANCE.perks.volatileChance);
+      break;
+    case 'frost':
+      if (by >= 0) setPerk(w, by, PERK.Frost, 1);
+      break;
+    case 'scavenger':
+      if (by >= 0) addPerk(w, by, PERK.Scav, BALANCE.perks.scavChance);
+      break;
+    case 'adrenaline':
+      if (by >= 0) setPerk(w, by, PERK.AdrenCard, 1);
+      break;
+    case 'barrier':
+      if (by >= 0) {
+        addPerk(w, by, PERK.ShieldMax, BALANCE.perks.barrierAmount);
+        setPerk(w, by, PERK.Shield, perk(w, by, PERK.ShieldMax));
+      }
+      break;
+    case 'secondwind':
+      if (by >= 0) addPerk(w, by, PERK.Second, 1);
+      break;
+    case 'rage':
+      if (by >= 0) addPerk(w, by, PERK.Rage, 1);
       break;
     case 'heal':
       for (let s = 0; s < MAX_PLAYERS; s++) {

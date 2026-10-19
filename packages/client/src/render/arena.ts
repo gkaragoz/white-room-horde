@@ -7,6 +7,8 @@ export const THEMES: { side: string; top: string; rim: string }[] = [
   { side: '#a4a9b2', top: '#d3d7de', rim: '#656b76' }, // courtyard: stone
   { side: '#b27c76', top: '#d9aaa3', rim: '#7a4944' }, // corridors: brick
   { side: '#7ea06a', top: '#aecb97', rim: '#506b40' }, // field: hedge green
+  { side: '#9a8f86', top: '#c9bfb5', rim: '#6a5f56' }, // ruins: crumbled plaster
+  { side: '#c98a2e', top: '#e8b25a', rim: '#8a5a14' }, // factory: safety orange machinery
 ];
 
 /** The cover boxes of the current arena layout. Rebuilt when the layout changes. */

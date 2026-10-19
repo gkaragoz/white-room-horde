@@ -13,6 +13,8 @@ export interface PlayerInfo {
   acc: number;
   /** Vest colour index chosen in the lobby (-1: the slot's own colour). */
   color: number;
+  /** Class index chosen in the lobby (see CLASS_IDS). */
+  cls: number;
 }
 
 export interface RoomOptions {
@@ -26,6 +28,7 @@ export interface JoinOpts {
   password?: string;
   acc?: number;
   color?: number;
+  cls?: number;
   /** Game version of the client; the server refuses a different major.minor (the simulation rules may differ). */
   v?: string;
 }
@@ -40,12 +43,12 @@ export type ClientMsg =
   | { t: 'resync' }
   | { t: 'weapon'; weapon: WeaponId }
   | { t: 'options'; map: number; difficulty: number }
-  | { t: 'look'; acc: number; color?: number }
+  | { t: 'look'; acc: number; color?: number; cls?: number }
   | { t: 'leave' };
 
 export type ServerMsg =
   | { t: 'room'; code: string; slot: number; players: PlayerInfo[]; started: boolean; options: RoomOptions; token: string; locked: boolean }
-  | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId }[]; map: number; difficulty: number }
+  | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId; cls: number }[]; map: number; difficulty: number }
   | { t: 'desync'; tick: number; slots: number[] }
   | { t: 'pong'; ts: number }
   | { t: 'snapshotRequest' }
@@ -58,7 +61,7 @@ export interface Join {
 
 export interface Bundle {
   tick: number;
-  joins: { slot: number; weaponIndex: number }[];
+  joins: { slot: number; weaponIndex: number; cls: number }[];
   inputs: (PlayerInput | undefined)[];
 }
 
@@ -92,7 +95,7 @@ export function encodeBundle(b: Bundle): Uint8Array {
   let o = 6;
   for (const j of b.joins) {
     out[o++] = j.slot;
-    out[o++] = j.weaponIndex;
+    out[o++] = j.weaponIndex | (j.cls << 5); // weapons use the low five bits, the class the top three
   }
   out.set(body, o);
   return out;
@@ -105,7 +108,7 @@ export function decodeBundle(buf: Uint8Array, slots: number): Bundle {
   const joins: Bundle['joins'] = [];
   let o = 6;
   for (let i = 0; i < n; i++) {
-    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]! });
+    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]! & 31, cls: buf[o + 1]! >> 5 });
     o += 2;
   }
   return { tick, joins, inputs: decodeTick(buf.subarray(o), slots).inputs };

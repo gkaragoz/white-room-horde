@@ -169,12 +169,14 @@ describe('real server, real sockets, real simulation', () => {
 
   it('keeps the colour a player picked and ignores nonsense colours', async () => {
     const a = await newBot('a');
-    a.session.create('a', 'pistol', { color: 4 });
+    a.session.create('a', 'pistol', { color: 4, cls: 3 });
     await until(() => a.session.code !== '', 3000, 'room');
     const b = await newBot('b');
-    b.session.join(a.session.code, 'b', 'pistol', { color: 99 });
+    b.session.join(a.session.code, 'b', 'pistol', { color: 99, cls: 99 });
     await until(() => a.session.players.length === 2, 3000, 'second player');
     expect(a.session.players.find((p) => p.slot === a.session.slot)!.color).toBe(4);
+    expect(a.session.players.find((p) => p.slot === a.session.slot)!.cls).toBe(3);
+    expect(a.session.players.find((p) => p.slot === b.session.slot)!.cls).toBe(0);
     expect(a.session.players.find((p) => p.slot === b.session.slot)!.color).toBe(-1);
     b.session.setLook(2, 7);
     await until(() => a.session.players.find((p) => p.slot === b.session.slot)!.color === 7, 3000, 'look update');

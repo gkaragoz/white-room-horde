@@ -1,6 +1,7 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, WEAPON_IDS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
+import { ELITE, absorb, addPerk, barrelsBlast, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
 import { dropLoot } from './pickups';
 import { cellIndex } from './flowfield';
 import { out, pushOut, segmentBlocked } from './obstacles';
@@ -46,7 +47,7 @@ const sources = new Int32Array(MAX_PLAYERS);
 let killer = -1;
 
 function rad(w: World, i: number): number {
-  const r = RADIUS[w.eType[i]!]!;
+  const r = RADIUS[w.eType[i]!]! * (w.eMod[i] ? enemyRadiusMul(w, i) : 1);
   return w.eBoss[i] ? r * BALANCE.progression.boss.radiusMul : r;
 }
 
@@ -79,6 +80,7 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     const hp = HP[type]! * w.hpMul * BALANCE.difficulty.hp[w.difficulty]! * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
     w.eActive[i] = 1;
     w.eBoss[i] = 0;
+    w.eMod[i] = 0;
     w.eType[i] = type;
     w.eState[i] = withScream ? EnemyState.Spawn : EnemyState.Move;
     w.eStateTick[i] = w.tick;
@@ -231,11 +233,12 @@ function runWaves(w: World, playerCount: number): void {
   if (w.tick - w.waveTick >= cfg.periodSeconds * TICK_RATE) {
     setWave(w, w.wave + 1);
     const boss = w.wave % BALANCE.progression.boss.everyWaves === 0;
-    w.events.push({ type: 'waveStart', wave: w.wave, boss });
+    w.events.push({ type: 'waveStart', wave: w.wave, boss, mod: waveModOf(w.wave) });
     if (boss) spawnBoss(w);
   }
   if (playerCount === 0) return;
-  let target = Math.floor((cfg.baseCount + cfg.perPlayer * playerCount) * w.countMul * BALANCE.difficulty.count[w.difficulty]!);
+  const mod = waveModOf(w.wave);
+  let target = Math.floor((cfg.baseCount + cfg.perPlayer * playerCount) * w.countMul * BALANCE.difficulty.count[w.difficulty]! * (mod === 1 ? 1.5 : 1));
   if (target > cfg.cap) target = cfg.cap;
   for (let n = 0; n < cfg.spawnPerTick && w.enemyCount < target; n++) {
     let ok = false;
@@ -243,13 +246,25 @@ function runWaves(w: World, playerCount: number): void {
       edgePoint(w);
       ok = farFromPlayers(w, spawnX, spawnY);
     }
-    spawnEnemy(w, pickType(w), spawnX, spawnY);
+    const e = spawnEnemy(w, pickType(w), spawnX, spawnY);
+    if (e >= 0) {
+      if (mod === 1) w.eHp[e] = w.eHp[e]! * 0.7;
+      else if (mod === 2) w.eHp[e] = w.eHp[e]! * 1.6;
+      rollElite(w, e);
+    }
   }
 }
 
-export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number): boolean {
-  const damage = rawDamage * BALANCE.difficulty.damage[w.difficulty]! * w.modArmor * w.pModArmor[slot]!;
+export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number, attacker = -1): boolean {
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
+  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * w.modArmor * w.pModArmor[slot]!);
+  const thorns = perk(w, slot, PERK.Thorns);
+  if (thorns > 0 && attacker >= 0 && w.eActive[attacker]) {
+    const prev = killer;
+    killer = slot;
+    damageEnemy(w, attacker, thorns, 0, 0);
+    killer = prev;
+  }
   const hp = w.pHp[slot]! - damage;
   w.pHp[slot] = hp > 0 ? hp : 0;
   w.pIFrames[slot] = BALANCE.player.iFrames;
@@ -286,17 +301,66 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0);
   awardXp(w, w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]);
   if (type === T_EXPLODER) explode(w, i);
+  const mod = w.eMod[i]!;
+  const ex = w.eX[i]!;
+  const ey = w.eY[i]!;
+  if (killer >= 0) {
+    const p = killer;
+    addPerk(w, p, PERK.Kills, 1);
+    if (perk(w, p, PERK.AdrenCard) > 0) w.pPerk[p * PERKS + PERK.Adren] = BALANCE.perks.adrenSeconds;
+    const scav = perk(w, p, PERK.Scav);
+    if (scav > 0 && w.rng.float() < scav && w.pMag[p]! < BALANCE.weapons[WEAPON_IDS[w.pWeapon[p]!]!].mag) w.pMag[p] = w.pMag[p]! + 2;
+    const vol = perk(w, p, PERK.Volatile);
+    if (vol > 0 && w.rng.float() < vol) {
+      w.events.push({ type: 'explosion', x: ex, y: ey, radius: BALANCE.perks.volatileRadius });
+      blastFrom(w, p, ex, ey, BALANCE.perks.volatileRadius, BALANCE.perks.volatileDamage);
+    }
+  }
+  if (mod === ELITE.Splitter) {
+    for (let k = 0; k < BALANCE.elites.splitCount; k++) {
+      const a = (k / BALANCE.elites.splitCount) * 6.283185307179586 + 0.6;
+      const s = spawnEnemy(w, T_GRUNT, clamp(ex + cos(a) * 0.8, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(ey + sin(a) * 0.8, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), false);
+      if (s >= 0) w.eHp[s] = w.eHp[s]! * 0.45;
+    }
+  } else if (mod === ELITE.Volatile) {
+    const r = BALANCE.elites.volatileRadius;
+    w.events.push({ type: 'explosion', x: ex, y: ey, radius: r });
+    blastFrom(w, killer, ex, ey, r, BALANCE.elites.volatileDamage);
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
+      const dx = w.pX[s]! - ex;
+      const dy = w.pY[s]! - ey;
+      if (dx * dx + dy * dy <= r * r) hurtPlayer(w, s, 18, w.pX[s]!, w.pY[s]!);
+    }
+  }
 }
 
 /** Apply bullet damage; returns true when the enemy died. */
-export function damageEnemy(w: World, i: number, damage: number, dx: number, dy: number): boolean {
+export function damageEnemy(w: World, i: number, rawDamage: number, dx: number, dy: number): boolean {
+  const damage = w.eMod[i] ? rawDamage * enemyDamageMul(w, i) : rawDamage;
   w.eHp[i] = w.eHp[i]! - damage;
   if (w.eHp[i]! <= 0) {
     killEnemy(w, i, dx, dy, damage);
     return true;
   }
   w.events.push({ type: 'enemyHit', id: i, etype: w.eType[i]!, x: w.eX[i]!, y: w.eY[i]!, damage });
+  // a hit shoves the enemy along the shot (bosses barely move)
+  const kb = Math.min(BALANCE.knock.max, damage * BALANCE.knock.perDamage) * (w.eBoss[i] ? 0.15 : 1);
+  if (kb > 0.01) shove(w, i, dx * kb, dy * kb);
   return false;
+}
+
+/** Push an enemy by (dx, dy), staying inside the arena and out of cover. */
+export function shove(w: World, i: number, dx: number, dy: number): void {
+  const r = rad(w, i);
+  let x = clamp(w.eX[i]! + dx, -ARENA_HALF_W + r, ARENA_HALF_W - r);
+  let y = clamp(w.eY[i]! + dy, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+  if (pushOut(x, y, r * 0.8)) {
+    x = out.x;
+    y = out.y;
+  }
+  w.eX[i] = x;
+  w.eY[i] = y;
 }
 
 /** Rebuild the enemy grid from the current positions (also used before a shot, when the tick's grid is not built yet). */
@@ -323,6 +387,10 @@ export function updateEnemies(w: World): void {
   rebuildGrid(w);
   refreshField(w);
   if (playerCount === 0) return;
+  if (w.misc[0]! > 0) {
+    w.misc[0] = w.misc[0]! - TICK_DT; // frozen: everybody stands still
+    return;
+  }
   const g = w.grid;
   const field = w.field;
   const pr = BALANCE.player.radius;
@@ -333,6 +401,7 @@ export function updateEnemies(w: World): void {
     let x = w.eX[i]!;
     let y = w.eY[i]!;
     w.eCooldown[i] = w.eCooldown[i]! - TICK_DT;
+    if (w.eMod[i] === ELITE.Regen) w.eHp[i] = w.eHp[i]! + BALANCE.elites.regenPerSec * w.hpMul * TICK_DT;
     const age = w.tick - w.eStateTick[i]!;
     let state = w.eState[i]!;
     if (state === EnemyState.Spawn && age >= SPAWN_TICKS) state = EnemyState.Move;
@@ -389,7 +458,7 @@ export function updateEnemies(w: World): void {
         }
       } else if (dist <= reach + 0.15) {
         wantMove = false;
-        if (w.eCooldown[i]! <= 0 && hurtPlayer(w, best, boss ? BALANCE.progression.boss.damage : DAMAGE[type]!, w.pX[best]!, w.pY[best]!)) {
+        if (w.eCooldown[i]! <= 0 && hurtPlayer(w, best, boss ? BALANCE.progression.boss.damage : DAMAGE[type]!, w.pX[best]!, w.pY[best]!, i)) {
           w.eCooldown[i] = INTERVAL[type]!;
           w.eState[i] = EnemyState.Attack;
           w.eStateTick[i] = w.tick;
@@ -411,6 +480,8 @@ export function updateEnemies(w: World): void {
           w.eAux[i] = w.eAux[i]! - 1;
         }
         if (auraN > 0 && !boss && inAura(x, y)) sp *= BALANCE.progression.boss.auraSpeedMul;
+        if (w.eMod[i] || w.wave >= 3) sp *= enemySpeedMul(w, i);
+        if (perk(w, best, PERK.Frost) > 0 && dist < BALANCE.perks.frostRadius) sp *= BALANCE.perks.frostSlow;
         mx = dx * sp * TICK_DT;
         my = dy * sp * TICK_DT;
         w.eAngle[i] = atan2(dy, dx);
@@ -528,13 +599,16 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
 
 /** An explosion caused by a player's round: kills are credited to that player. */
 export function blastFrom(w: World, owner: number, x: number, y: number, radius: number, damage: number): void {
+  const prev = killer;
   killer = owner;
   blastEnemies(w, x, y, radius, damage);
-  killer = -1;
+  killer = prev;
 }
 
 /** Damage every enemy inside a circle (explosions). Dies and chains through killEnemy. */
 export function blastEnemies(w: World, x: number, y: number, radius: number, damage: number): void {
+  barrelsBlast(w, x, y, radius, damage, killer);
+  if (!w.grid.built) rebuildGrid(w);
   const g = w.grid;
   const cx0 = g.cellX(x - radius);
   const cx1 = g.cellX(x + radius);
@@ -552,7 +626,13 @@ export function blastEnemies(w: World, x: number, y: number, radius: number, dam
         const d = sqrt(d2);
         // closer to the centre hurts more
         const k = 1 - (d / R) * 0.5;
-        damageEnemy(w, j, damage * k, d > 1e-6 ? dx / d : 0, d > 1e-6 ? dy / d : 0);
+        const ux = d > 1e-6 ? dx / d : 0;
+        const uy = d > 1e-6 ? dy / d : 0;
+        if (!damageEnemy(w, j, damage * k, ux, uy)) {
+          // survivors are flung away from the blast
+          const push = BALANCE.barrels.push * (1 - (d / R) * 0.7) * (w.eBoss[j] ? 0.2 : 1);
+          shove(w, j, ux * push, uy * push);
+        }
       }
     }
   }
@@ -622,9 +702,10 @@ export function updateProjectiles(w: World): void {
     }
     if (w.gFuse[i]! <= 0) {
       w.gActive[i] = 0;
-      w.events.push({ type: 'explosion', x: w.gX[i]!, y: w.gY[i]!, radius: cfg.radius * w.modBlast });
+      const bm = w.modBlast * perk(w, w.gOwner[i]!, PERK.Blast);
+      w.events.push({ type: 'explosion', x: w.gX[i]!, y: w.gY[i]!, radius: cfg.radius * bm });
       killer = w.gOwner[i]!;
-      blastEnemies(w, w.gX[i]!, w.gY[i]!, cfg.radius * w.modBlast, cfg.damage * w.modBlast);
+      blastEnemies(w, w.gX[i]!, w.gY[i]!, cfg.radius * bm, cfg.damage * bm);
       killer = -1;
     }
   }
@@ -651,3 +732,15 @@ export function updateProjectiles(w: World): void {
     if (dead) w.sActive[i] = 0;
   }
 }
+
+// the features module reaches the enemy system through these
+hooks.blast = blastFrom;
+hooks.damage = (w, i, damage, dx, dy, owner) => {
+  const prev = killer;
+  killer = owner;
+  if (w.eActive[i]) damageEnemy(w, i, damage, dx, dy);
+  killer = prev;
+};
+hooks.hurt = (w, s, damage, x, y) => {
+  hurtPlayer(w, s, damage, x, y);
+};

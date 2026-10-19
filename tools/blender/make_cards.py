@@ -406,6 +406,236 @@ ICONS = [
     "quickhands", "roll", "armor", "crit", "sharp", "sprint", "bulk", "vampire", "tempo", "marksman", "ironskin",
 ]
 
+
+# ------------------------------------------------------------------------------------------------ second batch of icons
+ICE, ICE2, TEAL, LIME = "#9fe0ff", "#d8f4ff", "#2fd2c0", "#8ef07a"
+
+
+def glass(hex_color, alpha=0.45, emit=0.0):
+    key = ("glass", hex_color, alpha, emit)
+    if key not in _mats:
+        m = mat(hex_color, 0.15, 0.0, emit)
+        m = m.copy()
+        b = m.node_tree.nodes["Principled BSDF"]
+        b.inputs["Alpha"].default_value = alpha
+        try:
+            m.surface_render_method = "BLENDED"
+        except Exception:
+            pass
+        _mats[key] = m
+    return _mats[key]
+
+
+def heart_pts(s=1.0, n=26):
+    pts = []
+    for i in range(n):
+        t = 2 * math.pi * i / n
+        x = 16 * math.sin(t) ** 3
+        y = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
+        pts.append((x / 17 * s, (y + 2.5) / 17 * s))
+    return pts
+
+
+def spike(m, loc, ang_deg, r=0.14, ln=0.45):
+    """A cone in the XZ plane pointing along ang_deg (0 = +X, 90 = up) with its base at loc."""
+    a = math.radians(ang_deg)
+    c = (loc[0] + math.cos(a) * ln / 2, loc[1], loc[2] + math.sin(a) * ln / 2)
+    return cyl(r, ln, m, c, (0, 90 - ang_deg, 0), 8, r2=0.0)
+
+
+def drop(m, loc, s=1.0):
+    sphere(0.14 * s, m, (loc[0], loc[1], loc[2] - 0.05 * s), seg=10, rings=6)
+    cyl(0.135 * s, 0.34 * s, m, (loc[0], loc[1], loc[2] + 0.13 * s), (0, 0, 0), 10, r2=0.0)
+
+
+def icon_regen():
+    prism(heart_pts(1.25), 0.42, mat("#3fcf63", 0.4), (0, 0.1, 0.05), (90, 0, 0), 0.05)
+    prism(heart_pts(0.95), 0.1, mat("#7bef8d", 0.35, emit=0.15), (0, -0.28, 0.05), (90, 0, 0), 0.02)
+    box(0.26, 0.14, 0.78, mat(WHITE), (0, -0.4, 0.05), bevel=0.03)
+    box(0.78, 0.14, 0.26, mat(WHITE), (0, -0.4, 0.05), bevel=0.03)
+    dm = mat("#6fd8ff", 0.2, emit=0.35)
+    drop(dm, (-1.35, -0.1, 0.95), 1.0)
+    drop(dm, (1.3, -0.1, 1.05), 0.85)
+    drop(dm, (1.45, -0.1, -0.45), 0.7)
+    prism(star_points(4, 0.22, 0.07), 0.06, mat(YELLOW, emit=0.5), (-1.45, -0.2, -0.5), (90, 0, 0), 0.0)
+
+
+def icon_thorns():
+    steel, dk = mat(STEEL, 0.3, 0.8), mat("#5d6676", 0.35, 0.8)
+    cyl(1.0, 0.3, dk, (0, 0, 0), (90, 0, 0), 20, bevel=0.02)
+    torus(0.92, 0.1, steel, (0, -0.1, 0), (90, 0, 0), maj=24, mnr=6)
+    cyl(0.62, 0.12, mat(RED, 0.4), (0, -0.19, 0), (90, 0, 0), 20)
+    cyl(0.3, 0.2, steel, (0, -0.28, 0), (90, 0, 0), 14, r2=0.22)
+    sp = mat("#ffe39a", 0.3, 0.3, emit=0.2)
+    cyl(0.17, 0.62, sp, (0, -0.66, 0), (90, 0, 0), 8, r2=0.0)
+    for k in range(10):
+        a = k * 36
+        spike(sp, (math.cos(math.radians(a)) * 0.95, 0, math.sin(math.radians(a)) * 0.95), a, 0.16, 0.5)
+    for k in range(5):
+        a = math.radians(18 + k * 72)
+        cyl(0.11, 0.38, sp, (math.cos(a) * 0.55, -0.4, math.sin(a) * 0.55), (90, 0, 0), 8, r2=0.0)
+
+
+def icon_shock():
+    torus(1.15, 0.13, mat("#3ca0ff", 0.3, emit=0.8), (0, 0.15, 0), (90, 0, 0), maj=28, mnr=8)
+    torus(0.9, 0.05, mat("#bfe6ff", 0.3, emit=0.6), (0, 0.1, 0), (90, 0, 0), maj=28, mnr=6)
+    bolt = [(0.2, 1.15), (-0.7, -0.05), (-0.12, -0.05), (-0.35, -1.15), (0.7, 0.2), (0.1, 0.2), (0.5, 1.15)]
+    prism(bolt, 0.4, mat(YELLOW, 0.4, emit=0.45), (0, -0.05, 0.02), (90, 0, 0), 0.04)
+    prism([(x * 0.55 + 0.04, y * 0.62) for x, y in bolt], 0.14, mat("#fff7c2", 0.4, emit=0.8), (0, -0.28, 0.0), (90, 0, 0), 0.02)
+    for (x, z, s) in ((-1.45, 0.9, 0.3), (1.45, -0.85, 0.3), (1.35, 1.0, 0.2), (-1.4, -0.9, 0.22)):
+        prism(star_points(4, s, s * 0.3), 0.06, mat("#9fd4ff", emit=0.8), (x, -0.1, z), (90, 0, 0), 0.0)
+
+
+def icon_volatile():
+    sphere(0.95, mat("#2f2b3d", 0.35, 0.3), (0, 0, -0.25), seg=16, rings=12)
+    torus(0.93, 0.05, mat(RED, 0.4, emit=0.8), (0, 0, -0.25), (90, 0, 0), maj=24, mnr=6)
+    cyl(0.26, 0.3, mat(STEEL, 0.4, 0.8), (0, 0, 0.78), (0, 0, 0), 12)
+    cyl(0.04, 0.5, mat("#8a6a3a", 0.6), (0.12, 0, 1.1), (0, 0, -25), 6)
+    sphere(0.14, mat(YELLOW, emit=1.2), (0.25, 0, 1.38), seg=8, rings=6)
+    prism(star_points(4, 0.34, 0.1), 0.06, mat(ORANGE, emit=1.0), (0.25, -0.02, 1.38), (90, 0, 0), 0.0)
+    bone = mat("#f4f0e6", 0.5)
+    sphere(0.42, bone, (0, -0.74, -0.12), (1.0, 0.45, 0.88), seg=12, rings=8)
+    box(0.34, 0.2, 0.2, bone, (0, -0.84, -0.46), bevel=0.02)
+    for sx in (-1, 1):
+        sphere(0.11, mat("#16131c", 0.4), (sx * 0.16, -0.9, -0.08), (1, 0.4, 1.1), seg=8, rings=6)
+    box(0.07, 0.04, 0.1, mat("#16131c"), (0, -0.95, -0.27), bevel=0.0)
+
+
+def icon_frost():
+    ic, ic2 = mat(ICE, 0.15, 0.1, emit=0.25), mat(ICE2, 0.15, 0.0, emit=0.3)
+    for k in range(6):
+        a = 90 + k * 60
+        ar = math.radians(a)
+        box(1.5, 0.2, 0.2, ic, (math.cos(ar) * 0.75, 0, math.sin(ar) * 0.75), (0, -a, 0), 0.03)
+        for f, sgn in ((0.95, 1), (0.95, -1), (0.55, 1), (0.55, -1)):
+            ba = a + sgn * 55
+            br = math.radians(ba)
+            bx, bz = math.cos(ar) * f, math.sin(ar) * f
+            ln = 0.5 if f > 0.8 else 0.36
+            box(ln, 0.17, 0.17, ic2, (bx + math.cos(br) * ln / 2, 0, bz + math.sin(br) * ln / 2), (0, -ba, 0), 0.02)
+        prism([(0, 0.0), (0.12, 0.2), (0, 0.4), (-0.12, 0.2)], 0.18, ic2, (math.cos(ar) * 1.55, 0, math.sin(ar) * 1.55), (90, 90 - a, 0), 0.0)
+    cyl(0.34, 0.3, mat("#ffffff", 0.2, emit=0.4), (0, -0.05, 0), (90, 0, 0), 6, bevel=0.02)
+    cyl(0.18, 0.34, mat("#5fb8f5", 0.2, emit=0.4), (0, -0.07, 0), (90, 0, 0), 6)
+
+
+def icon_scavenger():
+    box(1.35, 0.9, 0.7, mat(OLIVE, 0.6), (0, 0.15, -0.2), bevel=0.06)
+    box(1.4, 0.95, 0.1, mat("#59622f"), (0, 0.15, 0.18), bevel=0.03)
+    for i in range(4):
+        bullet(mat(BRASS, 0.3, 0.9), mat(RED), (-0.42 + i * 0.28, 0.15, 0.2), (0, 0, 0), 0.34)
+    box(0.7, 0.04, 0.16, mat(YELLOW), (0, -0.33, -0.2), bevel=0.0)
+    gm = mat("#46d46b", 0.35, emit=0.15)
+    for start in (30, 210):
+        torus(1.35, 0.12, gm, (0, -0.45, 0.0), (90, -start, 0), maj=30, mnr=8, arc=125)
+        e = math.radians(start + 125)
+        tx, tz = -math.sin(e), math.cos(e)
+        px, pz = math.cos(e) * 1.35, math.sin(e) * 1.35
+        cyl(0.3, 0.5, gm, (px + tx * 0.18, -0.45, pz + tz * 0.18), (0, math.degrees(math.atan2(tx, tz)), 0), 3, r2=0.0)
+
+
+def icon_adrenaline():
+    before = set(coll.objects)
+    cyl(0.46, 1.8, mat("#e4f1ff", 0.15), (0, 0, 0.1), (0, 0, 0), 14)
+    cyl(0.48, 1.15, mat("#ff5a00", 0.25, emit=0.6), (0, 0, -0.22), (0, 0, 0), 14)
+    cyl(0.56, 0.14, mat(STEEL, 0.4, 0.8), (0, 0, 1.05), (0, 0, 0), 14)
+    box(1.3, 0.2, 0.16, mat(STEEL, 0.4, 0.8), (0, 0, 1.12))
+    cyl(0.13, 0.9, mat(STEEL, 0.4, 0.8), (0, 0, 1.55), (0, 0, 0), 10)
+    cyl(0.42, 0.14, mat(DARK, 0.4, 0.5), (0, 0, 2.05), (0, 0, 0), 14)
+    cyl(0.52, 0.2, mat(STEEL, 0.4, 0.8), (0, 0, -0.9), (0, 0, 0), 14, r2=0.12)
+    cyl(0.06, 0.8, mat(STEEL, 0.2, 1.0), (0, 0, -1.4), (0, 0, 0), 8, r2=0.0).rotation_euler.x = math.radians(180)
+    for z in (0.3, 0.6, 0.9):
+        box(0.26, 0.05, 0.06, mat(DARK), (0.3, -0.47, z - 0.5), bevel=0.0)
+    new = [o for o in coll.objects if o not in before]
+    rotate_group(new, -32)
+    for o in new:
+        o.location.x -= 0.2
+    om = mat("#ff9a2a", 0.2, emit=1.6)
+    for (x, z, s) in ((1.3, -1.0, 0.16), (1.7, -0.4, 0.11), (0.9, -1.55, 0.1)):
+        drop(om, (x, -0.1, z), s * 4.5)
+    for k, a in enumerate((20, 50, 80)):
+        ar = math.radians(a)
+        box(0.5, 0.06, 0.07, mat("#ffd23a", emit=1.0), (1.55 + math.cos(ar) * 0.35, -0.2, -0.95 + math.sin(ar) * 0.35), (0, -a, 0), 0.0)
+
+
+def rotate_group(objs, ang_deg):
+    rot = Euler((0, math.radians(ang_deg), 0)).to_matrix()
+    for o in objs:
+        o.location = rot @ o.location
+        m = rot @ o.rotation_euler.to_matrix()
+        o.rotation_euler = m.to_euler()
+
+
+def icon_barrier():
+    R = 1.45
+    tile = glass("#5fd9ff", 0.42, emit=0.35)
+    rim = glass("#bff4ff", 0.7, emit=0.6)
+
+    def tile_at(pol, azi, rad):
+        p, a = math.radians(pol), math.radians(azi)
+        n = Vector((math.sin(p) * math.cos(a), math.sin(p) * math.sin(a), math.cos(p)))
+        loc = n * R
+        rx = math.asin(max(-1.0, min(1.0, -n.y)))
+        ry = math.atan2(n.x, n.z)
+        c = cyl(rad, 0.1, tile, loc, (math.degrees(rx), math.degrees(ry), 0), 6)
+        return c
+    tile_at(0, 0, 0.36)
+    for k in range(6):
+        tile_at(30, k * 60, 0.34)
+    for k in range(12):
+        tile_at(58, k * 30 + 15, 0.3)
+    for k in range(14):
+        tile_at(84, k * (360 / 14), 0.28)
+    torus(R * 1.02, 0.1, rim, (0, 0, 0), (0, 0, 0), maj=32, mnr=8)
+    cyl(1.3, 0.12, mat("#2a3a55", 0.4, 0.4), (0, 0, -0.08), (0, 0, 0), 24)
+    # a little emblem inside the dome
+    pts = [(0, 0.6), (0.4, 0.4), (0.4, -0.05), (0.2, -0.4), (0, -0.55), (-0.2, -0.4), (-0.4, -0.05), (-0.4, 0.4)]
+    prism(pts, 0.14, mat(YELLOW, 0.35, emit=0.5), (0, -0.2, 0.55), (90, 0, 0), 0.02)
+
+
+def icon_secondwind():
+    wm = mat(WHITE, 0.45)
+    wing = [(0, 0.0), (0.55, 0.5), (1.3, 0.8), (1.1, 0.58), (1.6, 0.42), (1.2, 0.3), (1.5, 0.05), (1.05, 0.02), (1.2, -0.3), (0.6, -0.12)]
+    for sx in (-1, 1):
+        prism([(sx * x, y) for x, y in wing], 0.16, wm, (sx * 0.62, 0.3, 0.0), (90, 0, 0), 0.02)
+        prism([(sx * x * 0.78, y * 0.78 - 0.05) for x, y in wing], 0.1, mat("#cfe8ff", 0.45), (sx * 0.62, 0.2, 0.03), (90, 0, 0), 0.0)
+    prism(heart_pts(1.05), 0.44, mat("#ff4f6d", 0.4), (0, -0.05, -0.05), (90, 0, 0), 0.05)
+    prism(heart_pts(0.78), 0.1, mat("#ff8aa0", 0.35, emit=0.15), (0, -0.32, -0.02), (90, 0, 0), 0.02)
+    prism(star_points(4, 0.2, 0.06), 0.06, mat(YELLOW, emit=0.6), (-0.4, -0.4, 0.28), (90, 0, 0), 0.0)
+    prism(star_points(4, 0.26, 0.08), 0.06, mat(YELLOW, emit=0.6), (1.6, -0.2, 1.05), (90, 0, 0), 0.0)
+    prism(star_points(4, 0.18, 0.06), 0.06, mat(YELLOW, emit=0.6), (-1.7, -0.2, 0.95), (90, 0, 0), 0.0)
+
+
+def icon_rage():
+    fm, fd = mat("#ee4a3e", 0.4), mat("#bf2f28", 0.45)
+    for k in range(9):
+        a = 15 + k * 40
+        ar = math.radians(a)
+        ln = 1.0 if k % 2 == 0 else 0.7
+        fl = [(-0.2, 0), (-0.26, ln * 0.35), (-0.08, ln * 0.75), (0.0, ln), (0.1, ln * 0.7), (0.27, ln * 0.38), (0.2, 0)]
+        prism(fl, 0.14, mat(ORANGE if k % 2 else "#ff5a22", emit=0.5), (math.cos(ar) * 1.0, 0.6, math.sin(ar) * 1.0 + 0.05), (90, 90 - a, 0), 0.0)
+        fl2 = [(x * 0.55, y * 0.6) for x, y in fl]
+        prism(fl2, 0.1, mat(YELLOW, emit=0.7), (math.cos(ar) * 1.0, 0.5, math.sin(ar) * 1.0 + 0.05), (90, 90 - a, 0), 0.0)
+    box(1.7, 0.9, 1.25, fd, (0, 0.55, 0.12), bevel=0.1)
+    for i in range(4):
+        x = -0.64 + i * 0.425
+        box(0.42, 0.55, 0.5, fm, (x, 0.05, 0.38), bevel=0.07)
+        box(0.42, 0.5, 0.44, fd if i % 2 else fm, (x, -0.18, -0.04), bevel=0.07)
+    box(1.25, 0.34, 0.36, fm, (0.0, -0.5, -0.42), (0, 0, 7), 0.08)
+    box(1.3, 0.8, 0.5, mat("#2d2a33", 0.4, 0.3), (0, 0.55, -0.82), bevel=0.06)
+    for x in (-0.45, 0.0, 0.45):
+        sphere(0.07, mat(BRASS, 0.3, 0.8), (x, 0.1, -0.82), seg=8, rings=6)
+    for k, (dx, dz, s) in enumerate(((0.0, 0.0, 1.0), (0.0, 0.0, 1.0))):
+        pass
+    # anger mark
+    for ang in (45, 135):
+        box(0.55, 0.06, 0.12, mat("#ffd23a", emit=0.8), (1.15, -0.5, 1.15), (0, -ang, 0), 0.0)
+    for ang in (0, 90):
+        box(0.42, 0.06, 0.1, mat("#ffd23a", emit=0.8), (1.15, -0.5, 1.15), (0, -ang, 0), 0.0)
+
+
+ICONS += ["regen", "thorns", "shock", "volatile", "frost", "scavenger", "adrenaline", "barrier", "secondwind", "rage"]
+
+
 # ------------------------------------------------------------------------------------------------ rendering
 
 def setup_scene():

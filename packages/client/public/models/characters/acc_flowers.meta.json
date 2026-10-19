@@ -1,0 +1,23 @@
+{
+ "id": "acc_flowers",
+ "tris": 368,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_fixed"
+ ],
+ "height": 0.21,
+ "attach": "head"
+}

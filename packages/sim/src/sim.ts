@@ -1,4 +1,5 @@
 import {
+  PERK,
   ARENA_HALF_H,
   ARENA_HALF_W,
   BALANCE,
@@ -11,13 +12,14 @@ import {
   type PlayerInput,
   type WeaponId,
 } from '@wrh/shared';
-import { clamp, cos, sin, sqrt, TAU } from './detmath';
+import { atan2, clamp, cos, sin, sqrt, TAU } from './detmath';
 import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
 import { out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { Crc32 } from './hash';
 import { updatePickups } from './pickups';
 import { updateCards } from './progression';
 import { equipLoadout, selectSlot } from './loadout';
+import { applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
@@ -29,13 +31,13 @@ const AIM_TO_RAD = TAU / 65536;
 export interface GameSetup {
   seed: number;
   /** Players present at the start: slot and starting weapon. */
-  players: { slot: number; weapon: WeaponId }[];
+  players: { slot: number; weapon: WeaponId; cls?: number }[];
   /** Arena layout index (MAPS) and difficulty 0 easy / 1 normal / 2 hard. */
   map?: number;
   difficulty?: number;
 }
 
-export function addPlayer(w: World, slot: number, x: number, y: number, weapon: WeaponId = 'pistol'): void {
+export function addPlayer(w: World, slot: number, x: number, y: number, weapon: WeaponId = 'pistol', cls = 0): void {
   w.pActive[slot] = 1;
   w.pX[slot] = x;
   w.pY[slot] = y;
@@ -59,6 +61,8 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pModPierce[slot] = 0;
   w.pModArmor[slot] = 1;
   w.pLifesteal[slot] = 0;
+  resetPerks(w, slot);
+  applyClass(w, slot, cls);
 }
 
 /** Deterministic game start used by every client and by replays: players spread on a ring around the centre. */
@@ -68,19 +72,21 @@ export function createGame(setup: GameSetup): World {
   for (let i = 0; i < n; i++) {
     const p = setup.players[i]!;
     const a = (i / (n > 0 ? n : 1)) * TAU;
-    addPlayer(w, p.slot, n > 1 ? cos(a) * 2 : 0, n > 1 ? sin(a) * 2 : 0, p.weapon);
+    addPlayer(w, p.slot, n > 1 ? cos(a) * 2 : 0, n > 1 ? sin(a) * 2 : 0, p.weapon, p.cls ?? 0);
   }
+  useMap(w.map);
+  placeBarrels(w);
   return w;
 }
 
 /** A player joining a running game (late join): appears at the centre of the arena. */
-export function joinPlayer(w: World, slot: number, weapon: WeaponId): void {
-  addPlayer(w, slot, 0, 0, weapon);
+export function joinPlayer(w: World, slot: number, weapon: WeaponId, cls = 0): void {
+  addPlayer(w, slot, 0, 0, weapon, cls);
   w.pIFrames[slot] = BALANCE.progression.revive.iFrames;
 }
 
 /** A round ends: it disappears, and an explosive one bursts where it stopped. */
-function endBullet(w: World, i: number, x: number, y: number): void {
+function endBullet(w: World, i: number, x: number, y: number, reason: number): void {
   w.bActive[i] = 0;
   const owner = w.bOwner[i]!;
   const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[owner]!]!];
@@ -90,7 +96,7 @@ function endBullet(w: World, i: number, x: number, y: number): void {
     w.events.push({ type: 'explosion', x, y, radius: st.blast * w.modBlast });
     blastFrom(w, owner, x, y, st.blast * w.modBlast, (st.blastDamage ?? 0) * w.modBlast * w.modDamage * w.pModDmg[owner]!);
   } else {
-    w.events.push({ type: 'bulletGone', x, y });
+    w.events.push({ type: 'bulletGone', x, y, angle: atan2(w.bVy[i]!, w.bVx[i]!), reason });
   }
 }
 
@@ -112,9 +118,11 @@ function spawnBullet(w: World, owner: number, ox: number, oy: number, x: number,
     w.bPierce[i] = pierce;
     w.bHit.fill(-1, i * 4, i * 4 + 4);
     if (segmentBlocked(ox, oy, x, y)) {
-      endBullet(w, i, ox, oy);
+      endBullet(w, i, ox, oy, 1);
+    } else if (bulletVsBarrels(w, i, ox, oy, x, y)) {
+      endBullet(w, i, w.bX[i]!, w.bY[i]!, 2);
     } else if (w.enemyCount > 0 && bulletVsEnemies(w, i, ox, oy, x, y)) {
-      endBullet(w, i, w.bX[i]!, w.bY[i]!);
+      endBullet(w, i, w.bX[i]!, w.bY[i]!, 2);
     }
     return;
   }
@@ -138,7 +146,12 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
       w.pDashX[s] = len > 0.2 ? mx / l : cos(angle);
       w.pDashY[s] = len > 0.2 ? my / l : sin(angle);
       w.pDash[s] = Math.ceil(dc.seconds * 30);
-      w.pDashCd[s] = dc.cooldown * w.modDash;
+      w.pDashCd[s] = (dc.cooldown * w.modDash) / perk(w, s, PERK.DashRate);
+      if (perk(w, s, PERK.Shock) > 0) {
+        // shock card: the dash sends out a shockwave that hurts and shoves what is around
+        w.events.push({ type: 'explosion', x: w.pX[s]!, y: w.pY[s]!, radius: BALANCE.perks.shockRadius * 0.6 });
+        blastFrom(w, s, w.pX[s]!, w.pY[s]!, BALANCE.perks.shockRadius, BALANCE.perks.shockDamage);
+      }
       if (w.pIFrames[s]! < dc.iFrames) w.pIFrames[s] = dc.iFrames;
       w.events.push({ type: 'dash', slot: s, x: w.pX[s]!, y: w.pY[s]! });
     }
@@ -202,7 +215,7 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
       // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
       const crit = w.modCrit > 0 && w.rng.float() < w.modCrit ? 2 : 1;
-      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * crit, stats.pierce + w.modPierce + w.pModPierce[s]!);
+      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * damageMul(w, s) * crit, stats.pierce + w.modPierce + w.pModPierce[s]!);
     }
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
     w.pMag[s] = w.pMag[s]! - 1;
@@ -236,15 +249,19 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
   for (let d = 0; d < MAX_PLAYERS; d++) {
     if (!w.pActive[d] || w.pState[d] !== PlayerState.Downed) continue;
     let helped = false;
-    for (let s = 0; s < MAX_PLAYERS && !helped; s++) {
+    let rate = 1;
+    for (let s = 0; s < MAX_PLAYERS; s++) {
       if (s === d || !w.pActive[s] || w.pState[s] !== PlayerState.Alive) continue;
       if (!((inputs[s]?.buttons ?? 0) & Buttons.Revive)) continue;
       const dx = w.pX[s]! - w.pX[d]!;
       const dy = w.pY[s]! - w.pY[d]!;
-      if (dx * dx + dy * dy <= range2) helped = true;
+      if (dx * dx + dy * dy <= range2) {
+        if (!helped || perk(w, s, PERK.ReviveRate) > rate) rate = perk(w, s, PERK.ReviveRate);
+        helped = true;
+      }
     }
     if (helped) {
-      w.pRevive[d] = w.pRevive[d]! + TICK_DT;
+      w.pRevive[d] = w.pRevive[d]! + TICK_DT * rate;
       if (w.pRevive[d]! >= BALANCE.player.reviveSeconds * w.modRevive) {
         w.pState[d] = PlayerState.Alive;
         w.pHp[d] = w.pMaxHp[d]! * BALANCE.progression.revive.hpFraction;
@@ -298,9 +315,11 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     if (w.pSel[s] === 0 && w.pMag[s] === 0 && w.pAmmo[s]! === 0 && w.pReload[s]! <= 0) selectSlot(w, s, 1, true);
     // a helper holding Revive next to a downed teammate is busy: slower, no shooting (moving off interrupts the revive)
     const busy = (inp.buttons & Buttons.Revive) !== 0 && downedNear(w, s);
-    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed * w.pModSpeed[s]! * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
+    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
     if (!busy) fireWeapon(w, s, inp, angle);
   }
+  updatePlayerPerks(w);
+  updateBarrels(w);
   updateRevive(w, inputs);
   updateGrenades(w, inputs);
 
@@ -316,11 +335,13 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     w.bX[i] = x0 + w.bVx[i]! * TICK_DT;
     w.bY[i] = y0 + w.bVy[i]! * TICK_DT;
     w.bLife[i] = w.bLife[i]! - TICK_DT;
-    let spent = segmentBlocked(x0, y0, w.bX[i]!, w.bY[i]!);
+    const wall = segmentBlocked(x0, y0, w.bX[i]!, w.bY[i]!);
+    let spent = wall;
+    if (!spent) spent = bulletVsBarrels(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
     if (!spent && w.enemyCount > 0) spent = bulletVsEnemies(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
     const x = w.bX[i]!;
     const y = w.bY[i]!;
-    if (spent || w.bLife[i]! <= 0 || x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H) endBullet(w, i, x, y);
+    if (spent || w.bLife[i]! <= 0 || x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H) endBullet(w, i, x, y, wall ? 1 : spent ? 2 : 0);
   }
 
   // life cycle: zero hp means downed; nobody left standing ends the run
@@ -330,7 +351,13 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     if (!w.pActive[s]) continue;
     any = true;
     if (w.pState[s] === PlayerState.Alive) {
-      if (w.pHp[s]! <= 0) {
+      if (w.pHp[s]! <= 0 && perk(w, s, PERK.Second) > 0) {
+        setPerk(w, s, PERK.Second, perk(w, s, PERK.Second) - 1);
+        w.pHp[s] = w.pMaxHp[s]! * BALANCE.perks.secondHp;
+        w.pIFrames[s] = 2;
+        w.events.push({ type: 'secondWind', slot: s });
+        standing++;
+      } else if (w.pHp[s]! <= 0) {
         w.pState[s] = PlayerState.Downed;
         w.pTimer[s] = BALANCE.player.downedSeconds;
         w.pRevive[s] = 0;
@@ -360,6 +387,7 @@ export function hashWorld(w: World): number {
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
   c.typed(w.kActive).typed(w.kData).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
+  c.typed(w.pPerk).typed(w.eMod).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pSel).typed(w.pStashW).typed(w.pStashMag).typed(w.pStashAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);

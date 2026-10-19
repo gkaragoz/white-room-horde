@@ -1,5 +1,7 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, WEAPON_IDS } from '@wrh/shared';
 import { clamp, cos, sin, sqrt } from './detmath';
+import { PERK } from '@wrh/shared';
+import { nuke, perk, setPerk, waveModOf } from './features';
 import { giveMainWeapon, selectSlot, mainReserve, mainWeapon, reserveMax, setMainReserve } from './loadout';
 import type { World } from './state';
 
@@ -42,12 +44,30 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
     return;
   }
   const r = w.rng.float();
-  const luck = w.modLoot;
+  const luck = w.modLoot * (waveModOf(w.wave) === 4 ? 2 : 1);
   const ammoChance = (cfg.chance.ammo + (ammoStarved(w) ? cfg.lowAmmoBonus : 0)) * luck;
   if (r < ammoChance) spawnPickup(w, PickupType.Ammo, x, y);
   else if (r < ammoChance + cfg.chance.health * luck) spawnPickup(w, PickupType.Health, x, y);
   else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade) * luck) spawnPickup(w, PickupType.Grenade, x, y);
   else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, w.rng.int(WEAPON_IDS.length));
+  else {
+    // the rarer power-ups
+    let edge = ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck;
+    const table: [number, number][] = [
+      [PickupType.Shield, cfg.chance.shield],
+      [PickupType.Haste, cfg.chance.haste],
+      [PickupType.Quad, cfg.chance.quad],
+      [PickupType.Nuke, cfg.chance.nuke],
+      [PickupType.Freeze, cfg.chance.freeze],
+    ];
+    for (const [kind, c] of table) {
+      edge += c * luck;
+      if (r < edge) {
+        spawnPickup(w, kind, x, y);
+        break;
+      }
+    }
+  }
 }
 
 /** Magnet drift toward the nearest living player, then pickup on contact; expire after their lifetime. */
@@ -94,6 +114,8 @@ function wants(w: World, s: number, kind: number, i: number): boolean {
   if (kind === PickupType.Health) return w.pHp[s]! < w.pMaxHp[s]!;
   if (kind === PickupType.Grenade) return w.pGren[s]! < BALANCE.grenade.max;
   if (kind === PickupType.Weapon) return mainWeapon(w, s) !== w.kData[i]!;
+  if (kind === PickupType.Shield) return perk(w, s, PERK.Shield) < 100;
+  if (kind >= PickupType.Haste) return true;
   const max = reserveMax(w, s);
   // infinite weapons turn an ammo crate into a grenade
   return max > 0 ? mainReserve(w, s) < max : w.pGren[s]! < BALANCE.grenade.max;
@@ -106,6 +128,17 @@ function collect(w: World, s: number, i: number): void {
     w.pHp[s] = hp > w.pMaxHp[s]! ? w.pMaxHp[s]! : hp;
   } else if (kind === PickupType.Grenade) {
     w.pGren[s] = w.pGren[s]! + 1;
+  } else if (kind === PickupType.Shield) {
+    setPerk(w, s, PERK.Shield, Math.min(100, perk(w, s, PERK.Shield) + BALANCE.pickups.shieldAmount));
+  } else if (kind === PickupType.Haste) {
+    setPerk(w, s, PERK.Haste, BALANCE.pickups.hasteSeconds);
+  } else if (kind === PickupType.Quad) {
+    setPerk(w, s, PERK.Quad, BALANCE.pickups.quadSeconds);
+  } else if (kind === PickupType.Nuke) {
+    nuke(w, s);
+  } else if (kind === PickupType.Freeze) {
+    w.misc[0] = BALANCE.pickups.freezeSeconds;
+    w.events.push({ type: 'freeze', seconds: BALANCE.pickups.freezeSeconds });
   } else if (kind === PickupType.Weapon) {
     giveMainWeapon(w, s, w.kData[i]!);
   } else {

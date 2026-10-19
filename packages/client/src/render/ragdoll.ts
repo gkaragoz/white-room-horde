@@ -206,13 +206,16 @@ export class RagdollPool {
       b.pos[i * 3 + 2] = _v.z;
     }
     // verlet velocity: carry the walk, add the shot
-    const kick = Math.min(9, 2.5 + push.power * 0.07);
+    const kick = Math.min(22, 3.5 + push.power * 0.13);
+    const lift = 1 + Math.min(2.2, push.power * 0.012);
     for (let i = 0; i < N; i++) {
       // the upper body is thrown harder than the legs so the body spins as it falls
       const w = i === P.head || i === P.spine ? 1.3 : i === P.hips ? 0.9 : 0.7;
-      const vx = vel.x + push.x * kick * w;
-      const vz = vel.z + push.z * kick * w;
-      const vy = (2.2 + Math.min(4, push.power * 0.04)) * w;
+      const spinX = (Math.random() - 0.5) * 2.2;
+      const spinZ = (Math.random() - 0.5) * 2.2;
+      const vx = vel.x + push.x * kick * w + spinX * (i === P.head ? 1.5 : 0.6);
+      const vz = vel.z + push.z * kick * w + spinZ * (i === P.head ? 1.5 : 0.6);
+      const vy = (3 + Math.min(9, push.power * 0.07)) * w * lift * (0.85 + Math.random() * 0.3);
       b.prev[i * 3] = b.pos[i * 3]! - vx * STEP;
       b.prev[i * 3 + 1] = b.pos[i * 3 + 1]! - vy * STEP;
       b.prev[i * 3 + 2] = b.pos[i * 3 + 2]! - vz * STEP;

@@ -360,7 +360,7 @@
       "ironskin": 0.8,
       "ironMin": 0.4
     },
-    "ragdollPower": 22
+    "ragdollPower": 8
   },
   "grenade": {
     "max": 3,
@@ -390,7 +390,12 @@
       "ammo": 0.06,
       "health": 0.03,
       "grenade": 0.02,
-      "weapon": 0.012
+      "weapon": 0.012,
+      "shield": 0.012,
+      "haste": 0.01,
+      "quad": 0.008,
+      "nuke": 0.003,
+      "freeze": 0.006
     },
     "lowAmmoBonus": 0.1,
     "healthAmount": 30,
@@ -398,7 +403,12 @@
       "ammo": 2,
       "health": 2,
       "grenade": 1
-    }
+    },
+    "hasteSeconds": 8,
+    "quadSeconds": 8,
+    "shieldAmount": 50,
+    "freezeSeconds": 4,
+    "nukeDamage": 500
   },
   "dash": {
     "seconds": 0.2,
@@ -422,5 +432,176 @@
       1.0,
       1.35
     ]
+  },
+  "classes": [
+    {
+      "id": "soldier",
+      "hp": 0,
+      "speed": 1,
+      "damage": 1,
+      "rate": 1,
+      "armor": 1,
+      "regen": 0,
+      "aura": 0,
+      "grenades": 0,
+      "pierce": 0,
+      "lifesteal": 0,
+      "blast": 1,
+      "reviveRate": 1,
+      "dashRate": 1,
+      "rage": 0
+    },
+    {
+      "id": "medic",
+      "hp": -10,
+      "speed": 1.05,
+      "damage": 0.85,
+      "rate": 1,
+      "armor": 1,
+      "regen": 0.6,
+      "aura": 3.5,
+      "grenades": 0,
+      "pierce": 0,
+      "lifesteal": 0,
+      "blast": 1,
+      "reviveRate": 1.8,
+      "dashRate": 1,
+      "rage": 0
+    },
+    {
+      "id": "heavy",
+      "hp": 90,
+      "speed": 0.78,
+      "damage": 1,
+      "rate": 1,
+      "armor": 0.78,
+      "regen": 0.4,
+      "aura": 0,
+      "grenades": 0,
+      "pierce": 0,
+      "lifesteal": 0,
+      "blast": 1,
+      "reviveRate": 1,
+      "dashRate": 0.8,
+      "rage": 0
+    },
+    {
+      "id": "scout",
+      "hp": -25,
+      "speed": 1.28,
+      "damage": 1,
+      "rate": 1.1,
+      "armor": 1,
+      "regen": 0,
+      "aura": 0,
+      "grenades": 0,
+      "pierce": 0,
+      "lifesteal": 0,
+      "blast": 1,
+      "reviveRate": 1,
+      "dashRate": 1.6,
+      "rage": 0
+    },
+    {
+      "id": "demolisher",
+      "hp": 10,
+      "speed": 0.95,
+      "damage": 0.95,
+      "rate": 1,
+      "armor": 1,
+      "regen": 0,
+      "aura": 0,
+      "grenades": 3,
+      "pierce": 0,
+      "lifesteal": 0,
+      "blast": 1.5,
+      "reviveRate": 1,
+      "dashRate": 1,
+      "rage": 0
+    },
+    {
+      "id": "ranger",
+      "hp": -5,
+      "speed": 1,
+      "damage": 1.15,
+      "rate": 1,
+      "armor": 1,
+      "regen": 0,
+      "aura": 0,
+      "grenades": 0,
+      "pierce": 1,
+      "lifesteal": 0,
+      "blast": 1,
+      "reviveRate": 1,
+      "dashRate": 1,
+      "rage": 0
+    },
+    {
+      "id": "berserker",
+      "hp": 30,
+      "speed": 1,
+      "damage": 1,
+      "rate": 1,
+      "armor": 0.95,
+      "regen": 0,
+      "aura": 0,
+      "grenades": 0,
+      "pierce": 0,
+      "lifesteal": 2,
+      "blast": 1,
+      "reviveRate": 1,
+      "dashRate": 1,
+      "rage": 1
+    }
+  ],
+  "perks": {
+    "outOfCombatSeconds": 5,
+    "baseRegen": 1.0,
+    "cardRegen": 1.6,
+    "auraRadius": 7,
+    "thorns": 16,
+    "shockRadius": 3.6,
+    "shockDamage": 35,
+    "shockPush": 1.8,
+    "volatileChance": 0.18,
+    "volatileRadius": 2.2,
+    "volatileDamage": 45,
+    "frostRadius": 5.5,
+    "frostSlow": 0.65,
+    "scavChance": 0.15,
+    "rageMax": 0.7,
+    "secondHp": 0.5,
+    "adrenSeconds": 2.5,
+    "adrenSpeed": 1.35,
+    "barrierAmount": 45,
+    "barrierCd": 8
+  },
+  "elites": {
+    "start": 3,
+    "perWave": 0.03,
+    "max": 0.35,
+    "giantHp": 3,
+    "giantSpeed": 0.8,
+    "giantRadius": 1.5,
+    "swiftSpeed": 1.45,
+    "swiftHp": 0.8,
+    "armoredMul": 0.5,
+    "regenPerSec": 3,
+    "splitCount": 2,
+    "volatileRadius": 2.4,
+    "volatileDamage": 35
+  },
+  "barrels": {
+    "hp": 30,
+    "radius": 4.2,
+    "damage": 120,
+    "playerDamage": 25,
+    "respawn": 40,
+    "hitRadius": 0.6,
+    "push": 2.6
+  },
+  "knock": {
+    "perDamage": 0.012,
+    "max": 0.45
   }
 }

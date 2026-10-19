@@ -7,6 +7,24 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Night, light and chaos**
+- Night mode and a day and night cycle (four waves of day, four of night; or pick day or night in the settings). Real-time lights: every muzzle flash and explosion lights the arena, street lamps, campfires and neon signs glow, and the local player carries a flashlight cone at night. A setting turns the real-time lights off on weak machines.
+- Bullets are bigger, brighter and surrounded by a glow (even brighter at night). Hits on cover throw sparks, chips and dust and leave bullet holes on the walls; misses dig little pits in the ground with a puff of dust.
+- The camera is further away. A ring around your feet shows the rounds left in the magazine (green when full, red when empty, with 7/15 beside it, and it spins while reloading).
+- Physics and gore turned up: every hit shoves enemies back, blasts fling the survivors, almost every kill is a physical ragdoll and a blast launches nearby bodies high and far, bigger and more gibs and blood. Explosive barrels stand around the arena: shoot one and it chains into its neighbours, hurts you too and comes back after 40 seconds.
+- Kill streaks: a counter on the right and an announcer (Killing spree, Rampage, Unstoppable, Massacre, Godlike, Apocalypse). The game over screen lists every player's kills and the MVP.
+
+**Classes and cards**
+- Seven classes picked in the menu or lobby: Soldier, Medic (heals allies nearby, revives faster), Heavy (big, slow, tough), Scout (fast, dashes often), Demolisher (more grenades, bigger blasts), Ranger (damage and piercing), Berserker (stronger as health drops, heals on kills). Heavy and scout also look bigger and smaller.
+- Out of combat everybody now regenerates a little.
+- Ten new cards, all with Blender art: Regeneration, Thorns, Shockwave (your dash blasts), Volatile rounds (kills explode), Frost aura, Scavenger, Adrenaline, Barrier (rechargeable shield), Second wind (stand up once instead of going down), Rage. That makes 35.
+- Five new power-ups that drop from enemies: shield orb, haste, quad damage, nuke and time freeze.
+
+**Enemies and arenas**
+- Elite enemies from wave 3: giants, swift ones, splitters, volatile ones that blow up, regenerating and armoured ones, each looking different. Every wave can carry a modifier: swarm, armoured horde, fast and furious, bounty wave (twice the loot) or elite storm.
+- Two new arenas, Ruins and Factory (six now), with their own scenery.
+- 14 new head accessories (pirate, wizard, viking, santa, chef, astronaut, cat ears, halo, alien antennae, gas mask, beanie, samurai, shades, flower crown) and 14 new props (pine tree, rocks, hay bale, dumpster, tent, generator, wreck car, tombstone, campfire, fuel tank, picnic table, neon sign, radio tower, skull pile).
+
 ## v0.2.1 (2026-10-19)
 
 - Main menu polish: two columns, a big Play button, little top-down pictures of every arena (painted from the real layouts) and a difficulty row with skull icons (one, two or three skulls). The lobby shows the same pictures and skulls.

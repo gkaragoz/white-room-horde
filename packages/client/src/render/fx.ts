@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, ENEMY_TYPES, WEAPON_IDS } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, ENEMY_TYPES, MAPS, WEAPON_IDS, type Box } from '@wrh/shared';
 import type { SimEvent } from '@wrh/sim';
 
-const MAX_PARTICLES = 2400;
+const MAX_PARTICLES = 3600;
+const MAX_HOLES = 360;
 const GRAVITY = 16;
 
 const GIB_COLORS: Record<string, string> = {
@@ -50,6 +51,15 @@ export class Fx {
   private readonly col = new Float32Array(MAX_PARTICLES * 3);
   private live = 0;
 
+  /** Bullet holes on the cover boxes: a ring buffer of little dark discs standing on the faces. */
+  private readonly holes: THREE.InstancedMesh;
+  private holeNext = 0;
+  private holeCount = 0;
+  private boxes: readonly Box[] = MAPS[0]!.boxes;
+
+  /** Real-time light at a spot (muzzle flashes, explosions); wired to the stage's light pool by main. */
+  light: (x: number, y: number, z: number, color: string, intensity: number, life: number, distance?: number) => void = () => undefined;
+
   private readonly decalCanvas: HTMLCanvasElement;
   private readonly decalCtx: CanvasRenderingContext2D;
   private readonly decalTex: THREE.CanvasTexture;
@@ -91,6 +101,89 @@ export class Fx {
     plane.position.y = 0.012;
     plane.renderOrder = 1;
     this.group.add(plane);
+
+    const hc = document.createElement('canvas');
+    hc.width = hc.height = 64;
+    const h = hc.getContext('2d')!;
+    const rg = h.createRadialGradient(32, 32, 2, 32, 32, 30);
+    rg.addColorStop(0, 'rgba(8,9,12,1)');
+    rg.addColorStop(0.35, 'rgba(14,16,20,.95)');
+    rg.addColorStop(0.55, 'rgba(60,64,72,.55)');
+    rg.addColorStop(1, 'rgba(60,64,72,0)');
+    h.fillStyle = rg;
+    h.fillRect(0, 0, 64, 64);
+    h.strokeStyle = 'rgba(20,22,26,.7)';
+    h.lineWidth = 1.5;
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2 + 0.3;
+      h.beginPath();
+      h.moveTo(32 + Math.cos(a) * 9, 32 + Math.sin(a) * 9);
+      h.lineTo(32 + Math.cos(a + 0.15) * (20 + (k % 3) * 4), 32 + Math.sin(a + 0.15) * (20 + (k % 3) * 4));
+      h.stroke();
+    }
+    const holeTex = new THREE.CanvasTexture(hc);
+    holeTex.colorSpace = THREE.SRGBColorSpace;
+    this.holes = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: holeTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }),
+      MAX_HOLES,
+    );
+    this.holes.frustumCulled = false;
+    this.holes.count = 0;
+    this.holes.renderOrder = 2;
+    this.group.add(this.holes);
+  }
+
+  /** Remember the cover boxes of the arena in play (bullet holes stick to them). */
+  setMap(index: number): void {
+    this.boxes = MAPS[index]?.boxes ?? MAPS[0]!.boxes;
+    this.holeCount = 0;
+    this.holeNext = 0;
+    this.holes.count = 0;
+  }
+
+  /** Stick a bullet hole on the face of the box nearest to a bullet's last position; returns the face normal (sim axes). */
+  private bulletHole(x: number, y: number): { nx: number; ny: number; hx: number; hy: number } | null {
+    let best: Box | null = null;
+    let bestD = 0.9;
+    let bnx = 0;
+    let bny = 0;
+    for (const b of this.boxes) {
+      const dx = x - b.x;
+      const dy = y - b.y;
+      const fx = b.w / 2 - Math.abs(dx);
+      const fy = b.h / 2 - Math.abs(dy);
+      if (fx < -0.7 || fy < -0.7) continue;
+      const d = Math.max(0, -Math.min(fx, fy));
+      if (d <= bestD) {
+        bestD = d;
+        best = b;
+        if (fx < fy) {
+          bnx = Math.sign(dx) || 1;
+          bny = 0;
+        } else {
+          bnx = 0;
+          bny = Math.sign(dy) || 1;
+        }
+      }
+    }
+    if (!best) return null;
+    const hx = bnx !== 0 ? best.x + bnx * best.w / 2 : Math.max(best.x - best.w / 2 + 0.05, Math.min(best.x + best.w / 2 - 0.05, x));
+    const hy = bny !== 0 ? best.y + bny * best.h / 2 : Math.max(best.y - best.h / 2 + 0.05, Math.min(best.y + best.h / 2 - 0.05, y));
+    const height = 0.18 + Math.random() * 0.75;
+    const size = 0.16 + Math.random() * 0.12;
+    const d = this.dummy;
+    d.position.set(hx + bnx * 0.014, height, -(hy + bny * 0.014));
+    d.lookAt(d.position.x + bnx, height, d.position.z - bny);
+    d.rotateZ(Math.random() * 6.28);
+    d.scale.setScalar(size);
+    d.updateMatrix();
+    this.holes.setMatrixAt(this.holeNext, d.matrix);
+    this.holeNext = (this.holeNext + 1) % MAX_HOLES;
+    this.holeCount = Math.min(MAX_HOLES, this.holeCount + 1);
+    this.holes.count = this.holeCount;
+    this.holes.instanceMatrix.needsUpdate = true;
+    return { nx: bnx, ny: bny, hx, hy };
   }
 
   private splat(x: number, y: number, radius: number, color: string, alpha = 0.7): void {
@@ -166,15 +259,36 @@ export class Fx {
         const my = e.y + Math.sin(e.angle) * st.muzzleFwd - Math.cos(e.angle) * st.muzzleSide;
         const pw = this.powerFor(e.slot);
         this.flash(mx, st.muzzleH, -my, (0.16 + st.damage * 0.002) * (1 + pw * 0.6), pw > 0.3 ? '#ffd0a0' : '#ffe9a0', 0.05, 0);
+        this.light(mx, st.muzzleH + 0.2, -my, WEAPON_IDS[e.weapon] === 'flamer' ? '#ff8a2a' : '#ffd9a0', 4 + st.damage * 0.04 + pw * 3, 0.07, 8);
         if (pw > 0.25) this.burst(Kind.Spark, mx, my, st.muzzleH, Math.min(6, Math.round(pw * 4)), 6, Math.cos(e.angle), Math.sin(e.angle), 0.9, 0.2, 0.05, '#ff9a5a');
         this.burst(Kind.Spark, mx, my, st.muzzleH, 2, 5, Math.cos(e.angle), Math.sin(e.angle), 0.5, 0.18, 0.05, '#ffd36a');
         if (WEAPON_IDS[e.weapon] === 'flamer') this.burst(Kind.Fire, mx, my, st.muzzleH, 3, 5, Math.cos(e.angle), Math.sin(e.angle), 0.5, 0.4, 0.22, '#ff8a1a');
         if (e.slot === localSlot) this.shake = Math.min(0.22, this.shake + Math.min(0.1, st.damage * 0.0006 * Math.sqrt(st.pellets)));
         break;
       }
-      case 'bulletGone':
-        this.burst(Kind.Spark, e.x, e.y, 1.0, 2, 3, 0, 0, 6.28, 0.15, 0.04, '#ffe08a');
+      case 'bulletGone': {
+        if (e.reason === 2) break; // the blood of a hit enemy is shown by enemyHit
+        if (e.reason === 1) {
+          // cover: sparks fly back out, chips and dust, a bullet hole stays on the wall
+          const hole = this.bulletHole(e.x, e.y);
+          const bx = hole ? hole.nx : -Math.cos(e.angle);
+          const by = hole ? hole.ny : -Math.sin(e.angle);
+          const px = hole ? hole.hx + bx * 0.1 : e.x;
+          const py = hole ? hole.hy + by * 0.1 : e.y;
+          const h = 0.5 + Math.random() * 0.4;
+          this.burst(Kind.Spark, px, py, h, 7, 6.5, bx, by, 1.5, 0.28, 0.06, '#ffc866');
+          this.burst(Kind.Spark, px, py, h, 3, 3, bx, by, 2.4, 0.2, 0.05, '#ffffff');
+          this.burst(Kind.Gib, px, py, h, 3, 3.5, bx, by, 1.8, 0.7, 0.05, '#aeb4bd');
+          this.burst(Kind.Smoke, px, py, h, 2, 0.9, bx, by, 1.2, 0.6, 0.16, '#bfc4cc');
+          this.light(px, h, -py, '#ffd9a0', 3.5, 0.09, 4.5);
+        } else {
+          // a miss: the round digs into the ground
+          this.burst(Kind.Smoke, e.x, e.y, 0.15, 3, 1.1, 0, 0, 6.28, 0.55, 0.2, '#cfc8bb');
+          this.burst(Kind.Spark, e.x, e.y, 0.2, 3, 3, 0, 0, 6.28, 0.18, 0.045, '#ffe08a');
+          this.splat(e.x, e.y, 0.12, '#3a3f47', 0.55);
+        }
         break;
+      }
       case 'enemyHit':
         this.burst(Kind.Blood, e.x, e.y, 0.9, 5, 4, 0, 0, 6.28, 0.5, 0.07, '#8c1018');
         break;
@@ -182,20 +296,33 @@ export class Fx {
         const power = Math.min(1.6, 0.6 + e.power * 0.01);
         const type = ENEMY_TYPES[e.etype]!;
         if (type === 'exploder') break; // the explosion event covers it
-        this.burst(Kind.Blood, e.x, e.y, 0.8, Math.round(16 * power), 6 * power, e.dx, e.dy, 1.6, 0.8, 0.09, '#a3141c');
-        this.burst(Kind.Gib, e.x, e.y, 0.8, 3 + Math.round(3 * power), 5 * power, e.dx, e.dy, 2.4, 1.6, 0.17, GIB_COLORS[type] ?? '#aaa');
+        this.burst(Kind.Blood, e.x, e.y, 0.8, Math.round(26 * power), 8 * power, e.dx, e.dy, 1.8, 0.9, 0.09, '#a3141c');
+        this.burst(Kind.Gib, e.x, e.y, 0.8, 5 + Math.round(6 * power), 7.5 * power, e.dx, e.dy, 2.8, 1.9, 0.18, GIB_COLORS[type] ?? '#aaa');
         this.splat(e.x + e.dx * 0.5, e.y + e.dy * 0.5, 0.7 * power, '#7d0d14');
         break;
       }
       case 'explosion':
+        this.light(e.x, 1.4, -e.y, '#ffa24a', 26 + e.radius * 6, 0.5, 18 + e.radius * 3);
         this.flash(e.x, 0.8, -e.y, 0.5, '#ffb347', 0.35, e.radius * 3.2);
         this.flash(e.x, 0.8, -e.y, 0.3, '#fff2c8', 0.18, e.radius * 2);
         this.burst(Kind.Fire, e.x, e.y, 0.8, 26, 8, 0, 0, 6.28, 0.6, 0.22, '#ff7a1a');
-        this.burst(Kind.Gib, e.x, e.y, 0.8, 8, 7, 0, 0, 6.28, 1.4, 0.16, '#d88a4a');
+        this.burst(Kind.Gib, e.x, e.y, 0.8, 16, 11, 0, 0, 6.28, 1.8, 0.17, '#d88a4a');
+        this.burst(Kind.Gib, e.x, e.y, 0.8, 8, 8, 0, 0, 6.28, 1.6, 0.14, '#6b6258');
         this.burst(Kind.Smoke, e.x, e.y, 0.9, 10, 2.5, 0, 0, 6.28, 1.2, 0.35, '#5a5148');
         this.splat(e.x, e.y, e.radius * 0.6, '#2a211c', 0.55);
         this.shake = Math.min(0.6, this.shake + 0.22);
         this.onExplosionShake(0.3);
+        break;
+      case 'nuke':
+        this.light(e.x, 3, -e.y, '#fff2c0', 60, 0.9, 40);
+        this.flash(e.x, 1, -e.y, 0.6, '#fff6d0', 0.7, 24);
+        this.burst(Kind.Fire, e.x, e.y, 0.8, 80, 16, 0, 0, 6.28, 1.2, 0.3, '#ffb347');
+        this.shake = Math.min(0.7, this.shake + 0.35);
+        break;
+      case 'secondWind':
+        break;
+      case 'barrelHit':
+        this.burst(Kind.Spark, e.x, e.y, 0.8, 5, 4, 0, 0, 6.28, 0.25, 0.05, '#ff9a4a');
         break;
       case 'playerHit':
         this.burst(Kind.Blood, e.x, e.y, 1.0, 8, 4, 0, 0, 6.28, 0.6, 0.08, '#c01822');

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, MAPS, ENEMY_TYPES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
@@ -28,7 +28,7 @@ const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
 function loadSettings(): Settings {
-  const def: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
+  const def: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, time: 'cycle', dynLights: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
   try {
     return { ...def, ...(JSON.parse(localStorage.getItem('wrh.settings') ?? '{}') as Partial<Settings>) };
   } catch {
@@ -65,6 +65,7 @@ const audio = new Audio();
 const input = new Input(stage.renderer.domElement, stage.camera);
 const fx = new Fx(undefined, settings.texture);
 const power = new PowerView((x, y, h, color, n, speed) => fx.sparkle(x, y, h, color, n, speed));
+fx.light = (x, y, z, color, intensity, life, distance) => stage.glow(x, y, z, color, intensity, life, distance);
 fx.powerFor = (slot) => {
   if (!world) return 0;
   const st = strengthOf(world, slot);
@@ -73,13 +74,21 @@ fx.powerFor = (slot) => {
 stage.scene.add(fx.group);
 const crowd = await Crowd.create(150, backend);
 stage.scene.add(crowd.group);
-const ragdolls = await RagdollPool.create(14);
+const ragdolls = await RagdollPool.create(40);
 await ragdolls.preload([...ENEMY_TYPES]);
 stage.scene.add(ragdolls.group);
 const pickups = new PickupView();
 stage.scene.add(pickups.group);
 
-const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.1, 0.7), new THREE.MeshBasicMaterial({ color: '#fff0a8' }), MAX_BULLETS);
+const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.17, 0.17, 1.0), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), MAX_BULLETS);
+// a soft additive halo around every round so it reads at any distance and glows at night
+const bulletGlow = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(0.5, 0.5, 1.6),
+  new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
+  MAX_BULLETS,
+);
+bulletGlow.frustumCulled = false;
+bulletGlow.count = 0;
 bulletMesh.frustumCulled = false;
 /** Look of each weapon's rounds: colour and size of the tracer (width, length multipliers). */
 const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
@@ -98,12 +107,14 @@ const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
   gl: { color: new THREE.Color('#9fe870'), w: 3.2, l: 1.4 },
 };
 const tracerScale = new THREE.Vector3();
+const GLOW_SCALE = new THREE.Vector3(2.6, 2.6, 1.5);
 const tracerColor = new THREE.Color();
 const HOT = new THREE.Color('#ff3a2a');
 const COOL = new THREE.Color('#35d6ff');
 const strength: (ReturnType<typeof strengthOf> | undefined)[] = [];
 bulletMesh.count = 0;
 stage.scene.add(bulletMesh);
+stage.scene.add(bulletGlow);
 stage.scene.add(power.group);
 
 // cover boxes of the current layout (rebuilt per game)
@@ -127,6 +138,7 @@ function applySettings(): void {
   stage.setShadowQuality(settings.shadows);
   stage.setScale(settings.autoScale ? Math.min(autoScale, settings.scale) : settings.scale);
   stage.setBounce(settings.bounce);
+  stage.setDynamicLights(settings.dynLights);
   ui.applySettings(settings);
   try {
     localStorage.setItem('wrh.settings', JSON.stringify(settings));
@@ -168,7 +180,7 @@ const ui = new Ui(
       const r = loadRejoin();
       if (r) connect(ui.name(), r.server, r.code, '', r.token);
     },
-    onLook: (acc, color) => session?.setLook(acc, color),
+    onLook: (acc, color, cls) => session?.setLook(acc, color, cls),
     getBindings: () => input.bindings,
     onRebind: (action, done) =>
       input.captureKey(action as Action, (code) => {
@@ -212,6 +224,8 @@ const ui = new Ui(
         autoScale = settings.scale;
         stage.setScale(settings.scale);
       } else if (key === 'bounce') settings = { ...settings, bounce: value as boolean };
+      else if (key === 'time') settings = { ...settings, time: value as Settings['time'] };
+      else if (key === 'dynLights') settings = { ...settings, dynLights: value as boolean };
       else if (key === 'aa') {
         settings = { ...settings, aa: value as Settings['aa'] };
         applySettings();
@@ -247,6 +261,13 @@ function colorFor(s: number): string {
   return PLAYER_COLORS[(idx >= 0 ? idx : s) % PLAYER_COLORS.length]!;
 }
 ui.slotColor = colorFor;
+
+/** How dark it should be: the setting, or in the day and night cycle four waves of day followed by four of night. */
+function nightFor(w: World): number {
+  if (settings.time === 'night') return 1;
+  if (settings.time === 'day') return 0;
+  return (w.wave - 1) % 8 >= 4 ? 1 : 0;
+}
 
 function ensureCharacter(s: number): void {
   if (chars[s] || loading.has(s) || !world) return;
@@ -304,10 +325,18 @@ function afterStep(w: World): void {
 function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boolean {
   const type = ENEMY_TYPES[e.etype]!;
   if (type === 'exploder' || w.eBoss[e.id] || !ragdolls.ready) return false;
-  if (!(e.power >= BALANCE.progression.ragdollPower || Math.random() < 0.25)) return false;
+  // chaos: nearly every kill throws a physical body, and a blast near the corpse launches it high and far
+  if (!(e.power >= BALANCE.progression.ragdollPower || Math.random() < 0.8)) return false;
+  let boost = 1;
+  for (const ev of w.events) {
+    if (ev.type !== 'explosion') continue;
+    const reach = ev.radius * 2.2;
+    const d = Math.hypot(e.x - ev.x, e.y - ev.y);
+    if (d < reach) boost = Math.max(boost, 1 + 3 * (1 - d / reach));
+  }
   const info = crowd.deathInfo(w, e.id);
   // sim (x, y) -> three (x, z = -y)
-  return ragdolls.spawn(type, e.x, -e.y, info.yaw, info.clip, info.time, { x: info.vx * 0.5, z: -info.vy * 0.5 }, { x: e.dx, z: -e.dy, power: e.power });
+  return ragdolls.spawn(type, e.x, -e.y, info.yaw, info.clip, info.time, { x: info.vx * 0.5, z: -info.vy * 0.5 }, { x: e.dx, z: -e.dy, power: e.power * boost + (boost > 1 ? 40 : 0) });
 }
 
 function handleEvent(e: SimEvent): void {
@@ -325,9 +354,36 @@ function handleEvent(e: SimEvent): void {
       crowd.hit(e.id);
       if (Math.random() < 0.6) damageNumber(e.x, e.y, e.damage);
       break;
-    case 'waveStart':
-      ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${ui.lang === 'tr' ? 'Dalga' : 'Wave'} ${e.wave}`, '', e.boss ? 3500 : 1800);
+    case 'waveStart': {
+      const L = UI_STRINGS[ui.lang];
+      const mod = e.mod ?? 0;
+      ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${ui.lang === 'tr' ? 'Dalga' : 'Wave'} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
       break;
+    }
+    case 'secondWind':
+      ui.banner(UI_STRINGS[ui.lang].secondWind, names[e.slot] ?? '', 1600);
+      break;
+    case 'pickup':
+      if (e.slot === localSlot && e.kind >= 4) ui.banner(UI_STRINGS[ui.lang].powerups[e.kind]!, '', e.kind === 7 ? 1800 : 1300);
+      if (e.kind === 7) ui.screenFlash('#ffffff', 700);
+      break;
+    case 'nuke':
+      ui.screenFlash('#fff6c8', 900);
+      break;
+    case 'freeze':
+      ui.screenFlash('#9be8ff', 800);
+      break;
+    case 'enemyDeath': {
+      if (nowSec - comboAt > 2.2) comboCount = 0;
+      comboCount++;
+      comboAt = nowSec;
+      const step = COMBO_STEPS.indexOf(comboCount);
+      if (step >= 0) {
+        ui.banner(UI_STRINGS[ui.lang].combos[step]!, `x${comboCount}`, 1100);
+        audio.play('level');
+      }
+      break;
+    }
     case 'levelUp':
       ui.banner(ui.lang === 'tr' ? 'Seviye atlandı!' : 'Level up!', `${e.level}`, 1500);
       break;
@@ -350,6 +406,7 @@ function handleEvent(e: SimEvent): void {
       {
         const rec = world && !playback ? recordGame(world.wave, world.kills) : undefined;
         clearRejoin();
+        ui.playerNames = names;
         setTimeout(() => world && ui.showGameOver(world, recorder !== null, rec), 1800);
       }
       break;
@@ -387,11 +444,21 @@ function damageNumber(x: number, y: number, damage: number): void {
   ui.popNumber(px, py, String(Math.round(damage)), damage >= 25);
 }
 
+// ---- kill streaks ----
+let comboCount = 0;
+let comboAt = -10;
+const COMBO_STEPS = [10, 25, 50, 100, 200, 350];
+
 // ---- starting a game ----
 function beginPlaying(w: World, slot: number): void {
   audio.startMusic();
   arena.setMap(w.map);
   props.setMap(w.map);
+  fx.setMap(w.map);
+  stage.setLamps(props.lamps);
+  stage.setNightNow(nightFor(w));
+  stage.update(0, 0, 0);
+  props.setNight(stage.night);
   world = w;
   localSlot = slot;
   ui.clearScreen();
@@ -407,10 +474,10 @@ function beginPlaying(w: World, slot: number): void {
 
 function startSolo(name: string): void {
   mode = 'solo';
-  const players: { slot: number; weapon: WeaponId }[] = [{ slot: 0, weapon: startWeapon }];
+  const players: { slot: number; weapon: WeaponId; cls: number }[] = [{ slot: 0, weapon: startWeapon, cls: ui.cls }];
   names = [name];
   for (let b = 1; b <= dev.bots; b++) {
-    players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar' });
+    players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar', cls: b % 7 });
     names[b] = 'Bot ' + b;
   }
   const map = params.has('map') ? Number(params.get('map')) : ui.map >= 0 ? ui.map : Math.floor(Math.random() * MAPS.length);
@@ -477,8 +544,8 @@ function connect(name: string, rawServer: string, code: string | null, password 
   sock.onopen = () => {
     reconnectTries = 0;
     if (rejoinToken && code) sess.rejoin(code, rejoinToken);
-    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc, color: ui.color });
-    else sess.create(name, startWeapon, { password, acc: ui.acc, color: ui.color });
+    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
+    else sess.create(name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
   };
   sock.onmessage = (ev) => {
     sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
@@ -643,6 +710,7 @@ function frame(nowMs: number): void {
   if (world) {
     const w = world;
     // characters
+    props.syncBarrels(w, nowSec);
     power.begin();
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const c = chars[s];
@@ -657,7 +725,8 @@ function frame(nowMs: number): void {
       const ang = lerpAngle(prevA[s]!, curA[s]!, alpha);
       c.root.position.set(x, 0, -y);
       c.root.rotation.y = ang + Math.PI / 2;
-      c.root.scale.setScalar(PowerView.bodyScale(w, s));
+      const cls = w.pPerk[s * PERKS + PERK.Class]!;
+      c.root.scale.setScalar(PowerView.bodyScale(w, s) * (cls === 2 ? 1.18 : cls === 3 ? 0.92 : 1));
       power.slot(w, s, x, y, nowSec, dt, s === localSlot);
       const aimDriven = animator.apply(w, s, c, nowSec, { firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: curA[s]! });
       c.update(dt);
@@ -672,6 +741,27 @@ function frame(nowMs: number): void {
     const fx0 = prevX[target]! + (curX[target]! - prevX[target]!) * alpha;
     const fy0 = prevY[target]! + (curY[target]! - prevY[target]!) * alpha;
     stage.follow(fx0, -fy0, fx.shake);
+    // time of day, real-time lights and the flashlight of the local player
+    stage.nightTarget = nightFor(w);
+    stage.update(dt, fx0, -fy0);
+    props.setNight(stage.night);
+    ui.setNightHud(stage.night > 0.5);
+    ui.setCombo(nowSec - comboAt < 2.2 ? comboCount : 0, '');
+    {
+      const me = localSlot;
+      const lx = prevX[me]! + (curX[me]! - prevX[me]!) * alpha;
+      const ly = prevY[me]! + (curY[me]! - prevY[me]!) * alpha;
+      const a = lerpAngle(prevA[me]!, curA[me]!, alpha);
+      stage.setFlashlight(lx, -ly, Math.cos(a), -Math.sin(a), w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive);
+      // ammo ring around the feet: green full, red empty, rounds left beside it
+      const alive = w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive;
+      const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[me]!]!];
+      const reloading = w.pReload[me]! > 0;
+      _p.set(lx, 0.02, -ly).project(stage.camera);
+      const ppu = app.clientWidth / CAMERA.orthoWidth;
+      const frac = reloading ? 1 - w.pReload[me]! / (st.reload * w.modReload) : w.pMag[me]! / st.mag;
+      ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, alive && !w.gameOver, reloading);
+    }
 
     // name tags over the other players
     for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -737,13 +827,21 @@ function frame(nowMs: number): void {
       dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * (1 + Math.min(1.5, st.pierce * 0.5 + st.damage * 0.4))));
       dummy.updateMatrix();
       bulletMesh.setMatrixAt(n, dummy.matrix);
+      dummy.scale.multiply(GLOW_SCALE);
+      dummy.updateMatrix();
+      bulletGlow.setMatrixAt(n, dummy.matrix);
       tracerColor.copy(tr.color).lerp(HOT, Math.min(0.85, st.damage * 1.2));
       if (st.pierce > 0.2) tracerColor.lerp(COOL, Math.min(0.6, st.pierce * 0.3));
       if (st.crit > 0 && (i * 7 + w.tick) % 5 === 0) tracerColor.set('#ffd21f');
-      bulletMesh.setColorAt(n++, tracerColor);
+      tracerColor.multiplyScalar(1.5 + stage.night * 1.2);
+      bulletMesh.setColorAt(n, tracerColor);
+      bulletGlow.setColorAt(n++, tracerColor);
     }
     dummy.scale.setScalar(1);
     bulletMesh.count = n;
+    bulletGlow.count = n;
+    bulletGlow.instanceMatrix.needsUpdate = true;
+    if (bulletGlow.instanceColor) bulletGlow.instanceColor.needsUpdate = true;
     bulletMesh.instanceMatrix.needsUpdate = true;
     if (bulletMesh.instanceColor) bulletMesh.instanceColor.needsUpdate = true;
     let gn = 0;

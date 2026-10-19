@@ -27,13 +27,14 @@ function pick(w: World, id: CardId, by = 0): void {
 }
 
 describe('card pool', () => {
-  it('has 25 cards, every one with a rarity, unique ids and consistent personal list', () => {
-    expect(CARD_IDS.length).toBe(25);
-    expect(new Set(CARD_IDS).size).toBe(25);
+  it('has 35 cards, every one with a rarity, unique ids and consistent personal list', () => {
+    expect(CARD_IDS.length).toBe(35);
+    expect(new Set(CARD_IDS).size).toBe(35);
     for (const id of CARD_IDS) expect([0, 1, 2]).toContain(CARD_RARITY[id]);
     for (const p of PERSONAL_CARDS) expect(CARD_IDS).toContain(p);
     for (const id of Object.keys(CARD_RARITY)) expect(CARD_IDS).toContain(id);
-    for (const id of CARD_IDS) expect(BALANCE.progression.cards).toHaveProperty(id === 'arsenal' || id === 'heal' || id === 'ammo' ? 'damage' : id);
+    const perkCards = ['regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage'];
+    for (const id of CARD_IDS) expect(BALANCE.progression.cards).toHaveProperty(id === 'arsenal' || id === 'heal' || id === 'ammo' || perkCards.includes(id) ? 'damage' : id);
   });
 
   it('offers three different cards and favours common over rare over epic', () => {

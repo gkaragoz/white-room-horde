@@ -347,7 +347,10 @@ export class Crowd {
       this.drawY[i] = y;
       this.drawn[i] = 1;
       const s = this.sample(clip, time);
-      this.put(t, x, -y, this.yaw[i]!, s.a, s.b, s.m, 0.9 + ((i * 53) % 10) * 0.02 + this.flash[i]! * 1.6, 1);
+      // elites stand out: giants are big, swift ones bright, armoured ones dark, volatile ones glow hot
+      const mod = w.eMod[i]!;
+      const eliteShade = mod === 6 ? 0.55 : mod === 4 ? 1.9 : mod === 2 ? 1.35 : mod === 3 ? 1.25 : mod === 5 ? 1.15 : 1;
+      this.put(t, x, -y, this.yaw[i]!, s.a, s.b, s.m, (0.9 + ((i * 53) % 10) * 0.02) * eliteShade + this.flash[i]! * 1.6, mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : 1);
     }
     for (const c of this.corpses) {
       const t = this.types[c.render]!;

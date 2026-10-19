@@ -9,7 +9,7 @@ export const ARENA_HALF_W = 30;
 export const ARENA_HALF_H = 20;
 
 /** Camera (docs/DESIGN.md section 5, iso62): orthographic, elevation 28 deg, yaw 30 deg, ~17 units wide. */
-export const CAMERA = { orthoWidth: 24, elevationDeg: 28, yawDeg: 30 } as const;
+export const CAMERA = { orthoWidth: 32, elevationDeg: 28, yawDeg: 30 } as const;
 
 /** Player vest colours (docs/DESIGN.md section 3), slot 0..10. */
 export const PLAYER_COLORS = [
@@ -18,6 +18,7 @@ export const PLAYER_COLORS = [
 ] as const;
 
 export const MAX_GRENADES = 32;
+export const MAX_BARRELS = 12;
 export const MAX_SPIT = 160;
 
 export interface Box {
@@ -80,6 +81,40 @@ export const MAPS: readonly { id: string; boxes: readonly Box[] }[] = [
       { x: -4, y: 10, w: 2, h: 2 },
       { x: 5, y: -11, w: 4, h: 1.5 },
       { x: 24, y: 0, w: 2, h: 6 },
+    ],
+  },
+  {
+    id: 'ruins',
+    boxes: [
+      { x: -18, y: 6, w: 5, h: 1.2 },
+      { x: -20.4, y: 4, w: 1.2, h: 4 },
+      { x: 18, y: -6, w: 5, h: 1.2 },
+      { x: 20.4, y: -4, w: 1.2, h: 4 },
+      { x: -8, y: -10, w: 1.2, h: 5 },
+      { x: 8, y: 10, w: 1.2, h: 5 },
+      { x: 0, y: 6, w: 4, h: 1.2 },
+      { x: 0, y: -6, w: 4, h: 1.2 },
+      { x: -24, y: -12, w: 4, h: 1.2 },
+      { x: 24, y: 12, w: 4, h: 1.2 },
+      { x: 12, y: -14, w: 1.2, h: 4 },
+      { x: -12, y: 14, w: 1.2, h: 4 },
+      { x: -4, y: 8, w: 2, h: 2 },
+      { x: 4, y: -8, w: 2, h: 2 },
+    ],
+  },
+  {
+    id: 'factory',
+    boxes: [
+      { x: -12, y: 10, w: 18, h: 1.6 },
+      { x: 12, y: 10, w: 18, h: 1.6 },
+      { x: -12, y: -10, w: 18, h: 1.6 },
+      { x: 12, y: -10, w: 18, h: 1.6 },
+      { x: -6.5, y: 0, w: 4, h: 4 },
+      { x: 6.5, y: 0, w: 4, h: 4 },
+      { x: -24, y: 0, w: 2, h: 10 },
+      { x: 24, y: 0, w: 2, h: 10 },
+      { x: 0, y: 15.5, w: 3, h: 2 },
+      { x: 0, y: -15.5, w: 3, h: 2 },
     ],
   },
 ];

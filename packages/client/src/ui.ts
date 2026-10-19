@@ -1,4 +1,4 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS, keyLabel } from './input';
@@ -50,6 +50,11 @@ export const UI_STRINGS = {
     aa: 'Anti-aliasing',
     reloads: 'reloads the page',
     bounce: 'Bounce light (fake GI)',
+    timeOfDay: 'Time of day',
+    day: 'Day',
+    night: 'Night',
+    cycle: 'Day and night',
+    dynLights: 'Real-time lights (flashes, explosions, lamps)',
     on: 'On',
     quality: 'Render scale',
     language: 'Language',
@@ -94,9 +99,9 @@ export const UI_STRINGS = {
     newBest: 'New record!',
     unlockedWeapon: 'Unlocked',
     reconnecting: 'Connection lost, reconnecting...',
-    maps: { '-1': 'Random', '0': 'Warehouse', '1': 'Courtyard', '2': 'Corridors', '3': 'Open field' },
+    maps: { '-1': 'Random', '0': 'Warehouse', '1': 'Courtyard', '2': 'Corridors', '3': 'Open field', '4': 'Ruins', '5': 'Factory' },
     diffs: ['Easy', 'Normal', 'Hard'],
-    accs: ['Bandana', 'Cap', 'Goggles', 'Headphones', 'Helmet', 'Crown', 'Devil horns', 'Top hat', 'Cowboy hat', 'Ninja band', 'Mohawk', 'Bunny ears', 'Cyber visor'],
+    accs: ['Bandana', 'Cap', 'Goggles', 'Headphones', 'Helmet', 'Crown', 'Devil horns', 'Top hat', 'Cowboy hat', 'Ninja band', 'Mohawk', 'Bunny ears', 'Cyber visor', 'Pirate hat', 'Wizard hat', 'Viking helmet', 'Santa hat', 'Chef hat', 'Astronaut', 'Cat ears', 'Halo', 'Alien antennae', 'Gas mask', 'Beanie', 'Samurai helmet', 'Shades', 'Flower crown'],
     controlsTitle: 'Controls',
     pressKey: 'press a key...',
     resetKeys: 'Reset keys',
@@ -138,7 +143,36 @@ export const UI_STRINGS = {
       tempo: ['Tempo', '+25% fire rate for you only'],
       marksman: ['Marksman', 'Your bullets pierce 2 more enemies'],
       ironskin: ['Iron skin', 'You take 20% less damage'],
+      regen: ['Regeneration', 'You heal 1.6 HP per second'],
+      thorns: ['Thorns', 'Enemies that hit you take 16 damage'],
+      shock: ['Shockwave', 'Your dash blasts and shoves enemies around you'],
+      volatile: ['Volatile rounds', '18% of your kills explode'],
+      frost: ['Frost aura', 'Enemies near you move 35% slower'],
+      scavenger: ['Scavenger', 'Kills sometimes refill 2 rounds'],
+      adrenaline: ['Adrenaline', 'Every kill gives a burst of speed'],
+      barrier: ['Barrier', 'A 45 point shield that recharges'],
+      secondwind: ['Second wind', 'Once: get back up at half health instead of going down'],
+      rage: ['Rage', 'Up to 70% more damage as your health drops'],
     },
+    classNames: ['Soldier', 'Medic', 'Heavy', 'Scout', 'Demolisher', 'Ranger', 'Berserker'],
+    classTips: [
+      'Balanced all-rounder',
+      'Heals nearby allies, revives 80% faster, regenerates',
+      '+90 HP and 22% less damage taken, but slow',
+      'Very fast and dashes often, but fragile',
+      '3 extra grenades and 50% bigger blasts',
+      '+15% damage, bullets pierce one more enemy',
+      'Hits harder as health drops, heals on kills',
+    ],
+    classTitle: 'Class',
+    waveMods: ['', 'Swarm!', 'Armored horde!', 'Fast and furious!', 'Bounty wave!', 'Elite storm!'],
+    waveModTips: ['', 'Many weaker enemies', 'Enemies are tougher', 'Enemies run faster', 'Twice the loot', 'Many elite enemies'],
+    elites: ['', 'Giant', 'Swift', 'Splitter', 'Volatile', 'Regenerating', 'Armored'],
+    powerups: ['Ammo', 'Health', 'Grenade', 'Weapon', 'Shield', 'Haste', 'Quad damage', 'NUKE', 'Time freeze'],
+    combos: ['Killing spree!', 'Rampage!', 'Unstoppable!', 'Massacre!', 'Godlike!', 'Apocalypse!'],
+    secondWind: 'Second wind!',
+    mvp: 'MVP',
+    squadKills: 'Kills',
     weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper', revolver: 'Revolver', mp: 'Machine pistol', dbl: 'Double barrel', dmr: 'Marksman rifle', flamer: 'Flamethrower', gl: 'Grenade launcher' },
   },
   tr: {
@@ -181,6 +215,11 @@ export const UI_STRINGS = {
     aa: 'Kenar yumuşatma',
     reloads: 'sayfayı yeniler',
     bounce: 'Sekme ışığı (sahte GI)',
+    timeOfDay: 'Günün saati',
+    day: 'Gündüz',
+    night: 'Gece',
+    cycle: 'Gece gündüz döngüsü',
+    dynLights: 'Gerçek zamanlı ışıklar (namlu, patlama, lamba)',
     on: 'Açık',
     quality: 'Çözünürlük ölçeği',
     language: 'Dil',
@@ -225,9 +264,9 @@ export const UI_STRINGS = {
     newBest: 'Yeni rekor!',
     unlockedWeapon: 'Açıldı',
     reconnecting: 'Bağlantı koptu, yeniden bağlanıyor...',
-    maps: { '-1': 'Rastgele', '0': 'Depo', '1': 'Avlu', '2': 'Koridorlar', '3': 'Açık alan' },
+    maps: { '-1': 'Rastgele', '0': 'Depo', '1': 'Avlu', '2': 'Koridorlar', '3': 'Açık alan', '4': 'Harabe', '5': 'Fabrika' },
     diffs: ['Kolay', 'Normal', 'Zor'],
-    accs: ['Bandana', 'Şapka', 'Gözlük', 'Kulaklık', 'Kask', 'Taç', 'Şeytan boynuzu', 'Silindir şapka', 'Kovboy şapkası', 'Ninja bandı', 'Mohawk', 'Tavşan kulağı', 'Siber vizör'],
+    accs: ['Bandana', 'Şapka', 'Gözlük', 'Kulaklık', 'Kask', 'Taç', 'Şeytan boynuzu', 'Silindir şapka', 'Kovboy şapkası', 'Ninja bandı', 'Mohawk', 'Tavşan kulağı', 'Siber vizör', 'Korsan şapkası', 'Büyücü şapkası', 'Viking miğferi', 'Noel şapkası', 'Aşçı şapkası', 'Astronot', 'Kedi kulağı', 'Hale', 'Uzaylı anteni', 'Gaz maskesi', 'Bere', 'Samuray kaskı', 'Güneş gözlüğü', 'Çiçek tacı'],
     controlsTitle: 'Kontroller',
     pressKey: 'bir tuşa bas...',
     resetKeys: 'Tuşları sıfırla',
@@ -269,7 +308,36 @@ export const UI_STRINGS = {
       tempo: ['Tempo', 'Sadece sana +%25 ateş hızı'],
       marksman: ['Nişancı', 'Mermilerin 2 düşman daha deler'],
       ironskin: ['Demir deri', 'Sadece sen %20 daha az hasar alırsın'],
+      regen: ['Yenilenme', 'Saniyede 1,6 can yenilersin'],
+      thorns: ['Dikenler', 'Sana vuran düşman 16 hasar alır'],
+      shock: ['Şok dalgası', 'Atılman çevrendeki düşmanları patlatıp savurur'],
+      volatile: ['Patlayıcı mermiler', 'Öldürmelerinin %18\'i patlar'],
+      frost: ['Don alanı', 'Yakınındaki düşmanlar %35 yavaşlar'],
+      scavenger: ['Leşçi', 'Öldürmeler bazen 2 mermi doldurur'],
+      adrenaline: ['Adrenalin', 'Her öldürme kısa bir hız verir'],
+      barrier: ['Bariyer', 'Kendini dolduran 45 puanlık kalkan'],
+      secondwind: ['İkinci nefes', 'Bir kez: yere düşmek yerine yarı canla ayağa kalk'],
+      rage: ['Öfke', 'Canın azaldıkça %70\'e kadar fazla hasar'],
     },
+    classNames: ['Asker', 'Sağlıkçı', 'Ağır', 'Gözcü', 'Yıkımcı', 'Avcı', 'Çılgın'],
+    classTips: [
+      'Dengeli, her işe yarar',
+      'Yakındaki dostları iyileştirir, %80 hızlı kaldırır, yenilenir',
+      '+90 can, %22 az hasar, ama yavaş',
+      'Çok hızlı, sık atılır, ama kırılgan',
+      '3 fazladan bomba, %50 büyük patlama',
+      '%15 fazla hasar, mermi bir düşman daha deler',
+      'Canı azaldıkça sert vurur, öldürünce iyileşir',
+    ],
+    classTitle: 'Sınıf',
+    waveMods: ['', 'Sürü!', 'Zırhlı sürü!', 'Hızlı ve öfkeli!', 'Ganimet dalgası!', 'Elit fırtınası!'],
+    waveModTips: ['', 'Çok sayıda zayıf düşman', 'Düşmanlar daha dayanıklı', 'Düşmanlar daha hızlı', 'İki kat ganimet', 'Çok sayıda elit düşman'],
+    elites: ['', 'Dev', 'Çevik', 'Bölünen', 'Patlayıcı', 'Yenilenen', 'Zırhlı'],
+    powerups: ['Mermi', 'Can', 'Bomba', 'Silah', 'Kalkan', 'Hız', 'Dörtlü hasar', 'NÜKLEER', 'Zaman dondurma'],
+    combos: ['Öldürme serisi!', 'Çılgınlık!', 'Durdurulamaz!', 'Katliam!', 'Tanrısal!', 'Kıyamet!'],
+    secondWind: 'İkinci nefes!',
+    mvp: 'MVP',
+    squadKills: 'Öldürme',
     weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı', revolver: 'Revolver', mp: 'Makineli tabanca', dbl: 'Çift namlulu', dmr: 'Nişancı tüfeği', flamer: 'Alev makinesi', gl: 'Bombaatar' },
   },
 } as const;
@@ -280,7 +348,7 @@ export interface UiHandlers {
   onJoin(name: string, code: string, server: string, password: string): void;
   onRejoin(): void;
   onWeapon(weapon: WeaponId): void;
-  onLook(acc: number, color: number): void;
+  onLook(acc: number, color: number, cls: number): void;
   getBindings(): Record<string, string[]>;
   onRebind(action: string, done: () => void): void;
   onResetKeys(): void;
@@ -292,7 +360,7 @@ export interface UiHandlers {
   onResume(): void;
   onReplay(): void;
   onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
-  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'renderer' | 'fpsCap' | 'texture' | 'autoScale', value: number | string | boolean): void;
+  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'time' | 'dynLights' | 'renderer' | 'fpsCap' | 'texture' | 'autoScale', value: number | string | boolean): void;
 }
 
 export interface Settings {
@@ -304,6 +372,10 @@ export interface Settings {
   renderer: 'webgl' | 'webgpu';
   aa: 'off' | 'msaa' | 'smaa';
   bounce: boolean;
+  /** Time of day: always day, always night, or a day/night cycle that follows the waves. */
+  time: 'day' | 'night' | 'cycle';
+  /** Real-time lights: muzzle flashes, explosions, street lamps, flashlight. */
+  dynLights: boolean;
   volume: number;
   shadows: 0 | 1 | 2;
   scale: number;
@@ -402,7 +474,26 @@ const CSS = `
 .wrh-ro{display:flex;gap:10px;align-items:center;margin:6px 0 10px;font-size:13px}
 .wrh-thumb-s{width:84px;aspect-ratio:3/2;border-radius:7px;object-fit:cover}
 .wrh-ui button.wrh-play{width:100%;font-size:19px;padding:13px;margin:6px 0 4px;background:linear-gradient(180deg,#38b6ff,#1488e6);box-shadow:0 3px 0 #0e6fba}
+.wrh-classes{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 2px;width:100%;max-width:340px}
+.wrh-ui button.wrh-class{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;margin:0;border-radius:10px;background:#efe7d6;color:#3a352d;border:3px solid transparent;font-size:11px;box-shadow:0 2px 4px rgba(60,45,20,.15)}
+.wrh-ui button.wrh-class .ci{font-size:20px;line-height:1.1}
+.wrh-ui button.wrh-class.on{background:#fff;border-color:#1fa2ff}
+.wrh-class-tip{font-size:12px;opacity:.8;min-height:30px;text-align:center;max-width:340px}
+.wrh-combo{position:absolute;right:16px;top:90px;text-align:right;font-weight:900;color:#d8362e;text-shadow:0 2px 0 #fff,0 0 14px rgba(255,255,255,.8);pointer-events:none;transition:transform .08s}
+.wrh-combo b{font-size:42px;display:block;line-height:1}
+.wrh-combo small{font-size:13px;color:#3a352d;font-weight:700}
+.wrh-ui.night .wrh-combo small{color:#e9effa}
+.wrh-statrow{display:flex;gap:8px;align-items:center;justify-content:center;font-size:14px;margin:2px 0}
+.wrh-statrow .wrh-dot{flex:none}
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
+.wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{color:#e9effa;text-shadow:0 1px 2px #000}
+.wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
+.wrh-ammo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none}
+.wrh-ammo i{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--c) calc(var(--f)*1%),rgba(30,36,48,.28) 0);-webkit-mask:radial-gradient(closest-side,transparent 76%,#000 79%);mask:radial-gradient(closest-side,transparent 76%,#000 79%);filter:drop-shadow(0 0 3px rgba(0,0,0,.35))}
+.wrh-ammo b{position:absolute;left:100%;top:50%;transform:translate(8px,-50%);font-size:14px;font-weight:800;color:#fff;white-space:nowrap;padding:0 7px;border-radius:9px;background:rgba(25,30,42,.62);text-shadow:0 1px 0 rgba(0,0,0,.6)}
+.wrh-ammo.low b{background:rgba(190,30,30,.8);animation:wrhblink .4s infinite alternate}
+.wrh-ammo.reload i{animation:wrhspin 0.9s linear infinite}
+@keyframes wrhspin{from{filter:drop-shadow(0 0 3px rgba(0,0,0,.35)) brightness(1)}to{filter:drop-shadow(0 0 5px rgba(255,255,255,.7)) brightness(1.4)}}
 .wrh-arrow-off{position:absolute;pointer-events:none;display:none;transform:translate(-50%,-50%)}
 .wrh-arrow-off i{display:block;width:0;height:0;border-left:18px solid var(--c);border-top:10px solid transparent;border-bottom:10px solid transparent;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
 .wrh-arrow-off span{position:absolute;left:50%;top:18px;transform:translateX(-50%);font-size:10px;font-weight:700;padding:0 5px;border-radius:7px;background:rgba(250,244,232,.85);white-space:nowrap}
@@ -431,6 +522,9 @@ function esc(s: string): string {
 
 /** DOM overlay: menu, lobby, HUD, cards, down/dead/game-over screens, settings. */
 const thumbCache = new Map<number, string>();
+
+/** One emoji per class for the picker. */
+const CLASS_ICONS = ['\u{1F396}\uFE0F', '\u{1FA7A}', '\u{1F6E1}\uFE0F', '\u{1F45F}', '\u{1F4A3}', '\u{1F3AF}', '\u{1F608}'];
 
 /** A little top-down picture of an arena layout, painted from the same data the game uses (cached as a data URL). */
 function arenaThumb(index: number): string {
@@ -502,6 +596,10 @@ export class Ui {
   acc = 0;
   /** Vest colour index (-1: the slot's own colour). */
   color = -1;
+  /** Class index (see CLASS_IDS). */
+  cls = 0;
+  /** Names of the players by slot (game over screen). */
+  playerNames: string[] = [];
   /** Colour of a player slot as the game draws it (set by main from the lobby choices). */
   slotColor: (slot: number) => string = (s) => PLAYER_COLORS[s % PLAYER_COLORS.length]!;
   private preview: Preview | null = null;
@@ -661,6 +759,9 @@ export class Ui {
       <div class="wrh-stage"><button type="button" class="wrh-arrow" data-pdir="-1" aria-label="previous">&#9664;</button><div class="wrh-canvas" id="wrh-prev-host"></div><button type="button" class="wrh-arrow" data-pdir="1" aria-label="next">&#9654;</button></div>
       <div class="wrh-prev-name" id="wrh-prev-name"></div><div class="wrh-prev-stats" id="wrh-prev-stats"></div>
       <div class="wrh-swatches" id="wrh-swatches">${swatches}</div>
+      <label style="margin-top:8px">${t.classTitle}</label>
+      <div class="wrh-classes">${(t.classNames as readonly string[]).map((n, i) => `<button type="button" class="wrh-class${i === this.cls ? ' on' : ''}" data-cls="${i}" title="${esc((t.classTips as readonly string[])[i]!)}"><span class="ci">${CLASS_ICONS[i]}</span><b>${n}</b></button>`).join('')}</div>
+      <div class="wrh-class-tip" id="wrh-class-tip">${esc((t.classTips as readonly string[])[this.cls]!)}</div>
     </div>`;
   }
 
@@ -700,7 +801,7 @@ export class Ui {
         if (this.previewMode === 'char') {
           this.acc = (this.acc + dir + ACCESSORIES.length) % ACCESSORIES.length;
           this.persistLook();
-          this.h.onLook(this.acc, this.color);
+          this.h.onLook(this.acc, this.color, this.cls);
         } else {
           const list = unlocked();
           const at = Math.max(0, list.indexOf(this.weapon));
@@ -710,12 +811,22 @@ export class Ui {
         refresh();
       };
     });
+    this.screen.querySelectorAll<HTMLElement>('[data-cls]').forEach((el) => {
+      el.onclick = () => {
+        this.cls = Number(el.dataset.cls);
+        this.persistLook();
+        this.h.onLook(this.acc, this.color, this.cls);
+        this.screen.querySelectorAll<HTMLElement>('[data-cls]').forEach((x) => x.classList.toggle('on', x === el));
+        const tip = this.screen.querySelector<HTMLElement>('#wrh-class-tip');
+        if (tip) tip.textContent = (this.t.classTips as readonly string[])[this.cls] ?? '';
+      };
+    });
     this.screen.querySelectorAll<HTMLElement>('[data-sw]').forEach((el) => {
       el.onclick = () => {
         const i = Number(el.dataset.sw);
         this.color = this.color === i ? -1 : i;
         this.persistLook();
-        this.h.onLook(this.acc, this.color);
+        this.h.onLook(this.acc, this.color, this.cls);
         refresh();
       };
     });
@@ -733,6 +844,7 @@ export class Ui {
     const p = loadProfile();
     p.acc = this.acc;
     p.color = this.color;
+    p.cls = this.cls;
     p.map = this.map;
     p.difficulty = this.difficulty;
     saveProfile(p);
@@ -753,7 +865,7 @@ export class Ui {
       const pic = map >= 0 ? `<img class="wrh-thumb-s" src="${arenaThumb(map)}" alt="">` : '<span class="wrh-thumb-s wrh-dice">?</span>';
       return `<div class="wrh-ro">${pic}<span><b>${names[String(map)]}</b><br><span class="wrh-sk-row">${skulls(difficulty)}</span> <b>${diffNames[difficulty]}</b></span></div>`;
     }
-    const cards = ['-1', '0', '1', '2', '3']
+    const cards = ['-1', ...MAPS.map((_, i) => String(i))]
       .map((id) => {
         const pic = id === '-1' ? '<span class="wrh-dice">?</span>' : `<img src="${arenaThumb(Number(id))}" alt="">`;
         return `<button type="button" class="wrh-arena${id === String(map) ? ' on' : ''}" data-map="${id}">${pic}<span>${names[id]}</span></button>`;
@@ -770,6 +882,7 @@ export class Ui {
     const profile = loadProfile();
     this.acc = profile.acc;
     this.color = profile.color;
+    this.cls = profile.cls;
     this.map = profile.map;
     this.difficulty = profile.difficulty;
     const saved = (() => {
@@ -883,6 +996,61 @@ export class Ui {
     (el.firstElementChild as HTMLElement).style.transform = `rotate(${angle}rad)`;
     const label = el.lastElementChild as HTMLElement;
     if (label.textContent !== name) label.textContent = name;
+  }
+
+  private comboEl: HTMLElement | null = null;
+
+  /** The kill counter on the right while a streak is going (count 0 hides it). */
+  setCombo(count: number, label: string): void {
+    let el = this.comboEl;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wrh-combo';
+      el.innerHTML = '<b></b><small></small>';
+      this.root.appendChild(el);
+      this.comboEl = el;
+    }
+    el.style.display = count >= 3 ? 'block' : 'none';
+    if (count < 3) return;
+    const b = el.firstElementChild as HTMLElement;
+    if (b.textContent !== `x${count}`) {
+      b.textContent = `x${count}`;
+      el.style.transform = 'scale(1.18)';
+      setTimeout(() => (el!.style.transform = 'scale(1)'), 80);
+    }
+    (el.lastElementChild as HTMLElement).textContent = label;
+  }
+
+  private ammoEl: HTMLElement | null = null;
+
+  /** The ring around the player's feet: green when the magazine is full, red when it runs out, with the rounds left beside it. */
+  /** Light text on the HUD while it is night. */
+  setNightHud(on: boolean): void {
+    this.root.classList.toggle('night', on);
+  }
+
+  setAmmoRing(px: number, py: number, w: number, frac: number, text: string, visible: boolean, reloading: boolean): void {
+    let el = this.ammoEl;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wrh-ammo';
+      el.innerHTML = '<i></i><b></b>';
+      this.root.appendChild(el);
+      this.ammoEl = el;
+    }
+    el.style.display = visible ? 'block' : 'none';
+    if (!visible) return;
+    el.style.left = `${px}px`;
+    el.style.top = `${py}px`;
+    el.style.width = `${w}px`;
+    el.style.height = `${w * 0.52}px`;
+    const f = Math.max(0, Math.min(1, frac));
+    el.style.setProperty('--f', String(Math.round(f * 100)));
+    el.style.setProperty('--c', `hsl(${Math.round(f * 125)} 85% 48%)`);
+    el.classList.toggle('reload', reloading);
+    el.classList.toggle('low', f <= 0.25 && !reloading);
+    const b = el.lastElementChild as HTMLElement;
+    if (b.textContent !== text) b.textContent = text;
   }
 
   private ringEls: HTMLElement[] = [];
@@ -1018,6 +1186,18 @@ export class Ui {
     }
   }
 
+  /** Who killed how many (the top killer is the MVP). */
+  private squadStats(world: World): string {
+    const rows: { s: number; k: number }[] = [];
+    for (let s = 0; s < MAX_PLAYERS; s++) if (world.pActive[s]) rows.push({ s, k: world.pPerk[s * PERKS + PERK.Kills]! });
+    if (rows.length < 2) return '';
+    rows.sort((a, b) => b.k - a.k);
+    const t = this.t;
+    return rows
+      .map((r, i) => `<div class="wrh-statrow"><span class="wrh-dot" style="background:${this.slotColor(r.s)}"></span>${esc(this.playerNames[r.s] ?? 'P' + (r.s + 1))}: <b>${r.k}</b> ${t.squadKills}${i === 0 && r.k > 0 ? ` &middot; &#127942; <b>${t.mvp}</b>` : ''}</div>`)
+      .join('');
+  }
+
   showGameOver(world: World, canReplay = false, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }): void {
     const t = this.t;
     const names = t.weapons as Record<string, string>;
@@ -1027,6 +1207,7 @@ export class Ui {
     this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center">
       <h1>${t.over}</h1>
       <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${world.level}</b></p>${extra}
+      ${this.squadStats(world)}
       <button id="wrh-again">${t.again}</button>${canReplay ? `<button id="wrh-replay" class="alt">${t.replay}</button>` : ''}
     </div>`;
     const rb = this.screen.querySelector<HTMLElement>('#wrh-replay');
@@ -1065,6 +1246,15 @@ export class Ui {
   }
 
   /** Big message in the middle for a moment (wave start, boss, revive). */
+  /** A full-screen flash of a colour that fades out (nukes, freezes). */
+  screenFlash(color: string, ms: number): void {
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;inset:0;background:${color};opacity:.85;pointer-events:none;transition:opacity ${ms}ms ease-out`;
+    this.root.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => (el.style.opacity = '0')));
+    setTimeout(() => el.remove(), ms + 100);
+  }
+
   banner(text: string, sub = '', ms = 2200): void {
     const el = this.hud.querySelector<HTMLElement>('#h-banner');
     if (!el) return;
@@ -1099,6 +1289,8 @@ export class Ui {
       <label>${t.quality} (${s.scale.toFixed(2)})</label><input id="s-sc" type="range" min="50" max="100" step="5" value="${Math.round(s.scale * 100)}">
       <label>${t.renderer} <small>(${t.reloads})</small></label><div class="wrh-row">${(['webgl', 'webgpu'] as const).map((m) => `<button class="wrh-wp${s.renderer === m ? ' on' : ''}" data-rd="${m}">${m === 'webgl' ? 'WebGL2' : 'WebGPU'}</button>`).join('')}</div>
       <label>${t.aa} <small>(${t.reloads})</small></label><div class="wrh-row">${(['off', 'msaa', 'smaa'] as const).map((m) => `<button class="wrh-wp${s.aa === m ? ' on' : ''}" data-aa="${m}">${m === 'off' ? t.off : m.toUpperCase()}</button>`).join('')}</div>
+      <label>${t.timeOfDay}</label><div class="wrh-row">${(['day', 'night', 'cycle'] as const).map((m) => `<button class="wrh-wp${s.time === m ? ' on' : ''}" data-tod="${m}">${t[m]}</button>`).join('')}</div>
+      <label>${t.dynLights}</label><div class="wrh-row"><button class="wrh-wp${s.dynLights ? ' on' : ''}" id="s-dl1">${t.on}</button><button class="wrh-wp${!s.dynLights ? ' on' : ''}" id="s-dl0">${t.off}</button></div>
       <label>${t.bounce}</label><div class="wrh-row"><button class="wrh-wp${s.bounce ? ' on' : ''}" id="s-bn1">${t.on}</button><button class="wrh-wp${!s.bounce ? ' on' : ''}" id="s-bn0">${t.off}</button></div>
       <label>${t.controlsTitle}</label><div class="wrh-keys" id="s-keys">${this.keyRows()}</div><button class="alt" id="s-resetkeys">${t.resetKeys}</button>
       <label>${t.fpsCap}</label><div class="wrh-row">${([0, 30, 60, 120] as const).map((v) => `<button class="wrh-wp${s.fpsCap === v ? ' on' : ''}" data-fps="${v}">${v === 0 ? t.unlimited : v}</button>`).join('')}</div>
@@ -1118,6 +1310,11 @@ export class Ui {
     this.settingsEl.querySelectorAll<HTMLElement>('[data-rd]').forEach((el) => {
       el.onclick = () => this.h.onSetting('renderer', el.dataset.rd!);
     });
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-tod]').forEach((el) => {
+      el.onclick = () => this.h.onSetting('time', el.dataset.tod!);
+    });
+    q('s-dl1').onclick = () => this.h.onSetting('dynLights', true);
+    q('s-dl0').onclick = () => this.h.onSetting('dynLights', false);
     q('s-bn1').onclick = () => this.h.onSetting('bounce', true);
     q('s-bn0').onclick = () => this.h.onSetting('bounce', false);
     this.settingsEl.querySelectorAll<HTMLElement>('[data-act]').forEach((el) => {

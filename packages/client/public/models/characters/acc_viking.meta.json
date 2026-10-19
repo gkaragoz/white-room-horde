@@ -1,0 +1,23 @@
+{
+ "id": "acc_viking",
+ "tris": 316,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_fixed"
+ ],
+ "height": 1.216,
+ "attach": "head"
+}

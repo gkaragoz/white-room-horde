@@ -8,8 +8,11 @@ export const SH_H = Math.ceil((ARENA_HALF_H * 2) / SH_CELL) + 1;
 export class SpatialHash {
   readonly head = new Int32Array(SH_W * SH_H);
   readonly next = new Int32Array(MAX_ENEMIES);
+  /** False until the grid has been built once (before that the lists would be garbage). */
+  built = false;
 
   clear(): void {
+    this.built = true;
     this.head.fill(-1);
   }
 

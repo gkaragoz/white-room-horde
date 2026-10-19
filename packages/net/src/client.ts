@@ -43,7 +43,7 @@ export class NetSession {
   /** Number of snapshots this client restored (diagnostics). */
   resyncs = 0;
   private weapon: WeaponId = 'pistol';
-  private pendingStart: { seed: number; players: { slot: number; weapon: WeaponId }[] } | null = null;
+  private pendingStart: { seed: number; players: { slot: number; weapon: WeaponId; cls: number }[] } | null = null;
   private nextPing = 0;
 
   constructor(
@@ -75,8 +75,8 @@ export class NetSession {
     this.sendJson({ t: 'options', map, difficulty });
   }
 
-  setLook(acc: number, color = -1): void {
-    this.sendJson({ t: 'look', acc, color });
+  setLook(acc: number, color = -1, cls = 0): void {
+    this.sendJson({ t: 'look', acc, color, cls });
   }
 
   start(): void {
@@ -179,7 +179,7 @@ export class NetSession {
       this.bundles.delete(b.tick);
       this.history.set(b.tick, b);
       this.history.delete(b.tick - 900);
-      for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!);
+      for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!, j.cls);
       hooks?.before?.(w);
       step(w, b.inputs);
       hooks?.after?.(w);

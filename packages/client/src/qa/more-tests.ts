@@ -339,7 +339,7 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
@@ -401,7 +401,7 @@ export const moreTests: QaTest[] = [
       document.body.appendChild(host);
       const looks: [number, number][] = [];
       const weapons: string[] = [];
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: (w) => weapons.push(w), onLook: (a, c) => looks.push([a, c]), getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
@@ -507,7 +507,7 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,

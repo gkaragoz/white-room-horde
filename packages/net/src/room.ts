@@ -1,4 +1,4 @@
-import { GAME_VERSION, MAP_COUNT, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { GAME_VERSION, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { Bin, decodeInputMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
@@ -15,6 +15,7 @@ interface Member {
   weapon: WeaponId;
   acc: number;
   color: number;
+  cls: number;
   /** Secret that lets this player reattach to the slot after a dropped connection. */
   token: string;
   /** Set once the member is part of the running simulation (join command emitted). */
@@ -55,11 +56,11 @@ export class Room {
   lastActive = 0;
   /** Every bundle sent so far (index = tick), for late joiners. */
   readonly history: Uint8Array[] = [];
-  private pendingJoins: { slot: number; weaponIndex: number }[] = [];
+  private pendingJoins: { slot: number; weaponIndex: number; cls: number }[] = [];
   private readonly votes = new Map<number, Map<number, number>>();
   private readonly diverged = new Set<number>();
   private readonly jobs: SnapJob[] = [];
-  private startPlayers: { slot: number; weapon: WeaponId }[] = [];
+  private startPlayers: { slot: number; weapon: WeaponId; cls: number }[] = [];
 
   constructor(
     readonly code: string,
@@ -68,7 +69,7 @@ export class Room {
 
   private info(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc, color: m.color });
+    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc, color: m.color, cls: m.cls });
     return out;
   }
 
@@ -84,15 +85,15 @@ export class Room {
     send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, difficulty: this.options.difficulty });
   }
 
-  add(conn: Conn, name: string, weapon: WeaponId, acc = 0, color = -1): Member | null {
+  add(conn: Conn, name: string, weapon: WeaponId, acc = 0, color = -1, cls = 0): Member | null {
     const slot = this.members.findIndex((m) => m === null);
     if (slot < 0) return null;
     const host = this.members.every((m) => m === null);
-    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, color, token: randomToken(), joined: false, pending: new Map(), last: undefined };
+    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, color, cls, token: randomToken(), joined: false, pending: new Map(), last: undefined };
     this.members[slot] = m;
     if (this.started) {
       // late join: add the player at the next tick and bring the client up to date
-      this.pendingJoins.push({ slot, weaponIndex: WEAPON_IDS.indexOf(weapon) });
+      this.pendingJoins.push({ slot, weaponIndex: WEAPON_IDS.indexOf(weapon), cls });
       m.joined = true;
       this.sendStart(conn);
       this.catchUp(m);
@@ -146,7 +147,7 @@ export class Room {
     for (const m of this.members) {
       if (!m) continue;
       m.joined = true;
-      this.startPlayers.push({ slot: m.slot, weapon: m.weapon });
+      this.startPlayers.push({ slot: m.slot, weapon: m.weapon, cls: m.cls });
     }
     for (const m of this.members) if (m?.conn) this.sendStart(m.conn);
     this.broadcastRoom();
@@ -364,7 +365,8 @@ export class RoomManager {
     if (!msg || typeof msg !== 'object' || typeof (msg as { t?: unknown }).t !== 'string') return;
     const weaponOf = (w: unknown): WeaponId => (typeof w === 'string' && (WEAPON_IDS as readonly string[]).includes(w) ? (w as WeaponId) : 'pistol');
     const colorOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < PLAYER_COLORS.length ? v : -1);
-    const accOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 16 ? v : 0);
+    const clsOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < CLASS_IDS.length ? v : 0);
+    const accOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 40 ? v : 0);
     const isHost = (): boolean => !!a && a.room.members[a.slot]?.host === true;
     switch (msg.t) {
       case 'create': {
@@ -375,7 +377,7 @@ export class RoomManager {
         room.lastActive = this.now;
         if (typeof msg.password === 'string') room.password = msg.password.slice(0, 24);
         this.rooms.set(room.code, room);
-        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color))!;
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color), clsOf(msg.cls))!;
         this.attached.set(conn, { room, slot: m.slot });
         room.broadcastRoom();
         break;
@@ -386,7 +388,7 @@ export class RoomManager {
         const room = this.rooms.get(String(msg.code).toUpperCase());
         if (!room) return send(conn, { t: 'error', message: 'room not found' });
         if (room.password && room.password !== msg.password) return send(conn, { t: 'error', message: 'wrong password' });
-        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color));
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color), clsOf(msg.cls));
         if (!m) return send(conn, { t: 'error', message: 'room is full' });
         room.lastActive = this.now;
         this.attached.set(conn, { room, slot: m.slot });
@@ -429,6 +431,7 @@ export class RoomManager {
         if (a && !a.room.started) {
           a.room.members[a.slot]!.acc = accOf(msg.acc);
           a.room.members[a.slot]!.color = colorOf(msg.color);
+          a.room.members[a.slot]!.cls = clsOf(msg.cls);
           a.room.broadcastRoom();
         }
         break;

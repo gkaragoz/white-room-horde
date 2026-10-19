@@ -595,3 +595,12 @@ Kalite çıtası: "AA" seviyesi (indie üstü, AAA altı): cilalı VFX, tutarlı
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - Sunucu barındırma: ilk aşamada yerel; Cloudflare Tunnel sonra.
 - Sonraki sürüm: kalıcı meta ilerleme (yerel), yeni haritalar, WebRTC aktarımı, sıralama tablosu.
+
+
+## 23. Sınıflar, perklar ve kaos (v0.3)
+- **Sınıflar** (`balance.json` `classes`, `CLASS_IDS`): asker, sağlıkçı, ağır, gözcü, yıkımcı, avcı, berserker. `addPlayer(..., cls)` sınıfın can/hız/hasar/zırh/yenilenme/aura/bomba gibi değerlerini uygular; sınıf lobide seçilir, `look` mesajı ve `start`/`joins` içinde taşınır (join byte'ında silah 5 bit, sınıf 3 bit).
+- **Perk dizisi** `pPerk[slot * PERKS + PERK.x]`: sınıf pasifleri, kart etkileri (yenilenme, diken, şok, patlayıcı, buz, leşçi, adrenalin, bariyer, ikinci nefes, öfke) ve zamanlayıcılar (hız, dörtlü hasar, kalkan). Hepsi snapshot ve hash içinde.
+- **Elit düşmanlar** `eMod` (dev, çevik, bölünen, patlayıcı, yenilenen, zırhlı) ve **dalga modifikatörleri** `waveModOf(wave)` (sürü, zırhlı sürü, hızlı, ganimet, elit fırtınası).
+- **Güç artıları**: kalkan, hız, dörtlü hasar, nükleer, zaman dondurma (`PickupType`).
+- **Fizik**: her vuruş düşmanı iter (`knock`), patlamalar hayatta kalanları savurur, patlayıcı variller (`brActive...`) zincirleme patlar.
+- **Işık**: `Stage.setNightNow/nightTarget`, sabit sayıda PointLight havuzu (8) + 4 lamba ışığı + el feneri (ışık sayısı sabit, shader yeniden derlenmez). `Fx.light` namlu ve patlama ışığı verir.

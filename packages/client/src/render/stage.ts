@@ -30,6 +30,19 @@ export class Stage {
 
   private composer: EffectComposer | null = null;
   private readonly bounce: THREE.DirectionalLight;
+  private readonly hemi: THREE.HemisphereLight;
+  private readonly bg = new THREE.Color('#d5dde6');
+  /** 0 = broad daylight, 1 = deep night. Moves smoothly towards `nightTarget`. */
+  night = 0;
+  nightTarget = 0;
+  /** Real-time lights: a fixed pool (a constant light count avoids shader recompiles), lamp lights and a flashlight. */
+  private readonly pool: { light: THREE.PointLight; life: number; max: number; peak: number }[] = [];
+  private readonly lampLights: THREE.PointLight[] = [];
+  private readonly flashlight: THREE.SpotLight;
+  private readonly selfLight: THREE.PointLight;
+  private dynamicLights = true;
+  private lampSpots: { x: number; y: number; z: number; color?: string }[] = [];
+  private flashOn = false;
 
   /** Build a stage on the requested backend (WebGPU is initialised asynchronously). */
   static async create(container: HTMLElement, opts: StageOptions = { aa: 'msaa', bounce: true }): Promise<Stage> {
@@ -59,7 +72,7 @@ export class Stage {
 
     this.scene.background = new THREE.Color('#d5dde6');
 
-    // Camera: elevation 28 deg above the horizon, yaw 30 deg, orthographic 24 units wide.
+    // Camera: elevation 28 deg above the horizon, yaw 30 deg, orthographic 32 units wide.
     const el = THREE.MathUtils.degToRad(CAMERA.elevationDeg);
     const yaw = THREE.MathUtils.degToRad(CAMERA.yawDeg);
     this.camOffset = new THREE.Vector3(Math.sin(yaw) * Math.cos(el), Math.sin(el), Math.cos(yaw) * Math.cos(el)).multiplyScalar(40);
@@ -71,17 +84,35 @@ export class Stage {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
-    sc.left = -22; sc.right = 22; sc.top = 22; sc.bottom = -22; sc.near = 1; sc.far = 80;
+    sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 80;
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun, this.sun.target);
-    this.scene.add(new THREE.HemisphereLight('#e4eefc', '#a9b2bd', 1.55));
+    this.hemi = new THREE.HemisphereLight('#e4eefc', '#a9b2bd', 1.55);
+    this.scene.add(this.hemi);
 
     // fake bounce light: sunlight reflected by the cream floor tints the shaded sides warmly
     this.bounce = new THREE.DirectionalLight('#dfe9f5', 0.5);
     this.bounce.position.set(-this.sunOffset.x, -this.sunOffset.y * 0.2 + 2, -this.sunOffset.z);
     this.bounce.visible = opts.bounce;
     this.scene.add(this.bounce);
+
+    // real-time lights: 8 for flashes and explosions, 4 for the street lamps nearest to the camera, the player's own
+    // little light and a flashlight cone (all start dark; the night turns lamps and flashlight on)
+    for (let i = 0; i < 8; i++) {
+      const light = new THREE.PointLight('#ffd9a0', 0, 12, 1.6);
+      this.scene.add(light);
+      this.pool.push({ light, life: 0, max: 1, peak: 0 });
+    }
+    for (let i = 0; i < 4; i++) {
+      const l = new THREE.PointLight('#ffe2a8', 0, 13, 1.5);
+      this.scene.add(l);
+      this.lampLights.push(l);
+    }
+    this.selfLight = new THREE.PointLight('#cfe0ff', 0, 7, 1.5);
+    this.scene.add(this.selfLight);
+    this.flashlight = new THREE.SpotLight('#fff3d6', 0, 22, Math.PI / 5, 0.45, 1.3);
+    this.scene.add(this.flashlight, this.flashlight.target);
 
     this.scene.add(makeFloor(opts.texture ?? 1));
     if (opts.aa === 'smaa' && backend === 'webgl') {
@@ -94,6 +125,104 @@ export class Stage {
     }
     this.resize();
     window.addEventListener('resize', () => this.resize());
+  }
+
+  /** Switch the real-time lights (muzzle flashes, explosions, lamps, flashlight) on or off. */
+  setDynamicLights(on: boolean): void {
+    this.dynamicLights = on;
+    if (!on) {
+      for (const p of this.pool) p.light.intensity = 0;
+      for (const l of this.lampLights) l.intensity = 0;
+      this.selfLight.intensity = 0;
+      this.flashlight.intensity = 0;
+    }
+  }
+
+  /** Where the street lamps stand (world coordinates of their lamp heads); the nearest ones to the camera get a light. */
+  setLamps(spots: { x: number; y: number; z: number; color?: string }[]): void {
+    this.lampSpots = spots;
+  }
+
+  /** A short real-time light: muzzle flash, explosion, spark. Reuses the dimmest light of the pool. */
+  glow(x: number, y: number, z: number, color: string, intensity: number, life: number, distance = 10): void {
+    if (!this.dynamicLights) return;
+    let best = this.pool[0]!;
+    for (const p of this.pool) if (p.life < best.life) best = p;
+    best.light.position.set(x, y, z);
+    best.light.color.set(color);
+    best.light.distance = distance;
+    best.peak = intensity;
+    best.life = life;
+    best.max = life;
+    best.light.intensity = intensity;
+  }
+
+  /** The local player's flashlight: position, aim direction (floor plane) and whether it is lit. */
+  setFlashlight(x: number, z: number, dx: number, dz: number, on: boolean): void {
+    this.flashOn = on;
+    this.flashlight.position.set(x, 1.7, z);
+    this.flashlight.target.position.set(x + dx * 8, 0, z + dz * 8);
+    this.selfLight.position.set(x, 1.8, z);
+  }
+
+  /** Jump straight to a time of day (no fade), for the start of a game. */
+  setNightNow(t: number): void {
+    this.night = t;
+    this.nightTarget = t;
+    this.applyNight();
+  }
+
+  /** Advance the time of day and the flicker of the real-time lights. */
+  update(dt: number, cx: number, cz: number): void {
+    if (Math.abs(this.night - this.nightTarget) > 0.001) {
+      this.night += Math.sign(this.nightTarget - this.night) * Math.min(Math.abs(this.nightTarget - this.night), dt * 0.35);
+      this.applyNight();
+    }
+    for (const p of this.pool) {
+      if (p.life <= 0) continue;
+      p.life -= dt;
+      p.light.intensity = this.dynamicLights ? Math.max(0, p.life / p.max) * p.peak : 0;
+    }
+    const n = this.night;
+    // lamps: the four nearest to the camera focus
+    const near = [...this.lampSpots].sort((a, b) => (a.x - cx) ** 2 + (a.z - cz) ** 2 - ((b.x - cx) ** 2 + (b.z - cz) ** 2)).slice(0, this.lampLights.length);
+    this.lampLights.forEach((l, i) => {
+      const s = near[i];
+      if (!s || !this.dynamicLights) {
+        l.intensity = 0;
+        return;
+      }
+      l.position.set(s.x, s.y, s.z);
+      l.color.set(s.color ?? '#ffe2a8');
+      l.intensity = n * 14 * (0.95 + 0.05 * Math.sin(performance.now() / 90 + i));
+    });
+    this.flashlight.intensity = this.dynamicLights && this.flashOn ? n * 60 : 0;
+    this.selfLight.intensity = this.dynamicLights && this.flashOn ? n * 4 : 0;
+  }
+
+  private static readonly DAY = { bg: new THREE.Color('#d5dde6'), sky: new THREE.Color('#e4eefc'), ground: new THREE.Color('#a9b2bd'), hemi: 1.55, sun: new THREE.Color('#fff6ea'), sunI: 3.1, bounce: 0.5, exposure: 1.05 };
+  private static readonly NIGHT = { bg: new THREE.Color('#0a1020'), sky: new THREE.Color('#3a4e86'), ground: new THREE.Color('#10172a'), hemi: 0.85, sun: new THREE.Color('#8fa6ff'), sunI: 0.75, bounce: 0.0, exposure: 1.2 };
+
+  private applyNight(): void {
+    const t = this.night;
+    const D = Stage.DAY;
+    const N = Stage.NIGHT;
+    this.bg.copy(D.bg).lerp(N.bg, t);
+    (this.scene.background as THREE.Color).copy(this.bg);
+    this.hemi.color.copy(D.sky).lerp(N.sky, t);
+    this.hemi.groundColor.copy(D.ground).lerp(N.ground, t);
+    this.hemi.intensity = D.hemi + (N.hemi - D.hemi) * t;
+    this.sun.color.copy(D.sun).lerp(N.sun, t);
+    this.sun.intensity = D.sunI + (N.sunI - D.sunI) * t;
+    this.bounce.intensity = D.bounce * (1 - t);
+    this.renderer.toneMappingExposure = D.exposure + (N.exposure - D.exposure) * t;
+    if (t > 0.02) {
+      if (!this.scene.fog) this.scene.fog = new THREE.Fog(this.bg.clone(), 38, 95);
+      (this.scene.fog as THREE.Fog).color.copy(this.bg);
+      (this.scene.fog as THREE.Fog).far = 95 - 30 * t;
+    } else {
+      this.scene.fog = null;
+    }
   }
 
   /** 0 = off, 1 = low (1024 map), 2 = high (2048 map). */

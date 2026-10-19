@@ -34,7 +34,7 @@ describe('pickups', () => {
     expect(w.kActive[0]).toBe(1); // slot 0 is at full health, so it is not taken
     spawnPickup(w, PickupType.Health, 6.4, 0);
     for (let t = 0; t < 3; t++) step(w, [NONE, NONE]);
-    expect(w.pHp[1]).toBe(40 + BALANCE.pickups.healthAmount);
+    expect(w.pHp[1]!).toBeCloseTo(40 + BALANCE.pickups.healthAmount, 0); // out-of-combat regeneration adds a little
   });
 
   it('drifts toward a player who needs it and expires after its lifetime', () => {

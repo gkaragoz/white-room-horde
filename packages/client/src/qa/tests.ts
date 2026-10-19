@@ -49,7 +49,7 @@ export const tests: QaTest[] = [
     id: 'assets.load',
     title: 'All models and animation libraries load',
     async run() {
-      const chars = ['player_base', 'grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri', 'acc_bandana', 'acc_headphones', 'acc_helmet', 'acc_cap', 'acc_goggles', 'acc_crown', 'acc_horns', 'acc_tophat', 'acc_cowboy', 'acc_ninja', 'acc_mohawk', 'acc_bunny', 'acc_visor'];
+      const chars = ['player_base', 'grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri', 'acc_bandana', 'acc_headphones', 'acc_helmet', 'acc_cap', 'acc_goggles', 'acc_crown', 'acc_horns', 'acc_tophat', 'acc_cowboy', 'acc_ninja', 'acc_mohawk', 'acc_bunny', 'acc_visor', 'acc_pirate', 'acc_wizard', 'acc_viking', 'acc_santa', 'acc_chef', 'acc_astronaut', 'acc_cat', 'acc_halo', 'acc_alien', 'acc_gasmask', 'acc_beanie', 'acc_samurai', 'acc_shades', 'acc_flowers'];
       const weapons = [...WEAPON_IDS, 'grenade'];
       const problems: string[] = [];
       for (const c of chars) {

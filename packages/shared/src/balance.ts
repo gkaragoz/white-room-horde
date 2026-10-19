@@ -72,7 +72,7 @@ export interface ProgressionConfig {
 export const BALANCE = data as unknown as {
   dash: { seconds: number; speedMul: number; cooldown: number; iFrames: number };
   difficulty: { hp: number[]; count: number[]; damage: number[] };
-  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; chance: { ammo: number; health: number; grenade: number; weapon: number }; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number } };
+  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; hasteSeconds: number; quadSeconds: number; shieldAmount: number; freezeSeconds: number; nukeDamage: number; chance: { ammo: number; health: number; grenade: number; weapon: number; shield: number; haste: number; quad: number; nuke: number; freeze: number }; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number } };
   grenade: { max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
   spit: { speed: number; life: number; radius: number };
   shielder: { frontDot: number; frontMul: number };
@@ -81,4 +81,18 @@ export const BALANCE = data as unknown as {
   waves: WaveConfig;
   player: { reviveMoveMul: number; reviveDrain: number; hp: number; speed: number; iFrames: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };
   weapons: Record<WeaponId, WeaponStats>;
+  classes: ClassStats[];
+  perks: Record<PerkKey, number>;
+  elites: Record<EliteKey, number>;
+  barrels: Record<BarrelKey, number>;
+  knock: { perDamage: number; max: number };
 };
+
+type PerkKey = 'outOfCombatSeconds' | 'baseRegen' | 'cardRegen' | 'auraRadius' | 'thorns' | 'shockRadius' | 'shockDamage' | 'shockPush' | 'volatileChance' | 'volatileRadius' | 'volatileDamage' | 'frostRadius' | 'frostSlow' | 'scavChance' | 'rageMax' | 'secondHp' | 'adrenSeconds' | 'adrenSpeed' | 'barrierAmount' | 'barrierCd';
+type EliteKey = 'start' | 'perWave' | 'max' | 'giantHp' | 'giantSpeed' | 'giantRadius' | 'swiftSpeed' | 'swiftHp' | 'armoredMul' | 'regenPerSec' | 'splitCount' | 'volatileRadius' | 'volatileDamage';
+type BarrelKey = 'hp' | 'radius' | 'damage' | 'playerDamage' | 'respawn' | 'hitRadius' | 'push';
+
+export interface ClassStats {
+  id: string; hp: number; speed: number; damage: number; rate: number; armor: number; regen: number; aura: number; grenades: number;
+  pierce: number; lifesteal: number; blast: number; reviveRate: number; dashRate: number; rage: number;
+}

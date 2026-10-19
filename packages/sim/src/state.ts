@@ -1,4 +1,4 @@
-import { BALANCE, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT } from '@wrh/shared';
+import { BALANCE, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, PERKS } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -7,11 +7,16 @@ import { SpatialHash } from './spatial';
 /** Events emitted by a step for the client (VFX, audio). They never feed back into the simulation. */
 export type SimEvent =
   | { type: 'shot'; slot: number; weapon: number; x: number; y: number; angle: number }
-  | { type: 'bulletGone'; x: number; y: number }
+  /** reason: 0 range ended, 1 hit cover, 2 hit an enemy */
+  | { type: 'bulletGone'; x: number; y: number; angle: number; reason: number }
   | { type: 'enemyHit'; id: number; etype: number; x: number; y: number; damage: number }
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
   | { type: 'weaponSwitch'; slot: number; weapon: number; auto: boolean }
+  | { type: 'secondWind'; slot: number }
+  | { type: 'barrelHit'; x: number; y: number }
+  | { type: 'nuke'; x: number; y: number }
+  | { type: 'freeze'; seconds: number }
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'grenadeThrown'; owner: number; x: number; y: number }
   | { type: 'spit'; x: number; y: number; angle: number }
@@ -24,7 +29,7 @@ export type SimEvent =
   | { type: 'playerDown'; slot: number; x: number; y: number }
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
-  | { type: 'waveStart'; wave: number; boss: boolean }
+  | { type: 'waveStart'; wave: number; boss: boolean; mod: number }
   | { type: 'levelUp'; level: number }
   | { type: 'cardOffer'; cards: number[] }
   | { type: 'cardPicked'; card: number; by: number }
@@ -102,6 +107,8 @@ export interface World {
   pModPierce: Int32Array;
   pModArmor: Float64Array;
   pLifesteal: Float64Array;
+  /** Class passives, card effects and timers per player (see PERK in shared/types). */
+  pPerk: Float64Array;
   pGren: Int32Array;
   pGrenCharge: Float64Array;
   pGrenCd: Float64Array;
@@ -118,6 +125,16 @@ export interface World {
   /** Per-enemy scratch: boss charge ticks left. */
   eAux: Float64Array;
   eCooldown: Float64Array;
+  /** Elite modifier of an enemy (0 none; see ELITE in features.ts). */
+  eMod: Uint8Array;
+  // explosive barrels
+  brActive: Uint8Array;
+  brX: Float64Array;
+  brY: Float64Array;
+  brHp: Float64Array;
+  brT: Float64Array;
+  /** Misc world timers: [0] enemies frozen for this many seconds. */
+  misc: Float64Array;
   // grenades
   gActive: Uint8Array;
   gX: Float64Array;
@@ -221,6 +238,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pModPierce: new Int32Array(MAX_PLAYERS),
     pModArmor: new Float64Array(MAX_PLAYERS).fill(1),
     pLifesteal: new Float64Array(MAX_PLAYERS),
+    pPerk: new Float64Array(MAX_PLAYERS * PERKS),
     pGren: new Int32Array(MAX_PLAYERS).fill(BALANCE.grenade.max),
     pGrenCharge: new Float64Array(MAX_PLAYERS),
     pGrenCd: new Float64Array(MAX_PLAYERS),
@@ -235,6 +253,13 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     eBoss: new Uint8Array(MAX_ENEMIES),
     eAux: new Float64Array(MAX_ENEMIES),
     eCooldown: new Float64Array(MAX_ENEMIES),
+    eMod: new Uint8Array(MAX_ENEMIES),
+    brActive: new Uint8Array(MAX_BARRELS),
+    brX: new Float64Array(MAX_BARRELS),
+    brY: new Float64Array(MAX_BARRELS),
+    brHp: new Float64Array(MAX_BARRELS),
+    brT: new Float64Array(MAX_BARRELS),
+    misc: new Float64Array(4),
     gActive: new Uint8Array(MAX_GRENADES),
     gX: new Float64Array(MAX_GRENADES),
     gY: new Float64Array(MAX_GRENADES),

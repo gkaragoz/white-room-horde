@@ -47,18 +47,31 @@ export const CARD_IDS = [
   'damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal', 'ammo', 'grenades', 'medic', 'magnet', 'luck', 'scholar', 'blast', 'quickhands', 'roll', 'armor', 'crit',
   // personal
   'sharp', 'sprint', 'bulk', 'vampire', 'tempo', 'marksman', 'ironskin',
+  'regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage',
 ] as const;
 export type CardId = (typeof CARD_IDS)[number];
 /** Cards that only help the player who picked them. */
-export const PERSONAL_CARDS: readonly string[] = ['sharp', 'sprint', 'bulk', 'vampire', 'tempo', 'marksman', 'ironskin'];
+export const PERSONAL_CARDS: readonly string[] = ['sharp', 'sprint', 'bulk', 'vampire', 'tempo', 'marksman', 'ironskin', 'regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage'];
 /** 0 common, 1 rare, 2 epic: how often a card is offered and how its frame looks. */
 export const CARD_RARITY: Record<CardId, 0 | 1 | 2> = {
   damage: 0, rate: 0, speed: 0, hp: 0, heal: 0, ammo: 0, magnet: 0, sharp: 0, sprint: 0, bulk: 0,
   pierce: 1, grenades: 1, medic: 1, luck: 1, scholar: 1, roll: 1, quickhands: 1, armor: 1, tempo: 1, marksman: 1, ironskin: 1,
   arsenal: 2, blast: 2, crit: 2, vampire: 2,
+  regen: 0, scavenger: 0, adrenaline: 0, thorns: 1, shock: 1, frost: 1, barrier: 1, rage: 1, volatile: 2, secondwind: 2,
 };
 /** Offer weights per rarity. */
 export const RARITY_WEIGHT: readonly number[] = [6, 3, 1];
 
 /** Pickup kinds (kType). */
-export const PickupType = { Ammo: 0, Health: 1, Grenade: 2, Weapon: 3 } as const;
+export const PickupType = { Ammo: 0, Health: 1, Grenade: 2, Weapon: 3, Shield: 4, Haste: 5, Quad: 6, Nuke: 7, Freeze: 8 } as const;
+
+/** Slots of the per-player perk array (pPerk[slot * PERKS + PERK.x]): class passives, card effects and timers. */
+export const PERK = {
+  Regen: 0, Aura: 1, Thorns: 2, Shock: 3, Volatile: 4, Frost: 5, Scav: 6, Rage: 7, Second: 8, ReviveRate: 9, DashRate: 10, Blast: 11,
+  ShieldMax: 12, Shield: 13, ShieldCd: 14, HurtT: 15, Class: 16, Kills: 17, Haste: 18, Quad: 19, Adren: 20, Damage: 21, AdrenCard: 22,
+} as const;
+export const PERKS = 24;
+
+/** Classes a player can pick in the lobby (index = class id in the sim and on the wire). */
+export const CLASS_IDS = ['soldier', 'medic', 'heavy', 'scout', 'demolisher', 'ranger', 'berserker'] as const;
+export type ClassId = (typeof CLASS_IDS)[number];

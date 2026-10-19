@@ -412,6 +412,139 @@ def acc_visor(b):
     b.box("head", (-0.38, -0.2, 1.1), (0.08, 0.4, 0.14), "#2B2D33")
 
 
+def acc_pirate(b):
+    black, gold = "#26262E", "#E8B83A"
+    b.sphere("head", (0, 0, 1.33), 0.5, (1, 1, 0.55), black, seg=8, rings=4)
+    b.cyl("head", (0, 0, 1.38), 0.56, 0.06, black)
+    for k in range(3):                       # three folded-up brim flaps (tricorn)
+        a = math.radians(-90 + k * 120)
+        b.box("head", (0.4 * math.cos(a), 0.4 * math.sin(a), 1.44), (0.34, 0.42, 0.08), "#3A3A44", rot=(0, -0.22, a))
+    b.torus("head", (0, 0, 1.3), 0.5, 0.035, gold, major=10, minor=4)
+    b.sphere("head", (0, -0.62, 1.5), 0.13, (1, 0.6, 0.95), "#F4F0E6", seg=7, rings=4)       # skull badge
+    b.box("head", (0, -0.64, 1.4), (0.09, 0.07, 0.06), "#F4F0E6")
+    for sx in (-1, 1):
+        b.box("head", (sx * 0.04, -0.68, 1.51), (0.04, 0.03, 0.04), black)
+
+
+def acc_wizard(b):
+    purple, gold = "#5B3FA6", "#FFC93C"
+    b.cyl("head", (0, 0, 1.43), 0.62, 0.05, purple)
+    b.cyl("head", (0, 0, 1.6), 0.36, 0.3, purple, r2=0.25)
+    b.cyl("head", (0, 0, 1.52), 0.38, 0.08, "#2B2F7A")
+    b.cyl("head", (0, 0.02, 1.98), 0.25, 0.5, purple, r2=0.1, rot=(-0.12, 0, 0))
+    b.cyl("head", (0, 0.1, 2.28), 0.1, 0.22, purple, r2=0.0, rot=(-0.35, 0, 0))
+    for (x, z, s) in ((0.1, 1.85, 1.0), (-0.12, 1.65, 0.8)):
+        b.box("head", (x, -0.3, z), (0.12 * s, 0.03, 0.12 * s), gold)
+        b.box("head", (x, -0.3, z), (0.12 * s, 0.03, 0.12 * s), gold, rot=(0, math.pi / 4, 0))
+
+
+def acc_viking(b):
+    steel, bone = "#8C97A5", "#F3E3C3"
+    b.sphere("head", (0, 0, 1.2), 0.5, (1, 1, 0.7), steel)
+    b.torus("head", (0, 0, 1.18), 0.5, 0.05, "#B07A45", major=12, minor=4)
+    b.box("head", (0, -0.5, 1.12), (0.1, 0.05, 0.3), steel)
+    for sx in (-1, 1):
+        b.cyl("head", (sx * 0.52, 0, 1.28), 0.11, 0.3, bone, rot=(0, sx * 1.0, 0), r2=0.08)
+        b.cyl("head", (sx * 0.72, 0, 1.52), 0.08, 0.3, bone, rot=(0, sx * 0.35, 0), r2=0.0)
+
+
+def acc_santa(b):
+    red, white = "#D32F2F", "#FFFFFF"
+    b.sphere("head", (0, 0, 1.25), 0.5, (1, 1, 0.65), red)
+    b.cyl("head", (0, 0.1, 1.58), 0.3, 0.4, red, r2=0.1, rot=(-0.55, 0, 0))
+    b.torus("head", (0, 0, 1.17), 0.49, 0.08, white, major=12, minor=4)
+    b.sphere("head", (0, 0.36, 1.78), 0.13, (1, 1, 1), white, seg=8, rings=5)
+
+
+def acc_chef(b):
+    white = "#FAFAFA"
+    b.cyl("head", (0, 0, 1.47), 0.4, 0.2, white, r2=0.38)
+    b.cyl("head", (0, 0, 1.67), 0.38, 0.2, "#EDEDED", r2=0.4)
+    b.sphere("head", (0, 0, 1.95), 0.33, (1, 1, 0.85), white, seg=8, rings=4)
+    for (x, y) in ((0.3, 0.0), (-0.3, 0.0), (0.0, 0.3), (0.0, -0.3)):
+        b.sphere("head", (x, y, 1.82), 0.2, (1, 1, 0.9), white, seg=8, rings=4)
+
+
+def acc_astronaut(b):
+    b.sphere("head", (0, 0, 1.07), 0.54, (1, 1, 0.92), "#F4F6FA")
+    b.sphere("head", (0, -0.36, 1.1), 0.42, (1.0, 0.55, 0.85), "#2F9BFF", seg=10, rings=6)
+    b.sphere("head", (0.14, -0.55, 1.26), 0.07, (1, 0.4, 0.7), "#BFE6FF", seg=6, rings=4)
+    b.torus("head", (0, 0, 0.82), 0.44, 0.07, "#9AA3B2", major=12, minor=4)
+    b.cyl("head", (0.35, 0.2, 1.52), 0.025, 0.28, "#9AA3B2", r2=0.025)
+    b.sphere("head", (0.35, 0.2, 1.68), 0.06, (1, 1, 1), "#E0405A", seg=6, rings=4)
+
+
+def acc_cat(b):
+    band = "#2B2D33"
+    b.torus("head", (0, 0, 1.24), 0.45, 0.05, band, major=12, minor=4)
+    old = b.cylseg
+    b.cylseg = 4
+    for sx in (-1, 1):
+        b.cyl("head", (sx * 0.28, 0.02, 1.6), 0.21, 0.42, "#3A3A44", r2=0.0, rot=(0, sx * 0.3, math.pi / 4))
+        b.cyl("head", (sx * 0.28, -0.08, 1.56), 0.13, 0.3, "#FF8FB8", r2=0.0, rot=(0, sx * 0.3, math.pi / 4))
+    b.cylseg = old
+
+
+def acc_halo(b):
+    b.torus("head", (0, 0, 1.85), 0.32, 0.06, "#FFE14A", major=14, minor=5)
+    b.torus("head", (0, 0, 1.85), 0.32, 0.03, "#FFF6B0", major=14, minor=4, scale=(1, 1, 1.0))
+
+
+def acc_alien(b):
+    for sx in (-1, 1):
+        b.cyl("head", (sx * 0.18, 0, 1.68), 0.03, 0.42, "#6AAA3A", rot=(0, sx * 0.35, 0), r2=0.03)
+        b.sphere("head", (sx * 0.27, 0, 1.92), 0.11, (1, 1, 1), "#8CFF5A", seg=8, rings=5)
+    b.torus("head", (0, 0, 1.4), 0.3, 0.05, "#6AAA3A", major=10, minor=4)
+    b.sphere("head", (0, 0, 1.46), 0.2, (1, 1, 0.5), "#6AAA3A", seg=8, rings=4)
+
+
+def acc_gasmask(b):
+    dk, rub = "#3F4A3C", "#1F2420"
+    b.sphere("head", (0, -0.27, 0.93), 0.33, (1, 0.8, 0.85), dk)
+    for sx in (-1, 1):
+        b.cyl("head", (sx * 0.17, -0.5, 0.88), 0.11, 0.16, "#5C6B58", rot=(math.pi / 2, 0, 0))
+        b.cyl("head", (sx * 0.17, -0.6, 0.88), 0.08, 0.06, rub, rot=(math.pi / 2, 0, 0))
+        b.cyl("head", (sx * 0.2, -0.4, 1.13), 0.1, 0.06, "#F2A93B", rot=(math.pi / 2, 0, 0))
+    b.torus("head", (0, 0, 1.08), 0.47, 0.03, rub, major=12, minor=4)
+
+
+def acc_beanie(b):
+    b.sphere("head", (0, 0, 1.22), 0.5, (1, 1, 0.62), "#FFFFFF", tint=True)
+    b.torus("head", (0, 0, 1.15), 0.49, 0.09, "#FFFFFF", tint=True, major=12, minor=4)
+    b.sphere("head", (0, 0, 1.58), 0.14, (1, 1, 1), "#F4F0E6", seg=8, rings=5)
+
+
+def acc_samurai(b):
+    dark, red, gold = "#2E2F38", "#A8262C", "#E8B83A"
+    b.sphere("head", (0, 0, 1.22), 0.5, (1, 1, 0.7), dark)
+    b.cyl("head", (0, 0, 1.12), 0.62, 0.1, red, r2=0.52)       # flared neck guard
+    b.box("head", (0, -0.5, 1.3), (0.5, 0.1, 0.07), red, rot=(0.25, 0, 0))
+    b.cyl("head", (0, 0, 1.55), 0.12, 0.08, gold)
+    for k in range(7):                                         # crescent crest
+        th = math.radians(175 + k * 32)
+        b.box("head", (0.32 * math.cos(th), -0.42, 1.68 + 0.32 * math.sin(th)), (0.17, 0.05, 0.09), gold, rot=(0, -(th + math.pi / 2), 0))
+    b.box("head", (0, -0.42, 1.52), (0.08, 0.05, 0.14), gold)
+
+
+def acc_shades(b):
+    for sx in (-1, 1):
+        b.box("head", (sx * 0.2, -0.44, 1.1), (0.27, 0.08, 0.17), "#15171D", rot=(0, 0, sx * 0.1))
+        b.box("head", (sx * 0.27, -0.48, 1.15), (0.07, 0.02, 0.03), "#8FE0FF")
+        b.box("head", (sx * 0.4, -0.27, 1.12), (0.04, 0.3, 0.04), "#15171D")
+    b.box("head", (0, -0.44, 1.12), (0.14, 0.06, 0.05), "#15171D")
+
+
+def acc_flowers(b):
+    b.torus("head", (0, 0, 1.2), 0.45, 0.035, "#4E9B3E", major=10, minor=4)
+    cols = ["#FF6FA5", "#FFFFFF", "#FFD23A", "#B07CFF", "#FF9A3C", "#FF5252"]
+    for k in range(6):
+        a = 2 * math.pi * k / 6 - math.pi / 2
+        c = cols[k]
+        p = (0.46 * math.cos(a), 0.46 * math.sin(a), 1.23)
+        b.sphere("head", p, 0.1, (1, 1, 0.7), c, seg=6, rings=4)
+        b.box("head", (p[0] * 1.07, p[1] * 1.07, p[2]), (0.05, 0.05, 0.05), "#FFD23A" if c != "#FFD23A" else "#FFFFFF")
+
+
 # id, builder, scale, budget key, head_top
 SPECS = [
     ("player_base", spec_player, 1.5, "player", 1.5),
@@ -439,6 +572,20 @@ SPECS = [
     ("acc_mohawk", acc_mohawk, 1.5, "acc", 1.5),
     ("acc_bunny", acc_bunny, 1.5, "acc", 1.5),
     ("acc_visor", acc_visor, 1.5, "acc", 1.5),
+    ("acc_pirate", acc_pirate, 1.5, "acc", 1.5),
+    ("acc_wizard", acc_wizard, 1.5, "acc", 1.5),
+    ("acc_viking", acc_viking, 1.5, "acc", 1.5),
+    ("acc_santa", acc_santa, 1.5, "acc", 1.5),
+    ("acc_chef", acc_chef, 1.5, "acc", 1.5),
+    ("acc_astronaut", acc_astronaut, 1.5, "acc", 1.5),
+    ("acc_cat", acc_cat, 1.5, "acc", 1.5),
+    ("acc_halo", acc_halo, 1.5, "acc", 1.5),
+    ("acc_alien", acc_alien, 1.5, "acc", 1.5),
+    ("acc_gasmask", acc_gasmask, 1.5, "acc", 1.5),
+    ("acc_beanie", acc_beanie, 1.5, "acc", 1.5),
+    ("acc_samurai", acc_samurai, 1.5, "acc", 1.5),
+    ("acc_shades", acc_shades, 1.5, "acc", 1.5),
+    ("acc_flowers", acc_flowers, 1.5, "acc", 1.5),
 ]
 
 

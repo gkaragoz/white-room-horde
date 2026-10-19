@@ -5,8 +5,9 @@ import type { World } from './state';
 function arrays(w: World): ArrayBufferView[] {
   return [
     w.cardOffer,
-    w.pActive, w.pX, w.pY, w.pAngle, w.pHp, w.pMaxHp, w.pState, w.pTimer, w.pRevive, w.pCooldown, w.pIFrames, w.pWeapon, w.pAmmo, w.pSel, w.pStashW, w.pStashMag, w.pStashAmmo, w.pMoving, w.pMag, w.pReload, w.pDash, w.pDashCd, w.pDashX, w.pDashY, w.pModDmg, w.pModSpeed, w.pModRate, w.pModPierce, w.pModArmor, w.pLifesteal, w.pGren, w.pGrenCharge, w.pGrenCd,
-    w.eActive, w.eType, w.eBoss, w.eAux, w.eState, w.eStateTick, w.eX, w.eY, w.eAngle, w.eHp, w.eCooldown,
+    w.pActive, w.pX, w.pY, w.pAngle, w.pHp, w.pMaxHp, w.pState, w.pTimer, w.pRevive, w.pCooldown, w.pIFrames, w.pWeapon, w.pAmmo, w.pSel, w.pStashW, w.pStashMag, w.pStashAmmo, w.pMoving, w.pMag, w.pReload, w.pDash, w.pDashCd, w.pDashX, w.pDashY, w.pModDmg, w.pModSpeed, w.pModRate, w.pModPierce, w.pModArmor, w.pLifesteal, w.pPerk, w.pGren, w.pGrenCharge, w.pGrenCd,
+    w.eActive, w.eType, w.eBoss, w.eAux, w.eState, w.eStateTick, w.eX, w.eY, w.eAngle, w.eHp, w.eCooldown, w.eMod,
+    w.brActive, w.brX, w.brY, w.brHp, w.brT, w.misc,
     w.gActive, w.gX, w.gY, w.gVx, w.gVy, w.gFuse, w.gOwner,
     w.kActive, w.kType, w.kX, w.kY, w.kLife, w.kData,
     w.sActive, w.sX, w.sY, w.sVx, w.sVy, w.sLife,
