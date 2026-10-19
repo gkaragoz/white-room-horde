@@ -1,5 +1,6 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
+import { asset } from './assets';
 import { ACTIONS, keyLabel } from './input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
 
@@ -36,6 +37,8 @@ export const UI_STRINGS = {
     resume: 'Resume',
     replay: 'Save replay',
     pick: 'Level up! Pick a card',
+    rarity: ['Common', 'Rare', 'Epic'],
+    onlyYou: 'Only you',
     settings: 'Settings',
     volume: 'Volume',
     music: 'Music',
@@ -94,6 +97,21 @@ export const UI_STRINGS = {
       sharp: ['Sharpshooter', '+30% damage for you only'],
       sprint: ['Sprinter', '+20% move speed for you only'],
       bulk: ['Bulk up', '+40 max HP for you only'],
+      ammo: ['Full magazines', 'Everyone refills magazine and reserve'],
+      grenades: ['Grenade crate', '+2 grenades for everyone'],
+      medic: ['Field medics', 'Revive 30% faster'],
+      magnet: ['Loot magnet', 'Pickups fly to you from further away'],
+      luck: ['Lucky clover', '+50% loot drops'],
+      scholar: ['Quick study', '+25% XP for the team'],
+      blast: ['Big bang', 'Grenades +25% radius and damage'],
+      quickhands: ['Quick hands', 'Reload 25% faster'],
+      roll: ['Roll with it', 'Dash recharges 30% faster'],
+      armor: ['Padded vests', 'Everyone takes 12% less damage'],
+      crit: ['Critical hits', '10% chance of double damage'],
+      vampire: ['Vampire', 'You heal 3 HP per kill'],
+      tempo: ['Tempo', '+25% fire rate for you only'],
+      marksman: ['Marksman', 'Your bullets pierce 2 more enemies'],
+      ironskin: ['Iron skin', 'You take 20% less damage'],
     },
     weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper' },
   },
@@ -127,6 +145,8 @@ export const UI_STRINGS = {
     resume: 'Devam et',
     replay: 'Tekrarı kaydet',
     pick: 'Seviye atladın! Bir kart seç',
+    rarity: ['Yaygın', 'Nadir', 'Efsanevi'],
+    onlyYou: 'Sadece sen',
     settings: 'Ayarlar',
     volume: 'Ses',
     music: 'Müzik',
@@ -185,6 +205,21 @@ export const UI_STRINGS = {
       sharp: ['Keskin nişancı', 'Sadece sana +%30 hasar'],
       sprint: ['Koşucu', 'Sadece sana +%20 hız'],
       bulk: ['Kalın deri', 'Sadece sana +40 azami can'],
+      ammo: ['Dolu şarjörler', 'Herkesin şarjörü ve yedeği dolar'],
+      grenades: ['Bomba sandığı', 'Herkese +2 el bombası'],
+      medic: ['Saha sağlıkçıları', 'Kaldırma %30 daha hızlı'],
+      magnet: ['Ganimet mıknatısı', 'Kutular daha uzaktan sana uçar'],
+      luck: ['Şans yoncası', '%50 daha çok ganimet'],
+      scholar: ['Çabuk öğrenen', 'Takıma +%25 XP'],
+      blast: ['Büyük patlama', 'El bombaları +%25 alan ve hasar'],
+      quickhands: ['Çevik eller', '%25 daha hızlı doldurma'],
+      roll: ['Yuvarlan', 'Atılma %30 daha hızlı dolar'],
+      armor: ['Dolgulu yelekler', 'Herkes %12 daha az hasar alır'],
+      crit: ['Kritik vuruşlar', '%10 ihtimalle çift hasar'],
+      vampire: ['Vampir', 'Her öldürmede 3 can kazanırsın'],
+      tempo: ['Tempo', 'Sadece sana +%25 ateş hızı'],
+      marksman: ['Nişancı', 'Mermilerin 2 düşman daha deler'],
+      ironskin: ['Demir deri', 'Sadece sen %20 daha az hasar alırsın'],
     },
     weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı' },
   },
@@ -260,13 +295,21 @@ const CSS = `
 .wrh-hurt{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(200,20,30,0) 45%,rgba(200,20,30,.55) 100%);opacity:0}
 .wrh-banner{position:absolute;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-weight:800;font-size:30px;color:#c8242c;text-shadow:0 2px 0 #fff,0 0 18px rgba(255,255,255,.8)}
 .wrh-banner small{display:block;font-size:14px;color:#3a352d;font-weight:600}
-.wrh-cards{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);text-align:center;pointer-events:none}
+.wrh-cards{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);text-align:center;pointer-events:none;width:max-content;max-width:98vw;white-space:nowrap}
+@media (max-width:640px){.wrh-card{width:29vw!important;margin:0 3px!important}.wrh-card .art{height:70px!important}.wrh-card span{font-size:10px!important}}
 .wrh-cards h3{margin:0 0 8px;text-shadow:0 1px 0 #fff}
-.wrh-card{pointer-events:auto;cursor:pointer;display:inline-block;width:170px;vertical-align:top;margin:0 6px;padding:12px;background:#fffaf0;border:3px solid #1fa2ff;border-radius:12px;box-shadow:0 6px 18px rgba(60,45,20,.3);text-align:left}
-.wrh-card:hover{transform:translateY(-4px);border-color:#ff9a3a}
-.wrh-card b{display:block;font-size:15px}
-.wrh-card span{font-size:12px;opacity:.8}
-.wrh-card kbd{float:right;background:#1fa2ff;color:#fff;border-radius:5px;padding:0 6px;font-size:12px}
+.wrh-card{white-space:normal;pointer-events:auto;cursor:pointer;display:inline-block;position:relative;width:176px;vertical-align:top;margin:0 6px;padding:8px 10px 10px;background:#fffaf0;border:3px solid #8aa0b6;border-radius:14px;box-shadow:0 6px 18px rgba(60,45,20,.3);text-align:left;transition:transform .12s}
+.wrh-card:hover{transform:translateY(-6px) scale(1.03)}
+.wrh-card .art{height:104px;margin:0 -2px 6px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,#fdf6e6,#dfe6ee)}
+.wrh-card .art img{max-height:100px;max-width:100%;filter:drop-shadow(0 3px 2px rgba(60,45,20,.3))}
+.wrh-card b{display:block;font-size:15px;margin-top:2px}
+.wrh-card span{display:block;font-size:12px;opacity:.85;min-height:30px}
+.wrh-card em{display:block;margin-top:5px;font-size:10px;font-style:normal;font-weight:800;letter-spacing:.6px;text-transform:uppercase;opacity:.75}
+.wrh-card.r1{border-color:#9a63ff}
+.wrh-card.r1 .art{background:radial-gradient(circle at 50% 40%,#f6efff,#d9c8f5)}
+.wrh-card.r2{border-color:#ff9a1f;box-shadow:0 0 0 2px #ffd97a,0 8px 22px rgba(255,150,30,.45)}
+.wrh-card.r2 .art{background:radial-gradient(circle at 50% 40%,#fff5d6,#ffd48a)}
+.wrh-card kbd{position:absolute;right:8px;top:8px;z-index:1;background:#1fa2ff;color:#fff;border-radius:5px;padding:0 6px;font-size:12px}
 .wrh-cardtime{width:200px;height:6px;background:rgba(60,45,20,.2);border-radius:4px;margin:8px auto 0;overflow:hidden}
 .wrh-cardtime>i{display:block;height:100%;background:#ff9a3a}
 .wrh-gear{position:absolute;right:12px;top:10px;pointer-events:auto;cursor:pointer;width:34px;height:34px;border-radius:50%;background:rgba(250,244,232,.9);border:2px solid #cdbfa5;text-align:center;line-height:30px;font-size:18px}
@@ -877,7 +920,12 @@ export class Ui {
         cardsEl.innerHTML =
           `<h3>${t.pick}</h3>` +
           Array.from(world.cardOffer)
-            .map((c, i) => `<div class="wrh-card" data-i="${i}"><kbd>${i + 1}</kbd><b>${cards[CARD_IDS[c]!]![0]}</b><span>${cards[CARD_IDS[c]!]![1]}</span></div>`)
+            .map((c, i) => {
+              const id = CARD_IDS[c]!;
+              const rarity = CARD_RARITY[id];
+              const personal = PERSONAL_CARDS.includes(id);
+              return `<div class="wrh-card r${rarity}" data-i="${i}"><kbd>${i + 1}</kbd><div class="art"><img src="${asset(`cards/${id}.png`)}" alt="" draggable="false"></div><b>${cards[id]![0]}</b><span>${cards[id]![1]}</span><em>${(t.rarity as readonly string[])[rarity]}${personal ? ` &middot; ${t.onlyYou}` : ''}</em></div>`;
+            })
             .join('') +
           `<div class="wrh-cardtime"><i id="h-ct"></i></div>`;
         cardsEl.querySelectorAll<HTMLElement>('.wrh-card').forEach((el) => {

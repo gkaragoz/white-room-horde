@@ -354,6 +354,15 @@ white-room-horde/
 - QA ve CI: tarayıcı QA'sı Playwright ile CI'da (`tools/ci/qa-browsers.mjs`): Chromium'da 23 test, Firefox ve WebKit'te determinizm. Sim hash'leri Node, Chromium (V8), Firefox (SpiderMonkey) ve WebKit (JavaScriptCore)'te birebir aynı; referans senaryolar bomba, reload, dash, kart, boss, harita ve zorluk kapsar.
 - Hâlâ yok: yakın dövüş (yukarıya bak), gerçek GI, mobilde gerçek cihaz testi (dokunmatik mantık test edildi, cihazda denenmedi), WebGPU CI'da (başsız tarayıcıda yok).
 
+**Kartlar: 25 kart, çizimler, nadirlik (tamam)**
+- Havuz 25 kart: 18 takım kartı (hasar, ateş hızı, hız, can, delme, silah yükseltme, iyileştirme, şarjör doldurma, el bombası, sağlıkçı: daha hızlı kaldırma, mıknatıs, şans: daha çok ganimet, bilgin: XP, patlama: bomba alanı/hasarı, çevik eller: reload, yuvarlan: dash bekleme, yelek: alınan hasar, kritik) ve 7 kişisel kart (keskin nişancı, koşucu, kalın deri, vampir: öldürünce can, tempo, nişancı: delme, demir deri). Çarpan kartların alt/üst sınırı var (balance.json), ayrıca hash ve snapshot'a dahil. Her kartın testi `sim/tests/cards.test.ts`.
+- Nadirlik: yaygın 10, nadir 11, efsanevi 4 kart; teklif ağırlıkları 6/3/1 ile çekilir, üç kart hep farklı.
+- Çizimler: `tools/blender/make_cards.py` her kartı düşük poligonlu oyuncak maketi olarak (ilkellerden, siyah kontur, saydam arka plan) 256 px olarak `packages/client/public/cards/<id>.png`'e çizer; her çizimin boş/aşırı dolu olmasını kendisi denetler, `SHEET=...` ile temas sayfası üretir. Kart arayüzü çizimi nadirliğe göre renkli plakaya koyar (yaygın çelik mavisi, nadir mor, efsanevi turuncu parlama), kişisel kartlara "Sadece sen" etiketi.
+- QA: `cards.art` (25 görüntü var, 256 px, köşeleri saydam, hiçbiri birbirine benzemiyor) ve `cards.ui` (iki dilde 25 kartın çizimi, metni, nadirliği, kişisel etiketi).
+
+**X-ray siluet (tamam)**
+- Oyuncular bir engelin, düşmanın veya takım arkadaşının arkasında kalınca saydam renkli silüet görünür: her oyuncu mesh'inin bir ikizi `GreaterDepth` ile yalnızca başka bir şeyin arkasındaki piksellere çizilir; oyuncunun görünen gövdesi stencil yazar ve ikiz oraya çizilmez (görünen gövde boyanmaz, kendi içinde saklanan uzuvlar görünmez). Karakterler gizleyebilecek her şeyden sonra çizilir (renderOrder), SMAA yolunda da stencil'li hedef kullanılır, WebGPU'da da çalışır. QA: `player.xray-outline`.
+
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
 2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).

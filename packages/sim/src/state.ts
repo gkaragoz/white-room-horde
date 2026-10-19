@@ -56,6 +56,16 @@ export interface World {
   modSpeed: number;
   modPierce: number;
   modHp: number;
+  /** More team modifiers from cards (multipliers start at 1, crit chance at 0). */
+  modRevive: number;
+  modMagnet: number;
+  modLoot: number;
+  modXp: number;
+  modBlast: number;
+  modReload: number;
+  modDash: number;
+  modArmor: number;
+  modCrit: number;
   // players
   pActive: Uint8Array;
   pX: Float64Array;
@@ -82,6 +92,10 @@ export interface World {
   pDashY: Float64Array;
   pModDmg: Float64Array;
   pModSpeed: Float64Array;
+  pModRate: Float64Array;
+  pModPierce: Int32Array;
+  pModArmor: Float64Array;
+  pLifesteal: Float64Array;
   pGren: Int32Array;
   pGrenCharge: Float64Array;
   pGrenCd: Float64Array;
@@ -162,6 +176,15 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     modSpeed: 1,
     modPierce: 0,
     modHp: 0,
+    modRevive: 1,
+    modMagnet: 1,
+    modLoot: 1,
+    modXp: 1,
+    modBlast: 1,
+    modReload: 1,
+    modDash: 1,
+    modArmor: 1,
+    modCrit: 0,
     pActive: new Uint8Array(MAX_PLAYERS),
     pX: new Float64Array(MAX_PLAYERS),
     pY: new Float64Array(MAX_PLAYERS),
@@ -184,6 +207,10 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pDashY: new Float64Array(MAX_PLAYERS),
     pModDmg: new Float64Array(MAX_PLAYERS).fill(1),
     pModSpeed: new Float64Array(MAX_PLAYERS).fill(1),
+    pModRate: new Float64Array(MAX_PLAYERS).fill(1),
+    pModPierce: new Int32Array(MAX_PLAYERS),
+    pModArmor: new Float64Array(MAX_PLAYERS).fill(1),
+    pLifesteal: new Float64Array(MAX_PLAYERS),
     pGren: new Int32Array(MAX_PLAYERS).fill(BALANCE.grenade.max),
     pGrenCharge: new Float64Array(MAX_PLAYERS),
     pGrenCd: new Float64Array(MAX_PLAYERS),

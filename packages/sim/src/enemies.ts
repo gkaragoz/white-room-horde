@@ -42,6 +42,8 @@ const SEP_MAX = 0.12;
 const SPAWN_MARGIN = 1.0;
 
 const sources = new Int32Array(MAX_PLAYERS);
+/** Player credited with the damage being dealt right now (-1 for enemies, explosions of exploders). */
+let killer = -1;
 
 function rad(w: World, i: number): number {
   const r = RADIUS[w.eType[i]!]!;
@@ -246,7 +248,7 @@ function runWaves(w: World, playerCount: number): void {
 }
 
 export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number): boolean {
-  const damage = rawDamage * BALANCE.difficulty.damage[w.difficulty]!;
+  const damage = rawDamage * BALANCE.difficulty.damage[w.difficulty]! * w.modArmor * w.pModArmor[slot]!;
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
   const hp = w.pHp[slot]! - damage;
   w.pHp[slot] = hp > 0 ? hp : 0;
@@ -272,6 +274,11 @@ function explode(w: World, i: number): void {
 /** Remove an enemy because its hp ran out; (dx, dy) is the push direction for the client ragdoll. */
 export function killEnemy(w: World, i: number, dx: number, dy: number, power: number): void {
   const type = w.eType[i]!;
+  // vampire card: the player whose shot (or grenade) made the kill heals
+  if (killer >= 0 && w.pLifesteal[killer]! > 0 && w.pState[killer] === PlayerState.Alive) {
+    const hp = w.pHp[killer]! + w.pLifesteal[killer]!;
+    w.pHp[killer] = hp > w.pMaxHp[killer]! ? w.pMaxHp[killer]! : hp;
+  }
   w.eActive[i] = 0;
   w.enemyCount--;
   w.kills++;
@@ -505,7 +512,9 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
       const facing = bdx * cos(w.eAngle[bestSlot]!) + bdy * sin(w.eAngle[bestSlot]!);
       if (facing < BALANCE.shielder.frontDot) dmg *= BALANCE.shielder.frontMul;
     }
+    killer = w.bOwner[b]!;
     damageEnemy(w, bestSlot, dmg, bdx, bdy);
+    killer = -1;
     if (w.bPierce[b]! <= 0) {
       w.bX[b] = x0 + sx * bestT;
       w.bY[b] = y0 + sy * bestT;
@@ -605,8 +614,10 @@ export function updateProjectiles(w: World): void {
     }
     if (w.gFuse[i]! <= 0) {
       w.gActive[i] = 0;
-      w.events.push({ type: 'explosion', x: w.gX[i]!, y: w.gY[i]!, radius: cfg.radius });
-      blastEnemies(w, w.gX[i]!, w.gY[i]!, cfg.radius, cfg.damage);
+      w.events.push({ type: 'explosion', x: w.gX[i]!, y: w.gY[i]!, radius: cfg.radius * w.modBlast });
+      killer = w.gOwner[i]!;
+      blastEnemies(w, w.gX[i]!, w.gY[i]!, cfg.radius * w.modBlast, cfg.damage * w.modBlast);
+      killer = -1;
     }
   }
   const r2 = (BALANCE.spit.radius + BALANCE.player.radius) * (BALANCE.spit.radius + BALANCE.player.radius);

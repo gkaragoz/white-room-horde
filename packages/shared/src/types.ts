@@ -38,11 +38,27 @@ export const EnemyState = { Move: 0, Attack: 1, Spawn: 2 } as const;
 /** Player life cycle (pState). */
 export const PlayerState = { Alive: 0, Downed: 1, Dead: 2 } as const;
 
-/** Team upgrade cards offered on level up (index = card id). */
-export const CARD_IDS = ['damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal', 'sharp', 'sprint', 'bulk'] as const;
-/** Cards that only help the player who picked them. */
-export const PERSONAL_CARDS: readonly string[] = ['sharp', 'sprint', 'bulk'];
+/**
+ * The card pool (docs/DESIGN.md section 9). Index = card id in the sim and in the offer. Team cards help everybody,
+ * personal cards only the player who picked them. Art for each card lives in packages/client/public/cards/<id>.png.
+ */
+export const CARD_IDS = [
+  // team
+  'damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal', 'ammo', 'grenades', 'medic', 'magnet', 'luck', 'scholar', 'blast', 'quickhands', 'roll', 'armor', 'crit',
+  // personal
+  'sharp', 'sprint', 'bulk', 'vampire', 'tempo', 'marksman', 'ironskin',
+] as const;
 export type CardId = (typeof CARD_IDS)[number];
+/** Cards that only help the player who picked them. */
+export const PERSONAL_CARDS: readonly string[] = ['sharp', 'sprint', 'bulk', 'vampire', 'tempo', 'marksman', 'ironskin'];
+/** 0 common, 1 rare, 2 epic: how often a card is offered and how its frame looks. */
+export const CARD_RARITY: Record<CardId, 0 | 1 | 2> = {
+  damage: 0, rate: 0, speed: 0, hp: 0, heal: 0, ammo: 0, magnet: 0, sharp: 0, sprint: 0, bulk: 0,
+  pierce: 1, grenades: 1, medic: 1, luck: 1, scholar: 1, roll: 1, quickhands: 1, armor: 1, tempo: 1, marksman: 1, ironskin: 1,
+  arsenal: 2, blast: 2, crit: 2, vampire: 2,
+};
+/** Offer weights per rarity. */
+export const RARITY_WEIGHT: readonly number[] = [6, 3, 1];
 
 /** Pickup kinds (kType). */
 export const PickupType = { Ammo: 0, Health: 1, Grenade: 2, Weapon: 3 } as const;

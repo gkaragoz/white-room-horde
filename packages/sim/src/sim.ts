@@ -55,6 +55,10 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pDashCd[slot] = 0;
   w.pModDmg[slot] = 1;
   w.pModSpeed[slot] = 1;
+  w.pModRate[slot] = 1;
+  w.pModPierce[slot] = 0;
+  w.pModArmor[slot] = 1;
+  w.pLifesteal[slot] = 0;
 }
 
 /** Deterministic game start used by every client and by replays: players spread on a ring around the centre. */
@@ -110,7 +114,7 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
       w.pDashX[s] = len > 0.2 ? mx / l : cos(angle);
       w.pDashY[s] = len > 0.2 ? my / l : sin(angle);
       w.pDash[s] = Math.ceil(dc.seconds * 30);
-      w.pDashCd[s] = dc.cooldown;
+      w.pDashCd[s] = dc.cooldown * w.modDash;
       if (w.pIFrames[s]! < dc.iFrames) w.pIFrames[s] = dc.iFrames;
       w.events.push({ type: 'dash', slot: s, x: w.pX[s]!, y: w.pY[s]! });
     }
@@ -136,7 +140,7 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
 }
 
 function startReload(w: World, s: number, stats: { reload: number }): void {
-  w.pReload[s] = stats.reload;
+  w.pReload[s] = stats.reload * w.modReload;
   w.events.push({ type: 'reloadStart', slot: s });
 }
 
@@ -171,11 +175,13 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       // the shot leaves the muzzle: forward along the aim and a little to the right-hand side
       const ox = cos(angle) * stats.muzzleFwd + sin(angle) * stats.muzzleSide;
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
-      spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]!, stats.pierce + w.modPierce);
+      // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
+      const crit = w.modCrit > 0 && w.rng.float() < w.modCrit ? 2 : 1;
+      spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * crit, stats.pierce + w.modPierce + w.pModPierce[s]!);
     }
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
     w.pMag[s] = w.pMag[s]! - 1;
-    w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate);
+    w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate * w.pModRate[s]!);
     shots++;
   }
   if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
@@ -202,7 +208,7 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
     }
     if (helped) {
       w.pRevive[d] = w.pRevive[d]! + TICK_DT;
-      if (w.pRevive[d]! >= BALANCE.player.reviveSeconds) {
+      if (w.pRevive[d]! >= BALANCE.player.reviveSeconds * w.modRevive) {
         w.pState[d] = PlayerState.Alive;
         w.pHp[d] = w.pMaxHp[d]! * BALANCE.progression.revive.hpFraction;
         w.pRevive[d] = 0;
@@ -302,7 +308,8 @@ export function hashWorld(w: World): number {
   for (const v of w.rng.getState()) c.u32(v);
   c.u32(w.difficulty).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver).u32(w.xp).u32(w.level).u32(w.pendingLevels).u32(w.cardTimer);
   c.typed(w.cardOffer);
-  c.typed(new Float64Array([w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modHp]));
+  c.typed(new Float64Array([w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modHp, w.modRevive, w.modMagnet, w.modLoot, w.modXp, w.modBlast, w.modReload, w.modDash, w.modArmor, w.modCrit]));
+  c.typed(w.pModRate).typed(w.pModPierce).typed(w.pModArmor).typed(w.pLifesteal);
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);
   c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);
   c.typed(w.pMag).typed(w.pReload).typed(w.pDash).typed(w.pDashCd).typed(w.pDashX).typed(w.pDashY).typed(w.pModDmg).typed(w.pModSpeed);

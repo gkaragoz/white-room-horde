@@ -45,6 +45,15 @@ export interface WaveConfig {
   weights: Record<EnemyType, number>;
 }
 
+/** Strength of every card (see docs/DESIGN.md section 9); multiplier cards have a floor/ceiling so they cannot run away. */
+export interface CardTuning {
+  damage: number; rate: number; speed: number; hp: number; pierce: number;
+  grenades: number; medic: number; medicMin: number; magnet: number; magnetMax: number; luck: number; luckMax: number;
+  scholar: number; blast: number; blastMax: number; quickhands: number; quickMin: number; roll: number; rollMin: number;
+  armor: number; armorMin: number; crit: number; critMax: number;
+  sharp: number; sprint: number; bulk: number; vampire: number; tempo: number; marksman: number; ironskin: number; ironMin: number;
+}
+
 export interface ProgressionConfig {
   xpBase: number;
   xpPerLevel: number;
@@ -54,7 +63,7 @@ export interface ProgressionConfig {
   xp: Record<EnemyType, number>;
   boss: { everyWaves: number; hpMul: number; damage: number; radiusMul: number; summonSeconds: number; summonCount: number; xp: number; chargeSeconds: number; chargeSpeedMul: number; chargeTicks: number; queenSummonSeconds: number; queenCount: number; auraRadius: number; auraSpeedMul: number };
   revive: { hpFraction: number; iFrames: number };
-  cards: { damage: number; rate: number; speed: number; hp: number; pierce: number; sharp: number; sprint: number; bulk: number };
+  cards: CardTuning;
 }
 
 export const BALANCE = data as unknown as {

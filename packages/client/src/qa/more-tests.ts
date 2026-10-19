@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Buttons, CARD_IDS, MAPS, WEAPON_IDS } from '@wrh/shared';
+import { Buttons, CARD_IDS, CARD_RARITY, MAPS, PERSONAL_CARDS, WEAPON_IDS } from '@wrh/shared';
 import { addPlayer, createWorld } from '@wrh/sim';
 import { DEFAULT_BINDINGS, Input } from '../input';
 import { WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
@@ -8,7 +8,7 @@ import { Character } from '../render/character';
 import { PlayerAnimator } from '../render/playerAnim';
 import { asset } from '../assets';
 import { BANK_FILES, MUSIC_FILES } from '../audio';
-import { UI_STRINGS } from '../ui';
+import { Ui, UI_STRINGS, type Settings } from '../ui';
 import { diffCount, grab } from './crowd-tests';
 import type { QaTest } from './tests';
 
@@ -254,6 +254,127 @@ export const moreTests: QaTest[] = [
           ctx.stage.scene.remove(wall);
         }
       }
+    },
+  },
+  {
+    id: 'cards.art',
+    title: 'All 25 cards have a 256 px illustration with a transparent background, each one different',
+    async run() {
+      const problems: string[] = [];
+      const sigs: { id: string; sig: number[] }[] = [];
+      for (const id of CARD_IDS) {
+        const img = new Image();
+        img.src = asset(`cards/${id}.png`);
+        try {
+          await img.decode();
+        } catch {
+          problems.push(`${id}: cards/${id}.png is missing or broken`);
+          continue;
+        }
+        if (img.naturalWidth !== 256 || img.naturalHeight !== 256) problems.push(`${id}: ${img.naturalWidth}x${img.naturalHeight}, expected 256x256`);
+        const c = document.createElement('canvas');
+        c.width = c.height = 256;
+        const g = c.getContext('2d')!;
+        g.drawImage(img, 0, 0);
+        const px = g.getImageData(0, 0, 256, 256).data;
+        let solid = 0;
+        for (let i = 3; i < px.length; i += 4) if (px[i]! > 128) solid++;
+        const cover = solid / (256 * 256);
+        if (px[3]! > 10 || px[(255 * 256 + 255) * 4 + 3]! > 10) problems.push(`${id}: the corners are not transparent`);
+        if (cover < 0.08 || cover > 0.9) problems.push(`${id}: covers ${f(cover * 100, 0)}% of the image`);
+        // an 8x8 thumbnail as a fingerprint to catch duplicates
+        const sig: number[] = [];
+        for (let ty = 0; ty < 8; ty++) {
+          for (let tx = 0; tx < 8; tx++) {
+            let r = 0;
+            let gr = 0;
+            let b = 0;
+            for (let y = 0; y < 32; y++) {
+              for (let x = 0; x < 32; x++) {
+                const k = ((ty * 32 + y) * 256 + tx * 32 + x) * 4;
+                const a = px[k + 3]! / 255;
+                r += px[k]! * a;
+                gr += px[k + 1]! * a;
+                b += px[k + 2]! * a;
+              }
+            }
+            sig.push(r / 1024, gr / 1024, b / 1024);
+          }
+        }
+        sigs.push({ id, sig });
+      }
+      let closest = 1e9;
+      for (let a = 0; a < sigs.length; a++) {
+        for (let b = a + 1; b < sigs.length; b++) {
+          let d = 0;
+          for (let k = 0; k < sigs[a]!.sig.length; k++) d += Math.abs(sigs[a]!.sig[k]! - sigs[b]!.sig[k]!);
+          d /= sigs[a]!.sig.length;
+          closest = Math.min(closest, d);
+          if (d < 4) problems.push(`${sigs[a]!.id} and ${sigs[b]!.id} look almost identical (${f(d)})`);
+        }
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 8).join(' | ') : `${CARD_IDS.length} illustrations, the two most alike differ by ${f(closest, 1)}` };
+    },
+  },
+  {
+    id: 'cards.ui',
+    title: 'The card offer shows art, title, text and rarity for every card in both languages',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop,
+      }, settings);
+      const w = createWorld(1);
+      addPlayer(w, 0, 0, 0);
+      try {
+        let clock = 1000;
+        const bySet = (cards: string[]): void => {
+          cards.forEach((c, i) => (w.cardOffer[i] = CARD_IDS.indexOf(c as (typeof CARD_IDS)[number])));
+        };
+        for (const lang of ['en', 'tr'] as const) {
+          ui.applySettings({ ...settings, lang });
+          // walk through the whole pool three cards at a time
+          for (let start = 0; start < CARD_IDS.length; start += 3) {
+            const group = [0, 1, 2].map((k) => CARD_IDS[(start + k) % CARD_IDS.length]!);
+            bySet(group);
+            w.cardTimer = 100;
+            clock += 200; // the HUD throttles on time, so keep it moving forward
+            ui.update(w, 0, 0, clock, ['p']);
+            const cards = [...host.querySelectorAll<HTMLElement>('.wrh-card')];
+            if (cards.length !== 3) {
+              problems.push(`${lang}: ${cards.length} cards shown for ${group.join(',')}`);
+              continue;
+            }
+            for (const [k, el] of cards.entries()) {
+              const id = group[k]!;
+              const title = el.querySelector('b')?.textContent ?? '';
+              const text = el.querySelector('span')?.textContent ?? '';
+              const tag = el.querySelector('em')?.textContent ?? '';
+              const img = el.querySelector('img');
+              if (!title || !text) problems.push(`${lang}/${id}: empty title or text`);
+              if (!img?.src.includes(`cards/${id}.png`)) problems.push(`${lang}/${id}: wrong image ${img?.src}`);
+              if (!el.classList.contains(`r${CARD_RARITY[id]}`)) problems.push(`${lang}/${id}: wrong rarity class`);
+              if (PERSONAL_CARDS.includes(id) !== /sen|you/i.test(tag)) problems.push(`${lang}/${id}: personal tag mismatch ("${tag}")`);
+              if (img) {
+                try {
+                  await img.decode();
+                } catch {
+                  problems.push(`${lang}/${id}: image failed to load`);
+                }
+              }
+            }
+          }
+        }
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 8).join(' | ') : 'all 25 cards render with art, text and rarity in English and Turkish' };
     },
   },
 ];

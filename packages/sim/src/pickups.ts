@@ -42,18 +42,20 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
     return;
   }
   const r = w.rng.float();
-  const ammoChance = cfg.chance.ammo + (ammoStarved(w) ? cfg.lowAmmoBonus : 0);
+  const luck = w.modLoot;
+  const ammoChance = (cfg.chance.ammo + (ammoStarved(w) ? cfg.lowAmmoBonus : 0)) * luck;
   if (r < ammoChance) spawnPickup(w, PickupType.Ammo, x, y);
-  else if (r < ammoChance + cfg.chance.health) spawnPickup(w, PickupType.Health, x, y);
-  else if (r < ammoChance + cfg.chance.health + cfg.chance.grenade) spawnPickup(w, PickupType.Grenade, x, y);
-  else if (r < ammoChance + cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) spawnPickup(w, PickupType.Weapon, x, y, w.rng.int(WEAPON_IDS.length));
+  else if (r < ammoChance + cfg.chance.health * luck) spawnPickup(w, PickupType.Health, x, y);
+  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade) * luck) spawnPickup(w, PickupType.Grenade, x, y);
+  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, w.rng.int(WEAPON_IDS.length));
 }
 
 /** Magnet drift toward the nearest living player, then pickup on contact; expire after their lifetime. */
 export function updatePickups(w: World): void {
   const cfg = BALANCE.pickups;
   const r2 = cfg.radius * cfg.radius;
-  const m2 = cfg.magnetRadius * cfg.magnetRadius;
+  const magnet = cfg.magnetRadius * w.modMagnet;
+  const m2 = magnet * magnet;
   for (let i = 0; i < MAX_PICKUPS; i++) {
     if (!w.kActive[i]) continue;
     w.kLife[i] = w.kLife[i]! - TICK_DT;
