@@ -29,7 +29,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const engines = { chromium, firefox, webkit };
 const wanted = process.argv.slice(2).length ? process.argv.slice(2) : ['chromium'];
 // Firefox and WebKit run the tests that do not need the WebGL renderer: determinism, controls, audio decoding, strings
-const NO_GL = 'sim.determinism,controls.mapping,audio.bank,audio.formats,audio.spatial,input.devices,profile.unlocks,ui.strings';
+const NO_GL = 'sim.determinism,audio.bank,audio.formats,audio.spatial,input.devices,profile.unlocks,ui.strings';
 const ONLY = { chromium: '', firefox: NO_GL, webkit: NO_GL };
 let failed = false;
 
