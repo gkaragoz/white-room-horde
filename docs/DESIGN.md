@@ -27,7 +27,44 @@ Sahne: açık gri-beyaz zemin, ince ızgara çizgileri, alçak duvarlar, kasalar
 | Kan | `#B31927` (koyu kırmızı) | Tek renk, parlak yüzey |
 | Silah | koyu gövde `#6F737C`, vurgu sarı `#F9E16C` | Kalın, abartılı oran |
 
-Kural: düşman paleti pastel yeşil/turuncu/mor, oyuncular doygun ve ayırt edilir, kan tek kırmızı.
+Kural: düşman paleti pastel, oyuncular doygun ve ayırt edilir, kan tek kırmızı.
+
+**Tam renk listesi (onaylandı)**
+Kurallar: oyuncu kafası hep beyaz (`#FDFDFD`), düşman kafası hep renkli (kafadan ayırt edilir); kırmızı sadece kan; sarı kontur sadece tehlike alanı işareti; boss'lar altın taç/aura.
+
+| # | Oyuncu yeleği | Hex |
+|---|---|---|
+| 1 | Mavi | `#6CC4F9` |
+| 2 | Pembe | `#F995B3` |
+| 3 | Sarı | `#FDE56C` |
+| 4 | Mor | `#C4A0ED` |
+| 5 | Mercan | `#FF9A6A` |
+| 6 | Turkuaz | `#3DD6C6` |
+| 7 | Lime | `#A8E063` |
+| 8 | Çivit | `#5B6BE0` |
+| 9 | Eflatun | `#E057C8` |
+| 10 | Kum | `#D2B48C` |
+| 11 | Çelik | `#8E9AAF` |
+
+Renk körlüğü: her oyuncunun adının ve HUD kartının yanında rakam (1-11) ve basit sembol (daire, üçgen, kare, yıldız, vb.), yelek sırtında aynı rakam; lobi ve HUD'da renkle birlikte gösterilir.
+
+| Düşman | Gövde | Kafa | Ölçek |
+|---|---|---|---|
+| Grunt | `#C4E5B3` | `#E1FDD3` | 1.35x |
+| Koşucu | `#F9B37C` | `#FFDABC` | 0.85-1.0x, öne eğik |
+| Tank | `#AD95C4` | `#D3C4E1` | 2.2x |
+| Patlayıcı | `#FFC93C` | `#FFE08A` | 1.3x, koyu tehlike şeritleri (kırmızı yok) |
+| Tükürüklü | `#55D6E0` | `#A9EEF2` | 1.35x, büyük ağız |
+| Zırhlı kalkancı | `#8FA3BF` | `#C9D4E4` | 1.5x, ön plaka `#5B6B85` |
+| Sayacı | `#E8B4BC` | `#F5D9DE` | 1.5x, krem yumurta kesesi `#F3E3C3` |
+
+| Boss | Gövde | Kafa | Ölçek |
+|---|---|---|---|
+| Dev Grunt | `#7DBE6A` | `#B8E3A8` | ~3x |
+| Kral Tank | `#7B5CA6` | `#B39BD6` | ~4x |
+| Sayacı Ana | `#D98E9A` | `#F0C1C9` | ~3.5x |
+| Koşucu Sürü Lideri | `#F28C38` | `#FFC48F` | ~2.5x |
+Boss ortak: altın taç ve nabız gibi atan altın aura `#FFC93C`; tehlike alanı konturu parlak sarı `#FFD400`. Patlayıcı sarısı ile oyuncu sarısı (#3) ayrışır: oyuncuda beyaz kafa, patlayıcıda renkli kafa ve tehlike şeritleri.
 
 ## 4. Işık
 - Tek yönlü yumuşak güneş (renk `#FFFCF6`, şiddet ~2.2, açı 6° yumuşak gölge), yön: yükseklik 52°, yaw 35°.
@@ -46,7 +83,7 @@ Yuvarlak beyaz kafa (r~0.46), yumurta gövde, koyu yelek, eldiven, kısa bacak. 
 | Grunt | 1.35x | Yavaş, sürü halinde |
 | Koşucu | 1.0x, eğik | Hızlı, düşük can, grup saldırısı |
 | Tank | 2.2x | Yavaş, yüksek can, zırh plakası |
-| Diğer türler | patlayıcı, tükürüklü, kalkancı, sayacı, 4 boss | Roster bölüm 9, değerler bölüm 20; renkleri açık karar |
+| Diğer türler | patlayıcı, tükürüklü, kalkancı, sayacı, 4 boss | Roster bölüm 9, değerler bölüm 20; renkleri bölüm 3 |
 
 ## 7. Silahlar
 Kalın oyuncak oran, sarı vurgu. Hepsinde yüksek geri bildirim: muzzle flash, kovan, hit-stop, parça uçuşması.
@@ -389,8 +426,6 @@ Mermi biterse pistole dönülür. Kritik: temel %5, hasar x2.
 **Ayar süreci:** headless sim denge raporu (`scripts/balance`): senaryo başına dps, ortalama ölüm dalgası, silah kullanım dağılımı; oynanış geri bildirimine göre `balance.json` güncellenir.
 
 ## 21. Açık kararlar
-- Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
-- Kalan düşman ve boss renkleri (patlayıcı, tükürüklü, kalkancı, sayacı, 4 boss) ve görsel ayrışma kuralı.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - Sunucu barındırma: ilk aşamada yerel; Cloudflare Tunnel sonra.
 - Sonraki sürüm: kalıcı meta ilerleme (yerel), yeni haritalar, WebRTC aktarımı, sıralama tablosu.
