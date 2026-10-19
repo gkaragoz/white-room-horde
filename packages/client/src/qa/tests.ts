@@ -6,6 +6,7 @@ import { aimDirThree, decodeAim, encodeAim, keysToMove, yawForAim } from '../con
 import { Character, loadGLB } from '../render/character';
 import { Stage } from '../render/stage';
 import { crowdTests } from './crowd-tests';
+import { moreTests } from './more-tests';
 import { asset } from '../assets';
 
 export type Status = 'pass' | 'fail' | 'warn';
@@ -278,4 +279,4 @@ export const tests: QaTest[] = [
   },
 ];
 
-tests.push(...crowdTests);
+tests.push(...crowdTests, ...moreTests);

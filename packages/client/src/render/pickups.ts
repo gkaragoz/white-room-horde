@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MAX_PICKUPS } from '@wrh/shared';
 import type { World } from '@wrh/sim';
 
-const COLORS = ['#ffcf3a', '#3ddc6a', '#6b8f4a'];
+const COLORS = ['#ffcf3a', '#3ddc6a', '#6b8f4a', '#c06bff'];
 
 /** Floating, spinning crates for the loot the sim drops (ammo, health, grenades), with a glow ring on the floor. */
 export class PickupView {
@@ -10,11 +10,11 @@ export class PickupView {
   private readonly crates: THREE.InstancedMesh[] = [];
   private readonly rings: THREE.InstancedMesh;
   private readonly dummy = new THREE.Object3D();
-  private readonly counts = [0, 0, 0];
+  private readonly counts = [0, 0, 0, 0];
 
   constructor() {
-    const geo = [new THREE.BoxGeometry(0.46, 0.34, 0.46), new THREE.BoxGeometry(0.42, 0.42, 0.42), new THREE.SphereGeometry(0.26, 10, 8)];
-    for (let k = 0; k < 3; k++) {
+    const geo = [new THREE.BoxGeometry(0.46, 0.34, 0.46), new THREE.BoxGeometry(0.42, 0.42, 0.42), new THREE.SphereGeometry(0.26, 10, 8), new THREE.OctahedronGeometry(0.34)];
+    for (let k = 0; k < 4; k++) {
       const mat = new THREE.MeshStandardMaterial({ color: COLORS[k], emissive: COLORS[k], emissiveIntensity: 0.55, roughness: 0.5, flatShading: true });
       const m = new THREE.InstancedMesh(geo[k]!, mat, MAX_PICKUPS);
       m.frustumCulled = false;
@@ -52,7 +52,7 @@ export class PickupView {
       d.updateMatrix();
       this.rings.setMatrixAt(rings++, d.matrix);
     }
-    for (let k = 0; k < 3; k++) {
+    for (let k = 0; k < 4; k++) {
       this.crates[k]!.count = this.counts[k]!;
       this.crates[k]!.instanceMatrix.needsUpdate = true;
     }
@@ -61,7 +61,7 @@ export class PickupView {
   }
 
   get visibleCount(): number {
-    return this.counts[0]! + this.counts[1]! + this.counts[2]!;
+    return this.counts[0]! + this.counts[1]! + this.counts[2]! + this.counts[3]!;
   }
 }
 

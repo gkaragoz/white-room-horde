@@ -240,6 +240,11 @@ export class Character {
     this.root.updateMatrixWorld(true);
   }
 
+  /** Length of a clip in seconds (0 when unknown). */
+  clipDuration(name: string): number {
+    return this.actions.get(name)?.getClip().duration ?? 0;
+  }
+
   has(name: string): boolean {
     return this.actions.has(name);
   }
@@ -256,8 +261,8 @@ export class Character {
   }
 
   /** Play a clip once and hold its last frame (death, get up). */
-  playOnce(name: string, fade = 0.15): void {
-    if (name === this.currentName) return;
+  playOnce(name: string, fade = 0.15, force = false): void {
+    if (name === this.currentName && !force) return;
     const next = this.actions.get(name);
     if (!next) return;
     next.setLoop(THREE.LoopOnce, 1);

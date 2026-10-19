@@ -1,5 +1,7 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, OBSTACLES, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
+import { ACTIONS, keyLabel } from './input';
+import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
 
 export type Lang = 'en' | 'tr';
 
@@ -51,9 +53,35 @@ const T = {
     high: 'High',
     desync: 'Desync detected!',
     connecting: 'Connecting...',
-    controls: 'WASD move · mouse aim · click/space fire · right-click/G grenade · E revive · 1-3 cards',
+    controls: 'WASD move · mouse aim · click fire · R reload · Shift dash · right-click grenade · E revive · 1-3 cards',
     weapon: 'Starting weapon',
+    arena: 'Arena',
+    difficulty: 'Difficulty',
+    look: 'Look',
+    password: 'Room password (optional)',
+    rejoin: 'Rejoin the game you left',
+    lockedTip: 'Reach wave',
+    best: 'Best',
+    newBest: 'New record!',
+    unlockedWeapon: 'Unlocked',
+    reconnecting: 'Connection lost, reconnecting...',
+    maps: { '-1': 'Random', '0': 'Warehouse', '1': 'Courtyard', '2': 'Corridors', '3': 'Open field' },
+    diffs: ['Easy', 'Normal', 'Hard'],
+    accs: ['Bandana', 'Cap', 'Goggles', 'Headphones', 'Helmet'],
+    controlsTitle: 'Controls',
+    pressKey: 'press a key...',
+    resetKeys: 'Reset keys',
+    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
+    fpsCap: 'Frame limit',
+    unlimited: 'Display rate',
+    texture: 'Texture detail',
+    autoScale: 'Auto resolution',
+    noServer: 'Enter the server address first',
+    noConnect: 'Could not connect to',
+    connLost: 'Connection lost',
     ammo: 'Ammo',
+    reloading: 'Reloading...',
+    dashReady: 'Dash',
     grenades: 'Grenades',
     cards: {
       damage: ['Heavy rounds', '+15% damage for everyone'],
@@ -113,9 +141,35 @@ const T = {
     high: 'Yüksek',
     desync: 'Senkron bozuldu!',
     connecting: 'Bağlanıyor...',
-    controls: 'WASD hareket · fare nişan · tık/boşluk ateş · sağ tık/G el bombası · E kaldır · 1-3 kart',
+    controls: 'WASD hareket · fare nişan · tık ateş · R doldur · Shift atıl · sağ tık bomba · E kaldır · 1-3 kart',
     weapon: 'Başlangıç silahı',
+    arena: 'Arena',
+    difficulty: 'Zorluk',
+    look: 'Görünüm',
+    password: 'Oda şifresi (isteğe bağlı)',
+    rejoin: 'Ayrıldığın oyuna geri dön',
+    lockedTip: 'Şu dalgaya ulaş:',
+    best: 'En iyi',
+    newBest: 'Yeni rekor!',
+    unlockedWeapon: 'Açıldı',
+    reconnecting: 'Bağlantı koptu, yeniden bağlanıyor...',
+    maps: { '-1': 'Rastgele', '0': 'Depo', '1': 'Avlu', '2': 'Koridorlar', '3': 'Açık alan' },
+    diffs: ['Kolay', 'Normal', 'Zor'],
+    accs: ['Bandana', 'Şapka', 'Gözlük', 'Kulaklık', 'Kask'],
+    controlsTitle: 'Kontroller',
+    pressKey: 'bir tuşa bas...',
+    resetKeys: 'Tuşları sıfırla',
+    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
+    fpsCap: 'Kare sınırı',
+    unlimited: 'Ekran hızı',
+    texture: 'Doku detayı',
+    autoScale: 'Otomatik çözünürlük',
+    noServer: 'Önce sunucu adresini gir',
+    noConnect: 'Bağlanılamadı:',
+    connLost: 'Bağlantı koptu',
     ammo: 'Mermi',
+    reloading: 'Dolduruyor...',
+    dashReady: 'Atılma',
     grenades: 'Bomba',
     cards: {
       damage: ['Ağır mermiler', 'Herkese +%15 hasar'],
@@ -132,9 +186,15 @@ const T = {
 
 export interface UiHandlers {
   onSolo(name: string): void;
-  onHost(name: string, server: string): void;
-  onJoin(name: string, code: string, server: string): void;
+  onHost(name: string, server: string, password: string): void;
+  onJoin(name: string, code: string, server: string, password: string): void;
+  onRejoin(): void;
   onWeapon(weapon: WeaponId): void;
+  onLook(acc: number): void;
+  getBindings(): Record<string, string[]>;
+  onRebind(action: string, done: () => void): void;
+  onResetKeys(): void;
+  onOptions(map: number, difficulty: number): void;
   onStart(): void;
   onLeave(): void;
   onCard(index: number): void;
@@ -142,10 +202,14 @@ export interface UiHandlers {
   onResume(): void;
   onReplay(): void;
   onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
-  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'renderer', value: number | string | boolean): void;
+  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'renderer' | 'fpsCap' | 'texture' | 'autoScale', value: number | string | boolean): void;
 }
 
 export interface Settings {
+  /** Frame limit: 0 = as fast as the display goes (vsync). */
+  fpsCap: 0 | 30 | 60 | 120;
+  texture: 0 | 1;
+  autoScale: boolean;
   music: number;
   renderer: 'webgl' | 'webgpu';
   aa: 'off' | 'msaa' | 'smaa';
@@ -205,6 +269,12 @@ const CSS = `
 .wrh-mini{position:absolute;right:14px;bottom:52px;width:180px;height:120px;border:2px solid #cdbfa5;border-radius:8px;background:rgba(250,244,232,.78);box-shadow:0 3px 10px rgba(60,45,20,.25)}
 .wrh-dmg{position:absolute;font-weight:800;font-size:15px;color:#fff;text-shadow:0 0 3px #7d0d14,0 0 3px #7d0d14,0 1px 0 #7d0d14;pointer-events:none;will-change:transform,opacity}
 .wrh-tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(250,244,232,.85);border:2px solid;white-space:nowrap;pointer-events:none}
+.wrh-reload{position:absolute;right:14px;bottom:36px;width:180px;height:6px;border-radius:4px;background:rgba(60,45,20,.25);overflow:hidden;display:none}
+.wrh-reload>i{display:block;height:100%;background:#ff9a3a;width:0}
+.wrh-scroll{max-height:92vh;overflow:auto}
+.wrh-ui button.wrh-wp:disabled{opacity:.45;cursor:not-allowed}
+.wrh-keys{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin:4px 0 8px;font-size:12px}
+.wrh-keys button{margin:0;padding:3px 8px;font-size:12px;background:#e6dcc8;color:#3a352d}
 .wrh-low{color:#d8362e}
 .wrh-hud-dev{position:absolute;left:12px;top:10px;font-size:12px;line-height:1.5}
 `;
@@ -219,6 +289,11 @@ export class Ui {
   lang: Lang = 'en';
   /** Starting weapon chosen in the menu or lobby. */
   weapon: WeaponId = 'pistol';
+  /** Arena (-1 random) and difficulty picked for solo games. */
+  map = -1;
+  difficulty = 1;
+  /** Accessory index. */
+  acc = 0;
   private readonly screen = document.createElement('div');
   private readonly hud = document.createElement('div');
   private readonly dev = document.createElement('div');
@@ -254,6 +329,11 @@ export class Ui {
     parent.appendChild(this.root);
   }
 
+  /** Translate a UI string key (for messages the game shows outside the UI module). */
+  tr(key: 'noServer' | 'noConnect' | 'connLost' | 'desync' | 'reconnecting'): string {
+    return (this.t as unknown as Record<string, string>)[key]!;
+  }
+
   private get t(): (typeof T)['en'] {
     return T[this.lang] as (typeof T)['en'];
   }
@@ -266,8 +346,66 @@ export class Ui {
     this.screen.innerHTML = '';
   }
 
+  /** The name typed in the menu (or the remembered one). */
+  name(): string {
+    const el = this.screen.querySelector<HTMLInputElement>('#wrh-name');
+    try {
+      return el?.value.trim() || localStorage.getItem('wrh.name') || 'player';
+    } catch {
+      return el?.value.trim() || 'player';
+    }
+  }
+
+  /** A row of toggle buttons; `value` is highlighted and `pick` runs when one is chosen. */
+  private group(items: { id: string; label: string; disabled?: boolean; tip?: string }[], value: string, attr: string): string {
+    return items
+      .map((i) => `<button type="button" class="wrh-wp${i.id === value ? ' on' : ''}" data-${attr}="${i.id}"${i.disabled ? ' disabled' : ''}${i.tip ? ` title="${esc(i.tip)}"` : ''}>${i.label}</button>`)
+      .join('');
+  }
+
+  private mapItems(): { id: string; label: string }[] {
+    const names = this.t.maps as Record<string, string>;
+    return ['-1', '0', '1', '2', '3'].map((id) => ({ id, label: names[id]! }));
+  }
+
+  private bindGroup(attr: string, pick: (id: string) => void): void {
+    this.screen.querySelectorAll<HTMLElement>(`[data-${attr}]`).forEach((el) => {
+      el.onclick = () => {
+        pick(el.getAttribute(`data-${attr}`)!);
+        this.screen.querySelectorAll(`[data-${attr}]`).forEach((x) => x.classList.toggle('on', x === el));
+      };
+    });
+  }
+
+  private persistLook(): void {
+    const p = loadProfile();
+    p.acc = this.acc;
+    p.map = this.map;
+    p.difficulty = this.difficulty;
+    saveProfile(p);
+  }
+
+  /** Option rows shared by the menu and the lobby: arena and difficulty (host or solo) and the player's look. */
+  private optionRows(editable: boolean, map: number, difficulty: number): string {
+    const t = this.t;
+    const names = t.accs as readonly string[];
+    const accs = ACCESSORIES.map((_, i) => ({ id: String(i), label: names[i]! }));
+    const diffs = (t.diffs as readonly string[]).map((label, i) => ({ id: String(i), label }));
+    return (
+      `<label>${t.look}</label><div class="wrh-weapons">${this.group(accs, String(this.acc), 'acc')}</div>` +
+      (editable
+        ? `<label>${t.arena}</label><div class="wrh-weapons">${this.group(this.mapItems(), String(map), 'map')}</div>` +
+          `<label>${t.difficulty}</label><div class="wrh-weapons">${this.group(diffs, String(difficulty), 'diff')}</div>`
+        : `<label>${t.arena}: <b>${(t.maps as Record<string, string>)[String(map)]}</b> &middot; ${t.difficulty}: <b>${(t.diffs as readonly string[])[difficulty]}</b></label>`)
+    );
+  }
+
   showMenu(error = ''): void {
     const t = this.t;
+    const profile = loadProfile();
+    this.acc = profile.acc;
+    this.map = profile.map;
+    this.difficulty = profile.difficulty;
     const saved = (() => {
       try {
         return localStorage.getItem('wrh.name') ?? '';
@@ -285,18 +423,35 @@ export class Ui {
     const fromParam = new URLSearchParams(location.search).get('server');
     const hosted = location.hostname.endsWith('github.io');
     const defServer = fromParam ?? (stored || (hosted ? '' : location.port === '5173' ? `ws://${location.hostname}:8787/ws` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
-    this.screen.innerHTML = `<div class="wrh-panel wrh-center">
-      <h1>${t.title}</h1><p class="sub">${t.tag}</p>
+    const rejoin = loadRejoin();
+    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
+      <h1>${t.title}</h1><p class="sub">${t.tag} &middot; ${t.best}: ${profile.bestWave} / ${profile.bestKills}</p>
       <label>${t.name}</label><input id="wrh-name" maxlength="16" value="${esc(saved)}" placeholder="player">
       <label>${t.weapon}</label><div class="wrh-weapons" id="wrh-weapons">${this.weaponButtons()}</div>
+      ${this.optionRows(true, this.map, this.difficulty)}
       <button id="wrh-solo">${t.solo}</button>
       <button id="wrh-host" class="alt">${t.host}</button>
+      ${rejoin ? `<button id="wrh-rejoin" class="alt">${t.rejoin} (${esc(rejoin.code)})</button>` : ''}
       <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD"></div><button id="wrh-join" class="alt">${t.join}</button></div>
+      <label>${t.password}</label><input id="wrh-pass" maxlength="24" autocomplete="off">
       <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}" placeholder="wss://your-tunnel.example.com/ws">
       <p class="sub" style="margin:6px 0 0">${t.controls}</p>
       ${error ? `<p style="color:#c8242c;font-weight:700">${esc(error)}</p>` : ''}
     </div>`;
     this.bindWeapons();
+    this.bindGroup('acc', (id) => {
+      this.acc = Number(id);
+      this.persistLook();
+      this.h.onLook(this.acc);
+    });
+    this.bindGroup('map', (id) => {
+      this.map = Number(id);
+      this.persistLook();
+    });
+    this.bindGroup('diff', (id) => {
+      this.difficulty = Number(id);
+      this.persistLook();
+    });
     const q = <E extends HTMLElement>(id: string): E => this.screen.querySelector<E>('#' + id)!;
     const name = (): string => {
       const n = q<HTMLInputElement>('wrh-name').value.trim() || 'player';
@@ -307,9 +462,12 @@ export class Ui {
       }
       return n;
     };
+    const pass = (): string => q<HTMLInputElement>('wrh-pass').value;
     q('wrh-solo').onclick = () => this.h.onSolo(name());
-    q('wrh-host').onclick = () => this.h.onHost(name(), q<HTMLInputElement>('wrh-server').value.trim());
-    q('wrh-join').onclick = () => this.h.onJoin(name(), q<HTMLInputElement>('wrh-code').value.trim().toUpperCase(), q<HTMLInputElement>('wrh-server').value.trim());
+    q('wrh-host').onclick = () => this.h.onHost(name(), q<HTMLInputElement>('wrh-server').value.trim(), pass());
+    q('wrh-join').onclick = () => this.h.onJoin(name(), q<HTMLInputElement>('wrh-code').value.trim().toUpperCase(), q<HTMLInputElement>('wrh-server').value.trim(), pass());
+    const rj = this.screen.querySelector<HTMLElement>('#wrh-rejoin');
+    if (rj) rj.onclick = () => this.h.onRejoin();
   }
 
   /** Pause screen (solo only; online games keep running). */
@@ -364,14 +522,18 @@ export class Ui {
 
   private weaponButtons(): string {
     const names = this.t.weapons as Record<string, string>;
-    return WEAPON_IDS.map((w) => `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}">${names[w]}</button>`).join('');
+    const profile = loadProfile();
+    return WEAPON_IDS.map((w) => {
+      const ok = isUnlocked(w, profile);
+      return `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}"${ok ? '' : ` disabled title="${esc(`${this.t.lockedTip} ${WEAPON_UNLOCK[w]}`)}"`}>${ok ? '' : '&#128274; '}${names[w]}</button>`;
+    }).join('');
   }
 
   private bindWeapons(): void {
-    this.screen.querySelectorAll<HTMLElement>('.wrh-wp').forEach((el) => {
+    this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => {
       el.onclick = () => {
         this.weapon = el.dataset.w as WeaponId;
-        this.screen.querySelectorAll('.wrh-wp').forEach((x) => x.classList.toggle('on', x === el));
+        this.screen.querySelectorAll('.wrh-wp[data-w]').forEach((x) => x.classList.toggle('on', x === el));
         this.h.onWeapon(this.weapon);
       };
     });
@@ -381,27 +543,59 @@ export class Ui {
     this.screen.innerHTML = `<div class="wrh-panel wrh-center"><h1>${this.t.connecting}</h1></div>`;
   }
 
-  showLobby(code: string, players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId }[], iAmHost: boolean): void {
+  showLobby(
+    code: string,
+    players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId; acc: number }[],
+    iAmHost: boolean,
+    options: { map: number; difficulty: number } = { map: 0, difficulty: 1 },
+    locked = false,
+  ): void {
     const t = this.t;
-    const list = players.map((p) => `<li><span class="wrh-dot" style="background:${PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]}</small></li>`).join('');
-    this.screen.innerHTML = `<div class="wrh-panel wrh-center">
-      <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span></h1>
+    const accNames = t.accs as readonly string[];
+    const list = players
+      .map(
+        (p) =>
+          `<li><span class="wrh-dot" style="background:${PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]} &middot; ${accNames[p.acc] ?? ''}</small></li>`,
+      )
+      .join('');
+    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
+      <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span>${locked ? ' &#128274;' : ''}</h1>
       <p class="sub">${iAmHost ? '' : t.waiting}</p>
       <label>${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist">${list}</ul>
       <label>${t.weapon}</label><div class="wrh-weapons">${this.weaponButtons()}</div>
+      ${this.optionRows(iAmHost, options.map, options.difficulty)}
       ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-leave" class="warn">${t.leave}</button>
     </div>`;
     this.bindWeapons();
+    this.bindGroup('acc', (id) => {
+      this.acc = Number(id);
+      this.persistLook();
+      this.h.onLook(this.acc);
+    });
+    let map = options.map;
+    let difficulty = options.difficulty;
+    this.bindGroup('map', (id) => {
+      map = Number(id);
+      this.h.onOptions(map, difficulty);
+    });
+    this.bindGroup('diff', (id) => {
+      difficulty = Number(id);
+      this.h.onOptions(map, difficulty);
+    });
     const s = this.screen.querySelector<HTMLElement>('#wrh-start');
     if (s) s.onclick = () => this.h.onStart();
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
   }
 
-  showGameOver(world: World, canReplay = false): void {
+  showGameOver(world: World, canReplay = false, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }): void {
     const t = this.t;
+    const names = t.weapons as Record<string, string>;
+    const extra = rec
+      ? `${rec.newWave || rec.newKills ? `<p style="color:#d8862e;font-weight:800">${t.newBest}</p>` : ''}${rec.unlocked.length ? `<p>&#128275; ${t.unlockedWeapon}: <b>${rec.unlocked.map((w) => names[w]).join(', ')}</b></p>` : ''}`
+      : '';
     this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center">
       <h1>${t.over}</h1>
-      <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${world.level}</b></p>
+      <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${world.level}</b></p>${extra}
       <button id="wrh-again">${t.again}</button>${canReplay ? `<button id="wrh-replay" class="alt">${t.replay}</button>` : ''}
     </div>`;
     const rb = this.screen.querySelector<HTMLElement>('#wrh-replay');
@@ -415,6 +609,7 @@ export class Ui {
       <div class="wrh-top"><div class="big" id="h-wave"></div><div class="wrh-bar"><i id="h-xp"></i></div><div class="wrh-bar boss" id="h-bossbar" style="display:none"><i id="h-boss"></i></div><div id="h-bosslabel" style="display:none;color:#d8362e"></div></div>
       <div class="wrh-squad" id="h-squad"></div>
       <canvas class="wrh-mini" id="h-mini" width="360" height="240"></canvas>
+      <div class="wrh-reload" id="h-reload"><i></i></div>
       <div class="wrh-me" id="h-me"></div>
       <div class="wrh-banner" id="h-banner" style="display:none"></div>
       <div class="wrh-cards" id="h-cards" style="display:none"></div>
@@ -452,6 +647,12 @@ export class Ui {
     this.renderSettings();
   }
 
+  private keyRows(): string {
+    const b = this.h.getBindings();
+    const names = this.t.actions as Record<string, string>;
+    return ACTIONS.map((a) => `<span>${names[a]}</span><button type="button" data-act="${a}">${esc((b[a] ?? []).map(keyLabel).join(' / '))}</button>`).join('');
+  }
+
   private renderSettings(): void {
     if (!this.settingsOpen) {
       this.settingsEl.innerHTML = '';
@@ -459,7 +660,7 @@ export class Ui {
     }
     const t = this.t;
     const s = this.settings;
-    this.settingsEl.innerHTML = `<div class="wrh-panel wrh-center">
+    this.settingsEl.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
       <h1 style="font-size:22px">${t.settings}</h1>
       <label>${t.volume}</label><input id="s-vol" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}">
       <label>${t.music}</label><input id="s-mus" type="range" min="0" max="100" value="${Math.round(s.music * 100)}">
@@ -468,6 +669,10 @@ export class Ui {
       <label>${t.renderer} <small>(${t.reloads})</small></label><div class="wrh-row">${(['webgl', 'webgpu'] as const).map((m) => `<button class="wrh-wp${s.renderer === m ? ' on' : ''}" data-rd="${m}">${m === 'webgl' ? 'WebGL2' : 'WebGPU'}</button>`).join('')}</div>
       <label>${t.aa} <small>(${t.reloads})</small></label><div class="wrh-row">${(['off', 'msaa', 'smaa'] as const).map((m) => `<button class="wrh-wp${s.aa === m ? ' on' : ''}" data-aa="${m}">${m === 'off' ? t.off : m.toUpperCase()}</button>`).join('')}</div>
       <label>${t.bounce}</label><div class="wrh-row"><button class="wrh-wp${s.bounce ? ' on' : ''}" id="s-bn1">${t.on}</button><button class="wrh-wp${!s.bounce ? ' on' : ''}" id="s-bn0">${t.off}</button></div>
+      <label>${t.controlsTitle}</label><div class="wrh-keys" id="s-keys">${this.keyRows()}</div><button class="alt" id="s-resetkeys">${t.resetKeys}</button>
+      <label>${t.fpsCap}</label><div class="wrh-row">${([0, 30, 60, 120] as const).map((v) => `<button class="wrh-wp${s.fpsCap === v ? ' on' : ''}" data-fps="${v}">${v === 0 ? t.unlimited : v}</button>`).join('')}</div>
+      <label>${t.texture} <small>(${t.reloads})</small></label><div class="wrh-row"><button class="wrh-wp${s.texture === 0 ? ' on' : ''}" data-tex="0">${t.low}</button><button class="wrh-wp${s.texture === 1 ? ' on' : ''}" data-tex="1">${t.high}</button></div>
+      <label>${t.autoScale}</label><div class="wrh-row"><button class="wrh-wp${s.autoScale ? ' on' : ''}" id="s-as1">${t.on}</button><button class="wrh-wp${!s.autoScale ? ' on' : ''}" id="s-as0">${t.off}</button></div>
       <label>${t.language}</label><div class="wrh-row"><button class="alt" id="s-en">English</button><button class="alt" id="s-tr">Türkçe</button></div>
       <button id="s-close">${t.close}</button>
     </div>`;
@@ -484,6 +689,24 @@ export class Ui {
     });
     q('s-bn1').onclick = () => this.h.onSetting('bounce', true);
     q('s-bn0').onclick = () => this.h.onSetting('bounce', false);
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-act]').forEach((el) => {
+      el.onclick = () => {
+        el.textContent = this.t.pressKey;
+        this.h.onRebind(el.dataset.act!, () => this.renderSettings());
+      };
+    });
+    this.settingsEl.querySelector<HTMLElement>('#s-resetkeys')!.onclick = () => {
+      this.h.onResetKeys();
+      this.renderSettings();
+    };
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-fps]').forEach((el) => {
+      el.onclick = () => this.h.onSetting('fpsCap', Number(el.dataset.fps));
+    });
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-tex]').forEach((el) => {
+      el.onclick = () => this.h.onSetting('texture', Number(el.dataset.tex));
+    });
+    q('s-as1').onclick = () => this.h.onSetting('autoScale', true);
+    q('s-as0').onclick = () => this.h.onSetting('autoScale', false);
     q('s-en').onclick = () => this.h.onSetting('lang', 'en');
     q('s-tr').onclick = () => this.h.onSetting('lang', 'tr');
     q('s-close').onclick = () => this.toggleSettings();
@@ -515,10 +738,10 @@ export class Ui {
     const Y = (y: number): number => (ARENA_HALF_H - y) * sy;
     g.clearRect(0, 0, W, H);
     g.fillStyle = '#8b7a5e';
-    for (const o of OBSTACLES) g.fillRect(X(o.x - o.w / 2), Y(o.y + o.h / 2), o.w * sx, o.h * sy);
+    for (const o of MAPS[world.map]?.boxes ?? MAPS[0]!.boxes) g.fillRect(X(o.x - o.w / 2), Y(o.y + o.h / 2), o.w * sx, o.h * sy);
     for (let i = 0; i < MAX_PICKUPS; i++) {
       if (!world.kActive[i]) continue;
-      g.fillStyle = ['#ffcf3a', '#3ddc6a', '#6b8f4a'][world.kType[i]!]!;
+      g.fillStyle = ['#ffcf3a', '#3ddc6a', '#6b8f4a', '#c06bff'][world.kType[i]!]!;
       g.fillRect(X(world.kX[i]!) - 3, Y(world.kY[i]!) - 3, 6, 6);
     }
     for (let i = 0; i < MAX_ENEMIES; i++) {
@@ -597,10 +820,21 @@ export class Ui {
     // local player
     if (world.pActive[slot]) {
       const wid = WEAPON_IDS[world.pWeapon[slot]!]!;
-      const ammo = world.pAmmo[slot]!;
-      const maxAmmo = BALANCE.weapons[wid].ammo;
-      const low = maxAmmo > 0 && ammo < maxAmmo * 0.2;
-      set('h-me', `${(t.weapons as Record<string, string>)[wid]}${ammo >= 0 ? ` &middot; <span class="${low ? 'wrh-low' : ''}">${t.ammo} ${ammo}${low ? ' !' : ''}</span>` : ' &infin;'} &middot; &#128163; ${world.pGren[slot]}`);
+      const stats = BALANCE.weapons[wid];
+      const mag = world.pMag[slot]!;
+      const reserve = world.pAmmo[slot]!;
+      const reloading = world.pReload[slot]! > 0;
+      const low = reserve >= 0 && mag + reserve < stats.ammo * 0.2;
+      const dashReady = world.pDashCd[slot]! <= 0;
+      const dashText = dashReady ? t.dashReady : `${Math.ceil(world.pDashCd[slot]!)}s`;
+      set(
+        'h-me',
+        `${(t.weapons as Record<string, string>)[wid]} &middot; <span class="${low || (mag === 0 && reserve === 0) ? 'wrh-low' : ''}">${reloading ? t.reloading : `${mag}/${reserve < 0 ? '&infin;' : reserve}`}${low ? ' !' : ''}</span>` +
+          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>`,
+      );
+      const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
+      bar.style.display = reloading ? 'block' : 'none';
+      if (reloading) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (1 - world.pReload[slot]! / stats.reload) * 100))}%`;
       const st = world.pState[slot]!;
       if (st === PlayerState.Downed) {
         const sec = Math.ceil(world.pTimer[slot]!);

@@ -6,13 +6,13 @@ import { SCREEN_RIGHT } from './controls';
 export type Sfx =
   | 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'heavyShot' | 'throw' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive'
   | 'level' | 'pick' | 'wave' | 'boss' | 'over' | 'zGroan' | 'zAttack' | 'zHit' | 'zDeath' | 'zScream' | 'step' | 'pickup' | 'pickupDrop' | 'spit'
-  | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart';
+  | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
 const GAP: Record<Sfx, number> = {
   shot: 0.035, midShot: 0.04, bigShot: 0.05, cannonShot: 0.08, heavyShot: 0.05, throw: 0.1, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3,
   level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1, zGroan: 0.25, zAttack: 0.12, zHit: 0.05, zDeath: 0.06, zScream: 0.4, step: 0.12, pickup: 0.06, pickupDrop: 0.15, spit: 0.15,
-  uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
+  reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
 };
 
 type Entry = { files: string[]; gain: number; rate: [number, number] };
@@ -48,6 +48,10 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   pickup: { files: ['ui_confirmation_002', 'ui_bong_001'], gain: 0.55, rate: [1, 1.2] },
   pickupDrop: { files: ['ui_drop_001'], gain: 0.3, rate: [0.9, 1.2] },
   spit: { files: ['ui_drop_001'], gain: 0.35, rate: [0.5, 0.65] },
+  reload: { files: n3('impactMetal_light'), gain: 0.5, rate: [0.7, 0.8] },
+  reloadDone: { files: n3('impactMetal_heavy'), gain: 0.5, rate: [1.1, 1.3] },
+  dash: { files: n3('impactSoft_medium'), gain: 0.45, rate: [1.5, 1.8] },
+  bossRoar: { files: z(16, 17, 18), gain: 0.9, rate: [0.5, 0.65] },
   uiClick: { files: ['ui_click_001', 'ui_click_002'], gain: 0.5, rate: [0.97, 1.05] },
   uiConfirm: { files: ['ui_confirmation_001'], gain: 0.55, rate: [1, 1] },
   uiBack: { files: ['ui_back_001'], gain: 0.5, rate: [1, 1] },
@@ -57,7 +61,7 @@ const BANK: Partial<Record<Sfx, Entry>> = {
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
-const SPATIAL = new Set<Sfx>(['shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit']);
+const SPATIAL = new Set<Sfx>(['reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit']);
 
 /** Every file the bank refers to (QA checks they all decode). */
 export const BANK_FILES: string[] = [...new Set(Object.values(BANK).flatMap((b) => b.files))];
@@ -74,6 +78,7 @@ export class Audio {
   private master: GainNode | null = null;
   private musicGain: GainNode | null = null;
   private music: AudioBufferSourceNode | null = null;
+  private musicFilter: BiquadFilterNode | null = null;
   private noise: AudioBuffer | null = null;
   private readonly last = new Map<Sfx, number>();
   private readonly buffers = new Map<string, AudioBuffer>();
@@ -106,6 +111,11 @@ export class Audio {
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0;
     this.musicGain.connect(this.master);
+    // the music opens up (brighter, louder) as the horde grows
+    this.musicFilter = this.ctx.createBiquadFilter();
+    this.musicFilter.type = 'lowpass';
+    this.musicFilter.frequency.value = 900;
+    this.musicFilter.connect(this.musicGain);
     const len = this.ctx.sampleRate;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
@@ -168,8 +178,23 @@ export class Audio {
   // ---- music ----
   private wantMusic = false;
 
+  private intensity = 0;
+
   private applyMusicGain(): void {
-    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(this.musicVolume * 0.55 * this.duck, this.ctx.currentTime, 0.3);
+    if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(this.musicVolume * (0.38 + 0.22 * this.intensity) * this.duck, this.ctx.currentTime, 0.3);
+  }
+
+  /** 0..1 energy of the fight (crowd size and a boss) steering the music brightness. */
+  setIntensity(v: number): void {
+    const next = Math.max(0, Math.min(1, v));
+    if (Math.abs(next - this.intensity) < 0.02) return;
+    this.intensity = next;
+    if (this.musicFilter && this.ctx) this.musicFilter.frequency.setTargetAtTime(700 + 9000 * next * next, this.ctx.currentTime, 0.6);
+    this.applyMusicGain();
+  }
+
+  get musicIntensity(): number {
+    return this.intensity;
   }
 
   startMusic(): void {
@@ -180,7 +205,7 @@ export class Audio {
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
-    src.connect(this.musicGain!);
+    src.connect(this.musicFilter!);
     src.start();
     this.music = src;
     this.applyMusicGain();
@@ -311,6 +336,16 @@ export class Audio {
       case 'uiError':
         this.tone(200, 150, 0.2, 'square', 0.12);
         break;
+      case 'reload':
+      case 'reloadDone':
+        this.burst(0.05, 0.2, 2500);
+        break;
+      case 'dash':
+        this.burst(0.18, 0.25, 3500);
+        break;
+      case 'bossRoar':
+        this.tone(80, 45, 0.8, 'sawtooth', 0.4);
+        break;
       default:
         break;
     }
@@ -350,6 +385,13 @@ export class Audio {
       src.connect(g).connect(this.master!);
     }
     src.start();
+  }
+
+  private slotPos: (slot: number) => { x: number; y: number } | undefined = () => undefined;
+
+  /** Lets events that only carry a slot (reloads) be placed in the arena. */
+  setSlotLookup(f: (slot: number) => { x: number; y: number } | undefined): void {
+    this.slotPos = f;
   }
 
   /** Stereo pan (-1 left .. 1 right on screen) and distance gain for a sound at a sim position. */
@@ -394,6 +436,18 @@ export class Audio {
       }
       case 'grenadeThrown':
         this.play('throw', e);
+        break;
+      case 'reloadStart':
+        this.play('reload', e.slot === localSlot ? undefined : this.slotPos(e.slot));
+        break;
+      case 'reloadDone':
+        this.play('reloadDone', e.slot === localSlot ? undefined : this.slotPos(e.slot));
+        break;
+      case 'dash':
+        this.play('dash', e.slot === localSlot ? undefined : e);
+        break;
+      case 'bossAbility':
+        this.play('bossRoar');
         break;
       case 'enemyHit':
         this.play('hit', e);
@@ -453,6 +507,9 @@ export class Audio {
    */
   tick(w: World, localSlot: number, dt: number): void {
     if (!this.ctx) return;
+    let boss = false;
+    for (let i = 0; i < MAX_ENEMIES && !boss; i++) if (w.eActive[i] && w.eBoss[i]) boss = true;
+    this.setIntensity(w.enemyCount / 260 + (boss ? 0.45 : 0));
     if (Math.abs(this.duck - this.duckTarget) > 0.01) {
       this.duck += (this.duckTarget - this.duck) * Math.min(1, dt * 2);
       this.applyMusicGain();

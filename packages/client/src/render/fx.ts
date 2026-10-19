@@ -4,7 +4,6 @@ import type { SimEvent } from '@wrh/sim';
 
 const MAX_PARTICLES = 2400;
 const GRAVITY = 16;
-const DECAL_PPU = 24; // pixels per world unit on the blood canvas
 
 const GIB_COLORS: Record<string, string> = {
   grunt: '#9aa57a',
@@ -61,7 +60,14 @@ export class Fx {
   private readonly dummy = new THREE.Object3D();
   private readonly c = new THREE.Color();
 
-  constructor(private readonly onExplosionShake: (amount: number) => void = () => undefined) {
+  /** Pixels per world unit on the blood canvas (12 low, 24 high). */
+  private readonly ppu: number;
+
+  constructor(
+    private readonly onExplosionShake: (amount: number) => void = () => undefined,
+    decalDetail: 0 | 1 = 1,
+  ) {
+    this.ppu = decalDetail === 1 ? 24 : 12;
     const geo = new THREE.BoxGeometry(1, 1, 1);
     const mat = new THREE.MeshBasicMaterial({ vertexColors: false });
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX_PARTICLES);
@@ -72,8 +78,8 @@ export class Fx {
 
     // persistent decal layer: a transparent canvas laid over the floor
     this.decalCanvas = document.createElement('canvas');
-    this.decalCanvas.width = ARENA_HALF_W * 2 * DECAL_PPU;
-    this.decalCanvas.height = ARENA_HALF_H * 2 * DECAL_PPU;
+    this.decalCanvas.width = ARENA_HALF_W * 2 * this.ppu;
+    this.decalCanvas.height = ARENA_HALF_H * 2 * this.ppu;
     this.decalCtx = this.decalCanvas.getContext('2d')!;
     this.decalTex = new THREE.CanvasTexture(this.decalCanvas);
     this.decalTex.colorSpace = THREE.SRGBColorSpace;
@@ -89,15 +95,15 @@ export class Fx {
 
   private splat(x: number, y: number, radius: number, color: string, alpha = 0.7): void {
     const ctx = this.decalCtx;
-    const cx = (x + ARENA_HALF_W) * DECAL_PPU;
-    const cy = (ARENA_HALF_H - y) * DECAL_PPU;
+    const cx = (x + ARENA_HALF_W) * this.ppu;
+    const cy = (ARENA_HALF_H - y) * this.ppu;
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     const blobs = 3 + Math.floor(Math.random() * 4);
     for (let i = 0; i < blobs; i++) {
       const a = Math.random() * Math.PI * 2;
-      const d = Math.random() * radius * 0.7 * DECAL_PPU;
-      const r = (0.25 + Math.random() * 0.6) * radius * DECAL_PPU;
+      const d = Math.random() * radius * 0.7 * this.ppu;
+      const r = (0.25 + Math.random() * 0.6) * radius * this.ppu;
       ctx.beginPath();
       ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r, 0, Math.PI * 2);
       ctx.fill();
@@ -186,6 +192,17 @@ export class Fx {
           this.hurt = 1;
           this.shake = Math.min(1.2, this.shake + 0.3);
         }
+        break;
+      case 'dash':
+        this.burst(Kind.Smoke, e.x, e.y, 0.3, 6, 1.5, 0, 0, 6.28, 0.5, 0.25, '#d9cfc0');
+        this.burst(Kind.Spark, e.x, e.y, 0.5, 4, 5, 0, 0, 6.28, 0.25, 0.06, '#ffffff');
+        break;
+      case 'bossAbility':
+        this.flash(e.x, 0.6, -e.y, 0.4, e.kind === 'charge' ? '#ff5533' : '#a050ff', 0.5, 5);
+        this.shake = Math.min(1.2, this.shake + 0.4);
+        break;
+      case 'pickup':
+        this.burst(Kind.Spark, e.x, e.y, 0.6, 8, 4, 0, 0, 6.28, 0.35, 0.07, e.kind === 1 ? '#6dff9a' : e.kind === 3 ? '#d79bff' : '#ffe27a');
         break;
       case 'playerDown':
         this.burst(Kind.Blood, e.x, e.y, 0.9, 20, 5, 0, 0, 6.28, 0.9, 0.1, '#a3141c');

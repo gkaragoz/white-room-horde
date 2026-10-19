@@ -13,6 +13,8 @@ export interface StageOptions {
   /** Cheap fake global illumination: a warm bounce fill from the floor side. */
   bounce: boolean;
   backend?: Backend;
+  /** Floor texture detail: 0 low, 1 high. */
+  texture?: 0 | 1;
 }
 
 /** Everything that is not a character: renderer, iso camera, warm sun, painted floor (docs/DESIGN.md sections 3b, 4, 5). */
@@ -81,7 +83,7 @@ export class Stage {
     this.bounce.visible = opts.bounce;
     this.scene.add(this.bounce);
 
-    this.scene.add(makeFloor());
+    this.scene.add(makeFloor(opts.texture ?? 1));
     if (opts.aa === 'smaa' && backend === 'webgl') {
       this.composer = new EffectComposer(this.renderer);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -154,8 +156,8 @@ export class Stage {
 }
 
 /** Light cream floor with soft painted patches and a faint grid, drawn once to a canvas. */
-function makeFloor(): THREE.Mesh {
-  const size = 2048;
+function makeFloor(quality: 0 | 1): THREE.Mesh {
+  const size = quality === 1 ? 2048 : 1024;
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d')!;
@@ -189,7 +191,7 @@ function makeFloor(): THREE.Mesh {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 8;
+  tex.anisotropy = quality === 1 ? 8 : 1;
   tex.repeat.set(2.5, 1.8);
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 }));
   mesh.rotation.x = -Math.PI / 2;

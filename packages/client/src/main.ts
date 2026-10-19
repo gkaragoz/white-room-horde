@@ -1,17 +1,19 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, ENEMY_TYPES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, OBSTACLES, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, MAPS, ENEMY_TYPES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
-import { pickPlayerClip } from './anim';
-import { Input } from './input';
+import { Input, type Action } from './input';
+import { ArenaView } from './render/arena';
 import { Character } from './render/character';
+import { PlayerAnimator } from './render/playerAnim';
 import { Crowd } from './render/crowd';
 import { PickupView } from './render/pickups';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
+import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
 import { Ui, type Settings } from './ui';
 
 const app = document.getElementById('app')!;
@@ -20,7 +22,7 @@ const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
 function loadSettings(): Settings {
-  const def: Settings = { music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
+  const def: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
   try {
     return { ...def, ...(JSON.parse(localStorage.getItem('wrh.settings') ?? '{}') as Partial<Settings>) };
   } catch {
@@ -28,13 +30,15 @@ function loadSettings(): Settings {
   }
 }
 let settings = loadSettings();
+/** Render scale chosen by the auto-resolution controller (never above the setting). */
+let autoScale = settings.scale;
 
 const wantBackend = params.get('renderer') === 'webgpu' ? 'webgpu' : params.get('renderer') === 'webgl' ? 'webgl' : settings.renderer;
 const backend = await pickBackend(wantBackend);
-const stage = await Stage.create(app, { aa: settings.aa, bounce: settings.bounce, backend });
+const stage = await Stage.create(app, { aa: settings.aa, bounce: settings.bounce, backend, texture: settings.texture });
 const audio = new Audio();
 const input = new Input(stage.renderer.domElement, stage.camera);
-const fx = new Fx();
+const fx = new Fx(undefined, settings.texture);
 stage.scene.add(fx.group);
 const crowd = await Crowd.create(150, backend);
 stage.scene.add(crowd.group);
@@ -49,20 +53,10 @@ bulletMesh.frustumCulled = false;
 bulletMesh.count = 0;
 stage.scene.add(bulletMesh);
 
-// cover boxes
-const crateMat = new THREE.MeshStandardMaterial({ color: '#c8b393', roughness: 0.9, flatShading: true });
-const crateTop = new THREE.MeshStandardMaterial({ color: '#e0d2b4', roughness: 0.9, flatShading: true });
-for (const o of OBSTACLES) {
-  const h = 1.1;
-  const box = new THREE.Mesh(new THREE.BoxGeometry(o.w, h, o.h), [crateMat, crateMat, crateTop, crateMat, crateMat, crateMat]);
-  box.position.set(o.x, h / 2, -o.y);
-  box.castShadow = true;
-  box.receiveShadow = true;
-  stage.scene.add(box);
-  const rim = new THREE.Mesh(new THREE.BoxGeometry(o.w + 0.1, 0.12, o.h + 0.1), new THREE.MeshStandardMaterial({ color: '#8b7a5e', roughness: 1, flatShading: true }));
-  rim.position.set(o.x, 0.06, -o.y);
-  stage.scene.add(rim);
-}
+// cover boxes of the current layout (rebuilt per game)
+const arena = new ArenaView();
+stage.scene.add(arena.group);
+const animator = new PlayerAnimator();
 
 // grenades and spit
 const grenadeMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 10, 8), new THREE.MeshStandardMaterial({ color: '#4d6b3a', roughness: 0.7, flatShading: true }), MAX_GRENADES);
@@ -76,7 +70,7 @@ function applySettings(): void {
   audio.setVolume(settings.volume);
   audio.setMusicVolume(settings.music);
   stage.setShadowQuality(settings.shadows);
-  stage.setScale(settings.scale);
+  stage.setScale(settings.autoScale ? Math.min(autoScale, settings.scale) : settings.scale);
   stage.setBounce(settings.bounce);
   ui.applySettings(settings);
   try {
@@ -113,8 +107,21 @@ const ui = new Ui(
   document.body,
   {
     onSolo: (name) => startSolo(name),
-    onHost: (name, server) => connect(name, server, null),
-    onJoin: (name, code, server) => connect(name, server, code),
+    onHost: (name, server, password) => connect(name, server, null, password),
+    onJoin: (name, code, server, password) => connect(name, server, code, password),
+    onRejoin: () => {
+      const r = loadRejoin();
+      if (r) connect(ui.name(), r.server, r.code, '', r.token);
+    },
+    onLook: (acc) => session?.setLook(acc),
+    getBindings: () => input.bindings,
+    onRebind: (action, done) =>
+      input.captureKey(action as Action, (code) => {
+        if (code) input.setBinding(action as Action, code);
+        done();
+      }),
+    onResetKeys: () => input.resetBindings(),
+    onOptions: (map, difficulty) => session?.setOptions(map, difficulty),
     onWeapon: (wp) => {
       startWeapon = wp;
       session?.setWeapon(wp);
@@ -130,12 +137,25 @@ const ui = new Ui(
       if (key === 'volume') settings = { ...settings, volume: value as number };
       else if (key === 'music') settings = { ...settings, music: value as number };
       else if (key === 'shadows') settings = { ...settings, shadows: value as 0 | 1 | 2 };
-      else if (key === 'scale') settings = { ...settings, scale: value as number };
+      else if (key === 'scale') {
+        settings = { ...settings, scale: value as number };
+        autoScale = settings.scale;
+      }
       else if (key === 'renderer') {
         settings = { ...settings, renderer: value as Settings['renderer'] };
         applySettings();
         location.reload();
         return;
+      } else if (key === 'texture') {
+        settings = { ...settings, texture: value as 0 | 1 };
+        applySettings();
+        location.reload();
+        return;
+      } else if (key === 'fpsCap') settings = { ...settings, fpsCap: value as Settings['fpsCap'] };
+      else if (key === 'autoScale') {
+        settings = { ...settings, autoScale: value as boolean };
+        autoScale = settings.scale;
+        stage.setScale(settings.scale);
       } else if (key === 'bounce') settings = { ...settings, bounce: value as boolean };
       else if (key === 'aa') {
         settings = { ...settings, aa: value as Settings['aa'] };
@@ -149,6 +169,7 @@ const ui = new Ui(
   },
   settings,
 );
+audio.setSlotLookup((s) => (world && world.pActive[s] ? { x: world.pX[s]!, y: world.pY[s]! } : undefined));
 window.addEventListener('pointerdown', () => audio.unlock());
 window.addEventListener('keydown', () => audio.unlock());
 ui.weapon = startWeapon;
@@ -158,7 +179,11 @@ applySettings();
 const chars: (Character | null)[] = new Array<Character | null>(MAX_PLAYERS).fill(null);
 const charWeapon = new Int32Array(MAX_PLAYERS).fill(-1);
 const loading = new Set<number>();
-const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headphones', 'acc_helmet'];
+/** Accessory index of a slot: the lobby choice online, the profile for the local player, otherwise by slot. */
+function accFor(s: number): number {
+  if (session) return session.players.find((p) => p.slot === s)?.acc ?? s;
+  return s === localSlot ? ui.acc : s;
+}
 
 function ensureCharacter(s: number): void {
   if (chars[s] || loading.has(s) || !world) return;
@@ -166,7 +191,7 @@ function ensureCharacter(s: number): void {
   const wid = WEAPON_IDS[world.pWeapon[s]!]!;
   void Character.createPlayer({
     color: PLAYER_COLORS[s % PLAYER_COLORS.length]!,
-    accessory: s === 0 && params.get('acc') ? params.get('acc')! : ACCESSORIES[s % ACCESSORIES.length]!,
+    accessory: params.get('acc') && s === localSlot ? params.get('acc')! : ACCESSORIES[accFor(s) % ACCESSORIES.length]!,
     weapon: 'weapon_' + wid,
   }).then((c) => {
     stage.scene.add(c.root);
@@ -240,11 +265,25 @@ function handleEvent(e: SimEvent): void {
       break;
     case 'playerRevive':
       ui.banner(ui.lang === 'tr' ? 'Kaldırıldı!' : 'Revived!', names[e.slot] ?? '', 1500);
+      animator.trigger(e.slot, 'get_up', 1.3, nowSec);
+      break;
+    case 'grenadeThrown':
+      animator.trigger(e.owner, world && world.pMoving[e.owner] ? 'throw_run' : 'throw', 0.85, nowSec);
+      break;
+    case 'playerDown':
+      animator.trigger(e.slot, 'hit_down', 1.2, nowSec);
+      break;
+    case 'bossAbility':
+      ui.banner(e.kind === 'charge' ? (ui.lang === 'tr' ? 'HÜCUM!' : 'CHARGE!') : e.kind === 'aura' ? (ui.lang === 'tr' ? 'Sürü hızlandı!' : 'The swarm speeds up!') : (ui.lang === 'tr' ? 'Takviye çağırdı!' : 'Reinforcements!'), '', 1400);
       break;
     case 'gameOver':
       over = true;
       setTimeout(() => audio.stopMusic(), 4000);
-      setTimeout(() => world && ui.showGameOver(world, recorder !== null), 1800);
+      {
+        const rec = world && !playback ? recordGame(world.wave, world.kills) : undefined;
+        clearRejoin();
+        setTimeout(() => world && ui.showGameOver(world, recorder !== null, rec), 1800);
+      }
       break;
     default:
       break;
@@ -263,7 +302,7 @@ function setPaused(p: boolean): void {
   else ui.clearScreen();
 }
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape') setPaused(!paused);
+  if (input.bindings.pause.includes(e.code) && (e.target as HTMLElement).tagName !== 'INPUT') setPaused(!paused);
 });
 window.addEventListener('blur', () => {
   if (mode === 'solo' && world && !over && !paused && !dev.auto && !dev.perf) setPaused(true);
@@ -283,6 +322,7 @@ function damageNumber(x: number, y: number, damage: number): void {
 // ---- starting a game ----
 function beginPlaying(w: World, slot: number): void {
   audio.startMusic();
+  arena.setMap(w.map);
   world = w;
   localSlot = slot;
   ui.clearScreen();
@@ -304,7 +344,8 @@ function startSolo(name: string): void {
     players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar' });
     names[b] = 'Bot ' + b;
   }
-  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players };
+  const map = params.has('map') ? Number(params.get('map')) : ui.map >= 0 ? ui.map : Math.floor(Math.random() * MAPS.length);
+  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map, difficulty: params.has('difficulty') ? Number(params.get('difficulty')) : ui.difficulty };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
   // a replay of a game that started on a later wave cannot be reproduced from the setup alone
@@ -340,10 +381,16 @@ function normalizeServer(raw: string): string {
   return u.toString();
 }
 
-function connect(name: string, rawServer: string, code: string | null): void {
+let reconnectTries = 0;
+
+/**
+ * Open an online session: host (code null), join with a code, or rejoin a slot with its token. When the socket drops in
+ * the middle of a game the page keeps the frozen world on screen and reattaches to the same slot a few times.
+ */
+function connect(name: string, rawServer: string, code: string | null, password = '', rejoinToken = ''): void {
   const server = normalizeServer(rawServer);
   if (!server) {
-    ui.showMenu('Enter the server address first');
+    ui.showMenu(ui.tr('noServer'));
     return;
   }
   try {
@@ -352,24 +399,39 @@ function connect(name: string, rawServer: string, code: string | null): void {
     /* ignore */
   }
   mode = 'online';
-  ui.showConnecting();
+  if (!world) ui.showConnecting();
   const sock = new WebSocket(server);
   sock.binaryType = 'arraybuffer';
   ws = sock;
   const sess = new NetSession({ send: (d) => sock.readyState === WebSocket.OPEN && sock.send(d) });
   session = sess;
-  sock.onopen = () => (code ? sess.join(code, name, startWeapon) : sess.create(name, startWeapon));
-  sock.onmessage = (ev) => sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
-  sock.onclose = () => {
-    if (!over) {
-      mode = 'menu';
-      session = null;
-      world = null;
-      ui.clearHud();
-      ui.showMenu('Connection lost');
-    }
+  sock.onopen = () => {
+    reconnectTries = 0;
+    if (rejoinToken && code) sess.rejoin(code, rejoinToken);
+    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc });
+    else sess.create(name, startWeapon, { password, acc: ui.acc });
   };
-  sock.onerror = () => ui.showMenu('Could not connect to ' + server);
+  sock.onmessage = (ev) => {
+    sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
+    if (sess.token && sess.code) saveRejoin({ server, code: sess.code, token: sess.token });
+  };
+  sock.onclose = () => {
+    if (over || session !== sess) return;
+    if (world && sess.token && reconnectTries < 6) {
+      reconnectTries++;
+      ui.warn(ui.tr('reconnecting'));
+      setTimeout(() => connect(name, server, sess.code, '', sess.token), 800 * reconnectTries);
+      return;
+    }
+    mode = 'menu';
+    session = null;
+    world = null;
+    ui.clearHud();
+    ui.showMenu(ui.tr('connLost'));
+  };
+  sock.onerror = () => {
+    if (!world) ui.showMenu(`${ui.tr('noConnect')} ${server}`);
+  };
 }
 
 // ---- main loop ----
@@ -396,8 +458,40 @@ function sampleLocal(): PlayerInput {
   return s.input;
 }
 
+let lastDrawn = 0;
+let slowSeconds = 0;
+let fastSeconds = 0;
+
+/** Dynamic resolution: shed pixels when the frame rate sags, win them back when there is headroom. */
+function adaptScale(currentFps: number, seconds: number): void {
+  if (!settings.autoScale || !world) return;
+  const target = settings.fpsCap || 60;
+  if (currentFps < target * 0.8) {
+    slowSeconds += seconds;
+    fastSeconds = 0;
+  } else if (currentFps > target * 0.95) {
+    fastSeconds += seconds;
+    slowSeconds = 0;
+  }
+  if (slowSeconds >= 1.5 && autoScale > 0.55) {
+    autoScale = Math.max(0.55, autoScale - 0.1);
+    stage.setScale(autoScale);
+    slowSeconds = 0;
+  } else if (fastSeconds >= 6 && autoScale < settings.scale) {
+    autoScale = Math.min(settings.scale, autoScale + 0.05);
+    stage.setScale(autoScale);
+    fastSeconds = 0;
+  }
+}
+
 function frame(nowMs: number): void {
+  if (settings.fpsCap > 0 && nowMs - lastDrawn < 1000 / settings.fpsCap - 1.5) {
+    requestAnimationFrame(frame);
+    return;
+  }
+  lastDrawn = nowMs;
   const t0 = performance.now();
+  if (input.consumePause()) setPaused(!paused);
   const dt = Math.min(0.1, (nowMs - last) / 1000);
   last = nowMs;
   nowSec = nowMs / 1000;
@@ -406,14 +500,14 @@ function frame(nowMs: number): void {
   const sess0 = session;
   if (mode === 'online' && sess0 && session) {
     if (session.state === 'lobby') {
-      const sig = session.code + JSON.stringify(session.players);
+      const sig = session.code + JSON.stringify(session.players) + JSON.stringify(session.options);
       if (sig !== lobbySig) {
         lobbySig = sig;
         names = [];
         for (const p of session.players) names[p.slot] = p.name;
-        ui.showLobby(session.code, session.players, session.players.find((p) => p.slot === sess0.slot)?.host ?? false);
+        ui.showLobby(session.code, session.players, session.players.find((p) => p.slot === sess0.slot)?.host ?? false, session.options, session.locked);
       }
-    } else if (session.state === 'playing' && session.world && !world) {
+    } else if (session.state === 'playing' && session.world && session.world !== world) {
       for (const p of session.players) names[p.slot] = p.name;
       beginPlaying(session.world, session.slot);
     }
@@ -471,7 +565,7 @@ function frame(nowMs: number): void {
     catchingUp = false;
     alpha = Math.min(1, (performance.now() - lastStepAt) / (TICK_DT * 1000));
     for (let s = 0; s < MAX_PLAYERS; s++) if (world.pActive[s]) ensureCharacter(s);
-    if (session.desyncTicks.length) ui.warn('Desync detected!');
+    if (session.desyncTicks.length) ui.warn(ui.tr('desync'));
   }
 
   if (world) {
@@ -490,12 +584,9 @@ function frame(nowMs: number): void {
       const ang = lerpAngle(prevA[s]!, curA[s]!, alpha);
       c.root.position.set(x, 0, -y);
       c.root.rotation.y = ang + Math.PI / 2;
-      const st = w.pState[s]!;
-      if (st === PlayerState.Dead) c.playOnce('death');
-      else if (st === PlayerState.Downed) c.play('down_idle');
-      else c.play(pickPlayerClip({ moving: w.pMoving[s] === 1, firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: curA[s]! }));
+      const aimDriven = animator.apply(w, s, c, nowSec, { firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: curA[s]! });
       c.update(dt);
-      if (st === PlayerState.Alive) c.applyAim(dir.set(Math.cos(ang), 0, -Math.sin(ang)));
+      if (aimDriven) c.applyAim(dir.set(Math.cos(ang), 0, -Math.sin(ang)));
     }
     // camera follows the local player, or a living teammate when down/dead
     let target = localSlot;
@@ -572,6 +663,7 @@ function frame(nowMs: number): void {
   if (fpsT >= 0.5) {
     fps = Math.round(frames / fpsT);
     perf.fps = fps;
+    adaptScale(fps, 0.5);
     perf.simMs = stepN ? stepMs / stepN : 0;
     perf.frameMs = frameN ? frameMs / frameN : 0;
     perf.calls = stage.renderer.info.render.calls;
