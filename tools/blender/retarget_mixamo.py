@@ -4,7 +4,8 @@ Run headless:
   blender -b --factory-startup --python tools/blender/retarget_mixamo.py
   SELFTEST=1 blender -b --factory-startup --python tools/blender/retarget_mixamo.py   (no FBX needed)
 
-Inputs : assets-src/mixamo/<id>.fbx for every manifest clip, plus assets-src/mixamo/rifle_8way/*.fbx (extracted pack).
+Inputs : FBX files in ./mixamo/ and ./assets-src/mixamo/ named either <id>.fbx or the original Mixamo name (e.g. "Shoot Rifle.fbx"),
+         plus every sub-folder of those (the extracted Rifle 8-Way pack). Names shared by two manifest clips must be renamed to <id>.fbx.
 Outputs: packages/client/public/models/anims/{player,enemy}_anims.glb and anims.meta.json
 
 Method (works for any proportions and for T-pose -> chibi rest-pose differences):
@@ -19,7 +20,7 @@ from mathutils import Vector, Matrix
 
 HERE = os.path.dirname(os.path.abspath(globals().get("__file__", "tools/blender/retarget_mixamo.py")))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-SRC_DIR = os.environ.get("MIXAMO_DIR") or os.path.join(REPO, "assets-src", "mixamo")
+SRC_DIRS = [os.environ["MIXAMO_DIR"]] if os.environ.get("MIXAMO_DIR") else [os.path.join(REPO, "mixamo"), os.path.join(REPO, "assets-src", "mixamo")]
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(REPO, "packages", "client", "public", "models", "anims")
 MANIFEST = os.path.join(REPO, "tools", "mixamo", "manifest.json")
 SELFTEST = os.environ.get("SELFTEST") == "1"
@@ -205,6 +206,22 @@ def export_lib(tgt, path):
         bpy.ops.export_scene.gltf(**kw, export_animations=True, export_nla_strips=True)
 
 
+def find_clip(c, names):
+    """Resolve a manifest clip to a file: <id>.fbx first, else the original Mixamo name when it is unique in the manifest."""
+    for d in SRC_DIRS:
+        p = os.path.join(d, c["id"] + ".fbx")
+        if os.path.exists(p):
+            return p
+    if len(names[slug(c["name"])]) == 1:
+        for d in SRC_DIRS:
+            if not os.path.isdir(d):
+                continue
+            for fn in os.listdir(d):
+                if fn.lower().endswith(".fbx") and slug(os.path.splitext(fn)[0]) == slug(c["name"]):
+                    return os.path.join(d, fn)
+    return None
+
+
 def run():
     os.makedirs(OUT_DIR, exist_ok=True)
     if bpy.app.background:
@@ -215,32 +232,43 @@ def run():
     libs = {"player": new_target("player_rig"), "enemy": new_target("enemy_rig")}
     meta = {"fps": FPS, "authoredScale": 1.0, "note": "hips translation tracks are for scale 1.0; multiply by the character scale", "clips": {"player": [], "enemy": []}}
     missing = []
+    names = {}
     for c in man["clips"]:
-        p = os.path.join(SRC_DIR, c["id"] + ".fbx")
-        if not os.path.exists(p):
+        names.setdefault(slug(c["name"]), []).append(c["id"])
+    used = set()
+    for c in man["clips"]:
+        p = find_clip(c, names)
+        if p is None:
             missing.append(c["id"])
             continue
-        n = clip_from_fbx(p, libs[c["rig"]], c["id"], in_place=True)
-        meta["clips"][c["rig"]].append({"id": c["id"], "frames": n, "loop": c["loop"]})
-    pack_dir = os.path.join(SRC_DIR, "rifle_8way")
+        used.add(p)
+        in_place = c["id"] not in ("get_up", "death", "hit_down", "z_death_back", "z_death_fwd", "z_standup")
+        n = clip_from_fbx(p, libs[c["rig"]], c["id"], in_place=in_place)
+        meta["clips"][c["rig"]].append({"id": c["id"], "frames": n, "loop": c["loop"], "file": os.path.basename(p)})
     unmapped = []
-    if os.path.isdir(pack_dir):
-        for fn in sorted(os.listdir(pack_dir)):
-            if not fn.lower().endswith(".fbx"):
+    for d in SRC_DIRS:
+        if not os.path.isdir(d):
+            continue
+        for sub in sorted(os.listdir(d)):
+            pack_dir = os.path.join(d, sub)
+            if not os.path.isdir(pack_dir):
                 continue
-            sl = slug(os.path.splitext(fn)[0])
-            cid = None
-            for rx, gid in LOCO_RULES:
-                if re.search(rx, sl):
-                    cid = gid
-                    break
-            if cid is None:
-                cid = "loco_" + sl
-                unmapped.append(fn)
-            if any(cl["id"] == cid for cl in meta["clips"]["player"]):
-                cid = "loco_" + sl  # keep duplicates under their own name
-            n = clip_from_fbx(os.path.join(pack_dir, fn), libs["player"], cid, in_place=True)
-            meta["clips"]["player"].append({"id": cid, "frames": n, "loop": True, "file": fn})
+            for fn in sorted(os.listdir(pack_dir)):
+                if not fn.lower().endswith(".fbx"):
+                    continue
+                sl = slug(os.path.splitext(fn)[0])
+                cid = None
+                for rx, gid in LOCO_RULES:
+                    if re.search(rx, sl):
+                        cid = gid
+                        break
+                if cid is None:
+                    cid = "loco_" + sl
+                    unmapped.append(fn)
+                if any(cl["id"] == cid for cl in meta["clips"]["player"]):
+                    cid = "loco_" + sl  # keep duplicates under their own name
+                n = clip_from_fbx(os.path.join(pack_dir, fn), libs["player"], cid, in_place=True)
+                meta["clips"]["player"].append({"id": cid, "frames": n, "loop": True, "file": fn})
     for kind, tgt in libs.items():
         if meta["clips"][kind]:
             export_lib(tgt, os.path.join(OUT_DIR, kind + "_anims.glb"))
