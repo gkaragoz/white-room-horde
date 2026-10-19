@@ -29,6 +29,7 @@ const T = {
     over: 'Game over',
     reached: 'Reached wave',
     again: 'Play again',
+    replay: 'Save replay',
     pick: 'Level up! Pick a card',
     settings: 'Settings',
     volume: 'Volume',
@@ -80,6 +81,7 @@ const T = {
     over: 'Oyun bitti',
     reached: 'Ulaşılan dalga',
     again: 'Tekrar oyna',
+    replay: 'Tekrarı kaydet',
     pick: 'Seviye atladın! Bir kart seç',
     settings: 'Ayarlar',
     volume: 'Ses',
@@ -116,6 +118,7 @@ export interface UiHandlers {
   onLeave(): void;
   onCard(index: number): void;
   onAgain(): void;
+  onReplay(): void;
   onSetting(key: 'volume' | 'shadows' | 'scale' | 'lang', value: number | string): void;
 }
 
@@ -271,13 +274,15 @@ export class Ui {
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
   }
 
-  showGameOver(world: World): void {
+  showGameOver(world: World, canReplay = false): void {
     const t = this.t;
     this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center">
       <h1>${t.over}</h1>
       <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${world.level}</b></p>
-      <button id="wrh-again">${t.again}</button>
+      <button id="wrh-again">${t.again}</button>${canReplay ? `<button id="wrh-replay" class="alt">${t.replay}</button>` : ''}
     </div>`;
+    const rb = this.screen.querySelector<HTMLElement>('#wrh-replay');
+    if (rb) rb.onclick = () => this.h.onReplay();
     this.screen.querySelector<HTMLElement>('#wrh-again')!.onclick = () => this.h.onAgain();
   }
 
@@ -429,9 +434,13 @@ export class Ui {
       }
     }
 
+    if (world.gameOver) {
+      this.warn('');
+      set('h-hint', '');
+    }
     // cards
     const cardsEl = this.hud.querySelector<HTMLElement>('#h-cards')!;
-    if (world.cardOffer[0]! >= 0) {
+    if (world.cardOffer[0]! >= 0 && !world.gameOver) {
       const key = world.cardOffer.join(',') + this.lang;
       if (key !== this.lastCards) {
         this.lastCards = key;

@@ -1,7 +1,7 @@
 import { decodeTick, encodeTick, type PlayerInput, type WeaponId } from '@wrh/shared';
 
 /** First byte of every binary message. */
-export const Bin = { Input: 1, Bundle: 2 } as const;
+export const Bin = { Input: 1, Bundle: 2, Snapshot: 3, SnapshotDeliver: 4 } as const;
 
 export interface PlayerInfo {
   slot: number;
@@ -16,6 +16,7 @@ export type ClientMsg =
   | { t: 'start' }
   | { t: 'hash'; tick: number; hash: number }
   | { t: 'ping'; ts: number }
+  | { t: 'resync' }
   | { t: 'leave' };
 
 export type ServerMsg =
@@ -23,6 +24,7 @@ export type ServerMsg =
   | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId }[] }
   | { t: 'desync'; tick: number; slots: number[] }
   | { t: 'pong'; ts: number }
+  | { t: 'snapshotRequest' }
   | { t: 'error'; message: string };
 
 export interface Join {
@@ -83,4 +85,17 @@ export function decodeBundle(buf: Uint8Array, slots: number): Bundle {
     o += 2;
   }
   return { tick, joins, inputs: decodeTick(buf.subarray(o), slots).inputs };
+}
+
+/** Snapshot messages: [type][tick u32][world bytes]. */
+export function encodeSnapshot(type: typeof Bin.Snapshot | typeof Bin.SnapshotDeliver, tick: number, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(5 + data.length);
+  out[0] = type;
+  new DataView(out.buffer).setUint32(1, tick, true);
+  out.set(data, 5);
+  return out;
+}
+
+export function decodeSnapshot(buf: Uint8Array): { tick: number; data: Uint8Array } {
+  return { tick: new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getUint32(1, true), data: buf.subarray(5) };
 }

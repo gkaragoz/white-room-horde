@@ -322,6 +322,14 @@ white-room-horde/
 - UI (`client/ui.ts`): menü (solo/host/join), lobi, HUD (dalga, XP, boss çubuğu, takım canları, silah/mermi, kart paneli, yere düşme/ölüm uyarıları), game over, ayarlar (ses, gölge kalitesi, çözünürlük ölçeği, TR/EN). Ses: WebAudio ile sentezlenmiş geçici efektler; gerçek ücretsiz ses dosyaları sonra eklenecek.
 - Sürüm notları: tek sunucu (`pnpm --filter @wrh/client build && pnpm --filter @wrh/server start`), sonra `cloudflared tunnel --url http://localhost:8787`.
 
+**Sonraki tur (tamam)**
+- Siper: `OBSTACLES` (8 kutu) hem sim'de (oyuncu/düşman itilmesi, mermi ve tükürük engeli, akış alanında kapalı hücreler) hem renderer'da. Düşmanlar siperi akış alanıyla dolanır, görüş hattı açıksa doğrudan kovalar.
+- El bombası (sağ tık/G): 3 adet, 10 sn'de bir şarj, yay çizerek uçar, 0.9 sn sonra 3.2 yarıçaplı patlama (70 hasar, merkeze yakın daha fazla). Patlayıcı düşman da komşu düşmanlara zincirleme hasar verir.
+- Spitter artık gerçek mermi atar (yeşil damla, siperde durur); shielder önden gelen mermiyi %85 azaltır (arkadan tam hasar).
+- Anlık görüntü (`sim/snapshot.ts`): tüm dünya + akış alanı önbelleği serileştirilir (~120 KB). Sapan istemci `resync` ister, sunucu sağlam bir istemciden snapshot ister ve iletir, istemci geri yükleyip saklanan paket geçmişiyle ileri sarar (test: kasıtlı bozulan istemci toparlanır).
+- Tekrar: solo oyun kaydedilir, oyun sonunda `.wrh` indirilir; `?replay=/dosya.wrh` ile oynatılır. CI: `.github/workflows/ci.yml` (lint, typecheck, test, build).
+- Bilinen eksikler: gerçek ses dosyaları, WebGPU/GI/AA ayarları, boss için ayrı model, lobide silah seçimi arayüzü, ragdoll fiziği (şimdilik pişirilmiş ölüm animasyonu + gib).
+
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
 2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).

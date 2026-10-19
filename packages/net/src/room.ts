@@ -1,5 +1,5 @@
 import { MAX_PLAYERS, NO_INPUT, WEAPON_IDS, clampInput, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { Bin, decodeInputMsg, encodeBundle, type ClientMsg, type PlayerInfo, type ServerMsg } from './protocol';
+import { Bin, decodeInputMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
 export interface Conn {
@@ -30,6 +30,8 @@ export class Room {
   readonly history: Uint8Array[] = [];
   private pendingJoins: { slot: number; weaponIndex: number }[] = [];
   private readonly votes = new Map<number, Map<number, number>>();
+  private readonly diverged = new Set<number>();
+  private snapshotFor = -1;
 
   constructor(readonly code: string) {}
 
@@ -133,10 +135,31 @@ export class Room {
       }
       const slots: number[] = [];
       for (const [s, h] of v) if (h !== bestHash) slots.push(s);
+      for (const s of slots) this.diverged.add(s);
       for (const m of this.members) if (m?.conn) send(m.conn, { t: 'desync', tick, slots });
     }
     this.votes.delete(tick);
     for (const t of this.votes.keys()) if (t < tick - 600) this.votes.delete(t);
+  }
+
+  /** A diverged client asks for a fresh state: pick a healthy donor and have it upload a snapshot. */
+  resync(slot: number): void {
+    for (const m of this.members) {
+      if (m?.conn && m.joined && m.slot !== slot && !this.diverged.has(m.slot)) {
+        this.snapshotFor = slot;
+        send(m.conn, { t: 'snapshotRequest' });
+        return;
+      }
+    }
+  }
+
+  snapshot(from: number, data: Uint8Array): void {
+    const target = this.members[this.snapshotFor];
+    if (!target?.conn || from === this.snapshotFor) return;
+    const t = decodeSnapshot(data).tick;
+    target.conn.send(encodeSnapshot(Bin.SnapshotDeliver, t, decodeSnapshot(data).data));
+    this.diverged.delete(this.snapshotFor);
+    this.snapshotFor = -1;
   }
 
   /** Produce and broadcast the confirmed inputs for the current tick. Called at the tick rate. */
@@ -195,6 +218,8 @@ export class RoomManager {
       if (a && data[0] === Bin.Input && data.length >= 10) {
         const { tick, input } = decodeInputMsg(data);
         a.room.input(a.slot, tick, input);
+      } else if (a && data[0] === Bin.Snapshot) {
+        a.room.snapshot(a.slot, data);
       }
       return;
     }
@@ -234,6 +259,9 @@ export class RoomManager {
         break;
       case 'ping':
         send(conn, { t: 'pong', ts: msg.ts });
+        break;
+      case 'resync':
+        if (a) a.room.resync(a.slot);
         break;
       case 'leave':
         this.close(conn);

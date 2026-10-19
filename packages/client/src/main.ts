@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BALANCE, Buttons, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, OBSTACLES, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { createGame, hashWorld, scriptedInput, setWave, step, type SimEvent, type World } from '@wrh/sim';
+import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
 import { pickPlayerClip } from './anim';
@@ -84,6 +84,8 @@ let localSlot = 0;
 let names: string[] = [];
 let lobbySig = '';
 let over = false;
+let recorder: Recorder | null = null;
+let playback: Replay | null = null;
 const dev = {
   perf: params.get('perf') === '1',
   bots: Math.max(0, Math.min(10, Number(params.get('bots') ?? 0))),
@@ -104,6 +106,7 @@ const ui = new Ui(
     onLeave: () => location.reload(),
     onCard: (i) => input.queueButton([Buttons.Card1, Buttons.Card2, Buttons.Card3][i]!),
     onAgain: () => location.reload(),
+    onReplay: () => downloadReplay(),
     onSetting: (key, value) => {
       if (key === 'volume') settings = { ...settings, volume: value as number };
       else if (key === 'shadows') settings = { ...settings, shadows: value as 0 | 1 | 2 };
@@ -196,7 +199,7 @@ function handleEvent(e: SimEvent): void {
       break;
     case 'gameOver':
       over = true;
-      setTimeout(() => world && ui.showGameOver(world), 1800);
+      setTimeout(() => world && ui.showGameOver(world, recorder !== null), 1800);
       break;
     default:
       break;
@@ -226,9 +229,29 @@ function startSolo(name: string): void {
     players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar' });
     names[b] = 'Bot ' + b;
   }
-  const w = createGame({ seed: (Math.random() * 0xffffffff) >>> 0, players });
+  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players };
+  const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
+  // a replay of a game that started on a later wave cannot be reproduced from the setup alone
+  if (dev.wave <= 1) recorder = new Recorder(setup);
   beginPlaying(w, 0);
+}
+
+function startPlayback(r: Replay): void {
+  mode = 'solo';
+  playback = r;
+  names = r.setup.players.map((p) => 'P' + (p.slot + 1));
+  beginPlaying(createGame(r.setup), r.setup.players[0]?.slot ?? 0);
+}
+
+function downloadReplay(): void {
+  if (!recorder) return;
+  const blob = new Blob([encodeReplay(recorder.replay) as BlobPart], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `white-room-horde-${Date.now()}.wrh`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function connect(name: string, server: string, code: string | null): void {
@@ -309,17 +332,26 @@ function frame(nowMs: number): void {
     acc += dt;
     while (acc >= TICK_DT) {
       acc -= TICK_DT;
-      const inputs: PlayerInput[] = [];
-      for (let s = 0; s < MAX_PLAYERS; s++) {
-        if (!world.pActive[s]) continue;
-        inputs[s] = s === localSlot ? localInput : scriptedInput(world.tick, s);
+      let inputs: (PlayerInput | undefined)[] = [];
+      if (playback) {
+        inputs = playback.ticks[world.tick] ?? [];
+        if (world.tick >= playback.ticks.length) {
+          acc = 0;
+          break;
+        }
+      } else {
+        for (let s = 0; s < MAX_PLAYERS; s++) {
+          if (!world.pActive[s]) continue;
+          inputs[s] = scriptedInput(world.tick, s);
+        }
+        localInput = sampleLocal();
+        inputs[localSlot] = localInput;
       }
-      localInput = sampleLocal();
-      inputs[localSlot] = localInput;
-      if (dev.god) for (let s = 0; s < MAX_PLAYERS; s++) world.pHp[s] = world.pMaxHp[s]!;
+      if (dev.god && !playback) for (let s = 0; s < MAX_PLAYERS; s++) world.pHp[s] = world.pMaxHp[s]!;
       beforeStep(world);
       const s0 = performance.now();
       step(world, inputs);
+      recorder?.record(world, inputs);
       stepMs += performance.now() - s0;
       stepN++;
       afterStep(world);
@@ -447,10 +479,17 @@ function frame(nowMs: number): void {
   requestAnimationFrame(frame);
 }
 
+const replayUrl = params.get('replay');
+if (replayUrl) {
+  void fetch(replayUrl)
+    .then((r) => r.arrayBuffer())
+    .then((b) => startPlayback(decodeReplay(new Uint8Array(b))));
+}
+
 // menu or direct start for dev/measurement links
-const autoStart = params.get('solo') === '1' || dev.bots > 0 || dev.auto || dev.god || dev.perf || dev.wave > 1 || params.has('weapon');
+const autoStart = !replayUrl && params.get('solo') === '1' || dev.bots > 0 || dev.auto || dev.god || dev.perf || dev.wave > 1 || params.has('weapon');
 if (autoStart) startSolo('dev');
-else ui.showMenu();
+else if (!replayUrl) ui.showMenu();
 requestAnimationFrame(frame);
 
 (window as unknown as Record<string, unknown>).__wrh = {

@@ -148,6 +148,13 @@ describe('lockstep over a laggy network', () => {
     net.clients[1]!.session.world!.pX[0] = 999;
     net.advance(2500);
     expect(net.clients.some((c) => c.session.desyncTicks.length > 0)).toBe(true);
+    // the diverged client asked for a snapshot and rolled forward: it matches the others again
+    net.advance(4000);
+    expect(net.clients[1]!.session.resyncs).toBeGreaterThan(0);
+    const t = Math.min(...net.clients.map((c) => c.session.world!.tick));
+    expect(Math.abs(net.clients[1]!.session.world!.pX[0]! - net.clients[0]!.session.world!.pX[0]!)).toBeLessThan(40);
+    expect(net.clients[1]!.session.world!.pX[0]).not.toBe(999);
+    expect(t).toBeGreaterThan(300);
   });
 
   it('survives a client dropping out mid game', () => {

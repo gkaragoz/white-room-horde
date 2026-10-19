@@ -1,6 +1,6 @@
 import { INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, step, type World } from '@wrh/sim';
-import { Bin, decodeBundle, encodeInputMsg, type Bundle, type ClientMsg, type PlayerInfo, type ServerMsg } from './protocol';
+import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, restoreWorld, serializeWorld, step, type World } from '@wrh/sim';
+import { Bin, decodeBundle, decodeSnapshot, encodeInputMsg, encodeSnapshot, type Bundle, type ClientMsg, type PlayerInfo, type ServerMsg } from './protocol';
 
 export interface Transport {
   send(data: string | Uint8Array): void;
@@ -33,6 +33,11 @@ export class NetSession {
   /** Bundles stepped by the last pump (events of the last one are in world.events). */
   lastSteps = 0;
   private readonly bundles = new Map<number, Bundle>();
+  /** Recently applied bundles, kept so a restored snapshot can be rolled forward again. */
+  private readonly history = new Map<number, Bundle>();
+  private lastResync = -1e9;
+  /** Number of snapshots this client restored (diagnostics). */
+  resyncs = 0;
   private weapon: WeaponId = 'pistol';
   private pendingStart: { seed: number; players: { slot: number; weapon: WeaponId }[] } | null = null;
   private nextPing = 0;
@@ -72,6 +77,8 @@ export class NetSession {
         const b = decodeBundle(data, MAX_SLOTS);
         this.bundles.set(b.tick, b);
         if (b.tick > this.received) this.received = b.tick;
+      } else if (data[0] === Bin.SnapshotDeliver && this.world) {
+        this.applySnapshot(data);
       }
       return;
     }
@@ -91,6 +98,13 @@ export class NetSession {
         break;
       case 'desync':
         this.desyncTicks.push(m.tick);
+        if (m.slots.includes(this.slot) && this.clock() - this.lastResync > 3000) {
+          this.lastResync = this.clock();
+          this.sendJson({ t: 'resync' });
+        }
+        break;
+      case 'snapshotRequest':
+        if (this.world && this.state === 'playing') this.transport.send(encodeSnapshot(Bin.Snapshot, this.world.tick, serializeWorld(this.world)));
         break;
       case 'pong':
         this.rttMs = this.rttMs * 0.8 + (this.clock() - m.ts) * 0.2;
@@ -112,6 +126,16 @@ export class NetSession {
     this.transport.send(encodeInputMsg(this.inputTick(), input));
   }
 
+  private applySnapshot(buf: Uint8Array): void {
+    const w = this.world!;
+    const { tick, data } = decodeSnapshot(buf);
+    restoreWorld(w, data);
+    this.applied = tick - 1;
+    this.resyncs++;
+    // roll forward from the snapshot using the stored history
+    for (const [t, b] of this.history) if (t >= tick) this.bundles.set(t, b);
+  }
+
   /** Apply as many confirmed ticks as are available. Returns the number of ticks stepped. */
   pump(max = MAX_STEPS_PER_PUMP, hooks?: { before?: (w: World) => void; after?: (w: World) => void }): number {
     const w = this.world;
@@ -123,6 +147,8 @@ export class NetSession {
       const b = this.bundles.get(this.applied + 1);
       if (!b) break;
       this.bundles.delete(b.tick);
+      this.history.set(b.tick, b);
+      this.history.delete(b.tick - 900);
       for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!);
       hooks?.before?.(w);
       step(w, b.inputs);
