@@ -1,7 +1,9 @@
+import { mountVersionBadge } from '../buildinfo';
 import { Stage } from '../render/stage';
 import { measured, tests, type Ctx, type Result } from './tests';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+mountVersionBadge();
 // ?only=id1,id2 runs a subset (CI uses it for browsers without a usable WebGL context)
 const params = new URLSearchParams(location.search);
 const only = params.get('only')?.split(',');

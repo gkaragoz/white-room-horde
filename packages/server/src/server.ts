@@ -1,7 +1,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { extname, join, normalize } from 'node:path';
-import { TICK_DT } from '@wrh/shared';
+import { GAME_VERSION, TICK_DT } from '@wrh/shared';
 import { RoomManager, type Conn, type ManagerOptions } from '@wrh/net';
 import { WebSocketServer } from 'ws';
 
@@ -31,6 +31,10 @@ export async function startServer(opts: { port: number; staticRoot?: string; man
   const root = opts.staticRoot ?? '';
   const http = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://x');
+    if (url.pathname === '/version.json') {
+      res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify({ version: GAME_VERSION, rooms: manager.rooms.size }));
+      return;
+    }
     let path = normalize(decodeURIComponent(url.pathname));
     if (path === '/' || path === '\\') path = '/index.html';
     const file = join(root, path);

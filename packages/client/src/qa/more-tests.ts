@@ -377,4 +377,65 @@ export const moreTests: QaTest[] = [
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 8).join(' | ') : 'all 25 cards render with art, text and rarity in English and Turkish' };
     },
   },
+  {
+    id: 'menu.preview',
+    title: 'The menu shows a 3D preview: arrows change accessory and weapon, swatches the colour, and the choices reach the handlers',
+    async run() {
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:900px';
+      document.body.appendChild(host);
+      const looks: [number, number][] = [];
+      const weapons: string[] = [];
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: (w) => weapons.push(w), onLook: (a, c) => looks.push([a, c]), getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop,
+      }, settings);
+      const problems: string[] = [];
+      try {
+        saveProfile({ ...loadProfile(), acc: 0, color: -1 });
+        ui.acc = 0;
+        ui.color = -1;
+        ui.showMenu();
+        const q = <E extends HTMLElement>(sel: string): E => host.querySelector<E>(sel)!;
+        const canvas = host.querySelector('canvas.wrh-prev-canvas');
+        if (!canvas) return { status: 'warn', detail: 'no preview canvas (browser without a second WebGL context?)' };
+        const before = q('#wrh-prev-name').textContent;
+        q('[data-pdir="1"]').click();
+        const after = q('#wrh-prev-name').textContent;
+        if (before === after || !after) problems.push(`accessory name did not change (${before} -> ${after})`);
+        if (looks.length !== 1 || looks[0]![0] !== 1) problems.push('onLook not called with the next accessory: ' + JSON.stringify(looks));
+        q('[data-sw="3"]').click();
+        if (looks[looks.length - 1]![1] !== 3) problems.push('colour swatch did not reach onLook');
+        q('[data-ptab="weapon"]').click();
+        const w0 = q('#wrh-prev-name').textContent;
+        q('[data-pdir="1"]').click();
+        if (weapons.length !== 1) problems.push('weapon arrow did not call onWeapon');
+        if (q('#wrh-prev-name').textContent === w0) problems.push('weapon name did not change');
+        if (!/\d/.test(q('#wrh-prev-stats').textContent ?? '')) problems.push('weapon stats missing');
+        await new Promise((r) => setTimeout(r, 1500));
+        const sw = host.querySelector('[data-sw].on');
+        if (!sw) problems.push('selected swatch is not marked');
+      } finally {
+        ui.clearScreen();
+        host.remove();
+        saveProfile({ ...loadProfile(), acc: 0, color: -1 });
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'preview canvas, accessory/weapon arrows, colour swatches and stats work' };
+    },
+  },
+  {
+    id: 'ui.version-badge',
+    title: 'A version badge with the package version and commit is always on screen',
+    async run() {
+      const el = document.getElementById('wrh-version');
+      if (!el) return { status: 'fail', detail: 'no #wrh-version element' };
+      const text = el.textContent ?? '';
+      if (!/^v\d+\.\d+\.\d+/.test(text)) return { status: 'fail', detail: 'unexpected label ' + text };
+      const r = el.getBoundingClientRect();
+      if (r.width < 10 || r.right < 0 || r.bottom < 0 || r.left > innerWidth) return { status: 'fail', detail: 'badge is not visible' };
+      return { status: 'pass', detail: text };
+    },
+  },
 ];

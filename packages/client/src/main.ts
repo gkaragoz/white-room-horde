@@ -14,9 +14,11 @@ import { Fx } from './render/fx';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
 import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
+import { mountVersionBadge } from './buildinfo';
 import { Ui, type Settings } from './ui';
 
 const app = document.getElementById('app')!;
+mountVersionBadge();
 document.getElementById('hud')?.remove();
 const params = new URLSearchParams(location.search);
 
@@ -131,7 +133,7 @@ const ui = new Ui(
       const r = loadRejoin();
       if (r) connect(ui.name(), r.server, r.code, '', r.token);
     },
-    onLook: (acc) => session?.setLook(acc),
+    onLook: (acc, color) => session?.setLook(acc, color),
     getBindings: () => input.bindings,
     onRebind: (action, done) =>
       input.captureKey(action as Action, (code) => {
@@ -203,12 +205,19 @@ function accFor(s: number): number {
   return s === localSlot ? ui.acc : s;
 }
 
+/** Vest colour of a slot: the lobby choice online, the profile colour for the local player, otherwise by slot. */
+function colorFor(s: number): string {
+  const idx = session ? (session.players.find((p) => p.slot === s)?.color ?? -1) : s === localSlot ? ui.color : -1;
+  return PLAYER_COLORS[(idx >= 0 ? idx : s) % PLAYER_COLORS.length]!;
+}
+ui.slotColor = colorFor;
+
 function ensureCharacter(s: number): void {
   if (chars[s] || loading.has(s) || !world) return;
   loading.add(s);
   const wid = WEAPON_IDS[world.pWeapon[s]!]!;
   void Character.createPlayer({
-    color: PLAYER_COLORS[s % PLAYER_COLORS.length]!,
+    color: colorFor(s),
     accessory: params.get('acc') && s === localSlot ? params.get('acc')! : ACCESSORIES[accFor(s) % ACCESSORIES.length]!,
     weapon: 'weapon_' + wid,
   }).then((c) => {
@@ -426,8 +435,8 @@ function connect(name: string, rawServer: string, code: string | null, password 
   sock.onopen = () => {
     reconnectTries = 0;
     if (rejoinToken && code) sess.rejoin(code, rejoinToken);
-    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc });
-    else sess.create(name, startWeapon, { password, acc: ui.acc });
+    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc, color: ui.color });
+    else sess.create(name, startWeapon, { password, acc: ui.acc, color: ui.color });
   };
   sock.onmessage = (ev) => {
     sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
@@ -625,7 +634,7 @@ function frame(nowMs: number): void {
         continue;
       }
       _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 2.7, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
-      ui.setTag(s, names[s] ?? 'P' + (s + 1), PLAYER_COLORS[s % PLAYER_COLORS.length]!, ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
+      ui.setTag(s, names[s] ?? 'P' + (s + 1), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
     }
     audio.setListener(fx0, fy0);
     audio.tick(w, localSlot, dt);

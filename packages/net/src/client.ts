@@ -1,4 +1,4 @@
-import { INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { GAME_VERSION, INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, restoreWorld, serializeWorld, step, type World } from '@wrh/sim';
 import { Bin, decodeBundle, decodeSnapshot, encodeInputMsg, encodeSnapshot, type Bundle, type ClientMsg, type JoinOpts, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
@@ -57,17 +57,17 @@ export class NetSession {
 
   create(name: string, weapon: WeaponId = 'pistol', opts: JoinOpts = {}): void {
     this.weapon = weapon;
-    this.sendJson({ t: 'create', name, weapon, ...opts });
+    this.sendJson({ t: 'create', name, weapon, v: GAME_VERSION, ...opts });
   }
 
   join(code: string, name: string, weapon: WeaponId = 'pistol', opts: JoinOpts = {}): void {
     this.weapon = weapon;
-    this.sendJson({ t: 'join', code, name, weapon, ...opts });
+    this.sendJson({ t: 'join', code, name, weapon, v: GAME_VERSION, ...opts });
   }
 
   /** Reattach to a slot after the connection dropped (token from an earlier `room` message). */
   rejoin(code: string, token: string): void {
-    this.sendJson({ t: 'rejoin', code, token });
+    this.sendJson({ t: 'rejoin', code, token, v: GAME_VERSION });
   }
 
   /** Host only, before the game starts. */
@@ -75,8 +75,8 @@ export class NetSession {
     this.sendJson({ t: 'options', map, difficulty });
   }
 
-  setLook(acc: number): void {
-    this.sendJson({ t: 'look', acc });
+  setLook(acc: number, color = -1): void {
+    this.sendJson({ t: 'look', acc, color });
   }
 
   start(): void {

@@ -8,6 +8,8 @@ export interface Profile {
   totalKills: number;
   /** Accessory chosen for the character (index into ACCESSORIES). */
   acc: number;
+  /** Vest colour (index into PLAYER_COLORS, -1: the slot's own colour). */
+  color: number;
   /** Last solo options. */
   map: number;
   difficulty: number;
@@ -19,7 +21,7 @@ export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headph
 export const WEAPON_UNLOCK: Record<WeaponId, number> = { pistol: 0, smg: 0, ar: 0, shotgun: 3, hmg: 5, sniper: 7, minigun: 9 };
 
 const KEY = 'wrh.profile';
-const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, map: -1, difficulty: 1 };
+const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, color: -1, map: -1, difficulty: 1 };
 
 export function loadProfile(): Profile {
   try {

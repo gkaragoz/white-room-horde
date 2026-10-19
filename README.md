@@ -37,6 +37,8 @@ Tests: `pnpm test` (sim determinism, enemies, replay, lockstep with simulated la
 ## Live
 
 - Play (solo works out of the box): https://gkaragoz.github.io/white-room-horde/
+- **Playing online from the GitHub Pages site:** run the game server on your machine (`pnpm --filter @wrh/server start`), then in a second terminal `pnpm relay`. It starts a cloudflared quick tunnel, writes the tunnel address into `relay.json` and pushes it. Anyone opening https://gkaragoz.github.io/white-room-horde/ gets that address filled into the Server field automatically (the menu shows "Online server found"), hosts or joins with a room code, and plays across networks. When the tunnel changes, run `pnpm relay` again (or `node tools/relay.mjs https://your-tunnel` for an address you already have).
+- Versions: the corner badge shows `vX.Y.Z · commit`; a server and a client must have the same `major.minor`. `pnpm release minor` rolls `CHANGELOG.md`, bumps `package.json`, commits and tags; pushing the tag publishes a GitHub release with a zip of the game.
 - Multiplayer needs the relay server above. Run it on your machine, expose it (for example `cloudflared tunnel --url http://localhost:8787`), then paste the tunnel address into the "Server" field of the menu (or open the page with `?server=wss://your-tunnel/ws`). Everyone joins with the room code.
 - The GitHub Pages build is produced by `.github/workflows/pages.yml` (`BASE=/white-room-horde/`).
 

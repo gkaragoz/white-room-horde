@@ -1,3 +1,4 @@
+import { GAME_VERSION } from '@wrh/shared';
 import { hashWorld, scriptedInput } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -141,5 +142,41 @@ describe('real server, real sockets, real simulation', () => {
     await sleep(200);
     b.session.create('after junk');
     await until(() => b.session.code !== '', 3000, 'room after junk');
+  });
+  it('reports its version and refuses a client from another major.minor with a clear message', async () => {
+    const info = (await (await fetch(`http://127.0.0.1:${srv.port}/version.json`)).json()) as { version: string };
+    expect(info.version).toBe(GAME_VERSION);
+
+    const old = await newBot('old');
+    const errors: string[] = [];
+    old.ws.on('message', (d, bin) => {
+      if (!bin) {
+        const m = JSON.parse(d.toString()) as { t: string; message?: string };
+        if (m.t === 'error') errors.push(m.message ?? '');
+      }
+    });
+    old.ws.send(JSON.stringify({ t: 'create', name: 'old', v: '0.0.1' }));
+    await until(() => errors.length > 0, 3000, 'version error');
+    expect(errors[0]).toMatch(/version mismatch/);
+    expect(old.session.code).toBe('');
+
+    // a patch difference is fine
+    const [maj, min] = GAME_VERSION.split('.');
+    const near = await newBot('near');
+    near.ws.send(JSON.stringify({ t: 'create', name: 'near', v: `${maj}.${min}.99` }));
+    await until(() => near.session.code !== '', 3000, 'room for a patch-level different client');
+  });
+
+  it('keeps the colour a player picked and ignores nonsense colours', async () => {
+    const a = await newBot('a');
+    a.session.create('a', 'pistol', { color: 4 });
+    await until(() => a.session.code !== '', 3000, 'room');
+    const b = await newBot('b');
+    b.session.join(a.session.code, 'b', 'pistol', { color: 99 });
+    await until(() => a.session.players.length === 2, 3000, 'second player');
+    expect(a.session.players.find((p) => p.slot === a.session.slot)!.color).toBe(4);
+    expect(a.session.players.find((p) => p.slot === b.session.slot)!.color).toBe(-1);
+    b.session.setLook(2, 7);
+    await until(() => a.session.players.find((p) => p.slot === b.session.slot)!.color === 7, 3000, 'look update');
   });
 });

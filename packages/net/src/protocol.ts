@@ -11,6 +11,8 @@ export interface PlayerInfo {
   weapon: WeaponId;
   /** Accessory index chosen in the lobby (cosmetic). */
   acc: number;
+  /** Vest colour index chosen in the lobby (-1: the slot's own colour). */
+  color: number;
 }
 
 export interface RoomOptions {
@@ -23,19 +25,22 @@ export interface RoomOptions {
 export interface JoinOpts {
   password?: string;
   acc?: number;
+  color?: number;
+  /** Game version of the client; the server refuses a different major.minor (the simulation rules may differ). */
+  v?: string;
 }
 
 export type ClientMsg =
   | ({ t: 'create'; name: string; weapon?: WeaponId } & JoinOpts)
   | ({ t: 'join'; code: string; name: string; weapon?: WeaponId } & JoinOpts)
-  | { t: 'rejoin'; code: string; token: string }
+  | { t: 'rejoin'; code: string; token: string; v?: string }
   | { t: 'start' }
   | { t: 'hash'; tick: number; hash: number }
   | { t: 'ping'; ts: number }
   | { t: 'resync' }
   | { t: 'weapon'; weapon: WeaponId }
   | { t: 'options'; map: number; difficulty: number }
-  | { t: 'look'; acc: number }
+  | { t: 'look'; acc: number; color?: number }
   | { t: 'leave' };
 
 export type ServerMsg =

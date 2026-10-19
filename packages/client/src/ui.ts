@@ -2,6 +2,8 @@ import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CA
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS, keyLabel } from './input';
+import { discoverRelay } from './relay';
+import { Preview } from './render/preview';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
 
 export type Lang = 'en' | 'tr';
@@ -61,6 +63,16 @@ export const UI_STRINGS = {
     arena: 'Arena',
     difficulty: 'Difficulty',
     look: 'Look',
+    relayLooking: 'Looking for the online server...',
+    relayOnline: 'Online server found',
+    relayOffline: 'No online server is up right now: solo works, or paste an address above.',
+    tabChar: 'Character',
+    tabWeapon: 'Weapon',
+    colorAuto: 'Colour',
+    statDmg: 'Damage',
+    statRate: 'Rate',
+    statMag: 'Magazine',
+    statRange: 'Range',
     password: 'Room password (optional)',
     rejoin: 'Rejoin the game you left',
     lockedTip: 'Reach wave',
@@ -169,6 +181,16 @@ export const UI_STRINGS = {
     arena: 'Arena',
     difficulty: 'Zorluk',
     look: 'Görünüm',
+    relayLooking: 'Çevrimiçi sunucu aranıyor...',
+    relayOnline: 'Çevrimiçi sunucu bulundu',
+    relayOffline: 'Şu an çevrimiçi sunucu yok: tek başına oynayabilir ya da yukarıya adres yapıştırabilirsin.',
+    tabChar: 'Karakter',
+    tabWeapon: 'Silah',
+    colorAuto: 'Renk',
+    statDmg: 'Hasar',
+    statRate: 'Hız',
+    statMag: 'Şarjör',
+    statRange: 'Menzil',
     password: 'Oda şifresi (isteğe bağlı)',
     rejoin: 'Ayrıldığın oyuna geri dön',
     lockedTip: 'Şu dalgaya ulaş:',
@@ -231,7 +253,7 @@ export interface UiHandlers {
   onJoin(name: string, code: string, server: string, password: string): void;
   onRejoin(): void;
   onWeapon(weapon: WeaponId): void;
-  onLook(acc: number): void;
+  onLook(acc: number, color: number): void;
   getBindings(): Record<string, string[]>;
   onRebind(action: string, done: () => void): void;
   onResetKeys(): void;
@@ -277,6 +299,17 @@ const CSS = `
 .wrh-weapons{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 10px}
 .wrh-ui button.wrh-wp{background:#e6dcc8;color:#3a352d;font-size:12px;padding:6px 9px;margin:0;border:2px solid transparent}
 .wrh-ui button.wrh-wp.on{background:#fff;border-color:#1fa2ff}
+.wrh-prev{display:flex;flex-direction:column;align-items:center;margin:2px 0 8px}
+.wrh-tabs{display:flex;gap:4px;margin-bottom:6px}
+.wrh-stage{display:flex;align-items:center;gap:4px}
+.wrh-canvas{width:230px;height:230px;border-radius:12px;background:radial-gradient(circle at 50% 38%,#fffdf8,#e9e0cd);border:2px solid #cdbfa5;overflow:hidden}
+.wrh-canvas canvas{display:block;touch-action:none;cursor:grab}
+.wrh-ui button.wrh-arrow{width:38px;height:56px;padding:0;margin:0;font-size:18px;background:#e6dcc8;color:#3a352d}
+.wrh-prev-name{font-weight:800;font-size:16px;margin-top:6px}
+.wrh-prev-stats{font-size:12px;min-height:16px;opacity:.85}
+.wrh-swatches{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:6px;max-width:300px}
+.wrh-ui button.wrh-sw{width:24px;height:24px;padding:0;margin:0;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #8888}
+.wrh-ui button.wrh-sw.on{box-shadow:0 0 0 3px #1fa2ff}
 .wrh-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .wrh-plist{margin:8px 0;padding:0;list-style:none}
 .wrh-plist li{display:flex;align-items:center;gap:8px;padding:3px 0}
@@ -325,7 +358,7 @@ const CSS = `
 .wrh-keys{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin:4px 0 8px;font-size:12px}
 .wrh-keys button{margin:0;padding:3px 8px;font-size:12px;background:#e6dcc8;color:#3a352d}
 .wrh-low{color:#d8362e}
-.wrh-hud-dev{position:absolute;left:12px;top:10px;font-size:12px;line-height:1.5}
+.wrh-hud-dev{position:absolute;left:12px;top:26px;font-size:12px;line-height:1.5}
 `;
 
 function esc(s: string): string {
@@ -343,6 +376,12 @@ export class Ui {
   difficulty = 1;
   /** Accessory index. */
   acc = 0;
+  /** Vest colour index (-1: the slot's own colour). */
+  color = -1;
+  /** Colour of a player slot as the game draws it (set by main from the lobby choices). */
+  slotColor: (slot: number) => string = (s) => PLAYER_COLORS[s % PLAYER_COLORS.length]!;
+  private preview: Preview | null = null;
+  private previewMode: 'char' | 'weapon' = 'char';
   private readonly screen = document.createElement('div');
   private readonly hud = document.createElement('div');
   private readonly dev = document.createElement('div');
@@ -392,6 +431,7 @@ export class Ui {
   }
 
   clearScreen(): void {
+    this.disposePreview();
     this.screen.innerHTML = '';
   }
 
@@ -426,9 +466,117 @@ export class Ui {
     });
   }
 
+  /** Look up the public relay and fill the server field with it unless the player typed their own address. */
+  private async fillRelay(explicit: boolean): Promise<void> {
+    const input = this.screen.querySelector<HTMLInputElement>('#wrh-server');
+    const note = this.screen.querySelector<HTMLElement>('#wrh-relay-note');
+    if (!input || !note) return;
+    const own = input.value.trim();
+    // a remembered address that is not a quick tunnel (those die) or one from the link is the player's choice
+    if (explicit || (own && !/trycloudflare\.com/.test(own))) return;
+    note.textContent = this.t.relayLooking;
+    const relay = await discoverRelay();
+    if (!note.isConnected) return;
+    if (relay) {
+      if (!input.value.trim() || /trycloudflare\.com/.test(input.value)) input.value = relay.url;
+      note.textContent = `${this.t.relayOnline} (v${relay.version})`;
+      note.style.color = '#2a8a3a';
+    } else {
+      note.textContent = this.t.relayOffline;
+      note.style.color = '#c8242c';
+    }
+  }
+
+  private disposePreview(): void {
+    this.preview?.dispose();
+    this.preview = null;
+  }
+
+  /** Markup of the 3D preview: tabs, the turntable, arrows for the accessory or weapon, and the colour swatches. */
+  private previewBlock(): string {
+    const t = this.t;
+    const swatches = PLAYER_COLORS.map((c, i) => `<button type="button" class="wrh-sw${i === this.color ? ' on' : ''}" data-sw="${i}" style="background:${c}" aria-label="${c}"></button>`).join('');
+    return `<div class="wrh-prev">
+      <div class="wrh-tabs"><button type="button" class="wrh-wp${this.previewMode === 'char' ? ' on' : ''}" data-ptab="char">${t.tabChar}</button><button type="button" class="wrh-wp${this.previewMode === 'weapon' ? ' on' : ''}" data-ptab="weapon">${t.tabWeapon}</button></div>
+      <div class="wrh-stage"><button type="button" class="wrh-arrow" data-pdir="-1" aria-label="previous">&#9664;</button><div class="wrh-canvas" id="wrh-prev-host"></div><button type="button" class="wrh-arrow" data-pdir="1" aria-label="next">&#9654;</button></div>
+      <div class="wrh-prev-name" id="wrh-prev-name"></div><div class="wrh-prev-stats" id="wrh-prev-stats"></div>
+      <div class="wrh-swatches" id="wrh-swatches">${swatches}</div>
+    </div>`;
+  }
+
+  /** Wire the preview block: arrows change the accessory (Character tab) or the weapon (Weapon tab), swatches the colour. */
+  private bindPreview(): void {
+    this.disposePreview();
+    const host = this.screen.querySelector<HTMLElement>('#wrh-prev-host');
+    if (!host) return;
+    try {
+      this.preview = new Preview(230);
+      host.appendChild(this.preview.canvas);
+    } catch {
+      this.preview = null; // no WebGL for a second context: the menu still works without the picture
+    }
+    const names = this.t.accs as readonly string[];
+    const weaponNames = this.t.weapons as Record<string, string>;
+    const unlocked = (): WeaponId[] => WEAPON_IDS.filter((w) => isUnlocked(w, loadProfile()));
+    const refresh = (): void => {
+      const colorHex = PLAYER_COLORS[this.color >= 0 ? this.color % PLAYER_COLORS.length : 0]!;
+      const stats = BALANCE.weapons[this.weapon];
+      const q = (id: string): HTMLElement => this.screen.querySelector<HTMLElement>('#' + id)!;
+      q('wrh-prev-name').textContent = this.previewMode === 'char' ? (names[this.acc] ?? '') : (weaponNames[this.weapon] ?? '');
+      q('wrh-prev-stats').innerHTML =
+        this.previewMode === 'weapon'
+          ? `${this.t.statDmg} <b>${stats.damage}${stats.pellets > 1 ? 'x' + stats.pellets : ''}</b> &middot; ${this.t.statRate} <b>${stats.rate}</b> &middot; ${this.t.statMag} <b>${stats.mag}</b> &middot; ${this.t.statRange} <b>${stats.range}</b>`
+          : '';
+      this.screen.querySelectorAll<HTMLElement>('[data-ptab]').forEach((el) => el.classList.toggle('on', el.dataset.ptab === this.previewMode));
+      this.screen.querySelectorAll<HTMLElement>('[data-sw]').forEach((el) => el.classList.toggle('on', Number(el.dataset.sw) === this.color));
+      this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => el.classList.toggle('on', el.dataset.w === this.weapon));
+      void this.preview?.set({ mode: this.previewMode, accessory: ACCESSORIES[this.acc % ACCESSORIES.length]!, color: colorHex, weapon: this.weapon });
+    };
+    this.screen.querySelectorAll<HTMLElement>('[data-ptab]').forEach((el) => {
+      el.onclick = () => {
+        this.previewMode = el.dataset.ptab as 'char' | 'weapon';
+        refresh();
+      };
+    });
+    this.screen.querySelectorAll<HTMLElement>('[data-pdir]').forEach((el) => {
+      el.onclick = () => {
+        const dir = Number(el.dataset.pdir);
+        if (this.previewMode === 'char') {
+          this.acc = (this.acc + dir + ACCESSORIES.length) % ACCESSORIES.length;
+          this.persistLook();
+          this.h.onLook(this.acc, this.color);
+        } else {
+          const list = unlocked();
+          const at = Math.max(0, list.indexOf(this.weapon));
+          this.weapon = list[(at + dir + list.length) % list.length]!;
+          this.h.onWeapon(this.weapon);
+        }
+        refresh();
+      };
+    });
+    this.screen.querySelectorAll<HTMLElement>('[data-sw]').forEach((el) => {
+      el.onclick = () => {
+        const i = Number(el.dataset.sw);
+        this.color = this.color === i ? -1 : i;
+        this.persistLook();
+        this.h.onLook(this.acc, this.color);
+        refresh();
+      };
+    });
+    // picking a weapon in the list also shows it
+    this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => {
+      el.addEventListener('click', () => {
+        this.previewMode = 'weapon';
+        refresh();
+      });
+    });
+    refresh();
+  }
+
   private persistLook(): void {
     const p = loadProfile();
     p.acc = this.acc;
+    p.color = this.color;
     p.map = this.map;
     p.difficulty = this.difficulty;
     saveProfile(p);
@@ -437,11 +585,9 @@ export class Ui {
   /** Option rows shared by the menu and the lobby: arena and difficulty (host or solo) and the player's look. */
   private optionRows(editable: boolean, map: number, difficulty: number): string {
     const t = this.t;
-    const names = t.accs as readonly string[];
-    const accs = ACCESSORIES.map((_, i) => ({ id: String(i), label: names[i]! }));
     const diffs = (t.diffs as readonly string[]).map((label, i) => ({ id: String(i), label }));
     return (
-      `<label>${t.look}</label><div class="wrh-weapons">${this.group(accs, String(this.acc), 'acc')}</div>` +
+      this.previewBlock() +
       (editable
         ? `<label>${t.arena}</label><div class="wrh-weapons">${this.group(this.mapItems(), String(map), 'map')}</div>` +
           `<label>${t.difficulty}</label><div class="wrh-weapons">${this.group(diffs, String(difficulty), 'diff')}</div>`
@@ -453,6 +599,7 @@ export class Ui {
     const t = this.t;
     const profile = loadProfile();
     this.acc = profile.acc;
+    this.color = profile.color;
     this.map = profile.map;
     this.difficulty = profile.difficulty;
     const saved = (() => {
@@ -483,16 +630,13 @@ export class Ui {
       ${rejoin ? `<button id="wrh-rejoin" class="alt">${t.rejoin} (${esc(rejoin.code)})</button>` : ''}
       <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD"></div><button id="wrh-join" class="alt">${t.join}</button></div>
       <label>${t.password}</label><input id="wrh-pass" maxlength="24" autocomplete="off">
-      <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}" placeholder="wss://your-tunnel.example.com/ws">
+      <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}" placeholder="wss://your-tunnel.example.com/ws"><p class="sub" id="wrh-relay-note" style="margin:-6px 0 8px"></p>
       <p class="sub" style="margin:6px 0 0">${t.controls}</p>
       ${error ? `<p style="color:#c8242c;font-weight:700">${esc(error)}</p>` : ''}
     </div>`;
     this.bindWeapons();
-    this.bindGroup('acc', (id) => {
-      this.acc = Number(id);
-      this.persistLook();
-      this.h.onLook(this.acc);
-    });
+    this.bindPreview();
+    void this.fillRelay(fromParam !== null);
     this.bindGroup('map', (id) => {
       this.map = Number(id);
       this.persistLook();
@@ -594,7 +738,7 @@ export class Ui {
 
   showLobby(
     code: string,
-    players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId; acc: number }[],
+    players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId; acc: number; color: number }[],
     iAmHost: boolean,
     options: { map: number; difficulty: number } = { map: 0, difficulty: 1 },
     locked = false,
@@ -604,7 +748,7 @@ export class Ui {
     const list = players
       .map(
         (p) =>
-          `<li><span class="wrh-dot" style="background:${PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]} &middot; ${accNames[p.acc] ?? ''}</small></li>`,
+          `<li><span class="wrh-dot" style="background:${p.color >= 0 ? PLAYER_COLORS[p.color % PLAYER_COLORS.length] : PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]} &middot; ${accNames[p.acc] ?? ''}</small></li>`,
       )
       .join('');
     this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
@@ -616,11 +760,7 @@ export class Ui {
       ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-leave" class="warn">${t.leave}</button>
     </div>`;
     this.bindWeapons();
-    this.bindGroup('acc', (id) => {
-      this.acc = Number(id);
-      this.persistLook();
-      this.h.onLook(this.acc);
-    });
+    this.bindPreview();
     let map = options.map;
     let difficulty = options.difficulty;
     this.bindGroup('map', (id) => {
@@ -804,7 +944,7 @@ export class Ui {
     }
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (!world.pActive[s] || world.pState[s] === PlayerState.Dead) continue;
-      g.fillStyle = PLAYER_COLORS[s % PLAYER_COLORS.length]!;
+      g.fillStyle = this.slotColor(s);
       g.strokeStyle = s === slot ? '#fff' : '#3a352d';
       g.lineWidth = s === slot ? 3 : 1.5;
       g.beginPath();
@@ -860,7 +1000,7 @@ export class Ui {
       if (!world.pActive[s]) continue;
       const st = world.pState[s]!;
       const frac = st === PlayerState.Alive ? world.pHp[s]! / world.pMaxHp[s]! : st === PlayerState.Downed ? world.pTimer[s]! / BALANCE.player.downedSeconds : 0;
-      const col = PLAYER_COLORS[s % PLAYER_COLORS.length]!;
+      const col = this.slotColor(s);
       const tag = st === PlayerState.Downed ? ' &#9760;' : st === PlayerState.Dead ? ' &#10007;' : '';
       squad += `<div style="opacity:${st === PlayerState.Dead ? 0.45 : 1}"><span class="wrh-dot" style="background:${col}"></span>${esc(names[s] ?? 'P' + (s + 1))}${tag}<span class="hp"><i style="width:${Math.max(0, frac * 100)}%;background:${st === PlayerState.Downed ? '#e8a020' : '#3dd66a'}"></i></span></div>`;
     }

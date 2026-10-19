@@ -1,0 +1,46 @@
+name: release
+# Pushing a tag like v0.2.0 (see `pnpm release`) builds the game and publishes a GitHub release with a zip of it.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: The tag must match package.json
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if [ "refs/tags/v$v" != "$GITHUB_REF" ]; then echo "tag $GITHUB_REF does not match package.json version v$v"; exit 1; fi
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      # relative asset paths so the zip works from any folder of a static host
+      - run: pnpm --filter @wrh/client build
+        env:
+          BASE: ./
+      - name: Release notes from the changelog
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          awk -v v="$v" '$0 ~ "^## v" v " " {on=1; next} /^## /{on=0} on' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "no CHANGELOG section for v$v"; exit 1; fi
+          {
+            echo
+            echo "Play: https://${GITHUB_REPOSITORY_OWNER}.github.io/white-room-horde/ (solo works there; for online games run the server, see the README)."
+          } >> notes.md
+      - name: Zip the game
+        run: |
+          cd packages/client/dist
+          zip -qr "$GITHUB_WORKSPACE/white-room-horde-$GITHUB_REF_NAME.zip" .
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "white-room-horde-$GITHUB_REF_NAME.zip" --title "white-room-horde $GITHUB_REF_NAME" --notes-file notes.md --verify-tag

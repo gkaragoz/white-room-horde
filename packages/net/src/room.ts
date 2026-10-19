@@ -1,4 +1,4 @@
-import { MAP_COUNT, MAX_PLAYERS, NO_INPUT, TICK_RATE, WEAPON_IDS, clampInput, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { GAME_VERSION, MAP_COUNT, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { Bin, decodeInputMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
@@ -14,6 +14,7 @@ interface Member {
   conn: Conn | null;
   weapon: WeaponId;
   acc: number;
+  color: number;
   /** Secret that lets this player reattach to the slot after a dropped connection. */
   token: string;
   /** Set once the member is part of the running simulation (join command emitted). */
@@ -67,7 +68,7 @@ export class Room {
 
   private info(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc });
+    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc, color: m.color });
     return out;
   }
 
@@ -83,11 +84,11 @@ export class Room {
     send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, difficulty: this.options.difficulty });
   }
 
-  add(conn: Conn, name: string, weapon: WeaponId, acc = 0): Member | null {
+  add(conn: Conn, name: string, weapon: WeaponId, acc = 0, color = -1): Member | null {
     const slot = this.members.findIndex((m) => m === null);
     if (slot < 0) return null;
     const host = this.members.every((m) => m === null);
-    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, token: randomToken(), joined: false, pending: new Map(), last: undefined };
+    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, color, token: randomToken(), joined: false, pending: new Map(), last: undefined };
     this.members[slot] = m;
     if (this.started) {
       // late join: add the player at the next tick and bring the client up to date
@@ -281,6 +282,8 @@ interface Bucket {
 export interface ManagerOptions {
   catchUpLimit?: number;
   maxRooms?: number;
+  /** Version this server speaks (default: the shared GAME_VERSION); a client on another major.minor is turned away. */
+  version?: string;
   /** Messages per second a single connection may send (inputs are about 30 per second). */
   rate?: number;
   /** Seconds before a room nobody is connected to is deleted. */
@@ -301,7 +304,14 @@ export class RoomManager {
   private readonly opts: Required<ManagerOptions>;
 
   constructor(opts: ManagerOptions = {}) {
-    this.opts = { catchUpLimit: DEFAULT_CATCHUP_LIMIT, maxRooms: 300, rate: 150, idleSeconds: 120, ...opts };
+    this.opts = { catchUpLimit: DEFAULT_CATCHUP_LIMIT, maxRooms: 300, rate: 150, idleSeconds: 120, version: GAME_VERSION, ...opts };
+  }
+
+  /** A client with another game version would simulate different rules and desync at once: say so instead. */
+  private versionOk(conn: Conn, v: unknown): boolean {
+    if (typeof v === 'string' && compatibleVersions(v, this.opts.version)) return true;
+    send(conn, { t: 'error', message: `version mismatch: this server runs ${this.opts.version}, your game is ${typeof v === 'string' ? v : 'unknown'}. Reload the page (or update) and try again.` });
+    return false;
   }
 
   private newCode(): string {
@@ -353,27 +363,30 @@ export class RoomManager {
     }
     if (!msg || typeof msg !== 'object' || typeof (msg as { t?: unknown }).t !== 'string') return;
     const weaponOf = (w: unknown): WeaponId => (typeof w === 'string' && (WEAPON_IDS as readonly string[]).includes(w) ? (w as WeaponId) : 'pistol');
+    const colorOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < PLAYER_COLORS.length ? v : -1);
     const accOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 16 ? v : 0);
     const isHost = (): boolean => !!a && a.room.members[a.slot]?.host === true;
     switch (msg.t) {
       case 'create': {
         if (a) return;
+        if (!this.versionOk(conn, msg.v)) return;
         if (this.rooms.size >= this.opts.maxRooms) return send(conn, { t: 'error', message: 'server is full' });
         const room = new Room(this.newCode(), this.opts.catchUpLimit);
         room.lastActive = this.now;
         if (typeof msg.password === 'string') room.password = msg.password.slice(0, 24);
         this.rooms.set(room.code, room);
-        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc))!;
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color))!;
         this.attached.set(conn, { room, slot: m.slot });
         room.broadcastRoom();
         break;
       }
       case 'join': {
         if (a) return;
+        if (!this.versionOk(conn, msg.v)) return;
         const room = this.rooms.get(String(msg.code).toUpperCase());
         if (!room) return send(conn, { t: 'error', message: 'room not found' });
         if (room.password && room.password !== msg.password) return send(conn, { t: 'error', message: 'wrong password' });
-        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc));
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color));
         if (!m) return send(conn, { t: 'error', message: 'room is full' });
         room.lastActive = this.now;
         this.attached.set(conn, { room, slot: m.slot });
@@ -382,6 +395,7 @@ export class RoomManager {
       }
       case 'rejoin': {
         if (a) return;
+        if (!this.versionOk(conn, msg.v)) return;
         const room = this.rooms.get(String(msg.code).toUpperCase());
         const m = room && typeof msg.token === 'string' ? room.rejoin(conn, msg.token) : null;
         if (!room || !m) return send(conn, { t: 'error', message: 'cannot rejoin' });
@@ -414,6 +428,7 @@ export class RoomManager {
       case 'look':
         if (a && !a.room.started) {
           a.room.members[a.slot]!.acc = accOf(msg.acc);
+          a.room.members[a.slot]!.color = colorOf(msg.color);
           a.room.broadcastRoom();
         }
         break;
