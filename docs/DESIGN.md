@@ -257,7 +257,7 @@ Karar: Mixamo animasyonları standart Mixamo iskeletiyle indirilir, Blender'da k
 **Araçlar ve çalışma şekli**
 - Blender 5.2 + `blender-mcp` + LLAMA web UI (Gemma 4 26B-A4B, 16k bağlam), ship-rpg deneyiminden öğrenilen kurallar: LLAMA kod yazmaz; betikler repo'da `tools/blender/` altında yaşar, LLAMA sabit bir wrapper ile `exec` eder (tek görev, tek `execute_blender_code`), sonuç diskten kontrol edilir. Her çağrıyı onay kutusundan geçirmek gerekir.
 - Kurallar: kullanıcının açık sahnesine dokunma (Scratch/Sandbox), sadece kendi nesneni dışa aktar (`use_selection`), idempotent, isimler `[A-Za-z0-9_-]`, doğrulama başarısızsa hiçbir şey yazma, önce headless duman testi (`blender -b --factory-startup --python ...`).
-- Betikler: `make_chibi.py` (mesh + rig + palet atlası), `retarget_mixamo.py`, `bake_vat.py`, `make_weapons.py`, `make_gibs.py`, `make_props.py`. Faz 0 sahne betiği (`C:lender_scenes\make_scene.py`) başlangıç noktası olarak `tools/blender/` altına taşınır.
+- Betikler: `make_chibi.py` (mesh + rig + palet atlası), `retarget_mixamo.py`, `bake_vat.py`, `make_weapons.py`, `make_gibs.py`, `make_props.py`. Faz 0 sahne betiği (`C:\blender_scenes\make_scene.py`) başlangıç noktası olarak `tools/blender/` altına taşınır.
 
 **Rig (12 kemik)**
 `root, hips, spine, head, arm.L, arm.R, hand.L, hand.R, thigh.L, thigh.R, foot.L, foot.R`. Chibi oranı: büyük kafa, kısa uzuv, boyun yok. Silah soketi `hand.R`'de (+ `hand.L` yardımcı), namlu ucu için silah GLB'sinde `muzzle` boş nesnesi. Ragdoll için aynı kemikler fizik gövdeleri olur (kafa küre, gövde kapsül, uzuvlar kapsül).
