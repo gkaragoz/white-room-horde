@@ -6,6 +6,7 @@ import { RagdollPool } from '../render/ragdoll';
 import * as THREE from 'three';
 import { Audio, BANK_FILES } from '../audio';
 import { Stage, type AaMode } from '../render/stage';
+import { webgpuSupported } from '../render/backend';
 import type { Ctx, QaTest } from './tests';
 
 interface VatMeta {
@@ -327,7 +328,7 @@ export const crowdTests: QaTest[] = [
         const div = document.createElement('div');
         div.style.cssText = 'position:fixed;left:0;top:0;width:400px;height:300px;opacity:0;pointer-events:none';
         document.body.appendChild(div);
-        const st = new Stage(div, { aa: mode, bounce: true });
+        const st = await Stage.create(div, { aa: mode, bounce: true });
         st.renderer.setPixelRatio(1);
         st.resize();
         if (mode === 'smaa') await new Promise((r) => setTimeout(r, 600)); // SMAA lookup textures load asynchronously
@@ -377,6 +378,73 @@ export const crowdTests: QaTest[] = [
         if (r[m].edge < r.off.edge * 1.3 + 40) problems.push(`${m}: edges are not smoother than off (${r[m].edge} vs ${r.off.edge} soft-edge pixels)`);
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : Object.entries(r).map(([k, v]) => `${k}: mean ${f(v.mean, 1)}, cube ${v.cube}px, soft edges ${v.edge}`).join('; ') };
+    },
+  },
+  {
+    id: 'webgpu.crowd-pose',
+    title: 'WebGPU renderer: crowd animates, loops close, deaths lie down (same checks as WebGL)',
+    async run() {
+      if (!(await webgpuSupported())) return { status: 'warn', detail: 'WebGPU is not available in this browser, skipped' };
+      const div = document.createElement('div');
+      div.style.cssText = 'position:fixed;left:0;top:0;width:400px;height:300px;opacity:0;pointer-events:none';
+      document.body.appendChild(div);
+      const st = await Stage.create(div, { aa: 'msaa', bounce: true, backend: 'webgpu' });
+      const crowd = await Crowd.create(10, 'webgpu');
+      st.scene.add(crowd.group);
+      const problems: string[] = [];
+      const notes: string[] = [];
+      try {
+        const size = 300;
+        const rt = new THREE.RenderTarget(size, size, { type: THREE.UnsignedByteType });
+        const names: string[] = [...ENEMY_TYPES, ...BOSS_TYPES];
+        const shot = async (): Promise<Uint8Array> => {
+          const r = st.renderer as unknown as {
+            setRenderTarget(t: THREE.RenderTarget | null): void;
+            render(s: THREE.Scene, c: THREE.Camera): void;
+            readRenderTargetPixelsAsync(t: THREE.RenderTarget, x: number, y: number, w: number, h: number): Promise<Uint8Array>;
+          };
+          r.setRenderTarget(rt);
+          r.render(st.scene, st.camera);
+          r.setRenderTarget(null);
+          const px = await r.readRenderTargetPixelsAsync(rt, 0, 0, size, size);
+          return new Uint8Array(px.buffer, px.byteOffset, px.byteLength);
+        };
+        st.resize();
+        st.camera.left = -4;
+        st.camera.right = 4;
+        st.camera.top = 4;
+        st.camera.bottom = -4;
+        st.camera.updateProjectionMatrix();
+        st.follow(0, 0);
+        crowd.debugPose(0, 'z_walk', 0, 99, 99);
+        const bg = await shot();
+        for (const type of ['grunt', 'tank']) {
+          const idx = names.indexOf(type);
+          const dur = crowd.debugPose(idx, 'z_walk', 0)?.clip.duration ?? 1;
+          const shots: Uint8Array[] = [];
+          for (const frac of [0, 0.25, 0.5, 0.75, 1]) {
+            crowd.debugPose(idx, 'z_walk', frac * 0.9999 * dur, 0, 0, 0);
+            shots.push(await shot());
+          }
+          const sil = silhouette(shots[0]!, bg);
+          if (sil.count < 400) problems.push(`${type}: not visible on WebGPU (${sil.count} px)`);
+          const changes = [1, 2, 3].map((k) => diffCount(shots[0]!, shots[k]!));
+          if (Math.max(...changes) < 60) problems.push(`${type}: frozen on WebGPU (${changes.join('/')})`);
+          const closing = diffCount(shots[0]!, shots[4]!);
+          if (closing > Math.max(...changes) * 0.8) problems.push(`${type}: loop seam visible on WebGPU`);
+          const d = crowd.debugPose(idx, 'z_death_back', 0, 0, 0, 0)!;
+          const alive = silhouette(await shot(), bg);
+          crowd.debugPose(idx, 'z_death_back', d.clip.duration, 0, 0, 0);
+          const dead = silhouette(await shot(), bg);
+          if (!(dead.bottom - dead.top < (alive.bottom - alive.top) * 0.8)) problems.push(`${type}: death pose not lower on WebGPU`);
+          notes.push(`${type}: ${sil.count}px, motion ${Math.max(...changes)}px, death ${alive.bottom - alive.top} to ${dead.bottom - dead.top}`);
+        }
+        rt.dispose();
+      } finally {
+        (st.renderer as unknown as { dispose(): void }).dispose();
+        div.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : notes.join('; ') };
     },
   },
 ];

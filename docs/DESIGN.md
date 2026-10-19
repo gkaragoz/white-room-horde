@@ -330,6 +330,16 @@ white-room-horde/
 - Tekrar: solo oyun kaydedilir, oyun sonunda `.wrh` indirilir; `?replay=/dosya.wrh` ile oynatılır. CI: `.github/workflows/ci.yml` (lint, typecheck, test, build).
 - Bilinen eksikler: gerçek ses dosyaları, WebGPU/GI/AA ayarları, boss için ayrı model, lobide silah seçimi arayüzü, ragdoll fiziği (şimdilik pişirilmiş ölüm animasyonu + gib).
 
+**Eksiklerin kapatılması (tamam)**
+- Düzeltme: VAT pişirme hatası. `bake_vat.py` muted NLA izlerini değerlendirirken kareler hiç hareket etmiyordu; düşmanlar sabit pozda kayıyordu ve M2 ölçümü bunu yakalamamıştı (yalnızca performans bakılmıştı). Artık aksiyon doğrudan değerlendiriliyor, pişirici hareketsiz klipte hata veriyor ve QA bunu ayrıca denetliyor.
+- Yürüyüş döngüsü artık katedilen mesafeyle ilerler (ayak kayması yok), yön yumuşatılır, ceset vuruş yönünde savrulur ve sürtünmeyle durur.
+- Gerçek ragdoll: `client/render/ragdoll.ts`. 14'lük havuzda skinli düşman; 11 eklemli verlet iskeleti (mesafe bağları, zemin sürtünmesi, arena duvarı), ölüm anındaki yürüme/saldırı pozundan devam eder, öldüren mermiyle fırlatılır, durunca uyur. Sert vuruşlar (>= `ragdollPower`) ve %25 rastgele ölüm ragdoll olur, diğerleri pişirilmiş ölüm animasyonu oynar.
+- Boss: 4 ayrı model (dev grunt, kral tank, sayaç ana, sürü lideri) VAT olarak pişirildi; sim `eBoss` değeri boss dalgasına göre görünümü seçer.
+- Gerçek ses: CC0 dosyalar (`public/sfx`, kaynaklar `CREDITS.md`): rubberduck "25 CC0 bang" ve "100 CC0 SFX", Kenney "Impact Sounds". Silaha göre atış sesi, rastgele varyant ve perde, patlama/boss katmanlı; çözülemezse sentez yedeği.
+- Lobi/menüde başlangıç silahı seçimi (sunucu lobide silahı yayınlar, oyun seçilen silahla başlar).
+- Grafik ayarları: çizim motoru WebGL2/WebGPU (WebGPU yoksa otomatik WebGL2; VAT için TSL düğüm malzemesi), kenar yumuşatma Kapalı/MSAA/SMAA, sekme ışığı (sahte GI: zeminden yansıyan sıcak dolgu ışığı). Gerçek GI (lightmap/prob) hâlâ yok.
+- QA (qa.html, 16 test): VAT verisi hareket ediyor mu, render edilen poz değişiyor mu / döngü kapanıyor mu / ölü poz yatıyor mu (piksel farkı), canlı kovalamada animasyon ve yön, ceset savrulması ve gore parçacıkları, ragdoll fiziği, ses dosyaları çözülüyor mu, AA modları, WebGPU'da aynı poz testleri.
+
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
 2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).

@@ -5,16 +5,21 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 
+import type { Backend } from './backend';
+
 export type AaMode = 'off' | 'msaa' | 'smaa';
 export interface StageOptions {
   aa: AaMode;
   /** Cheap fake global illumination: a warm bounce fill from the floor side. */
   bounce: boolean;
+  backend?: Backend;
 }
 
 /** Everything that is not a character: renderer, iso camera, warm sun, painted floor (docs/DESIGN.md sections 3b, 4, 5). */
 export class Stage {
+  /** WebGLRenderer or WebGPURenderer (typed as the former; WebGL-only calls are never made on the WebGPU path). */
   readonly renderer: THREE.WebGLRenderer;
+  readonly backend: Backend;
   readonly scene = new THREE.Scene();
   readonly camera: THREE.OrthographicCamera;
   readonly sun: THREE.DirectionalLight;
@@ -24,12 +29,25 @@ export class Stage {
   private composer: EffectComposer | null = null;
   private readonly bounce: THREE.DirectionalLight;
 
+  /** Build a stage on the requested backend (WebGPU is initialised asynchronously). */
+  static async create(container: HTMLElement, opts: StageOptions = { aa: 'msaa', bounce: true }): Promise<Stage> {
+    if (opts.backend === 'webgpu') {
+      const { WebGPURenderer } = await import('three/webgpu');
+      const r = new WebGPURenderer({ antialias: opts.aa !== 'off', powerPreference: 'high-performance' });
+      await r.init();
+      return new Stage(container, r as unknown as THREE.WebGLRenderer, { ...opts, aa: opts.aa === 'off' ? 'off' : 'msaa' }, 'webgpu');
+    }
+    return new Stage(container, new THREE.WebGLRenderer({ antialias: opts.aa === 'msaa', powerPreference: 'high-performance' }), opts, 'webgl');
+  }
+
   constructor(
     private readonly container: HTMLElement,
+    renderer: THREE.WebGLRenderer,
     opts: StageOptions = { aa: 'msaa', bounce: true },
+    backend: Backend = 'webgl',
   ) {
-    // M1 uses WebGL2; the renderer is created only here so WebGPU can replace it later (design section 21).
-    this.renderer = new THREE.WebGLRenderer({ antialias: opts.aa === 'msaa', powerPreference: 'high-performance' });
+    this.backend = backend;
+    this.renderer = renderer;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.AgXToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -64,7 +82,7 @@ export class Stage {
     this.scene.add(this.bounce);
 
     this.scene.add(makeFloor());
-    if (opts.aa === 'smaa') {
+    if (opts.aa === 'smaa' && backend === 'webgl') {
       this.composer = new EffectComposer(this.renderer);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
       // tone map first so SMAA sees display-referred colours (edge detection is tuned for those)

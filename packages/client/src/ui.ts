@@ -34,6 +34,7 @@ const T = {
     settings: 'Settings',
     volume: 'Volume',
     shadows: 'Shadows',
+    renderer: 'Renderer (WebGPU falls back to WebGL2 if unavailable)',
     aa: 'Anti-aliasing',
     reloads: 'reloads the page',
     bounce: 'Bounce light (fake GI)',
@@ -91,6 +92,7 @@ const T = {
     settings: 'Ayarlar',
     volume: 'Ses',
     shadows: 'Gölgeler',
+    renderer: 'Çizim motoru (WebGPU yoksa WebGL2 kullanılır)',
     aa: 'Kenar yumuşatma',
     reloads: 'sayfayı yeniler',
     bounce: 'Sekme ışığı (sahte GI)',
@@ -130,10 +132,11 @@ export interface UiHandlers {
   onCard(index: number): void;
   onAgain(): void;
   onReplay(): void;
-  onSetting(key: 'volume' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce', value: number | string | boolean): void;
+  onSetting(key: 'volume' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'renderer', value: number | string | boolean): void;
 }
 
 export interface Settings {
+  renderer: 'webgl' | 'webgpu';
   aa: 'off' | 'msaa' | 'smaa';
   bounce: boolean;
   volume: number;
@@ -377,6 +380,7 @@ export class Ui {
       <label>${t.volume}</label><input id="s-vol" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}">
       <label>${t.shadows}</label><input id="s-sh" type="range" min="0" max="2" step="1" value="${s.shadows}">
       <label>${t.quality} (${s.scale.toFixed(2)})</label><input id="s-sc" type="range" min="50" max="100" step="5" value="${Math.round(s.scale * 100)}">
+      <label>${t.renderer} <small>(${t.reloads})</small></label><div class="wrh-row">${(['webgl', 'webgpu'] as const).map((m) => `<button class="wrh-wp${s.renderer === m ? ' on' : ''}" data-rd="${m}">${m === 'webgl' ? 'WebGL2' : 'WebGPU'}</button>`).join('')}</div>
       <label>${t.aa} <small>(${t.reloads})</small></label><div class="wrh-row">${(['off', 'msaa', 'smaa'] as const).map((m) => `<button class="wrh-wp${s.aa === m ? ' on' : ''}" data-aa="${m}">${m === 'off' ? t.off : m.toUpperCase()}</button>`).join('')}</div>
       <label>${t.bounce}</label><div class="wrh-row"><button class="wrh-wp${s.bounce ? ' on' : ''}" id="s-bn1">${t.on}</button><button class="wrh-wp${!s.bounce ? ' on' : ''}" id="s-bn0">${t.off}</button></div>
       <label>${t.language}</label><div class="wrh-row"><button class="alt" id="s-en">English</button><button class="alt" id="s-tr">Türkçe</button></div>
@@ -388,6 +392,9 @@ export class Ui {
     q('s-sc').oninput = (e) => this.h.onSetting('scale', Number((e.target as HTMLInputElement).value) / 100);
     this.settingsEl.querySelectorAll<HTMLElement>('[data-aa]').forEach((el) => {
       el.onclick = () => this.h.onSetting('aa', el.dataset.aa!);
+    });
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-rd]').forEach((el) => {
+      el.onclick = () => this.h.onSetting('renderer', el.dataset.rd!);
     });
     q('s-bn1').onclick = () => this.h.onSetting('bounce', true);
     q('s-bn0').onclick = () => this.h.onSetting('bounce', false);

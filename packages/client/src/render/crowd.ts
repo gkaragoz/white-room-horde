@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ENEMY_TYPES, EnemyState, MAX_ENEMIES, TICK_DT, type EnemyType } from '@wrh/shared';
 import type { SimEvent, World } from '@wrh/sim';
+import type { Backend } from './backend';
 
 /** Baked vertex-animation data for one enemy type (tools/blender/bake_vat.py). */
 interface VatMeta {
@@ -63,6 +64,30 @@ function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolea
   material.customProgramCacheKey = () => (tint ? 'wrh-vat-lit' : 'wrh-vat-depth');
 }
 
+/**
+ * WebGPU twin of the GLSL patch above, written in TSL: the same texture fetch, rotation and per-instance shade, so
+ * both renderers show identical enemies. Loaded on demand so the WebGL build never pulls the WebGPU code.
+ */
+async function makeNodeMaterial(vat: THREE.DataTexture, paint: THREE.Texture): Promise<THREE.Material> {
+  const webgpu = await import('three/webgpu');
+  const tsl = await import('three/tsl');
+  const { attribute, vertexIndex, textureLoad, ivec2, int, vec3, vec4, mix, cos, sin, texture } = tsl;
+  const posYaw = attribute('iPosYaw', 'vec4');
+  const anim = attribute('iAnim', 'vec4');
+  const idx = int(vertexIndex);
+  const pa = textureLoad(vat, ivec2(idx, int(anim.x))).xyz;
+  const pb = textureLoad(vat, ivec2(idx, int(anim.y))).xyz;
+  const p = mix(pa, pb, anim.z).mul(posYaw.y);
+  const yc = cos(posYaw.w);
+  const ys = sin(posYaw.w);
+  const rotated = vec3(yc.mul(p.x).add(ys.mul(p.z)), p.y, ys.negate().mul(p.x).add(yc.mul(p.z)));
+  const mat = new webgpu.MeshStandardNodeMaterial({ flatShading: true, roughness: 0.85, metalness: 0 });
+  mat.positionNode = rotated.add(vec3(posYaw.x, 0, posYaw.z));
+  const col = attribute('color', 'vec3');
+  mat.colorNode = vec4(texture(paint).rgb.mul(col).mul(anim.w), 1);
+  return mat;
+}
+
 interface TypeRenderer {
   mesh: THREE.Mesh;
   geometry: THREE.InstancedBufferGeometry;
@@ -118,12 +143,15 @@ export class Crowd {
   readonly maxCorpses: number;
   triangles = 0;
 
+  private backend: Backend = 'webgl';
+
   private constructor(maxCorpses: number) {
     this.maxCorpses = maxCorpses;
   }
 
-  static async create(maxCorpses = 150): Promise<Crowd> {
+  static async create(maxCorpses = 150, backend: Backend = 'webgl'): Promise<Crowd> {
     const crowd = new Crowd(maxCorpses);
+    crowd.backend = backend;
     const paint = await new THREE.TextureLoader().loadAsync('/models/vat/paint.png');
     paint.colorSpace = THREE.SRGBColorSpace;
     paint.magFilter = THREE.NearestFilter;
@@ -163,13 +191,19 @@ export class Crowd {
     vat.generateMipmaps = false;
     vat.needsUpdate = true;
 
-    const material = new THREE.MeshStandardMaterial({ map: paint, vertexColors: true, flatShading: true, roughness: 0.85, metalness: 0 });
-    patchVat(material, vat, true);
-    const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-    patchVat(depth, vat, false);
+    let material: THREE.Material;
+    let depth: THREE.Material | null = null;
+    if (this.backend === 'webgpu') {
+      material = await makeNodeMaterial(vat, paint); // shadows reuse positionNode
+    } else {
+      material = new THREE.MeshStandardMaterial({ map: paint, vertexColors: true, flatShading: true, roughness: 0.85, metalness: 0 });
+      patchVat(material, vat, true);
+      depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+      patchVat(depth, vat, false);
+    }
 
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.customDepthMaterial = depth;
+    if (depth) mesh.customDepthMaterial = depth;
     mesh.frustumCulled = false;
     mesh.castShadow = true;
     mesh.receiveShadow = true;

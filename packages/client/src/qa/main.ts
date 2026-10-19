@@ -2,7 +2,7 @@ import { Stage } from '../render/stage';
 import { measured, tests, type Ctx, type Result } from './tests';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
-const stage = new Stage($('stage'));
+const stage = await Stage.create($('stage'));
 stage.follow(0, 0);
 stage.render();
 

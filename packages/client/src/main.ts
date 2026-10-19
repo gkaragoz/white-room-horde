@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BALANCE, Buttons, ENEMY_TYPES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, OBSTACLES, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, step, type Replay, type SimEvent, type World } from '@wrh/sim';
+import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
 import { pickPlayerClip } from './anim';
@@ -9,6 +9,7 @@ import { Character } from './render/character';
 import { Crowd } from './render/crowd';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
+import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
 import { Ui, type Settings } from './ui';
 
@@ -18,7 +19,7 @@ const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
 function loadSettings(): Settings {
-  const def: Settings = { aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
+  const def: Settings = { renderer: 'webgl', aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
   try {
     return { ...def, ...(JSON.parse(localStorage.getItem('wrh.settings') ?? '{}') as Partial<Settings>) };
   } catch {
@@ -27,12 +28,14 @@ function loadSettings(): Settings {
 }
 let settings = loadSettings();
 
-const stage = new Stage(app, { aa: settings.aa, bounce: settings.bounce });
+const wantBackend = params.get('renderer') === 'webgpu' ? 'webgpu' : params.get('renderer') === 'webgl' ? 'webgl' : settings.renderer;
+const backend = await pickBackend(wantBackend);
+const stage = await Stage.create(app, { aa: settings.aa, bounce: settings.bounce, backend });
 const audio = new Audio();
 const input = new Input(stage.renderer.domElement, stage.camera);
 const fx = new Fx();
 stage.scene.add(fx.group);
-const crowd = await Crowd.create(150);
+const crowd = await Crowd.create(150, backend);
 stage.scene.add(crowd.group);
 const ragdolls = await RagdollPool.create(14);
 await ragdolls.preload([...ENEMY_TYPES]);
@@ -120,7 +123,12 @@ const ui = new Ui(
       if (key === 'volume') settings = { ...settings, volume: value as number };
       else if (key === 'shadows') settings = { ...settings, shadows: value as 0 | 1 | 2 };
       else if (key === 'scale') settings = { ...settings, scale: value as number };
-      else if (key === 'bounce') settings = { ...settings, bounce: value as boolean };
+      else if (key === 'renderer') {
+        settings = { ...settings, renderer: value as Settings['renderer'] };
+        applySettings();
+        location.reload();
+        return;
+      } else if (key === 'bounce') settings = { ...settings, bounce: value as boolean };
       else if (key === 'aa') {
         settings = { ...settings, aa: value as Settings['aa'] };
         applySettings();
@@ -499,6 +507,7 @@ function frame(nowMs: number): void {
       ui.setDev(
         `${fps} fps &middot; frame ${perf.frameMs.toFixed(2)} ms &middot; sim ${perf.simMs.toFixed(2)} ms &middot; calls ${perf.calls} &middot; tris ${(perf.triangles / 1000).toFixed(0)}k<br>` +
           `enemies ${perf.enemies} &middot; corpses ${perf.corpses} &middot; particles ${perf.particles}` +
+          ` &middot; ${backend}` +
           (world ? ` &middot; tick ${world.tick} &middot; hash ${hashWorld(world).toString(16)}` : '') +
           (session ? ` &middot; rtt ${Math.round(session.rttMs)} ms &middot; backlog ${session.backlog}` : ''),
       );
@@ -533,6 +542,7 @@ requestAnimationFrame(frame);
   perf,
   ui,
   ragdolls,
+  spawnBoss: () => (world ? spawnBoss(world) : -1),
   get ws() {
     return ws;
   },
