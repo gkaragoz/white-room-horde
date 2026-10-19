@@ -257,7 +257,7 @@ white-room-horde/
 - Matematik: `detmath.ts` (sin/cos/atan2 yaklaşımı, sadece temel işlemler), ESLint kuralı ile `Math.sin/cos/tan/atan2/pow/exp/log/random`, `Date`, `performance` sim'de yasak.
 
 **client paketi (sahne yapısı)**
-- Renderer: tek WebGLRenderer, ortografik kamera (iso62), tek yönlü ışık, gölge haritası sadece oyuncular ve ağır düşmanlar (düşman kalabalığı için yumuşak "blob" gölge dokusu), post-process hafif (SSAO düşük, vignette).
+- Renderer: Three.js `WebGPURenderer` (WebGPU öncelikli, desteklenmeyen cihazda otomatik WebGL2 yedek), ortografik kamera (iso62), tek yönlü ışık, ayrıntılar bölüm 21 (gölge, GI, AA, post-process, ayar profilleri).
 - Sahne grupları: `world` (zemin, duvar, kasa), `blood` (RenderTexture zemin üzerine decal pişirme), `crowd` (InstancedMesh, tür başına bir tane), `players` (az sayıda SkinnedMesh), `projectiles` (InstancedMesh), `ragdolls` (Rapier'dan sürülen kemik/mesh, havuzlu ~40), `gibs` (InstancedMesh küre/küp parçalar), `fx` (parçacık, muzzle flash).
 - Kalabalık render: VAT. Blender'da her düşman türü için yürü/koş/ölüm/saldırı animasyonları vertex dokusuna pişirilir (`tools/blender`), InstancedMesh'e örnek başına (konum, yön, animasyon id, faz, tint) attribute'ları verilir; vertex shader dokudan konum okur. Kare sayısı küçük (chibi düşük poli, ~300-600 vertex).
 - Enterpolasyon: sim 30 Hz; render önceki ve şu anki durumlar arasında alfa ile enterpole eder. Kendi karakter için yerel tahmin (girdi hemen görselde), sim kesinleşince düzeltme gözle görülmez olacak kadar küçük.
@@ -294,7 +294,7 @@ Karar: Mixamo animasyonları standart Mixamo iskeletiyle indirilir, Blender'da k
 **Araçlar ve çalışma şekli**
 - Blender 5.2 + `blender-mcp` + LLAMA web UI (Gemma 4 26B-A4B, 16k bağlam), ship-rpg deneyiminden öğrenilen kurallar: LLAMA kod yazmaz; betikler repo'da `tools/blender/` altında yaşar, LLAMA sabit bir wrapper ile `exec` eder (tek görev, tek `execute_blender_code`), sonuç diskten kontrol edilir. Her çağrıyı onay kutusundan geçirmek gerekir.
 - Kurallar: kullanıcının açık sahnesine dokunma (Scratch/Sandbox), sadece kendi nesneni dışa aktar (`use_selection`), idempotent, isimler `[A-Za-z0-9_-]`, doğrulama başarısızsa hiçbir şey yazma, önce headless duman testi (`blender -b --factory-startup --python ...`).
-- Betikler: `make_chibi.py` (mesh + rig + palet atlası), `retarget_mixamo.py`, `bake_vat.py`, `make_weapons.py`, `make_gibs.py`, `make_props.py`. Faz 0 sahne betiği (`C:\blender_scenes\make_scene.py`) başlangıç noktası olarak `tools/blender/` altına taşınır.
+- Betikler: `make_chibi.py` (mesh + rig + palet atlası), `retarget_mixamo.py`, `bake_vat.py`, `make_weapons.py`, `make_gibs.py`, `make_props.py`. Faz 0 sahne betiği (`C:\blender_scenes\make_scene.py`) başlangıç noktası olarak `tools/blender/` altına taşınır. Ek betik: `bake_lightmap.py` (harita başına Cycles ile lightmap + AO + ışık probu SH verisi pişirme, bölüm 21).
 
 **Rig (12 kemik)**
 `root, hips, spine, head, arm.L, arm.R, hand.L, hand.R, thigh.L, thigh.R, foot.L, foot.R`. Chibi oranı: büyük kafa, kısa uzuv, boyun yok. Silah soketi `hand.R`'de (+ `hand.L` yardımcı), namlu ucu için silah GLB'sinde `muzzle` boş nesnesi. Ragdoll için aynı kemikler fizik gövdeleri olur (kafa küre, gövde kapsül, uzuvlar kapsül).
@@ -425,7 +425,60 @@ Mermi biterse pistole dönülür. Kritik: temel %5, hasar x2.
 
 **Ayar süreci:** headless sim denge raporu (`scripts/balance`): senaryo başına dps, ortalama ölüm dalgası, silah kullanım dağılımı; oynanış geri bildirimine göre `balance.json` güncellenir.
 
-## 21. Açık kararlar
+## 21. Grafik teknolojisi ve ayarlar
+Kalite çıtası: "AA" seviyesi (indie üstü, AAA altı): cilalı VFX, tutarlı ve yumuşak ışık, zengin geri bildirim, stilize ama detaylı chibi. Karar özeti: WebGPU öncelikli (WebGL2 yedek), pişirilmiş lightmap + dinamik GTAO (+ Yüksek/Ultra'da SSGI), varsayılan TAA, ayar profilleri + otomatik algılama + ince ayarlar.
+
+**Render API**
+- Three.js `WebGPURenderer`; WebGPU yoksa otomatik WebGL2 geri düşüş. WebGL2'de SSGI ve compute tabanlı kesme (culling) kapalıdır, ayarlar ekranı bunu "Bu cihazda desteklenmiyor" olarak gösterir.
+- Shader'lar Three TSL (node tabanlı) ile yazılır ki VAT, tint, kan decal'ı ve post efektleri iki API'de tek kod olsun.
+- Doğrulama makinesi: geliştirici PC'si (GTX 1080 Ti, Chrome/Edge); düşük hedef: GTX 1060 / modern iGPU (Düşük profil 60 FPS).
+
+**Işık ve GI**
+- Sabit arena avantajı: her harita Blender'da (Cycles, `bake_lightmap.py`) lightmap + AO + ışık probu (SH) ile pişirilir; dolaylı ışık ve yumuşak gölgeler zemin/duvar/siper üzerinde bedava, kalite yüksek.
+- Dinamik nesneler (oyuncu, düşman, boss): pişirilmiş ışık probu SH'ı örnekler (ortam rengi) + tek yönlü güneş + rim ışığı; 500 instanced düşman için tek SH sorgusu hücre başına (ızgaradan okuma).
+- Dinamik GI: tüm profillerde GTAO (ekran uzayı ortam örtmesi). Yüksek/Ultra'da SSGI (WebGPU gerekir) dinamik renkli sıçrama ışığı verir (patlama, namlu çakması, boss aurası).
+- Efekt ışıkları: sınırlı sayıda dinamik nokta ışık (örn. aynı anda en fazla 8, en yakın/en parlak seçilir), geri kalan efektler emissive + bloom ile taklit edilir.
+
+**Gölge**
+- Tek güneş, kamera ortografik alanını izleyen gölge haritası (2048/4096), PCF yumuşak kenar; zemin gölgeleri pişirilmiş kısım + dinamik kısım birleşir.
+- Düşük: sadece blob gölge (yumuşak koyu elips decal) tüm karakterlerde. Orta: oyuncu, tank, boss dinamik gölge; kalabalık blob. Yüksek: tüm düşmanlar gölge düşürür (instanced gölge geçişi). Ultra: + kontakt gölge ve 4096 harita.
+
+**Anti-aliasing**
+- Seçenekler: Kapalı / FXAA / SMAA / TAA (varsayılan) / MSAA 4x (WebGPU'da). TAA için jitter + hareket vektörü (VAT/instanced için önceki kare konumu attribute'u olarak tutulur), ince keskinleştirme (CAS) kaydırıcısı, hareketli düşmanlarda hayalet (ghosting) azaltma (hız tabanlı geçmiş reddi).
+
+**Doku ve malzeme**
+- Doku kalitesi: Düşük/Orta/Yüksek (atlas ve lightmap 1K/2K/4K, mip bias), KTX2/Basis sıkıştırma, anizotropik filtre 1x-16x. Karakter atlası küçük (palet), lightmap'ler asıl doku maliyeti.
+- Malzeme: stilize aydınlatma (düz albedo palet + sabit pürüzlülük + hafif rim ve ince kontur, bölüm 22'deki karakter kararlarıyla netleşir); PBR doku seti yok (bellek ve boyut bütçesi), ama aydınlatma pişirilmiş GI ile zengin.
+
+**Post-process (hepsi ayarlanabilir)**
+- GTAO, bloom (emissive için), vignette, hafif renk derecelendirme (LUT), ton eşleme (ACES veya AgX), isteğe bağlı hareket bulanıklığı (varsayılan kapalı), kamera sarsıntısı kaydırıcısı, kenar kontur (outline) sadece oyuncu ve boss için.
+
+**Ayarlar ekranı**
+- Profiller: Düşük / Orta / Yüksek / Ultra + Özel. İlk açılışta 10 sn'lik otomatik benchmark (300 düşmanlı sahne, kare süresi ölçülür) profili önerir ve kullanıcıya sorar; sonra elle değiştirilebilir.
+- Görüntü: tam ekran/pencere (tarayıcı tam ekran API'si), render ölçeği (%50-%100, adım %5), dinamik çözünürlük (hedef FPS'i tutmak için ölçeği oynat), **FPS üst sınırı** (30 / 60 / 120 / sınırsız). Not: tarayıcıda gerçek V-Sync aç/kapat yoktur; kare hızı tarayıcı yenileme hızına kilitlidir, bu yüzden "V-Sync" yerine FPS sınırı ve "kare eşleme" (frame pacing) bilgisi sunulur.
+- Kalite: gölge (Blob/Orta/Yüksek/Ultra), gölge çözünürlüğü, GI (Pişirilmiş / +GTAO / +SSGI), ambient occlusion (Kapalı/Düşük/Yüksek), anti-aliasing, doku kalitesi, anizotropik filtre, post efektler (bloom, vignette, renk, hareket bulanıklığı), parçacık yoğunluğu (VFX), kalabalık ayrıntı seviyesi (animasyon kalitesi uzakta), ragdoll sayısı (20/40/80), gore (Kapalı/Azaltılmış/Tam), kan zemin çözünürlüğü.
+- Erişilebilirlik ve kontrol: ekran sarsıntısı, titreme, renk körü sembolleri, yazı boyutu, tuş atamaları, ses mikserleri (Müzik/SFX/UI), dil.
+- Saklama: `localStorage` (sürümlü şema), içe/dışa aktar; farklı cihazda otomatik algılama tekrar sorulur.
+- Dinamik bütçe izleme: `?perf` ekranında GPU/CPU kare süreleri; bütçe aşılırsa dinamik çözünürlük ve gölge düşürme kademeli devreye girer.
+
+**Profil tablosu (başlangıç, benchmark ile ayarlanır)**
+| Ayar | Düşük | Orta | Yüksek | Ultra |
+|---|---|---|---|---|
+| Render ölçeği | 75% | 100% | 100% | 100% |
+| Gölge | Blob | Orta | Yüksek | Ultra |
+| GI | Pişirilmiş | +GTAO | +GTAO | +GTAO +SSGI |
+| AA | FXAA | SMAA | TAA | TAA + MSAA 4x (varsa) |
+| Doku | 1K | 2K | 2K | 4K |
+| Ragdoll | 20 | 40 | 60 | 80 |
+| VFX yoğunluğu | %50 | %75 | %100 | %125 |
+| FPS sınırı varsayılan | 60 | 60 | 60 | 120 |
+
+## 22. Açık kararlar
+- Karakter görsel ayrıntı seviyesi (AA kalite): gölgelendirme stili, kontur, aksesuarlar, yüz-sizlik korunurken kişilik (kulaklık, bandana vb.), hasar/yaralanma görünümü.
+- Oyuncu temel yetenekleri (dash, silah değiştirme akışı) ve karakter farkları.
+- Tutorial/onboarding ve ilk dalga ipuçları.
+- VFX listesi ve parçacık bütçesi (muzzle flash, patlama, hit, kan, parça, aura).
+- Minimum sistem gereksinimi ve düşük donanım testi (GTX 1060 / iGPU hedefi).
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - Sunucu barındırma: ilk aşamada yerel; Cloudflare Tunnel sonra.
 - Sonraki sürüm: kalıcı meta ilerleme (yerel), yeni haritalar, WebRTC aktarımı, sıralama tablosu.
