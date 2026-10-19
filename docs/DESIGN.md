@@ -104,6 +104,9 @@ Kalın oyuncak oran, sarı vurgu. Hepsinde yüksek geri bildirim: muzzle flash, 
 | SMG | Yüksek hız, düşük hasar | Uzun gövde + namlu ucu + şarjör |
 | Pompalı | Yakın, çoklu saçma, itme | Uzun çift gövde + pompa + kabza |
 | HMG | Ağır, yavaşlatır, devasa şarjör | Kalın gövde + tambur + kalın namlu |
+| Otomatik tüfek (AR) | Orta menzil, isabetli, dengeli | Optikli gövde, ızgaralı elkoruma, bükük şarjör |
+| Minigun | Isınınca (namlu dönünce) ateşe geçer, yüksek tepe hasar | 6 namlulu döner küme, motor bloğu, cephanelik kutusu |
+| Keskin nişancı (sniper) | Yavaş tek atış, tüm hattı deler | Uzun namlu, dürbün, yan sürgü, katlı bipod |
 | El bombası | Alan hasarı, ragdoll patlaması | Yeşil küre + sarı pim |
 
 ## 8. Ağ mimarisi (deterministik simülasyon)
@@ -156,7 +159,7 @@ Kalın oyuncak oran, sarı vurgu. Hepsinde yüksek geri bildirim: muzzle flash, 
 - Boss: her 5. dalgada dev chibi boss (abartılı boyut, kendi saldırı deseni, ödül kartı).
 - Kamera: ortak kamera, grup ağırlık merkezini takip eder, ekran dışına çıkan oyuncu kenarda ok olarak gösterilir, kamera kapsamından çıkamaz (leash).
 
-- Silahlar: pistol sonsuz mermi; SMG/pompalı/HMG yerden veya düşmandan düşer, mermisi sınırlıdır (biter, pistole dönülür). El bombası toplanabilir.
+- Silahlar: pistol sonsuz mermi; SMG, AR, pompalı, HMG, minigun ve sniper yerden veya düşmandan düşer, mermisi sınırlıdır (biter, pistole dönülür); minigun, sniper ve HMG nadir kutularla gelir. El bombası toplanabilir.
 - Kontrol: WASD hareket, fare ile nişan, tıkla ateş, otomatik ateş yok. Gamepad sonra.
 - Bağlantı: oda kodu ile katılım, host migration var. Deterministik simülasyonda her client tam durumu taşıdığı için host düşerse en düşük gecikmeli oyuncu devralır (periyodik checkpoint ve state hash ile doğrulanır). Sinyal sunucusu sadece eşleştirme ve devir için.
 
@@ -214,6 +217,9 @@ Her dalga sonunda oyuncuya 3 kart: biri silaha bağlı, ikisi karışık. Nadirl
 | SMG | Atış hızı +%20, kovan sıçraması hasar verir, sarj süresi azalır |
 | Pompalı | +2 saçma, geri tepme düşmanı iter, yakın hasar x2 |
 | HMG | Isınma yok, tambur kapasitesi, yavaşlatma azalır |
+| AR | Üçlü seri atış, optik (kritik +%15), tam otomatik mod |
+| Minigun | Isınma süresi -%30, yanıcı mermi, dönerken hız cezası azalır |
+| Sniper | Delme +3 hedef, sürgü bekleme -%25, kafa vuruşunda zincir (öldürünce arkadaki düşmana ek hasar) |
 | Bomba | Küme bombası, itme yarıçapı, ikinci bomba |
 
 | Pasif | Kart örnekleri |
@@ -323,7 +329,7 @@ Karar: Mixamo animasyonları standart Mixamo iskeletiyle indirilir, Blender'da k
 | Grunt / Koşucu | <= 650 (üretilen: 576) | 8x4 küreler; VAT için tek mesh |
 | Tank / Kalkancı / Patlayıcı / Tükürüklü / Sayacı | <= 900 (üretilen: 600-816) | Ek plakalar aynı mesh içinde |
 | Boss (x4) | <= 4000 | Ayrı skinned, VAT yok (az sayıda) |
-| Silahlar (5) | <= 500 (üretilen: 168-444) | Statik GLB, `muzzle` ve `grip` boş nesneleri, namlu -Y |
+| Silahlar (8: pistol, SMG, AR, pompalı, HMG, minigun, sniper, el bombası) | <= 500 (üretilen: 168-480) | Statik GLB, `muzzle` ve `grip` boş nesneleri, namlu -Y |
 | Gibs (küre, küp, uzuv) | <= 100 | Instanced parçalar |
 Malzeme (en çok 2): `fixed` (vertex color x paylaşılan boyalı gürültü dokusu, en yakın komşu filtre) ve `tint` (beyaz taban x aynı doku; istemci örnek başına renkle çarpar: oyuncu yeleği, bandana, düşman gövdesi). PBR yok, kontur yok, düz gölgelendirme (faceted).
 
@@ -362,7 +368,7 @@ Karar: tek büyük sabit arena, 3 harita arasından lobide seçilir (oylama veya
   - Bütçe: sim 500 düşman < 12 ms/tick içinde; ayrışma komşu sorguları spatial hash ile sabit üst sınırlı. Hesap yükü profil kancasında ayrı gösterilir.
 - Spawn: düşmanlar kamera kenarı çemberinde (leash) arenanın içinden doğar; harita başına sabit "kapı" noktaları yok. Boss'lar arena merkezine veya karşı kapıdan girer.
 - Patlayıcı fıçılar: arena genelinde sabit noktalar, vurulunca patlar (alan hasarı + itme), yakındaki fıçıları zincirler; düşmana hasar verir, dosta hasar yok (itme ve sarsma var), yeniden doğmaz (dalga başına 1-2 yenisi gelir). Sim'de tohumlu yerleşim.
-- Toplanabilir kutular: silah kutusu (SMG/pompalı/HMG) ve mermi kutusu; belirli noktalarda yeniden doğar (30 sn), ayrıca düşmandan düşer (düşük şans). Kutu üstüne basarak alınır; HMG kutusu nadir (dalga başına 1-2).
+- Toplanabilir kutular: silah kutusu (SMG/AR/pompalı/HMG/minigun/sniper) ve mermi kutusu; belirli noktalarda yeniden doğar (30 sn), ayrıca düşmandan düşer (düşük şans). Kutu üstüne basarak alınır; HMG, minigun ve sniper kutuları nadir (dalga başına toplam 1-2).
 - Görsel: zemin ve duvar beyaz/gri (bölüm 3), kan zeminde birikir; her haritanın tek vurgu rengi (laboratuvar mavi, depo turuncu, arıtma yeşil) sadece zemin işaretlerinde ve fıçılarda.
 - Erişilebilirlik: yerdeki kırmızı tehlike alanları (boss işaretleri) kan kırmızısından ayrışsın diye parlak sarı kontur ve desenli doldurma.
 - Ertelenenler: tehlikeli zemin (asit/elektrik), yok edilebilir siper, harita rotasyonu (daha sonra).
@@ -409,6 +415,9 @@ Değerler `packages/shared/data/balance.json` dosyasında tutulur (kod değişme
 | SMG | 6 | 15/sn | 120 (kutu: +120) | Yayılım artar, ~90 dps |
 | Pompalı | 7 x 8 saçma | 1.2/sn | 24 (kutu: +16) | Yakın hasar x2, itme |
 | HMG | 12 | 12/sn | 200 (kutu: +150) | Delici 2, yavaşlatır, ısınma yok |
+| AR | 14 | 6.5/sn | 150 (kutu: +100) | ~91 dps, düşük yayılım, menzil 18 (SMG 10), kritik +%8 |
+| Minigun | 8 | 0 -> 28/sn (ısınma 1.2 sn) | 400 (kutu: +250) | Tuşa basınca namlu döner (1.2 sn), sonra ateş hızı tırmanır, tepe ~224 dps; bırakınca 0.8 sn döner (ateş etmez); hareket x0.6; delici 1; efsane kart ısınmayı kaldırır |
+| Sniper | 120 | 0.8/sn (1.25 sn bekleme) | 20 (kutu: +12) | Tüm hattı deler (5 hedefe kadar), zırh delici (kalkancı ön azaltmasını yok sayar), kritik %20 x2, menzil 40, itme; ~96 dps tek hedef |
 | El bombası | 60 alan, yarıçap 3 | 1 / 6 sn | 3 (kutu: +2) | Dostu iter hasarsız |
 Mermi biterse pistole dönülür. Kritik: temel %5, hasar x2.
 

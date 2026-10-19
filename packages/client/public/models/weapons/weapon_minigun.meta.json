@@ -1,0 +1,18 @@
+{
+ "id": "minigun",
+ "tris": 480,
+ "muzzle": [
+  0.0,
+  -2.22,
+  0.1
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

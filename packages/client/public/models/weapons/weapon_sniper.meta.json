@@ -1,0 +1,18 @@
+{
+ "id": "sniper",
+ "tris": 456,
+ "muzzle": [
+  0.0,
+  -2.32,
+  0.12
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

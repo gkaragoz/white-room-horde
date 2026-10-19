@@ -1,0 +1,18 @@
+{
+ "id": "ar",
+ "tris": 252,
+ "muzzle": [
+  0.0,
+  -2.02,
+  0.12
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

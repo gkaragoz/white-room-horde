@@ -113,7 +113,68 @@ def grenade(b):
     return None
 
 
-WEAPONS = [("pistol", pistol), ("smg", smg), ("shotgun", shotgun), ("hmg", hmg), ("grenade", grenade)]
+def ar(b):
+    b.box("root", (0, -0.55, 0.1), (0.25, 1.25, 0.3), DARK)                  # receiver
+    b.box("root", (0, -1.1, 0.12), (0.22, 0.7, 0.26), DARK2)                 # handguard
+    for k in range(4):
+        b.box("root", (0, -0.85 - 0.14 * k, 0.12), (0.24, 0.04, 0.28), METAL)
+    b.cyl("root", (0, -1.62, 0.12), 0.07, 0.5, METAL, rot=(math.pi / 2, 0, 0))   # barrel
+    b.cyl("root", (0, -1.92, 0.12), 0.1, 0.16, DARK2, rot=(math.pi / 2, 0, 0))   # flash hider
+    b.box("root", (0, -0.45, 0.34), (0.16, 0.34, 0.14), DARK2)               # optic body
+    b.box("root", (0, -0.65, 0.34), (0.1, 0.05, 0.1), ACC)                   # lens front
+    b.box("root", (0, -0.25, 0.34), (0.1, 0.05, 0.1), ACC2)                  # lens rear
+    b.box("root", (0, -0.2, 0.26), (0.06, 0.5, 0.05), DARK2)                 # rail
+    b.box("root", (0, 0.1, -0.2), (0.18, 0.2, 0.46), ACC, rot=(-0.18, 0, 0))  # grip
+    b.box("root", (0, -0.35, -0.36), (0.15, 0.2, 0.56), ACC2, rot=(0.28, 0, 0))   # curved mag
+    b.box("root", (0, 0.4, 0.04), (0.2, 0.62, 0.26), DARK2)                  # stock
+    b.box("root", (0, 0.75, 0.02), (0.22, 0.08, 0.34), ACC)                  # butt pad
+    b.box("root", (0, -1.75, 0.28), (0.05, 0.06, 0.1), ACC)                  # front sight
+    return (0, -2.02, 0.12)
+
+
+def minigun(b):
+    b.cyl("root", (0, -0.5, 0.1), 0.2, 1.0, DARK, rot=(math.pi / 2, 0, 0))   # gearbox barrel
+    b.box("root", (0, -0.1, 0.1), (0.46, 0.8, 0.46), DARK2)                  # rear housing
+    b.box("root", (0, -0.1, 0.1), (0.5, 0.2, 0.3), ACC)                      # accent band
+    b.cyl("root", (0, 0.45, 0.1), 0.22, 0.34, METAL, rot=(math.pi / 2, 0, 0))    # motor
+    for k in range(6):                                                         # rotating barrel cluster
+        a_ = 2 * math.pi * k / 6
+        b.cyl("root", (math.cos(a_) * 0.2, -1.35, 0.1 + math.sin(a_) * 0.2), 0.055, 1.6, METAL, rot=(math.pi / 2, 0, 0))
+    for y in (-0.8, -1.7):
+        b.cyl("root", (0, y, 0.1), 0.31, 0.07, DARK2, rot=(math.pi / 2, 0, 0))   # barrel clamps
+    b.cyl("root", (0, -2.14, 0.1), 0.33, 0.12, ACC, rot=(math.pi / 2, 0, 0))     # muzzle ring
+    b.box("root", (0.36, -0.1, -0.02), (0.3, 0.5, 0.34), ACC2)               # ammo box
+    b.box("root", (0.28, 0.1, 0.2), (0.1, 0.5, 0.08), METAL)                # ammo belt feed
+    b.box("root", (0, -0.15, 0.42), (0.3, 0.7, 0.08), DARK2)                 # carry handle
+    b.box("root", (0, 0.1, -0.24), (0.2, 0.22, 0.46), ACC, rot=(-0.15, 0, 0))     # grip
+    b.box("root", (0, -0.55, -0.22), (0.16, 0.2, 0.34), DARK2)               # front grip
+    return (0, -2.22, 0.1)
+
+
+def sniper(b):
+    b.cyl("root", (0, -1.2, 0.12), 0.065, 1.9, METAL, rot=(math.pi / 2, 0, 0))   # long barrel
+    b.box("root", (0, -0.45, 0.1), (0.22, 1.0, 0.28), DARK)                  # receiver
+    b.cyl("root", (0, -2.18, 0.12), 0.1, 0.22, DARK2, rot=(math.pi / 2, 0, 0))   # muzzle brake
+    for k in range(3):
+        b.cyl("root", (0, -2.0 - 0.07 * k, 0.12), 0.115, 0.03, METAL, rot=(math.pi / 2, 0, 0))
+    b.cyl("root", (0, -0.45, 0.4), 0.11, 0.8, DARK2, rot=(math.pi / 2, 0, 0))    # scope tube
+    b.cyl("root", (0, -0.86, 0.4), 0.15, 0.1, ACC, rot=(math.pi / 2, 0, 0))      # objective lens
+    b.cyl("root", (0, -0.04, 0.4), 0.13, 0.1, ACC2, rot=(math.pi / 2, 0, 0))     # eyepiece
+    for y in (-0.65, -0.25):
+        b.box("root", (0, y, 0.27), (0.1, 0.08, 0.14), DARK2)                # scope mounts
+    b.box("root", (0, 0.3, 0.02), (0.2, 0.8, 0.34), ACC2, rot=(-0.04, 0, 0))   # stock
+    b.box("root", (0, 0.35, 0.22), (0.2, 0.5, 0.1), ACC)                     # cheek rest
+    b.box("root", (0, 0.72, -0.02), (0.22, 0.1, 0.42), DARK2)                # butt pad
+    b.box("root", (0, -0.15, -0.3), (0.12, 0.16, 0.3), DARK2)                # small mag
+    b.box("root", (0, 0.12, -0.2), (0.18, 0.18, 0.4), ACC, rot=(-0.18, 0, 0))   # grip
+    b.box("root", (0.18, -0.25, 0.14), (0.14, 0.06, 0.05), METAL)            # bolt handle
+    b.sphere("root", (0.28, -0.25, 0.14), 0.06, (1, 1, 1), ACC, seg=6, rings=4)
+    for sx in (-1, 1):
+        b.box("root", (sx * 0.14, -1.5, -0.12), (0.05, 0.05, 0.4), DARK2, rot=(0, sx * 0.35, 0))   # folded bipod
+    return (0, -2.32, 0.12)
+
+
+WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade)]
 
 
 def build(wid, fn, mats):
@@ -173,7 +234,7 @@ def lineup(items):
             break
         except TypeError:
             pass
-    sc.render.resolution_x, sc.render.resolution_y = 1920, 760
+    sc.render.resolution_x, sc.render.resolution_y = 1920, 1000
     try:
         sc.eevee.taa_render_samples = 48
     except Exception:
@@ -190,9 +251,11 @@ def lineup(items):
     fl = bpy.context.active_object
     fl.scale = (30, 30, 0.1)
     fl.data.materials.append(fm)
-    xs = [-5.4, -2.2, 1.2, 4.8, 7.2]
-    for (wid, mesh, emp), x in zip(items, xs):
-        mesh.location = (x, 0, 0)
+    order = ["pistol", "smg", "ar", "shotgun", "hmg", "minigun", "sniper", "grenade"]
+    pos = {"pistol": (-8.4, 3.0), "smg": (-3.2, 3.0), "ar": (3.2, 3.0), "shotgun": (9.6, 3.0), "hmg": (-7.4, -3.2), "minigun": (-0.6, -3.2), "sniper": (6.8, -3.2), "grenade": (10.6, -3.2)}
+    for (wid, mesh, emp) in items:
+        x, y = pos[wid]
+        mesh.location = (x + 1.2, y, 0)
         mesh.rotation_euler = (0, 0, math.radians(-80))
     bpy.ops.object.light_add(type="SUN", location=(0, 0, 10))
     sun = bpy.context.active_object
@@ -203,9 +266,9 @@ def lineup(items):
     bpy.ops.object.camera_add()
     cam = bpy.context.active_object
     cam.data.type = "ORTHO"
-    cam.data.ortho_scale = 15
+    cam.data.ortho_scale = 25
     cam.rotation_euler = (math.radians(55), 0, math.radians(0))
-    cam.location = Vector((0.6, -0.4, 0.2)) + cam.rotation_euler.to_matrix() @ Vector((0, 0, 30))
+    cam.location = Vector((1.2, 0.0, 0.2)) + cam.rotation_euler.to_matrix() @ Vector((0, 0, 30))
     sc.camera = cam
     os.makedirs(os.path.dirname(PREVIEW_PATH), exist_ok=True)
     sc.render.filepath = PREVIEW_PATH
