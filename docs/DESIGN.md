@@ -333,7 +333,53 @@ Karar: ilk aşamada oyun localhost'ta çalışır; farklı ağlardan oynamak iç
 - Meta ilerleme (sonra): `localStorage` ile kozmetik (yelek deseni, kafa aksesuarı), silah düşme şansı bonusu gibi basit açılışlar; hile riski kabul edilir (sunucu tarafı hesap yok). Sıralama tablosu bu sürümde yok.
 - Gelir: yok. İleride isteğe bağlı itch.io "name your price" veya bağış butonu değerlendirilir.
 
-## 20. Açık kararlar
+## 20. Denge tablosu (ilk sürüm, oynanışla ayarlanacak)
+Değerler `packages/shared/data/balance.json` dosyasında tutulur (kod değişmeden ayarlanır, sim testleri formül ve bütçeyi korur). Birimler: birim=1 dünya birimi, süreler saniye. Not: "grunt 2 vuruşta ölür" hedefi için pistol 10 hasar ile grunt canı 20 alındı (30 yerine).
+
+**Oyuncu**
+| Alan | Değer |
+|---|---|
+| Can | 100 |
+| Hareket hızı | 6 birim/sn (HMG taşırken x0.75) |
+| Vurulunca dokunulmazlık | 0.4 sn |
+| Yaralı (yerde) süre | 25 sn, sonra ölür; yaralıyken emekler 1.5 birim/sn |
+| Revive süresi | 3 sn (yakın dostla, mesafe 1.5) |
+| Ölünce | Maç devam eder; herkes yerde ise maç biter |
+
+**Silahlar**
+| Silah | Hasar | Atış hızı | Şarjör/mermi | Not |
+|---|---|---|---|---|
+| Pistol | 10 | 8/sn | sonsuz | Başlangıç, düşük yayılım |
+| SMG | 6 | 15/sn | 120 (kutu: +120) | Yayılım artar, ~90 dps |
+| Pompalı | 7 x 8 saçma | 1.2/sn | 24 (kutu: +16) | Yakın hasar x2, itme |
+| HMG | 12 | 12/sn | 200 (kutu: +150) | Delici 2, yavaşlatır, ısınma yok |
+| El bombası | 60 alan, yarıçap 3 | 1 / 6 sn | 3 (kutu: +2) | Dostu iter hasarsız |
+Mermi biterse pistole dönülür. Kritik: temel %5, hasar x2.
+
+**Düşmanlar (dalga 1 değerleri, canlar dalga başı +%8, sayı çarpanı bölüm 14)**
+| Tür | Can | Hız | Saldırı | Not |
+|---|---|---|---|---|
+| Grunt | 20 | 2.2 | 8 temas, 0.8 sn aralık | Sürü |
+| Koşucu | 12 | 5.0 | 5 temas, 0.5 sn | Düşük can, hızlı |
+| Tank | 150 | 1.4 | 25 temas, yarıçap 2.2, 1.2 sn | 2.2x boyut |
+| Patlayıcı | 15 | 4.0 | patlama 40, yarıçap 2.5 | Ölünce de patlar |
+| Tükürüklü | 25 | 1.8 | 8 mermi, menzil 9, 2 sn | Duruyor ve atar |
+| Zırhlı kalkancı | 80 | 2.0 | 12 temas | Önden hasar -%90, arkadan x1 |
+| Sayacı | 120 | 0.8 | 3 koşucu / 6 sn | Öncelikli hedef |
+
+**Boss'lar** (taban can, p oyuncu sayısı, dalga w için `taban x (1 + 0.1 x (p-2)) x 1.08^(w-1)`)
+| Boss | Taban can | Hız | Not |
+|---|---|---|---|
+| Dev Grunt | 2000 | 1.8 | Yer sarsıntısı 40 hasar, 3 sn telegraf |
+| Kral Tank | 3500 | 1.2 | Arka zayıf nokta x2 hasar, plakalar kopar |
+| Sayacı Ana | 3000 | 0.6 | 5 koşucu / 5 sn doğurur |
+| Koşucu Sürü Lideri | 2500 | 4.5 | Her 8 sn 3 kopya (kopya can 5) |
+
+**Hedef tempo:** dalga 1-3 pistolle rahat; dalga 5'te Dev Grunt takımın ilk sınavı; dalga 8-12 silah düşürme ve kartlar şart; dalga 15+ zor, tavan 500 düşmanla kaos. 11 kişilik grup toplam ~900 dps ile dalga 12'de ~500x47 can havuzunu ~30 sn'de eritebilmeli (başlangıç hedef, oynanışla doğrulanır).
+
+**Ayar süreci:** headless sim denge raporu (`scripts/balance`): senaryo başına dps, ortalama ölüm dalgası, silah kullanım dağılımı; oynanış geri bildirimine göre `balance.json` güncellenir.
+
+## 21. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - CI dağıtım ve sunucu barındırma detayı.
