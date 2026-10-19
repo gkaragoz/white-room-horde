@@ -73,6 +73,9 @@ Boss ortak: altın taç ve nabız gibi atan altın aura `#FFC93C`; tehlike alan�
 - Renkler: karakter ve düşman renk listeleri (bölüm 3) pastel/doygun korunur; sıcak ışık altında hafif ısınır.
 - Reddedilen: A yumuşak, B stilize PBR, C cel-shaded, D kil, E kağıt, G vinil, H mürekkep, I peluş, K Bad North, L Hi-Fi Rush (arşivde: `tools/blender/prototype/`).
 
+## 3c. Oyuncu okunurluğu (karar)
+Kalabalıkta oyuncuların hemen seçilmesi için: oyuncu ölçeği 1.5x (düşman grunt 1.35x), doygun yelek renkleri (bölüm 3 listesinin daha canlı tonları), oyuncuya özel ince renkli kontur (inverted-hull, sadece oyuncular; stilin "kontur yok" kuralının bilinçli tek istisnası), ayak altında oyuncu renginde parlayan halka ve yumuşak disk, kafanın üstünde oyuncu renginde işaret oku, kafayı parlatan hafif kilit ışık. Oyunda bunlar shader/efekt olarak yapılır (kontur: sahne içi ucuz kabuk veya post), Blender sahnesi referanstır. Düşmanlarda kontur ve halka yok.
+
 ## 4. Işık
 - Tek yönlü sıcak güneş (renk `#FFD7A0`, şiddet ~3.6, açı 3°), yön: yükseklik 38°, yaw 55° (bölüm 3b). Gölgeler daha belirgin ve uzun; Valheim tadı.
 - Dünya ambient ~0.55, renk `#E8D9C2` (sıcak krem).
@@ -316,11 +319,11 @@ Karar: Mixamo animasyonları standart Mixamo iskeletiyle indirilir, Blender'da k
 **Modeller ve bütçeler**
 | Varlık | Üçgen bütçesi | Not |
 |---|---|---|
-| Oyuncu chibi | <= 1500 | Beyaz kafa, yelek rengi atlas satırı ile; skinned GLB |
-| Grunt / Koşucu | <= 800 | VAT için tek mesh, yelek/kafa tint attribute |
-| Tank / Kalkancı / Patlayıcı / Tükürüklü / Sayacı | <= 1200 | Ek plakalar aynı mesh içinde |
+| Oyuncu chibi | <= 1500 (üretilen: 1200) | Beyaz kafa, `tint` yelek; skinned GLB, 1.5x ölçek |
+| Grunt / Koşucu | <= 650 (üretilen: 576) | 8x4 küreler; VAT için tek mesh |
+| Tank / Kalkancı / Patlayıcı / Tükürüklü / Sayacı | <= 900 (üretilen: 600-816) | Ek plakalar aynı mesh içinde |
 | Boss (x4) | <= 4000 | Ayrı skinned, VAT yok (az sayıda) |
-| Silahlar (5) | <= 500 | Statik GLB, `muzzle` soket |
+| Silahlar (5) | <= 500 (üretilen: 168-444) | Statik GLB, `muzzle` ve `grip` boş nesneleri, namlu -Y |
 | Gibs (küre, küp, uzuv) | <= 100 | Instanced parçalar |
 Malzeme (en çok 2): `fixed` (vertex color x paylaşılan boyalı gürültü dokusu, en yakın komşu filtre) ve `tint` (beyaz taban x aynı doku; istemci örnek başına renkle çarpar: oyuncu yeleği, bandana, düşman gövdesi). PBR yok, kontur yok, düz gölgelendirme (faceted).
 

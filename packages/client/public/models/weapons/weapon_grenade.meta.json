@@ -1,0 +1,14 @@
+{
+ "id": "grenade",
+ "tris": 310,
+ "muzzle": null,
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

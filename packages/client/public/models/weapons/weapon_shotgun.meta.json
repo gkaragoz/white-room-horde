@@ -1,0 +1,18 @@
+{
+ "id": "shotgun",
+ "tris": 168,
+ "muzzle": [
+  0.0,
+  -1.8,
+  0.1
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

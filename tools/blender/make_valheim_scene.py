@@ -232,13 +232,13 @@ def player_marker(m, r, x, y, col, PS):
     bpy.context.active_object.visible_shadow = False
     bpy.ops.object.light_add(type="POINT", location=(x - 0.3, y - 0.6, 3.6))
     K_ = bpy.context.active_object
-    K_.data.energy = 420
+    K_.data.energy = 140
     K_.data.color = lin("#FFF4E2")
     K_.data.shadow_soft_size = 0.8
     K_.data.use_shadow = False
     bpy.ops.object.light_add(type="POINT", location=(x, y, 1.0))
     L = bpy.context.active_object
-    L.data.energy = 60
+    L.data.energy = 40
     L.data.color = lin(col)
     L.data.shadow_soft_size = 1.2
 
@@ -468,51 +468,98 @@ def vfx(out, mats):
         L.data.energy = 220
         L.data.color = lin("#FFC060")
         L.data.shadow_soft_size = 0.4
-    # explosion (right side)
-    ex = Vector((8.6, 6.4, 1.1))
-    core = emissive("core", "#FFE08A", 20)
-    shell = emissive("shell", "#FFA040", 9)
-    outer = emissive("outer", "#FF7A2A", 5)
-    for (r_, m_, sc) in ((1.9, outer, (1, 1, 0.9)), (1.4, shell, (1, 1, 0.95)), (0.8, core, (1, 1, 1))):
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=r_, location=ex + Vector((0, 0, 0.2 * r_)))
+    # explosion (right side): multi-lobe faceted fireball, smoke column, dust ring, radial sparks
+    ex = Vector((8.6, 6.4, 1.0))
+    core = emissive("core", "#FFE27A", 5.0)
+    mid = emissive("mid", "#FF9A10", 2.4)
+    outer = emissive("outer", "#FF3D0A", 1.5)
+    ember = emissive("ember", "#FF8A2A", 5)
+
+    def lobe(pos, r_, m_):
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=r_, location=pos)
         o = bpy.context.active_object
-        o.scale = sc
-        o.rotation_euler = (RND.random(), RND.random(), RND.random())
+        o.scale = (RND.uniform(0.9, 1.15), RND.uniform(0.9, 1.15), RND.uniform(0.85, 1.1))
+        o.rotation_euler = (RND.random() * 3, RND.random() * 3, RND.random() * 3)
         o.data.materials.append(m_)
+        o.visible_shadow = False
         for pgon in o.data.polygons:
             pgon.use_smooth = False
-    scorch = static("scorch", lambda b: (b.sphere("root", (ex.x, ex.y, 0.012), 3.0, (1, 1, 0.01), "#4A3F36", seg=10, rings=3), b.sphere("root", (ex.x, ex.y, 0.016), 1.9, (1, 1, 0.01), "#2E2620", seg=10, rings=3)), mats=mats)
+        return o
+
+    for k in range(7):  # outer red-orange lobes
+        a_ = 2 * math.pi * k / 7 + RND.uniform(-0.3, 0.3)
+        lobe(ex + Vector((math.cos(a_) * 1.15, math.sin(a_) * 1.15, RND.uniform(0.2, 1.4))), RND.uniform(0.85, 1.2), outer)
+    for k in range(4):  # rising plume lobes
+        lobe(ex + Vector((RND.uniform(-0.5, 0.5), RND.uniform(-0.5, 0.5), 1.7 + 0.55 * k)), 0.95 - 0.12 * k, outer if k > 1 else mid)
+    for k in range(5):  # mid orange-yellow
+        a_ = 2 * math.pi * k / 5 + RND.uniform(-0.4, 0.4)
+        lobe(ex + Vector((math.cos(a_) * 0.65, math.sin(a_) * 0.65, RND.uniform(0.3, 1.5))), RND.uniform(0.7, 0.95), mid)
+    lobe(ex + Vector((0, 0, 0.9)), 0.8, core)
+    lobe(ex + Vector((0.15, -0.1, 1.5)), 0.5, core)
     smoke_m = mats[0]
-    for k in range(10):
-        a = RND.random() * 6.28
-        rr = RND.uniform(0.6, 1.8)
-        pos = ex + Vector((math.cos(a) * rr * 0.8, math.sin(a) * rr * 0.8, RND.uniform(1.8, 4.6)))
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=RND.uniform(0.5, 1.1), location=pos)
+    for k in range(11):  # dark smoke column, brown with a lighter top
+        a_ = RND.random() * 6.28
+        rr = RND.uniform(0.2, 1.3)
+        z = 2.9 + k * 0.36 + RND.uniform(-0.2, 0.2)
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=RND.uniform(0.45, 0.8) + 0.04 * k, location=ex + Vector((math.cos(a_) * rr, math.sin(a_) * rr, z)))
         o = bpy.context.active_object
         o.data.materials.append(smoke_m)
         o.data.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
         col = o.data.color_attributes["Col"]
-        shade = RND.uniform(0.07, 0.17)
+        shade = 0.05 + 0.012 * k + RND.uniform(0, 0.03)
         for i in range(len(col.data)):
-            col.data[i].color = (shade, shade * 0.95, shade * 0.9, 1)
+            col.data[i].color = (shade * 1.15, shade * 0.95, shade * 0.8, 1)
         for pgon in o.data.polygons:
             pgon.use_smooth = False
-    for k in range(34):  # sparks and debris
-        a = RND.random() * 6.28
-        rr = RND.uniform(1.2, 4.2)
-        pos = ex + Vector((math.cos(a) * rr, math.sin(a) * rr, RND.uniform(0.4, 3.0)))
+    for k in range(10):  # dust ring on the ground
+        a_ = 2 * math.pi * k / 10
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1, radius=RND.uniform(0.45, 0.8), location=ex + Vector((math.cos(a_) * 3.1, math.sin(a_) * 3.1, 0.35 - 1.0 + 1.0)))
+        o = bpy.context.active_object
+        o.data.materials.append(smoke_m)
+        o.data.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
+        col = o.data.color_attributes["Col"]
+        for i in range(len(col.data)):
+            col.data[i].color = (0.55, 0.47, 0.38, 1)
+        for pgon in o.data.polygons:
+            pgon.use_smooth = False
+    spark = emissive("spark", "#FFC266", 8)
+    for k in range(46):  # radial sparks as elongated shards
+        a_ = RND.random() * 6.28
+        el = RND.uniform(0.1, 0.9)
+        rr = RND.uniform(1.6, 5.0)
+        d = Vector((math.cos(a_) * math.cos(el), math.sin(a_) * math.cos(el), math.sin(el)))
+        pos = ex + d * rr
         bpy.ops.mesh.primitive_cube_add(size=1, location=pos)
         o = bpy.context.active_object
-        o.scale = (RND.uniform(0.05, 0.12), RND.uniform(0.05, 0.12), RND.uniform(0.1, 0.35))
+        o.scale = (0.05, 0.05, RND.uniform(0.25, 0.7))
+        o.rotation_mode = "QUATERNION"
+        o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(d)
+        o.data.materials.append(spark if k % 3 else ember)
+        o.visible_shadow = False
+    for k in range(14):  # flying debris chunks
+        a_ = RND.random() * 6.28
+        rr = RND.uniform(1.8, 4.6)
+        pos = ex + Vector((math.cos(a_) * rr, math.sin(a_) * rr, RND.uniform(0.5, 2.6)))
+        bpy.ops.mesh.primitive_cube_add(size=1, location=pos)
+        o = bpy.context.active_object
+        o.scale = (RND.uniform(0.15, 0.34), RND.uniform(0.15, 0.34), RND.uniform(0.15, 0.34))
         o.rotation_euler = (RND.random() * 3, RND.random() * 3, RND.random() * 3)
-        o.data.materials.append(spark)
+        o.data.materials.append(mats[0])
+        o.data.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
+        col = o.data.color_attributes["Col"]
+        cc = RND.choice([(0.5, 0.42, 0.34, 1), (0.28, 0.24, 0.2, 1), (0.7, 0.58, 0.4, 1)])
+        for i in range(len(col.data)):
+            col.data[i].color = cc
+        for pgon in o.data.polygons:
+            pgon.use_smooth = False
+    scorch = static("scorch", lambda b: (b.sphere("root", (ex.x, ex.y, 0.012), 3.0, (1, 1, 0.01), "#4A3F36", seg=10, rings=3), b.sphere("root", (ex.x, ex.y, 0.016), 1.9, (1, 1, 0.01), "#2E2620", seg=10, rings=3)), mats=mats)
     bpy.ops.mesh.primitive_torus_add(major_radius=3.4, minor_radius=0.08, major_segments=24, minor_segments=4, location=(ex.x, ex.y, 0.05))
     ring = bpy.context.active_object
     ring.data.materials.append(emissive("ring", "#FFE08A", 4))
     bpy.ops.object.light_add(type="POINT", location=ex + Vector((0, -0.6, 1.6)))
     L = bpy.context.active_object
-    L.data.energy = 3800
-    L.data.color = lin("#FF9A4C")
+    L.data.energy = 2600
+    L.data.color = lin("#FF8A3C")
     L.data.shadow_soft_size = 1.4
     # boss telegraph ring (yellow, hazard colour)
     bx, by = out["boss_pos"]
@@ -565,7 +612,7 @@ def post(path_in, path_out):
         return x
 
     lum = rgb @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
-    bright = np.clip((lum - 0.78) / 0.22, 0, 1)[..., None] * rgb
+    bright = np.clip((lum - 0.88) / 0.12, 0, 1)[..., None] * rgb
     bloom = blur(bright, max(6, w // 160), 3) * 0.9 + blur(bright, max(18, w // 60), 2) * 0.7
     out = rgb + bloom
     yy, xx = np.mgrid[0:h, 0:w]

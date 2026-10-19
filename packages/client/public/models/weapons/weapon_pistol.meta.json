@@ -1,0 +1,18 @@
+{
+ "id": "pistol",
+ "tris": 316,
+ "muzzle": [
+  0.0,
+  -0.86,
+  0.12
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

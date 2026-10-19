@@ -1,0 +1,18 @@
+{
+ "id": "hmg",
+ "tris": 444,
+ "muzzle": [
+  0.0,
+  -2.26,
+  0.14
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}
