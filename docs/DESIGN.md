@@ -4,12 +4,12 @@ Durum: sanat yönü onaylandı (varyant A, kamera iso62). Oyun kodu henüz yok.
 Referans render: `docs/art/A_white_clean__iso62.png` (üretim betiği: `C:\blender_scenes\make_scene.py`, Blender 5.2 + LLAMA/Blender MCP).
 
 ## 1. Oyun özeti
-Host'lu 6-11 kişilik co-op, top-down survival shooter. Sonsuz dalgalar, yüzlerce düşman, kaos, ragdoll, kan ve parça yağmuru. Chibi karakterler, sade beyaz-gri sahne, Squad Alpha (SayGames) tadında oyuncak silahlar. Platform: web (Three.js).
+Host'lu 2-11 kişilik co-op (geliştirme için tek kişi test modu), top-down survival shooter. Sonsuz dalgalar, yüzlerce düşman, kaos, ragdoll, kan ve parça yağmuru. Chibi karakterler, sade beyaz-gri sahne, Squad Alpha (SayGames) tadında oyuncak silahlar. Platform: web (Three.js).
 
 ## 2. Dil ve üslup
 - Oyun içi dil: TR/EN (anahtar tabanlı yerelleştirme, ilk metinler EN).
 - Ton: absürt-şiddetli ama sevimli, "oyuncak katliamı". Yüzsüz karakterler, ifade yok; his animasyon ve efektten gelir.
-- UI: kalın, yuvarlak, oyuncak gibi; büyük sayılar, yüzen hasar yazıları, boss'larda renkli parıltı. Sanal joystick yok (PC öncelikli: WASD + fare), sonra gamepad.
+- UI: kalın, yuvarlak, oyuncak gibi; büyük sayılar, sınırlı hasar yazıları (bkz. bölüm 12), boss'larda renkli parıltı. Sanal joystick yok (PC öncelikli: WASD + fare), sonra gamepad.
 
 ## 3. Sahne ve renk
 Sahne: açık gri-beyaz zemin, ince ızgara çizgileri, alçak duvarlar, kasalar. Renk sadece karakterde, kanda ve silahlarda. Beyaz zemin kanı çok okunur yapar.
@@ -19,7 +19,7 @@ Sahne: açık gri-beyaz zemin, ince ızgara çizgileri, alçak duvarlar, kasalar
 | Zemin | `#E7E8ED` | Render'da ışıkla ~`#C8CAD2` görünür |
 | Duvar / kasa | `#E4E5EA` / `#D0CFCB` | Zeminle aynı ailede |
 | Oyuncu kafası | `#FDFDFD` | Yuvarlak, yüzsüz, hepsi beyaz |
-| Oyuncu yelek renkleri | mavi `#6CC4F9`, pembe `#F995B3`, sarı `#FDE56C`, mor `#C4A0ED` (+ 7 renk daha: turuncu, turkuaz, kırmızı değil) | 11 oyuncuya kadar; kırmızı kana ayrılmış |
+| Oyuncu yelek renkleri | mavi `#6CC4F9`, pembe `#F995B3`, sarı `#FDE56C`, mor `#C4A0ED` ; 7 renk daha seçilecek | 11 oyuncuya kadar; kırmızı kana ayrılmış |
 | Yelek / el | koyu gri `#61656F`, eldiven `#3F3F45` | |
 | Grunt | gövde `#C4E5B3`, kafa `#E1FDD3` | Standart düşman |
 | Koşucu | gövde `#F9B37C`, kafa `#FFDABC` | Küçük, ince, öne eğik, hızlı |
@@ -46,7 +46,7 @@ Yuvarlak beyaz kafa (r~0.46), yumurta gövde, koyu yelek, eldiven, kısa bacak. 
 | Grunt | 1.35x | Yavaş, sürü halinde |
 | Koşucu | 1.0x, eğik | Hızlı, düşük can, grup saldırısı |
 | Tank | 2.2x | Yavaş, yüksek can, zırh plakası |
-| Sonraki | patlayıcı, tükürücü, boss | Faz 1 sonrası |
+| Diğer türler | patlayıcı, tükürüklü, kalkancı, sayacı, 4 boss | Roster bölüm 9, değerler bölüm 20; renkleri açık karar |
 
 ## 7. Silahlar
 Kalın oyuncak oran, sarı vurgu. Hepsinde yüksek geri bildirim: muzzle flash, kovan, hit-stop, parça uçuşması.
@@ -77,8 +77,9 @@ Kalın oyuncak oran, sarı vurgu. Hepsinde yüksek geri bildirim: muzzle flash, 
 - Çarpışma ve AI sim'de, render ve fizik (ragdoll, parçacık) sim dışında.
 
 **Taşıma**
-- WebRTC DataChannel, yıldız topolojisi (herkes host'a bağlı), unreliable + yedekli gönderim (son 3 bundle tekrarı) ile kayıp tolere edilir; gerekirse eksik tick için tekrar istek.
-- Sinyal/oda sunucusu (WebSocket): oda kodu, eşleştirme, ICE değişimi, host migration koordinasyonu. Oyun verisi bu sunucudan geçmez.
+- `Transport` arayüzü; varsayılan **WebSocket aktarımı** (yıldız topolojisi: herkes sunucuya bağlı, sunucu girdileri host'a ve bundle'ları herkese aktarır, Cloudflare Tunnel'dan geçer). İsteğe bağlı WebRTC DataChannel (LAN P2P) sonra. Ayrıntı bölüm 19.
+- WebSocket TCP olduğu için sıralı ve güvenilirdir; gecikme dalgalanması girdi gecikmesi (3 tick) tamponu ile emilir, eksik tick bekleme süresi dolunca bölüm 8'deki kuralla doldurulur.
+- Oda sunucusu: oda kodu, eşleştirme, host migration koordinasyonu ve aktarım.
 
 **Desync ve zayıf client**
 - Her 1 sn (30 tick) her client durum hash'ini (CRC32) host'a yollar; host çoğunluğu belirler.
@@ -100,9 +101,9 @@ Kalın oyuncak oran, sarı vurgu. Hepsinde yüksek geri bildirim: muzzle flash, 
 
 ## 9. Oyun döngüsü (karar verildi)
 - Maç: sonsuz dalga, hedef en yüksek dalga skoru. Her dalga zorlaşır, ölünce biter.
-- Ölüm: yerde kalır, takım arkadaşı canlandırır (revive). Herkes yerdeyse maç biter.
+- Ölüm: yere düşer (yaralı, 25 sn), takım arkadaşı canlandırır (revive); süre dolarsa ölür. Ayakta veya yaralı oyuncu kalmazsa (hepsi yerde veya ölü) maç biter.
 - İlerleme: her dalga sonunda her oyuncuya kişiye özel 3 kart (silah/yetenek yükseltme). Maç bitince sıfırlanır, kalıcı meta ilerleme yok (ilk sürüm).
-- Ölçek: düşman sayısı ve canı oyuncu sayısıyla orantılı artar (2 kişi ~100, 11 kişi 500+ eşzamanlı düşman hedefi).
+- Ölçek: düşman sayısı ve canı oyuncu sayısıyla ve dalgayla artar; formül ve tavan (500) bölüm 14'te. Dalga w, maçın (w-1) x 60. saniyesinde başlar (süreye bağlı, temizleme beklemez).
 
 - Ritim: sürekli akış, her 60 sn'de yeni dalga ve zorluk artışı. Kart seçimi kısa (~10 sn) duraklama ile, oyun kesilmez (diğerleri akmaya devam eder, seçim süreli).
 - Boss: her 5. dalgada dev chibi boss (abartılı boyut, kendi saldırı deseni, ödül kartı).
@@ -126,7 +127,7 @@ Kural: gore tamamen yerel kozmetiktir. Ağda gitmez, simülasyon sonucunu etkile
 - Kan: kalıcı, zemin render texture'ına "pişer" (decal'lar tek dokuya basılır, sahne boyunca birikir; beyaz zemin imza görüntü olarak kırmızıya döner). Sınır: dokuyu çözünürlük belirler, taşan yer üzerine boyanır.
 - Leş: ragdoll 15 sn sonra solar (küçülüp kaybolur), kemik fiziği sönmeden önce uyutulur (sleep). Toplam eşzamanlı fizikli leş/parça tavanı 150, aşılınca en eski olan solar.
 - Parçalar: küre/küp parçalar fizikli ama kısa ömürlü (4-8 sn), sonra zemine kan lekesi olarak basılır ve kaybolur.
-- Performans bütçesi: 60 FPS, ~500 canlı düşman (GPU skinning'li instanced), ~150 fizikli leş/parça. Tam ragdoll fiziği sadece yakın ve son ölen ~40 için; kalanı basitleştirilmiş (tek rigid body + dönme) veya donmuş pozlu statik leş.
+- Performans bütçesi: 60 FPS, ~500 canlı düşman (VAT ile instanced), ~150 fizikli leş/parça. Tam ragdoll fiziği sadece yakın ve son ölen ~40 için; kalanı basitleştirilmiş (tek rigid body + dönme) veya donmuş pozlu statik leş.
 - Etki için kozmetikler: hit-stop, ekran sarsıntısı, kan damlası parçacıkları (instanced), kovan atımı.
 - Varsayılan kapatılabilir "gore azalt" ayarı (düşük donanım ve erişilebilirlik).
 
@@ -154,7 +155,7 @@ Karar: ses ve müzik prosedürel üretilmez, hazır ve ücretsiz kütüphanelerd
 - Kart seçimi: alt orta kısımda 3 kart çubuğu, oyun akışı kesilmez, 10 sn süreli, tuşlar 1-2-3 veya fare; seçilmezse otomatik rastgele seçilir. Kartlar kişiseldir (diğerleri sadece "seçiyor" göstergesini görür).
 - Geri bildirim: hasar sayıları kalabalıkta sınırlı (sadece kritik ve öldürücü vuruşlar, ölçekli), her vuruşta değil. Hit marker: kısa çizgi + ses. Can azlığında kırmızı kenar vignette ve kalp atışı sesi. Dalga başı kısa büyük "Wave N" yazısı.
 - Stil: yuvarlak, kalın, oyuncak; beyaz zemin üstünde koyu gri metin, oyuncu rengi vurgu, kan kırmızısı sadece hasar ve tehlike için.
-- Menüler: ana menü (oda kur / odaya katıl kodla), lobi (oyuncu renkleri, hazır durumu), maç sonu (ulaşılan dalga, öldürme sayısı, en iyi silah, toplam kan kapladığı alan yüzdesi).
+- Menüler: ana menü (oda kur / odaya katıl kodla), lobi (oyuncu renkleri, harita oyu; hazır durumu yok, host başlatır), maç sonu (ulaşılan dalga, öldürme sayısı, en iyi silah, toplam kan kapladığı alan yüzdesi).
 - Erişilebilirlik: "gore azalt", renk körlüğü için oyuncu renklerine şekil işareti (yelek deseni), titreme/ekran sarsıntısı kaydırıcısı, yeniden atanabilir tuşlar.
 
 ## 13. Kart havuzu (onaylandı)
@@ -206,7 +207,7 @@ white-room-horde/
     sim/       saf TS: deterministik oyun mantığı (DOM, Three, Date, Math.random yok)
     shared/    protokol (bundle/snapshot formatı), sabitler, ortak tipler
     client/    Vite + Three.js: render, girdi, ses, HUD, ağ istemcisi, gore (yerel kozmetik)
-    server/    küçük Node WebSocket sinyal/oda sunucusu (oda kodu, ICE, host devri)
+    server/    Node sunucusu: istemci dosyalarını sunar + WebSocket oda/aktarım (oda kodu, bundle aktarımı, host devri)
   tools/       Blender betikleri (GLB/VAT üretimi), ses lisans denetimi
   docs/        DESIGN.md, art/, audio-licenses.md
 ```
@@ -226,7 +227,7 @@ white-room-horde/
 - Ragdoll: sim olayı "düşman öldü + vuruş vektörü + seviye" verir; client havuzdan ragdoll alır (yakın/son ölen ~40), kalanını tek rigid body veya donmuş poz ile gösterir; 15 sn sonra solar. Rapier WASM, sim dışında, deterministik olması gerekmez.
 - Kan: `blood` RenderTexture (zemin büyüklüğüne uygun çözünürlük), olaylardan decal pişirilir; sahne boyunca birikir.
 - Girdi: klavye/fare ve gamepad soyutlaması; her tick için girdi paketi üretip ağ katmanına verir.
-- Ağ istemcisi: WebRTC DataChannel yönetimi (host/client), bundle yayını/okuması, hash raporu, snapshot uygulama, host devri.
+- Ağ istemcisi: `Transport` (WebSocket varsayılan), bundle yayını/okuması, hash raporu, snapshot uygulama, host devri.
 - Ses: Web Audio, voice havuzu ve öncelik, olay tabanlı.
 - HUD: DOM/CSS overlay (vanilla TS), sim durumundan okur, 30 Hz'de veya değişimde günceller.
 
@@ -295,7 +296,7 @@ Malzeme: tek renk paleti atlası (vertex color + 1 doku), PBR yok (düz renk + y
 5. Tüm düşman türleri ve boss'lar.
 
 ## 17. Arena ve harita
-Karar: tek büyük sabit arena, 3 harita arasından lobide seçilir (oylama veya host seçimi). Kamera grubu takip eder. Boyut ~60x40 birim (kamera 17 birim genişlik gösterir, arenanın yaklaşık yarısı). Sabit harita deterministik sim için güvenlidir (tohum yalnız spawn ve RNG içindir).
+Karar: tek büyük sabit arena, 3 harita arasından lobide seçilir (oylama veya host seçimi). Kamera grubu takip eder. Boyut ~60x40 birim (kamera 17 birim genişlik gösterir, yani arena genişliğinin ~%28'i). Sabit harita deterministik sim için güvenlidir (tohum yalnız spawn ve RNG içindir).
 
 | Harita | Tema (beyaz sade) | Yerleşim |
 |---|---|---|
@@ -320,8 +321,8 @@ Akış: Ana menü -> (Oda Kur | Kodla Katıl | Ayarlar) -> Lobi -> Maç -> Sonu�
 - Kimlik: hesap yok. Takma ad (maks 16 karakter, temel küfür filtresi) ve renk tarayıcıda yerel saklanır (`localStorage`); lobide ad çakışırsa sonuna numara eklenir.
 - Bağlantı kopması: oyuncu 20 sn içinde aynı renkle yeniden girebilir (karakter bu sürede dokunulmaz ve hareketsiz bekler), geri döndüğünde snapshot ile devam eder; 20 sn sonra karakter silinir, geri dönen yeni oyuncu olarak girer. Host düşerse host migration (bölüm 8) devreye girer, oyun < 2 sn kesilir.
 - Maç sonu: herkesin ölümü (hepsi yerde) veya host çıkışı. Sonuç ekranı: ulaşılan dalga, toplam öldürme, oyuncu başına öldürme/hasar/revive, en iyi silah, zemini kaplayan kan yüzdesi, boss öldürme süreleri. "Tekrar oyna" ile aynı odayla lobiye dönülür.
-- Hata durumları: oda yok/dolu, sürüm uyuşmazlığı (sim sürümü farklıysa katılım reddedilir; deterministik sim için birebir aynı sürüm şart), bağlantı kurulamadı (NAT) için basit mesaj ve yeniden dene, WebRTC desteklenmiyorsa uyarı.
-- Gizlilik: oda kodu dışında kişisel veri yok; sinyal sunucusu IP'yi sadece ICE bağlantısı için geçici kullanır, kayıt tutmaz.
+- Hata durumları: oda yok/dolu, sürüm uyuşmazlığı (sim sürümü farklıysa katılım reddedilir; deterministik sim için birebir aynı sürüm şart), sunucuya bağlanılamadı için basit mesaj ve yeniden dene.
+- Gizlilik: oda kodu dışında kişisel veri yok; sunucu IP'yi yalnızca bağlantı süresince bellekte tutar, kayıt tutmaz.
 
 ## 19. Yayın, meta ilerleme ve gelir
 Karar: ilk aşamada oyun localhost'ta çalışır; farklı ağlardan oynamak için sonra Cloudflare Tunnel eklenir; arkadaşlarla bağlantı linki paylaşılır. Ücretsiz, gelir yok (hobi/portföy). İlk sürümde meta ilerleme yok; sonra yerel (localStorage) kozmetik/silah açılışı.
@@ -381,7 +382,9 @@ Mermi biterse pistole dönülür. Kritik: temel %5, hasar x2.
 
 ## 21. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
+- Kalan düşman ve boss renkleri (patlayıcı, tükürüklü, kalkancı, sayacı, 4 boss) ve görsel ayrışma kuralı.
+- Düşman yol bulma yöntemi: tek hedefe akış alanı (flow field) mi, doğrudan kovalama + engelden kayma mı (500 düşman CPU bütçesi için karar gerekir).
+- Boss sonrası "sakin ara" (10 sn): sürekli akış kuralıyla uyumu (spawn durur mu, mevcutlar kalır mı).
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
-- CI dağıtım ve sunucu barındırma detayı.
-- Sinyal/oda sunucusu barındırma (WebSocket) ve maliyet.
-- Sonraki sürüm: kalıcı meta ilerleme, yeni haritalar, sıralama tablosu.
+- Sunucu barındırma: ilk aşamada yerel; Cloudflare Tunnel sonra.
+- Sonraki sürüm: kalıcı meta ilerleme (yerel), yeni haritalar, WebRTC aktarımı, sıralama tablosu.
