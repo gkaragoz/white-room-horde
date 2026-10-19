@@ -311,7 +311,19 @@ Karar: tek büyük sabit arena, 3 harita arasından lobide seçilir (oylama veya
 - Erişilebilirlik: yerdeki kırmızı tehlike alanları (boss işaretleri) kan kırmızısından ayrışsın diye parlak sarı kontur ve desenli doldurma.
 - Ertelenenler: tehlikeli zemin (asit/elektrik), yok edilebilir siper, harita rotasyonu (daha sonra).
 
-## 18. Açık kararlar
+## 18. Lobi ve oyun akışı
+Akış: Ana menü -> (Oda Kur | Kodla Katıl | Ayarlar) -> Lobi -> Maç -> Sonuç ekranı -> Lobiye dönüş.
+
+- Ana menü: "Oda Kur", "Kodla Katıl", "Ayarlar" (ses, grafik/gore azalt, kontroller, dil, takma ad). Oda kodu kısa ve okunur (6 karakter), bağlantı linki de paylaşılabilir.
+- Lobi: oyuncu listesi (renk, takma ad), renk seçimi (çakışmayan 11 renk; renk körlüğü deseniyle), harita oylaması (3 harita; eşitlikte host seçer), "Başlat" sadece host'ta. Hazır durumu yok. Oyuncu limiti 11 (host dahil). Oda kilitlenebilir.
+- Geç katılım: maç sürerken kodla katılan oyuncu snapshot ile girer (bölüm 8), kısa dokunulmazlık ile arena kenarında doğar; kart ilerlemesi yok (yeni oyuncu sıfır kartla, o dalganın kartlarını seçer).
+- Kimlik: hesap yok. Takma ad (maks 16 karakter, temel küfür filtresi) ve renk tarayıcıda yerel saklanır (`localStorage`); lobide ad çakışırsa sonuna numara eklenir.
+- Bağlantı kopması: oyuncu 20 sn içinde aynı renkle yeniden girebilir (karakter bu sürede dokunulmaz ve hareketsiz bekler), geri döndüğünde snapshot ile devam eder; 20 sn sonra karakter silinir, geri dönen yeni oyuncu olarak girer. Host düşerse host migration (bölüm 8) devreye girer, oyun < 2 sn kesilir.
+- Maç sonu: herkesin ölümü (hepsi yerde) veya host çıkışı. Sonuç ekranı: ulaşılan dalga, toplam öldürme, oyuncu başına öldürme/hasar/revive, en iyi silah, zemini kaplayan kan yüzdesi, boss öldürme süreleri. "Tekrar oyna" ile aynı odayla lobiye dönülür.
+- Hata durumları: oda yok/dolu, sürüm uyuşmazlığı (sim sürümü farklıysa katılım reddedilir; deterministik sim için birebir aynı sürüm şart), bağlantı kurulamadı (NAT) için basit mesaj ve yeniden dene, WebRTC desteklenmiyorsa uyarı.
+- Gizlilik: oda kodu dışında kişisel veri yok; sinyal sunucusu IP'yi sadece ICE bağlantısı için geçici kullanır, kayıt tutmaz.
+
+## 19. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - CI dağıtım ve sunucu barındırma detayı.
