@@ -196,10 +196,64 @@ Zorluk eğrisi:
 - Spawn: ekranın dışında, kamera kenarında (leash çemberi) dairesel dağılım, sim'de tohumlu RNG ile; aynı anda sınırlı spawn hızı (tick başına en fazla N) CPU piklerini önler.
 - Dengesizlik kontrolü: tavan 500 sabit; dalga 25+ ek zorluk sadece can/hasar ve boss gücüyle gelir (performans bütçesi korunur).
 
-## 15. Açık kararlar
+## 15. Teknik mimari
+Karar özeti: pnpm monorepo + TypeScript strict, Vite + Three.js (R3F yok), sim saf TS, düşmanlar VAT + InstancedMesh, ragdoll Rapier (WASM, kozmetik), HUD DOM/CSS overlay.
+
+**Klasör düzeni**
+```
+white-room-horde/
+  packages/
+    sim/       saf TS: deterministik oyun mantığı (DOM, Three, Date, Math.random yok)
+    shared/    protokol (bundle/snapshot formatı), sabitler, ortak tipler
+    client/    Vite + Three.js: render, girdi, ses, HUD, ağ istemcisi, gore (yerel kozmetik)
+    server/    küçük Node WebSocket sinyal/oda sunucusu (oda kodu, ICE, host devri)
+  tools/       Blender betikleri (GLB/VAT üretimi), ses lisans denetimi
+  docs/        DESIGN.md, art/, audio-licenses.md
+```
+
+**sim paketi**
+- Veri yapısı: struct-of-arrays (Float64Array/Int32Array) ile varlıklar; düşman ve mermi havuzları sabit boyutlu (500 + tampon), id'ler yeniden kullanılır (ölünce slot boşalır, sıralı).
+- Sistem sırası (her tick, sabit): girdi uygula, oyuncu hareketi, silah ateşi/mermi, düşman AI (hedef seçimi, yönlenme), çarpışma (deterministik spatial hash, hücre sırası sabit), hasar/ölüm, spawn, kart/ilerleme, dalga zamanlayıcı.
+- Çıktı: `snapshot(tick)` ve `events[]` (ölüm, vuruş, patlama) — client bu olaylardan gore/ses/efekt üretir; sim görsel bilmez.
+- `hash(state)`: CRC32 (kritik alanlar sıralı).
+- Matematik: `detmath.ts` (sin/cos/atan2 yaklaşımı, sadece temel işlemler), ESLint kuralı ile `Math.sin/cos/tan/atan2/pow/exp/log/random`, `Date`, `performance` sim'de yasak.
+
+**client paketi (sahne yapısı)**
+- Renderer: tek WebGLRenderer, ortografik kamera (iso62), tek yönlü ışık, gölge haritası sadece oyuncular ve ağır düşmanlar (düşman kalabalığı için yumuşak "blob" gölge dokusu), post-process hafif (SSAO düşük, vignette).
+- Sahne grupları: `world` (zemin, duvar, kasa), `blood` (RenderTexture zemin üzerine decal pişirme), `crowd` (InstancedMesh, tür başına bir tane), `players` (az sayıda SkinnedMesh), `projectiles` (InstancedMesh), `ragdolls` (Rapier'dan sürülen kemik/mesh, havuzlu ~40), `gibs` (InstancedMesh küre/küp parçalar), `fx` (parçacık, muzzle flash).
+- Kalabalık render: VAT. Blender'da her düşman türü için yürü/koş/ölüm/saldırı animasyonları vertex dokusuna pişirilir (`tools/blender`), InstancedMesh'e örnek başına (konum, yön, animasyon id, faz, tint) attribute'ları verilir; vertex shader dokudan konum okur. Kare sayısı küçük (chibi düşük poli, ~300-600 vertex).
+- Enterpolasyon: sim 30 Hz; render önceki ve şu anki durumlar arasında alfa ile enterpole eder. Kendi karakter için yerel tahmin (girdi hemen görselde), sim kesinleşince düzeltme gözle görülmez olacak kadar küçük.
+- Ragdoll: sim olayı "düşman öldü + vuruş vektörü + seviye" verir; client havuzdan ragdoll alır (yakın/son ölen ~40), kalanını tek rigid body veya donmuş poz ile gösterir; 15 sn sonra solar. Rapier WASM, sim dışında, deterministik olması gerekmez.
+- Kan: `blood` RenderTexture (zemin büyüklüğüne uygun çözünürlük), olaylardan decal pişirilir; sahne boyunca birikir.
+- Girdi: klavye/fare ve gamepad soyutlaması; her tick için girdi paketi üretip ağ katmanına verir.
+- Ağ istemcisi: WebRTC DataChannel yönetimi (host/client), bundle yayını/okuması, hash raporu, snapshot uygulama, host devri.
+- Ses: Web Audio, voice havuzu ve öncelik, olay tabanlı.
+- HUD: DOM/CSS overlay (vanilla TS), sim durumundan okur, 30 Hz'de veya değişimde günceller.
+
+**Performans bütçesi (hedef: 60 FPS, orta seviye PC)**
+- Sim: < 12 ms/tick (500 düşman). Render: < 8 ms/kare. Draw call: < 150. Üçgen: < 600K.
+- Profil kancaları `?perf` parametresiyle (FPS, tick süresi, düşman sayısı, draw call, bellek).
+
+**Test ve CI**
+- Birim testleri (Vitest): sim sistemleri, dalga/ölçek formülü, kart etkileri, spatial hash, hash fonksiyonu.
+- Determinizm testi: aynı tohum + kayıtlı girdi dosyası ile 10 dakikalık maç; sonunda hash Node'da, Chromium, Firefox ve WebKit'te (Playwright) eşit olmalı; sapma varsa CI kırmızı. Sim PR'larında zorunlu.
+- Lint: ESLint + `no-restricted-properties` ile sim'de yasak API'ler; Prettier; `tsc --noEmit` strict.
+- Performans testi: headless sim benchmark (tick süresi bütçesi), render için duman testi (sahne açılır, 500 düşman, 60 sn, hata yok).
+- Varlık sözleşmesi testi: GLB ve VAT dosyaları (isim, üçgen bütçesi, animasyon listesi) ship-rpg'deki `assets.test.ts` mantığıyla.
+- CI: GitHub Actions; yarış: lint + tsc + vitest + determinizm + build; ana dalda `server`/`client` dağıtım adımı sonra eklenir.
+
+**Milestone sırası (kod başlarken)**
+1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
+2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).
+3. Deterministik kayıt/oynatma ve çapraz tarayıcı hash testi.
+4. Ragdoll/gore/kan (yerel).
+5. Ağ: bundle, host, client, desync, geç katılım, host devri.
+6. Kartlar, dalga/boss, UI, ses, cila.
+
+## 16. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - Silah ve düşman modellerinin Blender'da üretimi (LLAMA/Blender MCP hattı) ve GLB sözleşmesi.
-- Teknik mimari: Three.js sahne yapısı, instanced skinning yaklaşımı (VAT veya GPU skinning), proje klasör düzeni, test ve CI (determinizm testi dahil).
+- CI dağıtım ve sunucu barındırma detayı.
 - Sinyal/oda sunucusu barındırma (WebSocket) ve maliyet.
 - Sonraki sürüm: kalıcı meta ilerleme, yeni haritalar, sıralama tablosu.
