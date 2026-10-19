@@ -323,7 +323,17 @@ Akış: Ana menü -> (Oda Kur | Kodla Katıl | Ayarlar) -> Lobi -> Maç -> Sonu�
 - Hata durumları: oda yok/dolu, sürüm uyuşmazlığı (sim sürümü farklıysa katılım reddedilir; deterministik sim için birebir aynı sürüm şart), bağlantı kurulamadı (NAT) için basit mesaj ve yeniden dene, WebRTC desteklenmiyorsa uyarı.
 - Gizlilik: oda kodu dışında kişisel veri yok; sinyal sunucusu IP'yi sadece ICE bağlantısı için geçici kullanır, kayıt tutmaz.
 
-## 19. Açık kararlar
+## 19. Yayın, meta ilerleme ve gelir
+Karar: ilk aşamada oyun localhost'ta çalışır; farklı ağlardan oynamak için sonra Cloudflare Tunnel eklenir; arkadaşlarla bağlantı linki paylaşılır. Ücretsiz, gelir yok (hobi/portföy). İlk sürümde meta ilerleme yok; sonra yerel (localStorage) kozmetik/silah açılışı.
+
+- Dağıtım: `server` paketi hem istemci dosyalarını (Vite build) hem sinyal/oda WebSocket sunucusunu sunar, tek komutla (`pnpm start`) geliştiricinin bilgisayarında çalışır; oyuncular `http://<adres>:PORT` açar. Aynı ağ: LAN IP; farklı ağlar: `cloudflared tunnel --url http://localhost:PORT` ile `https://....trycloudflare.com` benzeri paylaşılabilir link (sonra kalıcı tünel ve alan adı seçeneği).
+- Ağ taşıması (güncelleme): Cloudflare Tunnel sadece HTTP/WebSocket taşır, UDP/WebRTC P2P'yi garanti etmez (NAT ve TURN sorunu). Bu yüzden iki taşıma yöntemi soyutlanır (`Transport` arayüzü): (1) **WebSocket aktarımı** (varsayılan): tüm oyuncular sunucuya bağlanır, sunucu host'un yayınladığı bundle'ları ve girdileri aktarır; tünelden doğrudan geçer, kurulum yok. Trafik küçük (11 oyuncu ~2 KB/sn girdi, bundle ~70 bayt/tick), WebSocket yeterli. (2) WebRTC DataChannel (isteğe bağlı, sonra): düşük gecikme gerektiğinde LAN'da P2P. Determinizm ve lockstep taşıma yönteminden bağımsızdır.
+- Host migration: sunucu süreci kalıcı olduğundan (geliştirici bilgisayarında) "host" mantıksal roldür; host oyuncu düşerse en düşük gecikmeli oyuncu devralır (bölüm 8). Sunucu kapanırsa oda biter (kodla kurtarma yok).
+- Güvenlik: sunucu sadece oda kodu ve bundle aktarır, hesap/ödeme yok; tünel açıkken sınırlı (en fazla N oda, oda başına 11, oyuncu başına hız sınırı, maksimum paket boyutu); arayüz veya sunucu kaynağından komut çalıştırılmaz.
+- Meta ilerleme (sonra): `localStorage` ile kozmetik (yelek deseni, kafa aksesuarı), silah düşme şansı bonusu gibi basit açılışlar; hile riski kabul edilir (sunucu tarafı hesap yok). Sıralama tablosu bu sürümde yok.
+- Gelir: yok. İleride isteğe bağlı itch.io "name your price" veya bağış butonu değerlendirilir.
+
+## 20. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - CI dağıtım ve sunucu barındırma detayı.
