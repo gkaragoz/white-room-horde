@@ -57,7 +57,15 @@ async function hold(keys, ticks) {
 try {
   // a fresh profile: the menu appears and "Play solo" starts a game
   await page.goto(`${base}/?menu=1`);
-  await page.waitForSelector('#wrh-solo', { timeout: 60000 });
+  await page.waitForSelector('#wrh-solo, #wrh-nogl', { timeout: 60000, state: 'attached' });
+  if (await page.locator('#wrh-nogl').count()) {
+    // a browser without a WebGL context (headless Firefox on Linux): the game must say so instead of staying blank
+    const text = await page.locator('#wrh-nogl').innerText();
+    check('browser without WebGL shows a clear message', /WebGL/.test(text), text.slice(0, 80));
+    await browser.close();
+    server.close();
+    process.exit(name === 'chromium' || !results.every((r) => r.ok) ? 1 : 0);
+  }
   check('menu shows Play solo', true);
   await page.click('#wrh-solo');
   await page.waitForFunction(() => window.__wrh?.world && window.__wrh.world.tick > 5, undefined, { timeout: 60000 });

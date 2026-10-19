@@ -35,7 +35,25 @@ let autoScale = settings.scale;
 
 const wantBackend = params.get('renderer') === 'webgpu' ? 'webgpu' : params.get('renderer') === 'webgl' ? 'webgl' : settings.renderer;
 const backend = await pickBackend(wantBackend);
-const stage = await Stage.create(app, { aa: settings.aa, bounce: settings.bounce, backend, texture: settings.texture });
+async function createStage(): Promise<Stage> {
+  try {
+    return await Stage.create(app, { aa: settings.aa, bounce: settings.bounce, backend, texture: settings.texture });
+  } catch (e) {
+    // no usable graphics context (old or locked-down browser, graphics acceleration off): say so instead of a blank page
+    const tr = navigator.language.startsWith('tr');
+    const box = document.createElement('div');
+    box.id = 'wrh-nogl';
+    box.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#3a352d;text-align:center;padding:24px';
+    box.innerHTML = `<div style="max-width:460px"><h2>white-room-horde</h2><p>${
+      tr
+        ? 'Tarayıcın WebGL çizim bağlamı oluşturamadı. Donanım hızlandırmayı açmayı, tarayıcıyı güncellemeyi veya Chrome, Edge ya da Firefox ile denemeyi dene.'
+        : 'Your browser could not create a WebGL graphics context. Try turning on hardware acceleration, updating the browser, or using Chrome, Edge or Firefox.'
+    }</p></div>`;
+    document.body.appendChild(box);
+    throw e;
+  }
+}
+const stage = await createStage();
 const audio = new Audio();
 const input = new Input(stage.renderer.domElement, stage.camera);
 const fx = new Fx(undefined, settings.texture);
