@@ -1,0 +1,18 @@
+{
+  "name": "@wrh/relay",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The same room server as packages/server, as a Cloudflare Worker with one Durable Object, so the game has a permanent public address.",
+  "dependencies": {
+    "@wrh/net": "workspace:*",
+    "@wrh/shared": "workspace:*"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.2"
+  }
+}

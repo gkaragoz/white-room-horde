@@ -1,0 +1,12 @@
+name = "white-room-horde-relay"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "Hub"
+
+# The free plan only allows SQLite-backed Durable Objects.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Hub"]

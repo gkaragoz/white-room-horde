@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+- Permanent public relay: the room server also runs as a Cloudflare Worker (`packages/relay`), and the Pages build finds it through `relay.json`.
+
 ## v0.1.0 (2026-10-19)
 
 First public version.
