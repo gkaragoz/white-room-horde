@@ -9,6 +9,7 @@ import { PlayerAnimator } from '../render/playerAnim';
 import { asset } from '../assets';
 import { BANK_FILES, MUSIC_FILES } from '../audio';
 import { UI_STRINGS } from '../ui';
+import { diffCount, grab } from './crowd-tests';
 import type { QaTest } from './tests';
 
 const f = (n: number, d = 2): number => +n.toFixed(d);
@@ -208,6 +209,51 @@ export const moreTests: QaTest[] = [
         }
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 6).join(' | ') : `${names.length} sounds in two formats` };
+    },
+  },
+  {
+    id: 'player.xray-outline',
+    title: 'A player hidden behind scenery shows an outline; a visible player is not tinted by it',
+    async run(ctx) {
+      const problems: string[] = [];
+      const ch = await Character.createPlayer({ color: '#1FA2FF', weapon: 'weapon_ar', accessory: 'acc_cap' });
+      ch.play('aim_idle');
+      ch.update(0.2);
+      
+      ctx.stage.scene.add(ch.root);
+      ctx.stage.follow(0, 0);
+      // the camera sits to the +x/+z side: a wall between it and the player hides the player
+      const toCam = new THREE.Vector3().subVectors(ctx.stage.camera.position, new THREE.Vector3(0, 0.6, 0));
+      toCam.y = 0;
+      toCam.normalize();
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 5), new THREE.MeshStandardMaterial({ color: '#c8b393' }));
+      wall.position.set(toCam.x * 4.2, 2.5, toCam.z * 4.2);
+      try {
+        ch.setGhost(true);
+        ctx.stage.render();
+        const openOn = grab(ctx);
+        ch.setGhost(false);
+        ctx.stage.render();
+        const openOff = grab(ctx);
+        const tinted = diffCount(openOn, openOff);
+        if (tinted > 80) problems.push(`the outline changes ${tinted} px of a player nothing hides`);
+        ctx.stage.scene.add(wall);
+        ch.setGhost(false);
+        ctx.stage.render();
+        const hiddenOff = grab(ctx);
+        ch.setGhost(true);
+        ctx.stage.render();
+        const hiddenOn = grab(ctx);
+        const outline = diffCount(hiddenOn, hiddenOff);
+        if (outline < 300) problems.push(`only ${outline} outline pixels behind the wall`);
+        return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${outline} outline px behind a wall, ${tinted} px change when visible` };
+      } finally {
+        ch.setGhost(true);
+        if (!(window as unknown as { __keepScene?: boolean }).__keepScene) {
+          ctx.stage.scene.remove(ch.root);
+          ctx.stage.scene.remove(wall);
+        }
+      }
     },
   },
 ];

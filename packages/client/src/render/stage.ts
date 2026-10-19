@@ -35,11 +35,11 @@ export class Stage {
   static async create(container: HTMLElement, opts: StageOptions = { aa: 'msaa', bounce: true }): Promise<Stage> {
     if (opts.backend === 'webgpu') {
       const { WebGPURenderer } = await import('three/webgpu');
-      const r = new WebGPURenderer({ antialias: opts.aa !== 'off', powerPreference: 'high-performance' });
+      const r = new WebGPURenderer({ antialias: opts.aa !== 'off', powerPreference: 'high-performance', stencil: true });
       await r.init();
       return new Stage(container, r as unknown as THREE.WebGLRenderer, { ...opts, aa: opts.aa === 'off' ? 'off' : 'msaa' }, 'webgpu');
     }
-    return new Stage(container, new THREE.WebGLRenderer({ antialias: opts.aa === 'msaa', powerPreference: 'high-performance' }), opts, 'webgl');
+    return new Stage(container, new THREE.WebGLRenderer({ antialias: opts.aa === 'msaa', powerPreference: 'high-performance', stencil: true }), opts, 'webgl');
   }
 
   constructor(
@@ -85,7 +85,8 @@ export class Stage {
 
     this.scene.add(makeFloor(opts.texture ?? 1));
     if (opts.aa === 'smaa' && backend === 'webgl') {
-      this.composer = new EffectComposer(this.renderer);
+      // the x-ray outline of hidden characters needs a stencil buffer in the post-processing target too
+      this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, stencilBuffer: true }));
       this.composer.addPass(new RenderPass(this.scene, this.camera));
       // tone map first so SMAA sees display-referred colours (edge detection is tuned for those)
       this.composer.addPass(new OutputPass());

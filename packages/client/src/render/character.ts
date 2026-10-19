@@ -82,7 +82,33 @@ export class Character {
   private current: THREE.AnimationAction | null = null;
   currentName = '';
 
-  private constructor(readonly model: THREE.Object3D, clips: Map<string, THREE.AnimationClip>) {
+  /** Translucent outline of the parts hidden behind scenery or enemies (see armGhosts). */
+  private readonly ghostMaterial: THREE.MeshBasicMaterial;
+  private readonly ghostMeshes: THREE.Mesh[] = [];
+  private ghostOn = true;
+
+  private constructor(
+    readonly model: THREE.Object3D,
+    clips: Map<string, THREE.AnimationClip>,
+    color: THREE.ColorRepresentation = '#ffffff',
+  ) {
+    // Drawn only where the character is behind something that is already in the depth buffer (GreaterDepth) and
+    // where the character's own visible body did not write the stencil, so it neither tints the visible body nor
+    // shows the body parts that hide behind each other.
+    this.ghostMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.2),
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      depthFunc: THREE.GreaterDepth,
+      stencilWrite: true,
+      stencilFunc: THREE.NotEqualStencilFunc,
+      stencilRef: 1,
+      stencilFail: THREE.KeepStencilOp,
+      stencilZFail: THREE.KeepStencilOp,
+      stencilZPass: THREE.KeepStencilOp,
+      toneMapped: false,
+    });
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
     for (const [name, clip] of clips) this.actions.set(name, this.mixer.clipAction(clip));
@@ -104,7 +130,7 @@ export class Character {
       for (const t of clip.tracks) if (t.name.endsWith('.position')) t.values = t.values.map((v) => v * PLAYER_SCALE);
       clips.set(clip.name, clip);
     }
-    const ch = new Character(model, clips);
+    const ch = new Character(model, clips, opts.color);
     const skeleton = skinned[0]!.skeleton;
     for (const b of skeleton.bones) ch.bones.set(b.name, b);
 
@@ -121,6 +147,7 @@ export class Character {
       }
     }
     if (opts.weapon) await ch.attachWeapon(opts.weapon);
+    ch.armGhosts(model);
     return ch;
   }
 
@@ -142,6 +169,61 @@ export class Character {
     holder.rotation.copy(HAND_ATTACH.rotation);
     holder.add(g);
     hand.add(holder);
+    this.armGhosts(holder);
+  }
+
+  /**
+   * Give every mesh under `root` a stencil-writing material of its own and a ghost twin that draws the hidden parts
+   * (the x-ray outline that keeps the player visible behind obstacles and the horde).
+   */
+  private armGhosts(root: THREE.Object3D): void {
+    const meshes: THREE.Mesh[] = [];
+    root.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh && !o.userData.ghost) meshes.push(o as THREE.Mesh);
+    });
+    const mark = (m: THREE.Material): THREE.Material => {
+      const copy = m.clone();
+      copy.stencilWrite = true;
+      copy.stencilRef = 1;
+      copy.stencilFunc = THREE.AlwaysStencilFunc;
+      copy.stencilZPass = THREE.ReplaceStencilOp;
+      return copy;
+    };
+    for (const m of meshes) {
+      m.material = Array.isArray(m.material) ? m.material.map(mark) : mark(m.material);
+      // draw the characters after everything that can hide them: the stencil must only be written where they really
+      // end up visible, and an object drawn first would leave its stencil under whatever covers it later
+      m.renderOrder = 5;
+      const skinned = m as THREE.SkinnedMesh;
+      let g: THREE.Mesh;
+      if (skinned.isSkinnedMesh) {
+        const sm = new THREE.SkinnedMesh(m.geometry, this.ghostMaterial);
+        sm.bind(skinned.skeleton, skinned.bindMatrix);
+        g = sm;
+      } else {
+        g = new THREE.Mesh(m.geometry, this.ghostMaterial);
+      }
+      g.userData.ghost = true;
+      g.position.copy(m.position);
+      g.quaternion.copy(m.quaternion);
+      g.scale.copy(m.scale);
+      g.renderOrder = 10;
+      g.frustumCulled = false;
+      g.visible = this.ghostOn;
+      m.parent?.add(g);
+      this.ghostMeshes.push(g);
+    }
+  }
+
+  /** QA: the material of the x-ray twin. */
+  get ghostMat(): THREE.MeshBasicMaterial {
+    return this.ghostMaterial;
+  }
+
+  /** The x-ray outline can be switched off (settings, QA). */
+  setGhost(on: boolean): void {
+    this.ghostOn = on;
+    for (const g of this.ghostMeshes) g.visible = on;
   }
 
   /** Weapon node (`muzzle`, `grip`, `grip_l` empties live inside it). */

@@ -25,7 +25,7 @@ let crowdPromise: Promise<Crowd> | null = null;
 const getCrowd = (): Promise<Crowd> => (crowdPromise ??= Crowd.create(150));
 
 /** Read the centre of the canvas (RGBA) right after a render. */
-function grab(ctx: Ctx, size = 360): Uint8Array {
+export function grab(ctx: Ctx, size = 360): Uint8Array {
   const gl = ctx.stage.renderer.getContext();
   const w = gl.drawingBufferWidth;
   const h = gl.drawingBufferHeight;
@@ -35,7 +35,7 @@ function grab(ctx: Ctx, size = 360): Uint8Array {
   return out;
 }
 
-function diffCount(a: Uint8Array, b: Uint8Array, tol = 24): number {
+export function diffCount(a: Uint8Array, b: Uint8Array, tol = 24): number {
   let n = 0;
   for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i]! - b[i]!) + Math.abs(a[i + 1]! - b[i + 1]!) + Math.abs(a[i + 2]! - b[i + 2]!) > tol) n++;
   return n;
