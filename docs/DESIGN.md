@@ -1,10 +1,10 @@
 # white-room-horde: tasarım belgesi (Faz 0)
 
-Durum: sanat yönü onaylandı (varyant A, kamera iso62). Oyun kodu henüz yok.
-Referans render: `docs/art/A_white_clean__iso62.png` (üretim betiği: `C:\blender_scenes\make_scene.py`, Blender 5.2 + LLAMA/Blender MCP).
+Durum: sanat yönü onaylandı: **Valheim tadında low-poly** gölgelendirme (stil J), kamera iso62. Oyun kodu henüz yok.
+Referans renderlar: `docs/art/chaos_J_valheim.png` (kaotik sahne), `docs/art/style2_J_valheim.png` (karakter yakın plan), eski beyaz sahne: `docs/art/A_white_clean__iso62.png`. Prototip betikler `tools/blender/prototype/` (Blender 5.2 + LLAMA/Blender MCP).
 
 ## 1. Oyun özeti
-Host'lu 2-11 kişilik co-op (geliştirme için tek kişi test modu), top-down survival shooter. Sonsuz dalgalar, yüzlerce düşman, kaos, ragdoll, kan ve parça yağmuru. Chibi karakterler, sade beyaz-gri sahne, Squad Alpha (SayGames) tadında oyuncak silahlar. Platform: web (Three.js).
+Host'lu 2-11 kişilik co-op (geliştirme için tek kişi test modu), top-down survival shooter. Sonsuz dalgalar, yüzlerce düşman, kaos, ragdoll, kan ve parça yağmuru. Chibi karakterler, sade ve sıcak krem-gri sahne, Squad Alpha (SayGames) tadında oyuncak silahlar, Valheim tadında low-poly boyalı yüzeyler. Platform: web (Three.js).
 
 ## 2. Dil ve üslup
 - Oyun içi dil: TR/EN (anahtar tabanlı yerelleştirme, ilk metinler EN).
@@ -12,7 +12,7 @@ Host'lu 2-11 kişilik co-op (geliştirme için tek kişi test modu), top-down su
 - UI: kalın, yuvarlak, oyuncak gibi; büyük sayılar, sınırlı hasar yazıları (bkz. bölüm 12), boss'larda renkli parıltı. Sanal joystick yok (PC öncelikli: WASD + fare), sonra gamepad.
 
 ## 3. Sahne ve renk
-Sahne: açık gri-beyaz zemin, ince ızgara çizgileri, alçak duvarlar, kasalar. Renk sadece karakterde, kanda ve silahlarda. Beyaz zemin kanı çok okunur yapar.
+Sahne: açık, sıcak krem-gri zemin (sıcak ışık altında ~`#CABFB0` görünür), ince ızgara çizgileri, alçak duvarlar, kasalar. Renk sadece karakterde, kanda ve silahlarda. Açık zemin kanı çok okunur yapar. Not: ilk plandaki saf beyaz sahne yerine Valheim stilinin doğal sıcak tonu seçildi.
 
 | Öğe | Renk (sRGB yaklaşık) | Not |
 |---|---|---|
@@ -66,11 +66,18 @@ Renk körlüğü: her oyuncunun adının ve HUD kartının yanında rakam (1-11)
 | Koşucu Sürü Lideri | `#F28C38` | `#FFC48F` | ~2.5x |
 Boss ortak: altın taç ve nabız gibi atan altın aura `#FFC93C`; tehlike alanı konturu parlak sarı `#FFD400`. Patlayıcı sarısı ile oyuncu sarısı (#3) ayrışır: oyuncuda beyaz kafa, patlayıcıda renkli kafa ve tehlike şeritleri.
 
+## 3b. Gölgelendirme stili (karar: J, Valheim tadı)
+- Geometri: düşük poligon, düz (faceted) gölgelendirme: küre 10 dilim x 6 halka, silindir 10 kenar, halka 12x6; yumuşak normal yok. Karakter okunurluğu için kalın hacimler korunur.
+- Yüzey: düz renk (vertex color / palet) x düşük çözünürlüklü "boyalı" gürültü dokusu (128 px, en yakın komşu filtre, 3-4 kademeli posterize, çarpan ~0.72-1.08). Pürüzlülük 0.95, speküler ~0, kontur yok.
+- Işık: sıcak güneş `#FFD7A0` (şiddet ~3.6, açı 3° yumuşak), yükseklik 38°, yaw 55°; dünya ortamı `#E8D9C2` (0.55). AgX ton eşleme, exposure +0.1.
+- Renkler: karakter ve düşman renk listeleri (bölüm 3) pastel/doygun korunur; sıcak ışık altında hafif ısınır.
+- Reddedilen: A yumuşak, B stilize PBR, C cel-shaded, D kil, E kağıt, G vinil, H mürekkep, I peluş, K Bad North, L Hi-Fi Rush (arşivde: `tools/blender/prototype/`).
+
 ## 4. Işık
-- Tek yönlü yumuşak güneş (renk `#FFFCF6`, şiddet ~2.2, açı 6° yumuşak gölge), yön: yükseklik 52°, yaw 35°.
-- Dünya ambient ~0.45, ton: zeminle aynı.
+- Tek yönlü sıcak güneş (renk `#FFD7A0`, şiddet ~3.6, açı 3°), yön: yükseklik 38°, yaw 55° (bölüm 3b). Gölgeler daha belirgin ve uzun; Valheim tadı.
+- Dünya ambient ~0.55, renk `#E8D9C2` (sıcak krem).
 - Efekt ışıkları (silah ateşi, patlama) kısa ömürlü, sıcak sarı/turuncu.
-- Render: Standard görünüm, exposure -0.2, hafif AO (oyunda SSAO). Aşırı beyazlaşmaya karşı zemin tam beyaz değil.
+- Render: AgX ton eşleme, exposure +0.1, hafif AO (oyunda GTAO). Zemin tam beyaz değil.
 
 ## 5. Kamera
 Seçilen: **iso62**. Ortografik, pitch 62° (yukarıdan), yaw 30°, ortho genişlik ~17 birim (yaklaşık 17x9.5 görünür alan). Takip: oyuncu grubunun ağırlık merkezi; dalga yoğunluğunda hafif zoom-out. Sarsıntı: patlama ve ağır silahta kısa, düşük genlik. Reddedilenler: iso45 (fazla dik, karakterler kafadan ibaret), top78 (yukarıdan, silüet kaybı).
@@ -315,7 +322,7 @@ Karar: Mixamo animasyonları standart Mixamo iskeletiyle indirilir, Blender'da k
 | Boss (x4) | <= 4000 | Ayrı skinned, VAT yok (az sayıda) |
 | Silahlar (5) | <= 500 | Statik GLB, `muzzle` soket |
 | Gibs (küre, küp, uzuv) | <= 100 | Instanced parçalar |
-Malzeme: tek renk paleti atlası (vertex color + 1 doku), PBR yok (düz renk + yumuşak aydınlatma), 2 malzemeden fazlası yok.
+Malzeme (en çok 2): `fixed` (vertex color x paylaşılan boyalı gürültü dokusu, en yakın komşu filtre) ve `tint` (beyaz taban x aynı doku; istemci örnek başına renkle çarpar: oyuncu yeleği, bandana, düşman gövdesi). PBR yok, kontur yok, düz gölgelendirme (faceted).
 
 **VAT pişirme**
 - `bake_vat.py` her düşman türü ve klip için vertex konumlarını (ve gerekirse normalleri) dokuya pişirir: satır = kare, sütun = vertex; 16-bit float, `vat.bin` + `meta.json` (klip adları, kare sayıları, fps, sınırlar). Kare sayısı küçük tutulur (klip başına 16-32 kare). Çıktı `packages/client/public/models/...`.
@@ -448,10 +455,10 @@ Kalite çıtası: "AA" seviyesi (indie üstü, AAA altı): cilalı VFX, tutarlı
 
 **Doku ve malzeme**
 - Doku kalitesi: Düşük/Orta/Yüksek (atlas ve lightmap 1K/2K/4K, mip bias), KTX2/Basis sıkıştırma, anizotropik filtre 1x-16x. Karakter atlası küçük (palet), lightmap'ler asıl doku maliyeti.
-- Malzeme: stilize aydınlatma (düz albedo palet + sabit pürüzlülük + hafif rim ve ince kontur, bölüm 22'deki karakter kararlarıyla netleşir); PBR doku seti yok (bellek ve boyut bütçesi), ama aydınlatma pişirilmiş GI ile zengin.
+- Malzeme: Valheim tadı (bölüm 3b): düz renk x boyalı gürültü dokusu, kontur yok, düz gölgelendirme; PBR doku seti yok (bellek ve boyut bütçesi), aydınlatma pişirilmiş GI ile zengin. Dokusal ayrıntı düşük çözünürlüklü paylaşılan tek doku.
 
 **Post-process (hepsi ayarlanabilir)**
-- GTAO, bloom (emissive için), vignette, hafif renk derecelendirme (LUT), ton eşleme (ACES veya AgX), isteğe bağlı hareket bulanıklığı (varsayılan kapalı), kamera sarsıntısı kaydırıcısı, kenar kontur (outline) sadece oyuncu ve boss için.
+- GTAO, bloom (emissive için), vignette, hafif renk derecelendirme (LUT), ton eşleme (ACES veya AgX), isteğe bağlı hareket bulanıklığı (varsayılan kapalı), kamera sarsıntısı kaydırıcısı, kontur yok (stil gereği).
 
 **Ayarlar ekranı**
 - Profiller: Düşük / Orta / Yüksek / Ultra + Özel. İlk açılışta 10 sn'lik otomatik benchmark (300 düşmanlı sahne, kare süresi ölçülür) profili önerir ve kullanıcıya sorar; sonra elle değiştirilebilir.
@@ -474,7 +481,7 @@ Kalite çıtası: "AA" seviyesi (indie üstü, AAA altı): cilalı VFX, tutarlı
 | FPS sınırı varsayılan | 60 | 60 | 60 | 120 |
 
 ## 22. Açık kararlar
-- Karakter görsel ayrıntı seviyesi (AA kalite): gölgelendirme stili, kontur, aksesuarlar, yüz-sizlik korunurken kişilik (kulaklık, bandana vb.), hasar/yaralanma görünümü.
+- Karakter aksesuar listesi (bandana, kulaklık, kask, şapka, gözlük + sonra yenileri) ve hasar/yaralanma shader parametreleri (flash, soluk renk, kan lekesi maskesi).
 - Oyuncu temel yetenekleri (dash, silah değiştirme akışı) ve karakter farkları.
 - Tutorial/onboarding ve ilk dalga ipuçları.
 - VFX listesi ve parçacık bütçesi (muzzle flash, patlama, hit, kan, parça, aura).
