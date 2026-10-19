@@ -15,10 +15,10 @@ export interface Profile {
   difficulty: number;
 }
 
-export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headphones', 'acc_helmet'] as const;
+export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headphones', 'acc_helmet', 'acc_crown', 'acc_horns', 'acc_tophat', 'acc_cowboy', 'acc_ninja', 'acc_mohawk', 'acc_bunny', 'acc_visor'] as const;
 
 /** Best wave a player has to reach before a starting weapon unlocks (the first three are free). */
-export const WEAPON_UNLOCK: Record<WeaponId, number> = { pistol: 0, smg: 0, ar: 0, shotgun: 3, hmg: 5, sniper: 7, minigun: 9 };
+export const WEAPON_UNLOCK: Record<WeaponId, number> = { pistol: 0, smg: 0, ar: 0, shotgun: 3, hmg: 5, sniper: 7, minigun: 9, revolver: 2, mp: 4, dbl: 6, dmr: 8, flamer: 10, gl: 12 };
 
 const KEY = 'wrh.profile';
 const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, color: -1, map: -1, difficulty: 1 };

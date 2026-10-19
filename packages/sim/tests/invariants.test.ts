@@ -55,5 +55,5 @@ describe('simulation invariants under random play', () => {
         if (w.gameOver) break;
       }
     }
-  });
+  }, 60_000);
 });

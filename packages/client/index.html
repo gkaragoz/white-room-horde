@@ -5,14 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>white-room-horde</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #e8d9c2; overflow: hidden; font-family: system-ui, sans-serif; }
+      html, body { margin: 0; height: 100%; background: #d5dde6; overflow: hidden; font-family: system-ui, sans-serif; }
       #app { position: fixed; inset: 0; }
       canvas { display: block; }
       #hud { position: fixed; left: 12px; top: 10px; color: #3a352d; font-size: 13px; line-height: 1.5; pointer-events: none; text-shadow: 0 1px 0 rgba(255,255,255,.5); }
       #hud b { font-weight: 600; }
+      #wrh-loading { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: #d5dde6; color: #3a352d; transition: opacity .4s; }
+      #wrh-loading .card { width: min(420px, 86vw); text-align: center; }
+      #wrh-loading h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: .5px; }
+      #wrh-loading p { margin: 0 0 18px; opacity: .7; font-size: 13px; }
+      #wrh-loading .track { height: 14px; border-radius: 9px; background: rgba(60,45,20,.18); overflow: hidden; }
+      #wrh-loading .track i { display: block; height: 100%; width: 0; border-radius: 9px; background: linear-gradient(90deg, #1fa2ff, #6fd0ff); transition: width .15s; }
+      #wrh-loading .txt { margin-top: 10px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
     </style>
   </head>
   <body>
+    <div id="wrh-loading"><div class="card"><h1>white-room-horde</h1><p id="wrh-load-sub">co-op horde survival</p><div class="track"><i id="wrh-load-bar"></i></div><div class="txt" id="wrh-load-text">Loading...</div></div></div>
     <div id="app"></div>
     <div id="hud"></div>
     <script type="module" src="/src/main.ts"></script>

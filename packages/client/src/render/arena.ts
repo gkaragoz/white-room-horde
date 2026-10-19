@@ -3,10 +3,10 @@ import { MAPS } from '@wrh/shared';
 
 /** Cover colours per layout so the four arenas read differently at a glance. */
 const THEMES: { side: string; top: string; rim: string }[] = [
-  { side: '#c8b393', top: '#e0d2b4', rim: '#8b7a5e' }, // warehouse: cardboard tan
-  { side: '#a9b0bd', top: '#cfd5df', rim: '#6c7482' }, // courtyard: stone
-  { side: '#c98f7c', top: '#e3b8a6', rim: '#8a5a4a' }, // corridors: brick
-  { side: '#9fb27c', top: '#c5d4a3', rim: '#667a49' }, // field: hedge green
+  { side: '#7f93ad', top: '#b4c3d6', rim: '#4d5d73' }, // warehouse: blue steel containers
+  { side: '#a4a9b2', top: '#d3d7de', rim: '#656b76' }, // courtyard: stone
+  { side: '#b27c76', top: '#d9aaa3', rim: '#7a4944' }, // corridors: brick
+  { side: '#7ea06a', top: '#aecb97', rim: '#506b40' }, // field: hedge green
 ];
 
 /** The cover boxes of the current arena layout. Rebuilt when the layout changes. */

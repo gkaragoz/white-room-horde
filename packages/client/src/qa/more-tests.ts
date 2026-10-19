@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { Buttons, CARD_IDS, CARD_RARITY, MAPS, PERSONAL_CARDS, WEAPON_IDS } from '@wrh/shared';
 import { addPlayer, createWorld } from '@wrh/sim';
 import { DEFAULT_BINDINGS, Input } from '../input';
-import { WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
+import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
+import { PowerView, strengthOf } from '../render/power';
 import { Character } from '../render/character';
 import { PlayerAnimator } from '../render/playerAnim';
 import { asset } from '../assets';
@@ -106,6 +107,20 @@ export const moreTests: QaTest[] = [
       if (!(input.sample(0, 0).input.buttons & Buttons.Reload)) problems.push('rebound reload key does nothing');
       input.debugKeys(['KeyR']);
       if (input.sample(0, 0).input.buttons & Buttons.Reload) problems.push('old reload key still works');
+      // weapon switch: Q takes the slot that is not in the hands, latched at the press so holding it does not flip back
+      input.resetBindings();
+      input.switchTarget = 1;
+      input.debugKeys(['KeyQ']);
+      if (!(input.sample(0, 0).input.buttons & Buttons.Card2)) problems.push('Q does not select the sidearm');
+      input.switchTarget = 0; // the world changed under the held key
+      if (!(input.sample(0, 0).input.buttons & Buttons.Card2) || input.sample(0, 0).input.buttons & Buttons.Card1) problems.push('a held Q flips back and forth');
+      input.debugKeys([]);
+      input.sample(0, 0);
+      input.debugKeys(['KeyQ']);
+      if (!(input.sample(0, 0).input.buttons & Buttons.Card1)) problems.push('a new Q press does not go back to the main weapon');
+      input.debugKeys([]);
+      input.resetBindings();
+      input.setBinding('reload', 'KeyT');
       input.setBinding('dash', 'KeyT'); // a key belongs to one action only
       if (input.bindings.reload.includes('KeyT')) problems.push('a key is bound to two actions');
       input.resetBindings();
@@ -191,7 +206,7 @@ export const moreTests: QaTest[] = [
         for (const id of ['-1', ...MAPS.map((_, i) => String(i))]) if (!t.maps![id]) problems.push(`${lang}: map ${id} has no name`);
         for (const a of ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'card1', 'card2', 'card3', 'pause']) if (!t.actions![a]) problems.push(`${lang}: action ${a} has no label`);
         if ((UI_STRINGS[lang].diffs as readonly string[]).length !== 3) problems.push(`${lang}: needs three difficulty names`);
-        if ((UI_STRINGS[lang].accs as readonly string[]).length !== 5) problems.push(`${lang}: needs five accessory names`);
+        if ((UI_STRINGS[lang].accs as readonly string[]).length !== ACCESSORIES.length) problems.push(`${lang}: needs a name for each of the ${ACCESSORIES.length} accessories`);
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 12).join(' | ') : `${en.length} strings in two languages` };
     },
@@ -436,6 +451,88 @@ export const moreTests: QaTest[] = [
       const r = el.getBoundingClientRect();
       if (r.width < 10 || r.right < 0 || r.bottom < 0 || r.left > innerWidth) return { status: 'fail', detail: 'badge is not visible' };
       return { status: 'pass', detail: text };
+    },
+  },
+  {
+    id: 'power.visuals',
+    title: 'Every upgrade shows on the character: a gem per upgrade, a shield for armour, thicker redder tracers, bigger bodies for health',
+    async run() {
+      const w = createWorld(3);
+      addPlayer(w, 0, 0, 0);
+      const view = new PowerView(() => undefined);
+      const count = (): number => {
+        view.begin();
+        view.slot(w, 0, 0, 0, 1, 0.016, true);
+        view.end();
+        return (view.group.children[0] as THREE.InstancedMesh).count;
+      };
+      const problems: string[] = [];
+      if (count() !== 0) problems.push('a gem shows with no upgrades');
+      const steps: [string, () => void][] = [
+        ['damage', () => (w.modDamage = 1.3)],
+        ['rate', () => (w.modRate = 1.2)],
+        ['pierce', () => (w.modPierce = 2)],
+        ['crit', () => (w.modCrit = 0.1)],
+        ['blast', () => (w.modBlast = 1.3)],
+        ['speed', () => (w.pModSpeed[0] = 1.2)],
+        ['armor', () => (w.modArmor = 0.8)],
+        ['magnet', () => (w.modMagnet = 1.5)],
+        ['luck', () => (w.modLoot = 1.4)],
+        ['scholar', () => (w.modXp = 1.3)],
+        ['medic', () => (w.modRevive = 0.7)],
+        ['quick', () => (w.modReload = 0.8)],
+        ['roll', () => (w.modDash = 0.8)],
+        ['vampire', () => (w.pLifesteal[0] = 2)],
+      ];
+      let n = 0;
+      for (const [id, apply] of steps) {
+        apply();
+        const c = count();
+        if (c !== n + 1) problems.push(`${id}: expected ${n + 1} gems, got ${c}`);
+        n = c;
+      }
+      const shield = view.group.children.find((o) => (o as THREE.Mesh).geometry?.type === 'CylinderGeometry' && o.visible);
+      if (!shield) problems.push('armour shows no shield');
+      const st = strengthOf(w, 0);
+      if (!(st.damage > 0.25 && st.pierce > 0.9 && st.crit > 0.2)) problems.push('strengthOf does not follow the upgrades ' + JSON.stringify(st));
+      w.pMaxHp[0] = w.pMaxHp[0]! + 60;
+      if (!(PowerView.bodyScale(w, 0) > 1.05)) problems.push('health upgrades do not grow the body');
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${n} upgrade kinds each add a gem, armour a shield, health a bigger body` };
+    },
+  },
+  {
+    id: 'ui.revive-and-arrows',
+    title: 'The revive ring fills with progress and the off-screen teammate arrow points and shows the name',
+    async run() {
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop,
+      }, settings);
+      const problems: string[] = [];
+      try {
+        ui.setRing(2, 0.8, 0.5, 100, 100, true, true);
+        const ring = host.querySelector<HTMLElement>('.wrh-ring');
+        if (!ring || ring.style.display !== 'block') problems.push('ring not shown');
+        else {
+          if (ring.style.getPropertyValue('--p') !== '50') problems.push('ring progress ' + ring.style.getPropertyValue('--p'));
+          if (ring.style.getPropertyValue('--b') !== '80') problems.push('ring bleed ' + ring.style.getPropertyValue('--b'));
+        }
+        ui.setRing(2, 0, 0, 0, 0, false, false);
+        if (host.querySelector<HTMLElement>('.wrh-ring')!.style.display !== 'none') problems.push('ring not hidden');
+        ui.setArrow(1, 'Ayse', '#ff4f9a', 700, 300, Math.PI / 2, true, true);
+        const arrow = host.querySelector<HTMLElement>('.wrh-arrow-off');
+        if (!arrow || arrow.querySelector('span')?.textContent !== 'Ayse') problems.push('arrow label missing');
+        if (!arrow?.firstElementChild?.getAttribute('style')?.includes('rotate(1.57')) problems.push('arrow not rotated');
+        if (!arrow?.classList.contains('down')) problems.push('arrow does not blink for a downed teammate');
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'revive ring and teammate arrow behave' };
     },
   },
 ];

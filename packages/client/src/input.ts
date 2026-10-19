@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { Buttons, type PlayerInput } from '@wrh/shared';
 import { SCREEN_RIGHT, SCREEN_UP, encodeAim, keysToMove } from './controls';
 
-export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'card1' | 'card2' | 'card3' | 'pause';
-export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'card1', 'card2', 'card3', 'pause'];
+export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'card1' | 'card2' | 'card3' | 'switch' | 'pause';
+export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'switch', 'card1', 'card2', 'card3', 'pause'];
 
 export type Bindings = Record<Action, string[]>;
 
@@ -17,6 +17,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   revive: ['KeyE'],
   reload: ['KeyR'],
   dash: ['ShiftLeft', 'ShiftRight'],
+  switch: ['KeyQ'],
   card1: ['Digit1'],
   card2: ['Digit2'],
   card3: ['Digit3'],
@@ -88,6 +89,10 @@ export class Input {
   private touchMove: TouchStick | null = null;
   private touchAim: TouchStick | null = null;
   private touchButtons = 0;
+  /** Weapon slot (0 main, 1 sidearm) that a press of the switch key goes to; main keeps it up to date. */
+  switchTarget = 1;
+  private switchLatch: number | null = null;
+  private touchSwitch = false;
   private touchLayer: HTMLElement | null = null;
 
   constructor(
@@ -203,6 +208,15 @@ export class Input {
     if (this.held('revive')) buttons |= Buttons.Revive;
     if (this.held('reload')) buttons |= Buttons.Reload;
     if (this.held('dash')) buttons |= Buttons.Dash;
+    // weapon switch: the card buttons double as "take weapon slot 1 / 2" while no card offer is open. Q latches the
+    // slot that is not in the hands at the moment of the press, so holding the key does not flip back and forth.
+    const padSwitch = !!this.pad()?.buttons[3]?.pressed;
+    if (this.held('switch') || padSwitch || this.touchSwitch) {
+      if (this.switchLatch === null) this.switchLatch = this.switchTarget;
+      buttons |= this.switchLatch === 0 ? Buttons.Card1 : Buttons.Card2;
+    } else {
+      this.switchLatch = null;
+    }
     if (this.held('card1')) buttons |= Buttons.Card1;
     if (this.held('card2')) buttons |= Buttons.Card2;
     if (this.held('card3')) buttons |= Buttons.Card3;
@@ -358,6 +372,15 @@ export class Input {
     button('⚡', Buttons.Dash, 90, 200);
     button('↻', Buttons.Reload, 18, 130);
     button('+', Buttons.Revive, 90, 130);
+    const sw = document.createElement('div');
+    sw.textContent = '\u21C4';
+    sw.style.cssText = 'position:absolute;right:162px;bottom:130px;width:60px;height:60px;border-radius:50%;background:rgba(250,244,232,.75);border:2px solid #cdbfa5;display:flex;align-items:center;justify-content:center;font-size:26px;color:#3a352d;touch-action:none;user-select:none';
+    sw.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.touchSwitch = true;
+    });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) sw.addEventListener(ev, () => (this.touchSwitch = false));
+    layer.appendChild(sw);
   }
 
   get hasTouchControls(): boolean {

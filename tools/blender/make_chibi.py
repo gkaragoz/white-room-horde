@@ -356,6 +356,62 @@ def acc_goggles(b):
         b.cyl("head", (sx * 0.2, -0.43, 1.1), 0.14, 0.1, "#9FD8E6", rot=(math.pi / 2, 0, 0))
 
 
+def acc_crown(b):
+    b.cyl("head", (0, 0, 1.5), 0.36, 0.12, "#FFC93C")
+    for k in range(5):
+        a = 2 * math.pi * k / 5
+        b.cyl("head", (0.3 * math.cos(a), 0.3 * math.sin(a), 1.66), 0.08, 0.22, "#FFC93C", r2=0.0)
+        b.sphere("head", (0.3 * math.cos(a), 0.3 * math.sin(a), 1.78), 0.05, (1, 1, 1), "#E0405A", seg=6, rings=4)
+
+
+def acc_horns(b):
+    for sx in (-1, 1):
+        b.cyl("head", (sx * 0.3, 0.02, 1.58), 0.1, 0.34, "#C8242C", rot=(0, sx * 0.45, 0), r2=0.03)
+        b.cyl("head", (sx * 0.4, 0.02, 1.78), 0.06, 0.2, "#C8242C", rot=(0, sx * 0.9, 0), r2=0.0)
+    b.torus("head", (0, 0, 1.2), 0.45, 0.05, "#3A2A2E", major=12, minor=4)
+
+
+def acc_tophat(b):
+    b.cyl("head", (0, 0, 1.52), 0.5, 0.06, "#2B2D33")
+    b.cyl("head", (0, 0, 1.78), 0.3, 0.46, "#2B2D33")
+    b.cyl("head", (0, 0, 1.6), 0.31, 0.1, "#C8242C")
+
+
+def acc_cowboy(b):
+    b.cyl("head", (0, 0, 1.46), 0.62, 0.05, "#B07A45")
+    b.cyl("head", (0, 0, 1.62), 0.32, 0.3, "#B07A45", r2=0.26)
+    b.cyl("head", (0, 0, 1.52), 0.34, 0.07, "#7A4A28")
+    for sx in (-1, 1):
+        b.box("head", (sx * 0.55, 0, 1.5), (0.12, 0.5, 0.04), "#B07A45", rot=(0, sx * 0.3, 0))
+
+
+def acc_ninja(b):
+    b.torus("head", (0, 0, 1.22), 0.46, 0.07, "#FFFFFF", tint=True, major=12, minor=4)
+    b.box("head", (0, -0.45, 1.22), (0.26, 0.06, 0.2), "#C8C8D0")           # plate
+    b.box("head", (0.18, 0.5, 1.15), (0.1, 0.5, 0.05), "#FFFFFF", tint=True, rot=(0.6, 0, 0.25))
+    b.box("head", (-0.1, 0.5, 1.1), (0.1, 0.45, 0.05), "#FFFFFF", tint=True, rot=(0.7, 0, -0.2))
+
+
+def acc_mohawk(b):
+    for k in range(6):
+        y = -0.3 + k * 0.12
+        b.cyl("head", (0, y, 1.55 - abs(k - 2.5) * 0.03), 0.07, 0.3 - abs(k - 2.5) * 0.03, "#FF4F9A", r2=0.0)
+
+
+def acc_bunny(b):
+    b.torus("head", (0, 0, 1.2), 0.45, 0.05, "#F4F0E6", major=12, minor=4)
+    for sx in (-1, 1):
+        b.sphere("head", (sx * 0.2, 0.05, 1.82), 0.13, (0.6, 0.5, 2.0), "#F4F0E6", seg=8, rings=5)
+        b.sphere("head", (sx * 0.2, -0.02, 1.82), 0.07, (0.5, 0.4, 1.6), "#FFB0C8", seg=6, rings=4)
+
+
+def acc_visor(b):
+    b.torus("head", (0, 0, 1.1), 0.47, 0.04, "#2B2D33", major=12, minor=4)
+    b.box("head", (0, -0.45, 1.1), (0.7, 0.1, 0.18), "#35D6FF")
+    b.box("head", (0.38, -0.2, 1.1), (0.08, 0.4, 0.14), "#2B2D33")
+    b.box("head", (-0.38, -0.2, 1.1), (0.08, 0.4, 0.14), "#2B2D33")
+
+
 # id, builder, scale, budget key, head_top
 SPECS = [
     ("player_base", spec_player, 1.5, "player", 1.5),
@@ -375,6 +431,14 @@ SPECS = [
     ("acc_helmet", acc_helmet, 1.5, "acc", 1.5),
     ("acc_cap", acc_cap, 1.5, "acc", 1.5),
     ("acc_goggles", acc_goggles, 1.5, "acc", 1.5),
+    ("acc_crown", acc_crown, 1.5, "acc", 1.5),
+    ("acc_horns", acc_horns, 1.5, "acc", 1.5),
+    ("acc_tophat", acc_tophat, 1.5, "acc", 1.5),
+    ("acc_cowboy", acc_cowboy, 1.5, "acc", 1.5),
+    ("acc_ninja", acc_ninja, 1.5, "acc", 1.5),
+    ("acc_mohawk", acc_mohawk, 1.5, "acc", 1.5),
+    ("acc_bunny", acc_bunny, 1.5, "acc", 1.5),
+    ("acc_visor", acc_visor, 1.5, "acc", 1.5),
 ]
 
 

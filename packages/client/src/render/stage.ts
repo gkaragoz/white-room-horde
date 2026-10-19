@@ -57,28 +57,28 @@ export class Stage {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color('#e8d9c2');
+    this.scene.background = new THREE.Color('#d5dde6');
 
-    // Camera: elevation 28 deg above the horizon, yaw 30 deg, orthographic 17 units wide.
+    // Camera: elevation 28 deg above the horizon, yaw 30 deg, orthographic 24 units wide.
     const el = THREE.MathUtils.degToRad(CAMERA.elevationDeg);
     const yaw = THREE.MathUtils.degToRad(CAMERA.yawDeg);
     this.camOffset = new THREE.Vector3(Math.sin(yaw) * Math.cos(el), Math.sin(el), Math.cos(yaw) * Math.cos(el)).multiplyScalar(40);
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
 
-    // Warm key light and cream ambient (blender: sun #FFD7A0, elevation 38, yaw 55; world #E8D9C2).
+    // Neutral daylight: a near-white sun, cool sky fill and a pale blue-grey ground, so the colourful characters pop.
     this.sunOffset = new THREE.Vector3(0.505, 0.788, 0.353).multiplyScalar(30);
-    this.sun = new THREE.DirectionalLight('#ffd7a0', 3.4);
+    this.sun = new THREE.DirectionalLight('#fff6ea', 3.1);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
-    sc.left = -16; sc.right = 16; sc.top = 16; sc.bottom = -16; sc.near = 1; sc.far = 80;
+    sc.left = -22; sc.right = 22; sc.top = 22; sc.bottom = -22; sc.near = 1; sc.far = 80;
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun, this.sun.target);
-    this.scene.add(new THREE.HemisphereLight('#f2e6d0', '#b9a88f', 1.5));
+    this.scene.add(new THREE.HemisphereLight('#e4eefc', '#a9b2bd', 1.55));
 
     // fake bounce light: sunlight reflected by the cream floor tints the shaded sides warmly
-    this.bounce = new THREE.DirectionalLight('#ffd9b0', 0.55);
+    this.bounce = new THREE.DirectionalLight('#dfe9f5', 0.5);
     this.bounce.position.set(-this.sunOffset.x, -this.sunOffset.y * 0.2 + 2, -this.sunOffset.z);
     this.bounce.visible = opts.bounce;
     this.scene.add(this.bounce);
@@ -156,17 +156,17 @@ export class Stage {
   }
 }
 
-/** Light cream floor with soft painted patches and a faint grid, drawn once to a canvas. */
+/** Light concrete floor with soft painted patches and a faint grid, drawn once to a canvas. */
 function makeFloor(quality: 0 | 1): THREE.Mesh {
   const size = quality === 1 ? 2048 : 1024;
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#e4e6ed';
+  g.fillStyle = '#dfe4ea';
   g.fillRect(0, 0, size, size);
   let seed = 7;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-  const patches = ['#d9d2c5', '#ede6da', '#cfc7ba', '#e0d9cc', '#d3ccc0', '#e9e3d8'];
+  const patches = ['#d3dae2', '#e8edf2', '#c9d1da', '#dde3ea', '#cdd5de', '#e4e9ef'];
   for (let i = 0; i < 90; i++) {
     g.fillStyle = patches[Math.floor(rnd() * patches.length)]!;
     g.globalAlpha = 0.55;
@@ -182,7 +182,7 @@ function makeFloor(quality: 0 | 1): THREE.Mesh {
     g.fill();
   }
   g.globalAlpha = 1;
-  g.strokeStyle = '#c6beaf';
+  g.strokeStyle = '#bcc6d1';
   g.lineWidth = 3;
   const cell = size / 24;
   for (let i = 0; i <= 24; i++) {

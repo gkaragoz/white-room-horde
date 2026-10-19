@@ -1,15 +1,22 @@
-import { ENEMY_TYPES, MAX_ENEMIES, MAX_PLAYERS, PlayerState, WEAPON_IDS } from '@wrh/shared';
+import { ENEMY_TYPES, MAX_ENEMIES, MAX_PLAYERS, PlayerState, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import type { SimEvent, World } from '@wrh/sim';
 import { asset } from './assets';
 import { SCREEN_RIGHT } from './controls';
+import { AUDIO_FORMATS } from './preload';
 
+/** One sound kind per weapon (recorded reports, see public/sfx/CREDITS.md) and three reload sounds. */
+export type GunSfx = `gun_${WeaponId}`;
 export type Sfx =
+  | GunSfx | 'reloadPistol' | 'reloadRifle' | 'reloadShotgun'
   | 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'heavyShot' | 'throw' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive'
   | 'level' | 'pick' | 'wave' | 'boss' | 'over' | 'zGroan' | 'zAttack' | 'zHit' | 'zDeath' | 'zScream' | 'step' | 'pickup' | 'pickupDrop' | 'spit'
   | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
+const GUN_GAP = 0.02;
 const GAP: Record<Sfx, number> = {
+  ...(Object.fromEntries(WEAPON_IDS.map((w) => [`gun_${w}`, GUN_GAP])) as Record<GunSfx, number>),
+  reloadPistol: 0.2, reloadRifle: 0.2, reloadShotgun: 0.2,
   shot: 0.035, midShot: 0.04, bigShot: 0.05, cannonShot: 0.08, heavyShot: 0.05, throw: 0.1, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3,
   level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1, zGroan: 0.25, zAttack: 0.12, zHit: 0.05, zDeath: 0.06, zScream: 0.4, step: 0.12, pickup: 0.06, pickupDrop: 0.15, spit: 0.15,
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
@@ -19,8 +26,31 @@ type Entry = { files: string[]; gain: number; rate: [number, number] };
 const n3 = (p: string): string[] => [0, 1, 2].map((i) => `${p}_00${i}`);
 const z = (...ids: number[]): string[] => ids.map((i) => `zombie-${i}`);
 
+/** Takes recorded per weapon, and how each one is voiced: loudness and the pitch range (lower = heavier). */
+const GUNS: Record<WeaponId, { takes: number; gain: number; rate: [number, number] }> = {
+  pistol: { takes: 2, gain: 0.85, rate: [0.97, 1.05] },
+  revolver: { takes: 2, gain: 1.0, rate: [0.95, 1.0] },
+  mp: { takes: 3, gain: 0.8, rate: [1.0, 1.1] },
+  smg: { takes: 3, gain: 0.8, rate: [0.97, 1.05] },
+  ar: { takes: 2, gain: 0.85, rate: [0.97, 1.03] },
+  shotgun: { takes: 2, gain: 1.0, rate: [0.95, 1.0] },
+  dbl: { takes: 2, gain: 1.1, rate: [0.88, 0.96] },
+  hmg: { takes: 3, gain: 1.0, rate: [0.8, 0.9] },
+  minigun: { takes: 3, gain: 0.7, rate: [1.05, 1.15] },
+  sniper: { takes: 3, gain: 1.0, rate: [0.95, 1.0] },
+  dmr: { takes: 3, gain: 0.95, rate: [0.97, 1.03] },
+  flamer: { takes: 3, gain: 0.9, rate: [0.95, 1.1] },
+  gl: { takes: 3, gain: 1.0, rate: [0.95, 1.0] },
+};
+
 /** Recorded effects (CC0, see public/sfx/CREDITS.md). Each name picks a random file and varies the pitch a little. */
 const BANK: Partial<Record<Sfx, Entry>> = {
+  ...(Object.fromEntries(
+    WEAPON_IDS.map((w) => [`gun_${w}`, { files: Array.from({ length: GUNS[w].takes }, (_, i) => `gun_${w}_${i + 1}`), gain: GUNS[w].gain, rate: GUNS[w].rate }]),
+  ) as Record<GunSfx, Entry>),
+  reloadPistol: { files: ['reload_pistol'], gain: 0.7, rate: [0.97, 1.03] },
+  reloadRifle: { files: ['reload_rifle'], gain: 0.7, rate: [0.97, 1.03] },
+  reloadShotgun: { files: ['reload_shotgun'], gain: 0.8, rate: [0.97, 1.03] },
   shot: { files: ['shot_01', 'shot_02', 'shot_03'], gain: 0.55, rate: [0.95, 1.08] },
   midShot: { files: ['bang_01', 'bang_02', 'bang_03', 'bang_04', 'bang_05', 'bang_06'], gain: 0.6, rate: [0.95, 1.05] },
   bigShot: { files: ['bang_07', 'bang_08', 'bang_09', 'bang_10'], gain: 0.75, rate: [0.9, 1.0] },
@@ -61,7 +91,7 @@ const BANK: Partial<Record<Sfx, Entry>> = {
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
-const SPATIAL = new Set<Sfx>(['reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit']);
+const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit']);
 
 /** Every file the bank refers to (QA checks they all decode). */
 export const BANK_FILES: string[] = [...new Set(Object.values(BANK).flatMap((b) => b.files))];
@@ -69,14 +99,7 @@ export const MUSIC_FILES = ['determined_pursuit'];
 
 const MAX_VOICES = 28;
 
-/** Formats to try, preferred first. Both are shipped: Vorbis is smaller, MP3 works everywhere (Safari has no Vorbis). */
-const FORMATS: readonly string[] = (() => {
-  try {
-    return document.createElement('audio').canPlayType('audio/ogg; codecs="vorbis"') ? ['ogg', 'mp3'] : ['mp3', 'ogg'];
-  } catch {
-    return ['ogg', 'mp3'];
-  }
-})();
+const FORMATS = AUDIO_FORMATS;
 
 /**
  * Recorded effects with a synthesised fallback (browser cannot decode ogg, or a file is missing), positional pan and
@@ -89,6 +112,7 @@ export class Audio {
   private music: AudioBufferSourceNode | null = null;
   private musicFilter: BiquadFilterNode | null = null;
   private noise: AudioBuffer | null = null;
+  private reverbIn: GainNode | null = null;
   private readonly last = new Map<Sfx, number>();
   private readonly buffers = new Map<string, AudioBuffer>();
   private loading = false;
@@ -117,6 +141,19 @@ export class Audio {
     this.master.gain.value = this.muted ? 0 : this.volume;
     const comp = this.ctx.createDynamicsCompressor();
     this.master.connect(comp).connect(this.ctx.destination);
+    // a synthetic room: decaying noise as an impulse response, mixed in quietly for gunfire and explosions
+    const irLen = Math.floor(this.ctx.sampleRate * 1.2);
+    const ir = this.ctx.createBuffer(2, irLen, this.ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3.2);
+    }
+    const conv = this.ctx.createConvolver();
+    conv.buffer = ir;
+    const wet = this.ctx.createGain();
+    wet.gain.value = 0.5;
+    this.reverbIn = this.ctx.createGain();
+    this.reverbIn.connect(conv).connect(wet).connect(this.master);
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0;
     this.musicGain.connect(this.master);
@@ -276,6 +313,18 @@ export class Audio {
   }
 
   private synth(name: Sfx): void {
+    if (name.startsWith('gun_')) {
+      const w = name.slice(4) as WeaponId;
+      if (w === 'flamer') this.burst(0.3, 0.5, 2400);
+      else if (w === 'gl') this.tone(140, 40, 0.3, 'sine', 0.5);
+      else if (w === 'sniper' || w === 'dmr' || w === 'hmg' || w === 'dbl' || w === 'shotgun' || w === 'revolver') this.synth('bigShot');
+      else this.synth('shot');
+      return;
+    }
+    if (name === 'reloadPistol' || name === 'reloadRifle' || name === 'reloadShotgun') {
+      this.synth('reload');
+      return;
+    }
     switch (name) {
       case 'shot':
       case 'midShot':
@@ -374,7 +423,8 @@ export class Audio {
     if (!avail.length) return false;
     if (this.voices >= MAX_VOICES && !name.startsWith('ui') && name !== 'boom' && name !== 'hurt') return true; // dropped, but handled
     const file = avail[Math.floor(Math.random() * avail.length)]!;
-    this.voice(file, b.rate[0] + Math.random() * (b.rate[1] - b.rate[0]), b.gain * (0.9 + Math.random() * 0.2) * gainMul, pan);
+    const wet = name.startsWith('gun_') ? 0.22 : name === 'boom' ? 0.35 : 0;
+    this.voice(file, b.rate[0] + Math.random() * (b.rate[1] - b.rate[0]), b.gain * (0.9 + Math.random() * 0.2) * gainMul, pan, wet);
     // the big explosion and the boss roar layer a second sample
     if (name === 'boom' || name === 'boss') {
       const extra = avail[Math.floor(Math.random() * avail.length)]!;
@@ -383,7 +433,7 @@ export class Audio {
     return true;
   }
 
-  private voice(file: string, rate: number, gain: number, pan: number): void {
+  private voice(file: string, rate: number, gain: number, pan: number, wet = 0): void {
     const c = this.ctx!;
     const src = c.createBufferSource();
     src.buffer = this.buffers.get(file)!;
@@ -399,7 +449,19 @@ export class Audio {
     } else {
       src.connect(g).connect(this.master!);
     }
+    if (wet > 0 && this.reverbIn) {
+      const send = c.createGain();
+      send.gain.value = wet;
+      g.connect(send).connect(this.reverbIn);
+    }
     src.start();
+  }
+
+  private slotWeapon: (slot: number) => WeaponId | undefined = () => undefined;
+
+  /** Which weapon a slot holds (reload sounds differ by gun). */
+  setWeaponLookup(f: (slot: number) => WeaponId | undefined): void {
+    this.slotWeapon = f;
   }
 
   private slotPos: (slot: number) => { x: number; y: number } | undefined = () => undefined;
@@ -445,15 +507,20 @@ export class Audio {
       case 'shot': {
         if (e.slot !== localSlot && Math.random() < 0.4) return; // thin out the squad's gunfire
         const w = WEAPON_IDS[e.weapon];
-        const kind: Sfx = w === 'sniper' ? 'cannonShot' : w === 'shotgun' ? 'heavyShot' : w === 'hmg' ? 'bigShot' : w === 'ar' || w === 'minigun' ? 'midShot' : 'shot';
-        this.play(kind, e.slot === localSlot ? undefined : e);
+        this.play(`gun_${w!}`, e.slot === localSlot ? undefined : e);
         break;
       }
       case 'grenadeThrown':
         this.play('throw', e);
         break;
-      case 'reloadStart':
-        this.play('reload', e.slot === localSlot ? undefined : this.slotPos(e.slot));
+      case 'reloadStart': {
+        const id = this.slotWeapon(e.slot);
+        const kind: Sfx = id === 'shotgun' || id === 'dbl' || id === 'gl' ? 'reloadShotgun' : id === 'pistol' || id === 'revolver' || id === 'mp' ? 'reloadPistol' : 'reloadRifle';
+        this.play(kind, e.slot === localSlot ? undefined : this.slotPos(e.slot));
+        break;
+      }
+      case 'weaponSwitch':
+        if (e.slot === localSlot) this.play('reloadDone');
         break;
       case 'reloadDone':
         this.play('reloadDone', e.slot === localSlot ? undefined : this.slotPos(e.slot));

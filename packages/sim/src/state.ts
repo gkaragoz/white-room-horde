@@ -11,6 +11,7 @@ export type SimEvent =
   | { type: 'enemyHit'; id: number; etype: number; x: number; y: number; damage: number }
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
+  | { type: 'weaponSwitch'; slot: number; weapon: number; auto: boolean }
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'grenadeThrown'; owner: number; x: number; y: number }
   | { type: 'spit'; x: number; y: number; angle: number }
@@ -82,6 +83,11 @@ export interface World {
   pIFrames: Float64Array;
   pWeapon: Int32Array;
   pAmmo: Int32Array;
+  /** Two weapon slots: 0 = the main weapon, 1 = the sidearm (pistol). pSel is the one in the hands; the stash holds the other. */
+  pSel: Uint8Array;
+  pStashW: Int32Array;
+  pStashMag: Int32Array;
+  pStashAmmo: Int32Array;
   pMoving: Uint8Array;
   /** Rounds in the magazine, reload countdown (s), dash ticks left / cooldown (s) / direction, personal card multipliers. */
   pMag: Int32Array;
@@ -198,6 +204,10 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pIFrames: new Float64Array(MAX_PLAYERS),
     pWeapon: new Int32Array(MAX_PLAYERS),
     pAmmo: new Int32Array(MAX_PLAYERS),
+    pSel: new Uint8Array(MAX_PLAYERS),
+    pStashW: new Int32Array(MAX_PLAYERS).fill(-1),
+    pStashMag: new Int32Array(MAX_PLAYERS),
+    pStashAmmo: new Int32Array(MAX_PLAYERS),
     pMoving: new Uint8Array(MAX_PLAYERS),
     pMag: new Int32Array(MAX_PLAYERS),
     pReload: new Float64Array(MAX_PLAYERS),

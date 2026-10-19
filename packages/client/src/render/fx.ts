@@ -132,6 +132,14 @@ export class Fx {
     this.col[i * 3 + 2] = this.c.b;
   }
 
+  /** Strength of a player's offensive upgrades (0 = none): bigger muzzle flashes for stronger shooters. Set by main. */
+  powerFor: (slot: number) => number = () => 0;
+
+  /** A soft sparkle drifting up from a spot (upgrade auras). */
+  sparkle(x: number, y: number, h: number, color: string, count: number, speed: number): void {
+    this.burst(Kind.Spark, x, y, h, count, speed, 0, 0, 6.28, 0.7, 0.05, color);
+  }
+
   private burst(kind: Kind, sx: number, sy: number, h: number, count: number, speed: number, dirX: number, dirY: number, spread: number, life: number, size: number, color: string): void {
     for (let n = 0; n < count; n++) {
       // sim (x, y) -> three (x, h, -y)
@@ -156,9 +164,12 @@ export class Fx {
         const st = BALANCE.weapons[WEAPON_IDS[e.weapon]!];
         const mx = e.x + Math.cos(e.angle) * st.muzzleFwd + Math.sin(e.angle) * st.muzzleSide;
         const my = e.y + Math.sin(e.angle) * st.muzzleFwd - Math.cos(e.angle) * st.muzzleSide;
-        this.flash(mx, st.muzzleH, -my, 0.16 + st.damage * 0.002, '#ffe9a0', 0.05, 0);
+        const pw = this.powerFor(e.slot);
+        this.flash(mx, st.muzzleH, -my, (0.16 + st.damage * 0.002) * (1 + pw * 0.6), pw > 0.3 ? '#ffd0a0' : '#ffe9a0', 0.05, 0);
+        if (pw > 0.25) this.burst(Kind.Spark, mx, my, st.muzzleH, Math.min(6, Math.round(pw * 4)), 6, Math.cos(e.angle), Math.sin(e.angle), 0.9, 0.2, 0.05, '#ff9a5a');
         this.burst(Kind.Spark, mx, my, st.muzzleH, 2, 5, Math.cos(e.angle), Math.sin(e.angle), 0.5, 0.18, 0.05, '#ffd36a');
-        if (e.slot === localSlot) this.shake = Math.min(0.5, this.shake + st.damage * 0.0012 * st.pellets);
+        if (WEAPON_IDS[e.weapon] === 'flamer') this.burst(Kind.Fire, mx, my, st.muzzleH, 3, 5, Math.cos(e.angle), Math.sin(e.angle), 0.5, 0.4, 0.22, '#ff8a1a');
+        if (e.slot === localSlot) this.shake = Math.min(0.22, this.shake + Math.min(0.1, st.damage * 0.0006 * Math.sqrt(st.pellets)));
         break;
       }
       case 'bulletGone':
@@ -183,14 +194,14 @@ export class Fx {
         this.burst(Kind.Gib, e.x, e.y, 0.8, 8, 7, 0, 0, 6.28, 1.4, 0.16, '#d88a4a');
         this.burst(Kind.Smoke, e.x, e.y, 0.9, 10, 2.5, 0, 0, 6.28, 1.2, 0.35, '#5a5148');
         this.splat(e.x, e.y, e.radius * 0.6, '#2a211c', 0.55);
-        this.shake = Math.min(1.2, this.shake + 0.5);
-        this.onExplosionShake(0.5);
+        this.shake = Math.min(0.6, this.shake + 0.22);
+        this.onExplosionShake(0.3);
         break;
       case 'playerHit':
         this.burst(Kind.Blood, e.x, e.y, 1.0, 8, 4, 0, 0, 6.28, 0.6, 0.08, '#c01822');
         if (e.slot === localSlot) {
           this.hurt = 1;
-          this.shake = Math.min(1.2, this.shake + 0.3);
+          this.shake = Math.min(0.5, this.shake + 0.12);
         }
         break;
       case 'dash':
@@ -199,7 +210,7 @@ export class Fx {
         break;
       case 'bossAbility':
         this.flash(e.x, 0.6, -e.y, 0.4, e.kind === 'charge' ? '#ff5533' : '#a050ff', 0.5, 5);
-        this.shake = Math.min(1.2, this.shake + 0.4);
+        this.shake = Math.min(0.5, this.shake + 0.2);
         break;
       case 'pickup':
         this.burst(Kind.Spark, e.x, e.y, 0.6, 8, 4, 0, 0, 6.28, 0.35, 0.07, e.kind === 1 ? '#6dff9a' : e.kind === 3 ? '#d79bff' : '#ffe27a');

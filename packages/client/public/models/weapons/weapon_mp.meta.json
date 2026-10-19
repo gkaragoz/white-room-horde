@@ -1,0 +1,23 @@
+{
+ "id": "mp",
+ "tris": 130,
+ "muzzle": [
+  0.0,
+  -0.98,
+  0.12
+ ],
+ "grip_l": [
+  0,
+  -0.55,
+  -0.2
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

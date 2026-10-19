@@ -34,6 +34,9 @@ const median = (a: number[]): number => {
 };
 
 const WEAPONS = WEAPON_IDS as readonly WeaponId[];
+/** The cranium as a sphere: the chibi head is a wide ball whose lower part tucks behind the chin. */
+const CRANIUM_UP = new THREE.Vector3(0, 0.14, 0);
+const CRANIUM_R = 0.52;
 const REQUIRED_PLAYER_CLIPS = ['aim_idle', 'fire_stand', 'fire_run', 'reload_stand', 'death', 'run_forward', 'run_backward', 'run_left', 'run_right', 'run_forward_left', 'run_forward_right', 'run_backward_left', 'run_backward_right'];
 const REQUIRED_ENEMY_CLIPS = ['z_idle', 'z_walk', 'z_run', 'z_attack_swipe', 'z_attack_overhead', 'z_scream', 'z_death_back'];
 const BONES = ['root', 'hips', 'spine', 'head', 'armL', 'armR', 'handL', 'handR', 'thighL', 'thighR', 'footL', 'footR'];
@@ -46,8 +49,8 @@ export const tests: QaTest[] = [
     id: 'assets.load',
     title: 'All models and animation libraries load',
     async run() {
-      const chars = ['player_base', 'grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri', 'acc_bandana', 'acc_headphones', 'acc_helmet', 'acc_cap', 'acc_goggles'];
-      const weapons = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper', 'grenade'];
+      const chars = ['player_base', 'grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri', 'acc_bandana', 'acc_headphones', 'acc_helmet', 'acc_cap', 'acc_goggles', 'acc_crown', 'acc_horns', 'acc_tophat', 'acc_cowboy', 'acc_ninja', 'acc_mohawk', 'acc_bunny', 'acc_visor'];
+      const weapons = [...WEAPON_IDS, 'grenade'];
       const problems: string[] = [];
       for (const c of chars) {
         const g = await loadGLB(asset(`models/characters/${c}.glb`)).catch(() => null);
@@ -152,6 +155,44 @@ export const tests: QaTest[] = [
         ctx.stage.scene.remove(ch.root);
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join('\n') : `worst barrel dot ${f(worstDot, 4)} (>= 0.995)`, data: summary };
+    },
+  },
+  {
+    id: 'weapon.head-clearance',
+    title: 'No weapon pokes into the head of its holder in any pose or aim angle',
+    async run(ctx) {
+      const clips = ['aim_idle', 'fire_stand', 'run_forward', 'reload_stand', 'fire_run'];
+      const problems: string[] = [];
+      const data: Record<string, unknown> = {};
+      for (const w of WEAPONS) {
+        const ch = await Character.createPlayer({ color: '#1FA2FF', weapon: `weapon_${w}`, accessory: 'acc_helmet' });
+        ctx.stage.scene.add(ch.root);
+        let worst = 0;
+        let headY = 0;
+        let radius = 0;
+        const perClip: Record<string, number> = {};
+        for (const clip of clips) {
+          if (!ch.has(clip)) continue;
+          for (let i = 0; i < 12; i++) {
+            const ang = (i * Math.PI) / 6 + 0.1;
+            ch.root.position.set(0, 0, 0);
+            ch.root.rotation.y = yawForAim(ang);
+            ch.poseAt(clip, 0.4);
+            const d = aimDirThree(ang);
+            ch.applyAim(new THREE.Vector3(d.x, 0, d.z));
+            const sp = ch.headSphere();
+            headY = sp.centre.y;
+            radius = sp.radius;
+            const pen = ch.weaponPenetration(sp.centre.clone().add(CRANIUM_UP), CRANIUM_R);
+            perClip[clip] = Math.max(perClip[clip] ?? 0, f(pen, 2));
+            worst = Math.max(worst, pen);
+          }
+        }
+        data[w] = { worstPenetration: f(worst, 3), skullY: f(headY, 2), skullRadius: f(radius, 2), skullSize: [f(ch.lastHeadBox.x), f(ch.lastHeadBox.y), f(ch.lastHeadBox.z)], perClip };
+        if (worst > 0.16) problems.push(`${w}: reaches ${f(worst, 2)} into the head`);
+        ctx.stage.scene.remove(ch.root);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(String.fromCharCode(10)) : 'every weapon stays clear of the head', data };
     },
   },
   {

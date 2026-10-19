@@ -64,6 +64,7 @@ describe('magazines and reloading', () => {
     addPlayer(w2, 0, 0, 0, 'shotgun');
     w2.pAmmo[0] = 0;
     w2.pMag[0] = 0;
+    w2.pStashW[0] = -1; // no sidearm to fall back to
     for (let t = 0; t < 120; t++) step(w2, [{ ...NONE, buttons: Buttons.Fire }]);
     expect(w2.pMag[0]).toBe(0);
     expect(w2.pReload[0]).toBe(0);

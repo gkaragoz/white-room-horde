@@ -1,0 +1,24 @@
+{
+ "id": "acc_ninja",
+ "tris": 132,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_tint",
+  "wrh_fixed"
+ ],
+ "height": 0.576,
+ "attach": "head"
+}

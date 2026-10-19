@@ -58,7 +58,7 @@ export const UI_STRINGS = {
     high: 'High',
     desync: 'Desync detected!',
     connecting: 'Connecting...',
-    controls: 'WASD move · mouse aim · click fire · R reload · Shift dash · right-click grenade · E revive · 1-3 cards',
+    controls: 'WASD move · mouse aim · click fire · R reload · Q switch weapon · Shift dash · right-click grenade · E revive · 1-3 cards',
     weapon: 'Starting weapon',
     arena: 'Arena',
     difficulty: 'Difficulty',
@@ -66,6 +66,10 @@ export const UI_STRINGS = {
     relayLooking: 'Looking for the online server...',
     relayOnline: 'Online server found',
     relayOffline: 'No online server is up right now: solo works, or paste an address above.',
+    invite: 'Copy invite link',
+    inviteCopied: 'Link copied! Send it to your friends.',
+    invited: 'You were invited to room',
+    invitedHint: 'Type your name and press Join.',
     tabChar: 'Character',
     tabWeapon: 'Weapon',
     colorAuto: 'Colour',
@@ -73,6 +77,15 @@ export const UI_STRINGS = {
     statRate: 'Rate',
     statMag: 'Magazine',
     statRange: 'Range',
+    statAcc: 'Accuracy',
+    switched: 'Out of ammo, switched to',
+    backToMain: 'Ammo found, back to',
+    sidearm: 'Sidearm',
+    statReload: 'Reload',
+    statPierce: 'Pierce',
+    statBlast: 'Blast',
+    statDps: 'DPS',
+    statAmmo: 'Reserve',
     password: 'Room password (optional)',
     rejoin: 'Rejoin the game you left',
     lockedTip: 'Reach wave',
@@ -82,11 +95,11 @@ export const UI_STRINGS = {
     reconnecting: 'Connection lost, reconnecting...',
     maps: { '-1': 'Random', '0': 'Warehouse', '1': 'Courtyard', '2': 'Corridors', '3': 'Open field' },
     diffs: ['Easy', 'Normal', 'Hard'],
-    accs: ['Bandana', 'Cap', 'Goggles', 'Headphones', 'Helmet'],
+    accs: ['Bandana', 'Cap', 'Goggles', 'Headphones', 'Helmet', 'Crown', 'Devil horns', 'Top hat', 'Cowboy hat', 'Ninja band', 'Mohawk', 'Bunny ears', 'Cyber visor'],
     controlsTitle: 'Controls',
     pressKey: 'press a key...',
     resetKeys: 'Reset keys',
-    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
+    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', switch: 'Switch weapon', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
     fpsCap: 'Frame limit',
     unlimited: 'Display rate',
     texture: 'Texture detail',
@@ -125,7 +138,7 @@ export const UI_STRINGS = {
       marksman: ['Marksman', 'Your bullets pierce 2 more enemies'],
       ironskin: ['Iron skin', 'You take 20% less damage'],
     },
-    weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper' },
+    weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper', revolver: 'Revolver', mp: 'Machine pistol', dbl: 'Double barrel', dmr: 'Marksman rifle', flamer: 'Flamethrower', gl: 'Grenade launcher' },
   },
   tr: {
     title: 'white-room-horde',
@@ -176,7 +189,7 @@ export const UI_STRINGS = {
     high: 'Yüksek',
     desync: 'Senkron bozuldu!',
     connecting: 'Bağlanıyor...',
-    controls: 'WASD hareket · fare nişan · tık ateş · R doldur · Shift atıl · sağ tık bomba · E kaldır · 1-3 kart',
+    controls: 'WASD hareket · fare nişan · tık ateş · R doldur · Q silah değiştir · Shift atıl · sağ tık bomba · E kaldır · 1-3 kart',
     weapon: 'Başlangıç silahı',
     arena: 'Arena',
     difficulty: 'Zorluk',
@@ -184,6 +197,10 @@ export const UI_STRINGS = {
     relayLooking: 'Çevrimiçi sunucu aranıyor...',
     relayOnline: 'Çevrimiçi sunucu bulundu',
     relayOffline: 'Şu an çevrimiçi sunucu yok: tek başına oynayabilir ya da yukarıya adres yapıştırabilirsin.',
+    invite: 'Davet linkini kopyala',
+    inviteCopied: 'Link kopyalandı! Arkadaşlarına gönder.',
+    invited: 'Şu odaya davet edildin:',
+    invitedHint: 'Adını yaz ve Katıl\'a bas.',
     tabChar: 'Karakter',
     tabWeapon: 'Silah',
     colorAuto: 'Renk',
@@ -191,6 +208,15 @@ export const UI_STRINGS = {
     statRate: 'Hız',
     statMag: 'Şarjör',
     statRange: 'Menzil',
+    statAcc: 'İsabet',
+    switched: 'Mermi bitti, geçildi:',
+    backToMain: 'Mermi bulundu, dönüldü:',
+    sidearm: 'Yedek silah',
+    statReload: 'Doldurma',
+    statPierce: 'Delme',
+    statBlast: 'Patlama',
+    statDps: 'DPS',
+    statAmmo: 'Yedek',
     password: 'Oda şifresi (isteğe bağlı)',
     rejoin: 'Ayrıldığın oyuna geri dön',
     lockedTip: 'Şu dalgaya ulaş:',
@@ -200,11 +226,11 @@ export const UI_STRINGS = {
     reconnecting: 'Bağlantı koptu, yeniden bağlanıyor...',
     maps: { '-1': 'Rastgele', '0': 'Depo', '1': 'Avlu', '2': 'Koridorlar', '3': 'Açık alan' },
     diffs: ['Kolay', 'Normal', 'Zor'],
-    accs: ['Bandana', 'Şapka', 'Gözlük', 'Kulaklık', 'Kask'],
+    accs: ['Bandana', 'Şapka', 'Gözlük', 'Kulaklık', 'Kask', 'Taç', 'Şeytan boynuzu', 'Silindir şapka', 'Kovboy şapkası', 'Ninja bandı', 'Mohawk', 'Tavşan kulağı', 'Siber vizör'],
     controlsTitle: 'Kontroller',
     pressKey: 'bir tuşa bas...',
     resetKeys: 'Tuşları sıfırla',
-    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
+    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', switch: 'Silah değiştir', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
     fpsCap: 'Kare sınırı',
     unlimited: 'Ekran hızı',
     texture: 'Doku detayı',
@@ -243,7 +269,7 @@ export const UI_STRINGS = {
       marksman: ['Nişancı', 'Mermilerin 2 düşman daha deler'],
       ironskin: ['Demir deri', 'Sadece sen %20 daha az hasar alırsın'],
     },
-    weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı' },
+    weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı', revolver: 'Revolver', mp: 'Makineli tabanca', dbl: 'Çift namlulu', dmr: 'Nişancı tüfeği', flamer: 'Alev makinesi', gl: 'Bombaatar' },
   },
 } as const;
 
@@ -306,7 +332,13 @@ const CSS = `
 .wrh-canvas canvas{display:block;touch-action:none;cursor:grab}
 .wrh-ui button.wrh-arrow{width:38px;height:56px;padding:0;margin:0;font-size:18px;background:#e6dcc8;color:#3a352d}
 .wrh-prev-name{font-weight:800;font-size:16px;margin-top:6px}
-.wrh-prev-stats{font-size:12px;min-height:16px;opacity:.85}
+.wrh-prev-stats{font-size:12px;min-height:16px;width:100%;max-width:300px}
+.wrh-stat{display:flex;align-items:center;gap:6px;margin:2px 0}
+.wrh-stat .ic{width:18px;text-align:center}
+.wrh-stat .nm{width:68px;font-weight:600;opacity:.8}
+.wrh-stat .bar{flex:1;height:8px;border-radius:5px;background:rgba(60,45,20,.18);overflow:hidden}
+.wrh-stat .bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#1fa2ff,#6fd0ff)}
+.wrh-stat b{width:54px;text-align:right}
 .wrh-swatches{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:6px;max-width:300px}
 .wrh-ui button.wrh-sw{width:24px;height:24px;padding:0;margin:0;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #8888}
 .wrh-ui button.wrh-sw.on{box-shadow:0 0 0 3px #1fa2ff}
@@ -350,6 +382,18 @@ const CSS = `
 .wrh-warn{position:absolute;left:50%;top:60px;transform:translateX(-50%);color:#fff;background:#d8362e;padding:4px 12px;border-radius:8px;font-weight:700}
 .wrh-mini{position:absolute;right:14px;bottom:52px;width:180px;height:120px;border:2px solid #cdbfa5;border-radius:8px;background:rgba(250,244,232,.78);box-shadow:0 3px 10px rgba(60,45,20,.25)}
 .wrh-dmg{position:absolute;font-weight:800;font-size:15px;color:#fff;text-shadow:0 0 3px #7d0d14,0 0 3px #7d0d14,0 1px 0 #7d0d14;pointer-events:none;will-change:transform,opacity}
+.wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
+.wrh-arrow-off{position:absolute;pointer-events:none;display:none;transform:translate(-50%,-50%)}
+.wrh-arrow-off i{display:block;width:0;height:0;border-left:18px solid var(--c);border-top:10px solid transparent;border-bottom:10px solid transparent;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+.wrh-arrow-off span{position:absolute;left:50%;top:18px;transform:translateX(-50%);font-size:10px;font-weight:700;padding:0 5px;border-radius:7px;background:rgba(250,244,232,.85);white-space:nowrap}
+.wrh-arrow-off.down i{animation:wrhblink .6s infinite alternate}
+@keyframes wrhblink{from{opacity:1}to{opacity:.35}}
+.wrh-ring{position:absolute;width:64px;height:64px;transform:translate(-50%,-50%);pointer-events:none;display:none}
+.wrh-ring i{position:absolute;inset:0;border-radius:50%}
+.wrh-ring .bleed{background:conic-gradient(#e0524a calc(var(--b)*1%),rgba(60,45,20,.25) 0);-webkit-mask:radial-gradient(circle,transparent 58%,#000 60%);mask:radial-gradient(circle,transparent 58%,#000 60%)}
+.wrh-ring .prog{inset:7px;background:conic-gradient(#3dd66a calc(var(--p)*1%),rgba(60,45,20,.22) 0);-webkit-mask:radial-gradient(circle,transparent 52%,#000 54%);mask:radial-gradient(circle,transparent 52%,#000 54%)}
+.wrh-ring b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:15px;text-shadow:0 1px 0 #fff}
+.wrh-ring.live .prog{filter:drop-shadow(0 0 4px rgba(61,214,106,.9))}
 .wrh-tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(250,244,232,.85);border:2px solid;white-space:nowrap;pointer-events:none}
 .wrh-reload{position:absolute;right:14px;bottom:36px;width:180px;height:6px;border-radius:4px;background:rgba(60,45,20,.25);overflow:hidden;display:none}
 .wrh-reload>i{display:block;height:100%;background:#ff9a3a;width:0}
@@ -487,6 +531,47 @@ export class Ui {
     }
   }
 
+  /** Icon, bar and number for each trait of a weapon; bars are scaled against the best of all weapons. */
+  private weaponStatBars(id: WeaponId): string {
+    const t = this.t;
+    const all = WEAPON_IDS.map((w) => BALANCE.weapons[w]);
+    const perShot = (s: (typeof all)[number]): number => s.damage * s.pellets + (s.blastDamage ?? 0);
+    const max = (f: (s: (typeof all)[number]) => number): number => Math.max(...all.map(f));
+    const s = BALANCE.weapons[id];
+    const dps = perShot(s) * s.rate;
+    const rows: { icon: string; label: string; frac: number; text: string }[] = [
+      { icon: '&#128165;', label: t.statDmg, frac: perShot(s) / max(perShot), text: `${s.damage}${s.pellets > 1 ? '&times;' + s.pellets : ''}${s.blast ? ' + ' + s.blastDamage : ''}` },
+      { icon: '&#9889;', label: t.statRate, frac: s.rate / max((x) => x.rate), text: `${s.rate}/s` },
+      { icon: '&#128293;', label: t.statDps, frac: dps / max((x) => perShot(x) * x.rate), text: String(Math.round(dps)) },
+      { icon: '&#127919;', label: t.statRange, frac: s.range / max((x) => x.range), text: String(s.range) },
+      { icon: '&#9678;', label: t.statAcc, frac: 1 - s.spread / (max((x) => x.spread) * 1.1), text: `${Math.round((1 - s.spread) * 100)}%` },
+      { icon: '&#128230;', label: t.statMag, frac: s.mag / max((x) => x.mag), text: String(s.mag) },
+      { icon: '&#128260;', label: t.statReload, frac: 1 - s.reload / (max((x) => x.reload) * 1.2), text: `${s.reload}s` },
+      { icon: '&#10138;', label: s.blast ? t.statBlast : t.statPierce, frac: s.blast ? s.blast / 3 : Math.min(1, s.pierce / 5), text: s.blast ? String(s.blast) : String(s.pierce) },
+      { icon: '&#127873;', label: t.statAmmo, frac: s.ammo < 0 ? 1 : s.ammo / max((x) => (x.ammo < 0 ? 0 : x.ammo)), text: s.ammo < 0 ? '&infin;' : String(s.ammo) },
+    ];
+    return rows
+      .map((r) => `<div class="wrh-stat"><span class="ic">${r.icon}</span><span class="nm">${r.label}</span><span class="bar"><i style="width:${Math.max(4, Math.min(100, Math.round(r.frac * 100)))}%"></i></span><b>${r.text}</b></div>`)
+      .join('');
+  }
+
+  /** Link that opens this page with the room code and server already filled in (no password in the link). */
+  private inviteLink(code: string): string {
+    let server = '';
+    try {
+      server = localStorage.getItem('wrh.server') ?? '';
+    } catch {
+      /* ignore */
+    }
+    const u = new URL(location.href);
+    u.search = '';
+    u.hash = '';
+    u.searchParams.set('join', code);
+    // quick tunnels die; the page finds the current public relay by itself when the link has no server
+    if (server && !/trycloudflare\.com/.test(server)) u.searchParams.set('server', server);
+    return u.toString();
+  }
+
   private disposePreview(): void {
     this.preview?.dispose();
     this.preview = null;
@@ -520,13 +605,9 @@ export class Ui {
     const unlocked = (): WeaponId[] => WEAPON_IDS.filter((w) => isUnlocked(w, loadProfile()));
     const refresh = (): void => {
       const colorHex = PLAYER_COLORS[this.color >= 0 ? this.color % PLAYER_COLORS.length : 0]!;
-      const stats = BALANCE.weapons[this.weapon];
       const q = (id: string): HTMLElement => this.screen.querySelector<HTMLElement>('#' + id)!;
       q('wrh-prev-name').textContent = this.previewMode === 'char' ? (names[this.acc] ?? '') : (weaponNames[this.weapon] ?? '');
-      q('wrh-prev-stats').innerHTML =
-        this.previewMode === 'weapon'
-          ? `${this.t.statDmg} <b>${stats.damage}${stats.pellets > 1 ? 'x' + stats.pellets : ''}</b> &middot; ${this.t.statRate} <b>${stats.rate}</b> &middot; ${this.t.statMag} <b>${stats.mag}</b> &middot; ${this.t.statRange} <b>${stats.range}</b>`
-          : '';
+      q('wrh-prev-stats').innerHTML = this.previewMode === 'weapon' ? this.weaponStatBars(this.weapon) : '';
       this.screen.querySelectorAll<HTMLElement>('[data-ptab]').forEach((el) => el.classList.toggle('on', el.dataset.ptab === this.previewMode));
       this.screen.querySelectorAll<HTMLElement>('[data-sw]').forEach((el) => el.classList.toggle('on', Number(el.dataset.sw) === this.color));
       this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => el.classList.toggle('on', el.dataset.w === this.weapon));
@@ -616,19 +697,22 @@ export class Ui {
         return '';
       }
     })();
-    const fromParam = new URLSearchParams(location.search).get('server');
+    const params = new URLSearchParams(location.search);
+    const fromParam = params.get('server');
+    const inviteCode = (params.get('join') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     const hosted = location.hostname.endsWith('github.io');
     const defServer = fromParam ?? (stored || (hosted ? '' : location.port === '5173' ? `ws://${location.hostname}:8787/ws` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
     const rejoin = loadRejoin();
     this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
       <h1>${t.title}</h1><p class="sub">${t.tag} &middot; ${t.best}: ${profile.bestWave} / ${profile.bestKills}</p>
+      ${inviteCode ? `<p class="wrh-invite">&#127881; ${t.invited} <b>${esc(inviteCode)}</b>. ${t.invitedHint}</p>` : ''}
       <label>${t.name}</label><input id="wrh-name" maxlength="16" value="${esc(saved)}" placeholder="player">
       <label>${t.weapon}</label><div class="wrh-weapons" id="wrh-weapons">${this.weaponButtons()}</div>
       ${this.optionRows(true, this.map, this.difficulty)}
       <button id="wrh-solo">${t.solo}</button>
       <button id="wrh-host" class="alt">${t.host}</button>
       ${rejoin ? `<button id="wrh-rejoin" class="alt">${t.rejoin} (${esc(rejoin.code)})</button>` : ''}
-      <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD"></div><button id="wrh-join" class="alt">${t.join}</button></div>
+      <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD" value="${esc(inviteCode)}"></div><button id="wrh-join" class="alt">${t.join}</button></div>
       <label>${t.password}</label><input id="wrh-pass" maxlength="24" autocomplete="off">
       <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}" placeholder="wss://your-tunnel.example.com/ws"><p class="sub" id="wrh-relay-note" style="margin:-6px 0 8px"></p>
       <p class="sub" style="margin:6px 0 0">${t.controls}</p>
@@ -659,6 +743,15 @@ export class Ui {
     q('wrh-solo').onclick = () => this.h.onSolo(name());
     q('wrh-host').onclick = () => this.h.onHost(name(), q<HTMLInputElement>('wrh-server').value.trim(), pass());
     q('wrh-join').onclick = () => this.h.onJoin(name(), q<HTMLInputElement>('wrh-code').value.trim().toUpperCase(), q<HTMLInputElement>('wrh-server').value.trim(), pass());
+    if (inviteCode) {
+      q('wrh-join').classList.remove('alt');
+      q('wrh-host').classList.add('alt');
+      q('wrh-name').focus();
+      // Enter in the name box joins the invited room
+      q('wrh-name').onkeydown = (e) => {
+        if ((e as KeyboardEvent).key === 'Enter') q('wrh-join').click();
+      };
+    }
     const rj = this.screen.querySelector<HTMLElement>('#wrh-rejoin');
     if (rj) rj.onclick = () => this.h.onRejoin();
   }
@@ -676,6 +769,50 @@ export class Ui {
   private readonly tagEls: (HTMLDivElement | null)[] = new Array<HTMLDivElement | null>(MAX_PLAYERS).fill(null);
 
   /** Name label floating over a teammate (screen position in px); `visible` false hides it. */
+  private arrowEls: HTMLElement[] = [];
+
+  /** Arrow on the screen edge pointing at an off-screen teammate (angle in screen space, blinks while they are down). */
+  setArrow(slot: number, name: string, color: string, px: number, py: number, angle: number, visible: boolean, down = false): void {
+    let el = this.arrowEls[slot];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wrh-arrow-off';
+      el.innerHTML = '<i></i><span></span>';
+      this.root.appendChild(el);
+      this.arrowEls[slot] = el;
+    }
+    el.style.display = visible ? 'block' : 'none';
+    if (!visible) return;
+    el.style.left = `${px}px`;
+    el.style.top = `${py}px`;
+    el.style.setProperty('--c', color);
+    el.classList.toggle('down', down);
+    (el.firstElementChild as HTMLElement).style.transform = `rotate(${angle}rad)`;
+    const label = el.lastElementChild as HTMLElement;
+    if (label.textContent !== name) label.textContent = name;
+  }
+
+  private ringEls: HTMLElement[] = [];
+
+  /** Round progress ring over a downed player: red = time left before they bleed out, green = the revive in progress. */
+  setRing(slot: number, bleed: number, progress: number, px: number, py: number, visible: boolean, active: boolean): void {
+    let el = this.ringEls[slot];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wrh-ring';
+      el.innerHTML = '<i class="bleed"></i><i class="prog"></i><b>&#10010;</b>';
+      this.root.appendChild(el);
+      this.ringEls[slot] = el;
+    }
+    el.style.display = visible ? 'block' : 'none';
+    if (!visible) return;
+    el.style.left = `${px}px`;
+    el.style.top = `${py}px`;
+    el.style.setProperty('--b', String(Math.round(bleed * 100)));
+    el.style.setProperty('--p', String(Math.round(progress * 100)));
+    el.classList.toggle('live', active);
+  }
+
   setTag(slot: number, text: string, color: string, px: number, py: number, visible: boolean): void {
     let el = this.tagEls[slot];
     if (!el) {
@@ -757,7 +894,7 @@ export class Ui {
       <label>${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist">${list}</ul>
       <label>${t.weapon}</label><div class="wrh-weapons">${this.weaponButtons()}</div>
       ${this.optionRows(iAmHost, options.map, options.difficulty)}
-      ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-leave" class="warn">${t.leave}</button>
+      ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-invite" class="alt">&#128279; ${t.invite}</button><button id="wrh-leave" class="warn">${t.leave}</button>
     </div>`;
     this.bindWeapons();
     this.bindPreview();
@@ -774,6 +911,18 @@ export class Ui {
     const s = this.screen.querySelector<HTMLElement>('#wrh-start');
     if (s) s.onclick = () => this.h.onStart();
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
+    const inv = this.screen.querySelector<HTMLElement>('#wrh-invite');
+    if (inv) {
+      inv.onclick = () => {
+        const link = this.inviteLink(code);
+        const done = (): void => {
+          inv.textContent = '✔ ' + this.t.inviteCopied;
+        };
+        (navigator.clipboard?.writeText(link) ?? Promise.reject(new Error('no clipboard'))).then(done, () => {
+          window.prompt(this.t.invite, link);
+        });
+      };
+    }
   }
 
   showGameOver(world: World, canReplay = false, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }): void {
@@ -1019,7 +1168,10 @@ export class Ui {
       set(
         'h-me',
         `${(t.weapons as Record<string, string>)[wid]} &middot; <span class="${low || (mag === 0 && reserve === 0) ? 'wrh-low' : ''}">${reloading ? t.reloading : `${mag}/${reserve < 0 ? '&infin;' : reserve}`}${low ? ' !' : ''}</span>` +
-          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>`,
+          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>` +
+          (world.pStashW[slot]! >= 0
+            ? `<br><small style="opacity:.7">[Q] ${(t.weapons as Record<string, string>)[WEAPON_IDS[world.pStashW[slot]!]!]} ${world.pStashMag[slot]}/${world.pStashAmmo[slot]! < 0 ? '&infin;' : world.pStashAmmo[slot]}</small>`
+            : ''),
       );
       const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
       bar.style.display = reloading ? 'block' : 'none';

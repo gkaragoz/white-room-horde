@@ -299,7 +299,8 @@ export function damageEnemy(w: World, i: number, damage: number, dx: number, dy:
   return false;
 }
 
-function rebuildGrid(w: World): void {
+/** Rebuild the enemy grid from the current positions (also used before a shot, when the tick's grid is not built yet). */
+export function rebuildGrid(w: World): void {
   const g = w.grid;
   g.clear();
   for (let i = 0; i < MAX_ENEMIES; i++) if (w.eActive[i]) g.insert(i, w.eX[i]!, w.eY[i]!);
@@ -524,6 +525,13 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
   }
 }
 
+
+/** An explosion caused by a player's round: kills are credited to that player. */
+export function blastFrom(w: World, owner: number, x: number, y: number, radius: number, damage: number): void {
+  killer = owner;
+  blastEnemies(w, x, y, radius, damage);
+  killer = -1;
+}
 
 /** Damage every enemy inside a circle (explosions). Dies and chains through killEnemy. */
 export function blastEnemies(w: World, x: number, y: number, radius: number, damage: number): void {

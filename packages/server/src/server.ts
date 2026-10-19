@@ -14,6 +14,10 @@ const MIME: Record<string, string> = {
   '.glb': 'model/gltf-binary',
   '.bin': 'application/octet-stream',
   '.ogg': 'audio/ogg',
+  '.mp3': 'audio/mpeg',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.wav': 'audio/wav',
 };
 
 export interface RunningServer {
@@ -42,7 +46,7 @@ export async function startServer(opts: { port: number; staticRoot?: string; man
       res.writeHead(404).end('not found');
       return;
     }
-    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
+    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': file.includes('asset-manifest') || file.endsWith('.html') ? 'no-cache' : 'public, max-age=300' });
     createReadStream(file).pipe(res);
   });
 

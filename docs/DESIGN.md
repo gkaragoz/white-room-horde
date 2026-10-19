@@ -108,6 +108,21 @@ Kalın oyuncak oran, sarı vurgu. Hepsinde yüksek geri bildirim: muzzle flash, 
 | Minigun | Isınınca (namlu dönünce) ateşe geçer, yüksek tepe hasar | 6 namlulu döner küme, motor bloğu, cephanelik kutusu |
 | Keskin nişancı (sniper) | Yavaş tek atış, tüm hattı deler | Uzun namlu, dürbün, yan sürgü, katlı bipod |
 | El bombası | Alan hasarı, ragdoll patlaması | Yeşil küre + sarı pim |
+| Tabanca (pistol) | Sakin, saniyede ~3 atış, isabetli, sonsuz mermi | (yukarıda) |
+| Revolver | Saniyede ~2 atış, 36 hasar, bir düşmanı deler, 6'lık tambur | Kalın tambur, uzun namlu, ahşap kabza |
+| Makineli tabanca (mp) | 20 atış/s, düşük hasar, çok dağınık | Uzatılmış şarjör, kompansatör |
+| Çift namlulu | Tek şarjörde 2 atış, 12 saçma, çok kısa menzil | İki namlu, kırma menteşe |
+| Nişancı tüfeği (dmr) | 2,6 atış/s, 46 hasar, 2 düşman deler, 30 menzil | Kısa dürbün, iskelet dipçik |
+| Alev makinesi | 22 atış/s, ince hasar, 20 düşmanı deler, 4,8 menzil | Yan yakıt tüpleri, geniş meme |
+| Bombaatar | Mermi çarpınca patlar (2,4 yarıçap, 55 patlama hasarı) | Kalın namlu, döner tambur |
+
+Silah sayıları `packages/shared/data/balance.json` içinde; yeni silahlar başlangıç silahı olarak dalga rekoruyla açılır (`WEAPON_UNLOCK`). Blender modelleri `tools/blender/make_weapons.py` (üst üste binen/gömülü yüzler otomatik temizlenir, titreme olmaz). Seslerin hepsi gerçek kayıt: `tools/audio/make_guns.py`.
+
+**Silah tutuşu:** karakterin kafası geniş bir küre; silah elde belden aşağıda tutulur (`Character.aimPose`: `drop`, `out`, `push`) ve `weapon.head-clearance` QA testi tüm silahlar x klipler x 12 açıyı kafa küresiyle ölçer.
+
+**Yükseltme görselleri:** `render/power.ts` her kartı oyuncunun etrafında dönen renkli bir mücevher olarak, zırhı kalkan balonu, mıknatısı yer halkası, can bonusunu büyüyen gövde, hasar/delme/kritik bonuslarını mermi izi (kalınlık, renk, uzunluk) ve namlu alevi olarak gösterir; hepsi simülasyon çarpanlarından okunur, ağa yük bindirmez.
+
+**Diriltme:** E basılı tut; ölen oyuncunun üstünde yuvarlak ilerleme halkası (yeşil diriltme, kırmızı kanama süresi) görünür. Tuşu bırakmak ya da uzaklaşmak diriltmeyi keser, ilerleme boşalır (`reviveDrain`), tekrar denenebilir. Diriltirken yavaşlar ve ateş edemezsin.
 
 ## 8. Ağ mimarisi (deterministik simülasyon)
 Özet: her client oyunun tamamını aynı kurallarla simüle eder; ağda sadece oyuncu girdileri dolaşır. Host "kesinleşmiş girdi paketi" (tick bundle) yayınlar. Düşman AI, hasar, spawn deterministik. Gore yerel kozmetik (bkz. bölüm 10).

@@ -1,6 +1,6 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, WEAPON_IDS } from '@wrh/shared';
 import { clamp, cos, sin, sqrt } from './detmath';
-import { equipWeapon, reserveMax } from './loadout';
+import { giveMainWeapon, selectSlot, mainReserve, mainWeapon, reserveMax, setMainReserve } from './loadout';
 import type { World } from './state';
 
 export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0): void {
@@ -93,10 +93,10 @@ export function updatePickups(w: World): void {
 function wants(w: World, s: number, kind: number, i: number): boolean {
   if (kind === PickupType.Health) return w.pHp[s]! < w.pMaxHp[s]!;
   if (kind === PickupType.Grenade) return w.pGren[s]! < BALANCE.grenade.max;
-  if (kind === PickupType.Weapon) return w.pWeapon[s]! !== w.kData[i]!;
+  if (kind === PickupType.Weapon) return mainWeapon(w, s) !== w.kData[i]!;
   const max = reserveMax(w, s);
   // infinite weapons turn an ammo crate into a grenade
-  return max > 0 ? w.pAmmo[s]! < max : w.pGren[s]! < BALANCE.grenade.max;
+  return max > 0 ? mainReserve(w, s) < max : w.pGren[s]! < BALANCE.grenade.max;
 }
 
 function collect(w: World, s: number, i: number): void {
@@ -107,10 +107,14 @@ function collect(w: World, s: number, i: number): void {
   } else if (kind === PickupType.Grenade) {
     w.pGren[s] = w.pGren[s]! + 1;
   } else if (kind === PickupType.Weapon) {
-    equipWeapon(w, s, w.kData[i]!);
+    giveMainWeapon(w, s, w.kData[i]!);
   } else {
     const max = reserveMax(w, s);
-    if (max > 0) w.pAmmo[s] = max;
+    if (max > 0) {
+      setMainReserve(w, s, max);
+      // the main weapon was dry and the sidearm is out: go back to it now that there is ammo
+      if (w.pSel[s] === 1 && w.pStashMag[s] === 0) selectSlot(w, s, 0, true);
+    }
     else w.pGren[s] = w.pGren[s]! + 1;
   }
   w.kActive[i] = 0;

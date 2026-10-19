@@ -1,5 +1,5 @@
 import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, MAX_PLAYERS, PlayerState, RARITY_WEIGHT, TICK_RATE, WEAPON_IDS, type PlayerInput } from '@wrh/shared';
-import { equipWeapon } from './loadout';
+import { giveMainWeapon, mainWeapon, refillAll } from './loadout';
 import type { World } from './state';
 
 const CARDS = CARD_IDS.length;
@@ -72,7 +72,7 @@ function applyCard(w: World, card: number, by: number): void {
     case 'arsenal':
       for (let s = 0; s < MAX_PLAYERS; s++) {
         if (!w.pActive[s]) continue;
-        equipWeapon(w, s, (w.pWeapon[s]! + 1) % WEAPON_IDS.length);
+        giveMainWeapon(w, s, (mainWeapon(w, s) + 1) % WEAPON_IDS.length);
       }
       break;
     case 'sharp':
@@ -88,7 +88,7 @@ function applyCard(w: World, card: number, by: number): void {
       }
       break;
     case 'ammo':
-      for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) equipWeapon(w, s, w.pWeapon[s]!);
+      for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) refillAll(w, s);
       break;
     case 'grenades':
       for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) w.pGren[s] = w.pGren[s]! + c.grenades;

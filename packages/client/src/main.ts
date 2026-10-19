@@ -11,15 +11,19 @@ import { Crowd } from './render/crowd';
 import { PickupView } from './render/pickups';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
+import { PropsView } from './render/props';
+import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
 import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
 import { mountVersionBadge } from './buildinfo';
-import { Ui, type Settings } from './ui';
+import { Ui, UI_STRINGS, type Settings } from './ui';
+import { hideLoading, preloadAssets } from './preload';
 
 const app = document.getElementById('app')!;
 mountVersionBadge();
 document.getElementById('hud')?.remove();
+await preloadAssets();
 const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
@@ -52,6 +56,7 @@ async function createStage(): Promise<Stage> {
         : 'Your browser could not create a WebGL graphics context. Try turning on hardware acceleration, updating the browser, or using Chrome, Edge or Firefox.'
     }</p></div>`;
     document.body.appendChild(box);
+    hideLoading();
     throw e;
   }
 }
@@ -59,6 +64,12 @@ const stage = await createStage();
 const audio = new Audio();
 const input = new Input(stage.renderer.domElement, stage.camera);
 const fx = new Fx(undefined, settings.texture);
+const power = new PowerView((x, y, h, color, n, speed) => fx.sparkle(x, y, h, color, n, speed));
+fx.powerFor = (slot) => {
+  if (!world) return 0;
+  const st = strengthOf(world, slot);
+  return st.damage + st.rate * 0.7;
+};
 stage.scene.add(fx.group);
 const crowd = await Crowd.create(150, backend);
 stage.scene.add(crowd.group);
@@ -70,11 +81,35 @@ stage.scene.add(pickups.group);
 
 const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.1, 0.7), new THREE.MeshBasicMaterial({ color: '#fff0a8' }), MAX_BULLETS);
 bulletMesh.frustumCulled = false;
+/** Look of each weapon's rounds: colour and size of the tracer (width, length multipliers). */
+const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
+  pistol: { color: new THREE.Color('#fff0a8'), w: 1, l: 1 },
+  smg: { color: new THREE.Color('#ffe58a'), w: 0.8, l: 0.9 },
+  ar: { color: new THREE.Color('#ffd86a'), w: 1, l: 1.2 },
+  shotgun: { color: new THREE.Color('#ffc65a'), w: 0.8, l: 0.5 },
+  hmg: { color: new THREE.Color('#ffb347'), w: 1.5, l: 1.4 },
+  minigun: { color: new THREE.Color('#ff9f3a'), w: 1.1, l: 1.6 },
+  sniper: { color: new THREE.Color('#d6f1ff'), w: 0.9, l: 3 },
+  revolver: { color: new THREE.Color('#ffd27a'), w: 1.4, l: 1.2 },
+  mp: { color: new THREE.Color('#fff2b0'), w: 0.7, l: 0.8 },
+  dbl: { color: new THREE.Color('#ffb13a'), w: 0.9, l: 0.45 },
+  dmr: { color: new THREE.Color('#bfe9ff'), w: 1, l: 2.2 },
+  flamer: { color: new THREE.Color('#ff7a1a'), w: 5, l: 1.6 },
+  gl: { color: new THREE.Color('#9fe870'), w: 3.2, l: 1.4 },
+};
+const tracerScale = new THREE.Vector3();
+const tracerColor = new THREE.Color();
+const HOT = new THREE.Color('#ff3a2a');
+const COOL = new THREE.Color('#35d6ff');
+const strength: (ReturnType<typeof strengthOf> | undefined)[] = [];
 bulletMesh.count = 0;
 stage.scene.add(bulletMesh);
+stage.scene.add(power.group);
 
 // cover boxes of the current layout (rebuilt per game)
 const arena = new ArenaView();
+const props = await PropsView.create();
+stage.scene.add(props.group);
 stage.scene.add(arena.group);
 const animator = new PlayerAnimator();
 
@@ -189,6 +224,7 @@ const ui = new Ui(
   },
   settings,
 );
+audio.setWeaponLookup((s) => (world && world.pActive[s] ? WEAPON_IDS[world.pWeapon[s]!] : undefined));
 audio.setSlotLookup((s) => (world && world.pActive[s] ? { x: world.pX[s]!, y: world.pY[s]! } : undefined));
 window.addEventListener('pointerdown', () => audio.unlock());
 window.addEventListener('keydown', () => audio.unlock());
@@ -276,6 +312,11 @@ function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boo
 
 function handleEvent(e: SimEvent): void {
   if (e.type === 'shot') lastShot[e.slot] = nowSec;
+  if (e.type === 'weaponSwitch' && e.slot === localSlot && e.auto) {
+    const L = UI_STRINGS[ui.lang];
+    const n = (L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!];
+    ui.warn(`${e.weapon === 0 ? L.switched : L.backToMain} ${n}`);
+  }
   if (catchingUp) return;
   fx.onEvent(e, localSlot);
   audio.onEvent(e, localSlot);
@@ -350,6 +391,7 @@ function damageNumber(x: number, y: number, damage: number): void {
 function beginPlaying(w: World, slot: number): void {
   audio.startMusic();
   arena.setMap(w.map);
+  props.setMap(w.map);
   world = w;
   localSlot = slot;
   ui.clearScreen();
@@ -481,6 +523,7 @@ function lerpAngle(a: number, b: number, t: number): number {
 
 function sampleLocal(): PlayerInput {
   if (dev.auto && mode === 'solo') return scriptedInput(world!.tick, 0);
+  if (world) input.switchTarget = world.pSel[localSlot] === 0 ? 1 : 0;
   const s = input.sample(curX[localSlot]!, curY[localSlot]!);
   return s.input;
 }
@@ -600,6 +643,7 @@ function frame(nowMs: number): void {
   if (world) {
     const w = world;
     // characters
+    power.begin();
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const c = chars[s];
       if (!c || !w.pActive[s]) continue;
@@ -613,10 +657,13 @@ function frame(nowMs: number): void {
       const ang = lerpAngle(prevA[s]!, curA[s]!, alpha);
       c.root.position.set(x, 0, -y);
       c.root.rotation.y = ang + Math.PI / 2;
+      c.root.scale.setScalar(PowerView.bodyScale(w, s));
+      power.slot(w, s, x, y, nowSec, dt, s === localSlot);
       const aimDriven = animator.apply(w, s, c, nowSec, { firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: curA[s]! });
       c.update(dt);
       if (aimDriven) c.applyAim(dir.set(Math.cos(ang), 0, -Math.sin(ang)));
     }
+    power.end();
     // camera follows the local player, or a living teammate when down/dead
     let target = localSlot;
     if (w.pState[target] === PlayerState.Dead) {
@@ -636,6 +683,36 @@ function frame(nowMs: number): void {
       _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 2.7, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
       ui.setTag(s, names[s] ?? 'P' + (s + 1), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
     }
+    // revive rings over downed players (red: bleeding out, green: being revived)
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      const down = !!w.pActive[s] && w.pState[s] === PlayerState.Downed && !w.gameOver;
+      if (!down) {
+        ui.setRing(s, 0, 0, 0, 0, false, false);
+        continue;
+      }
+      _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 1.6, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
+      const need = BALANCE.player.reviveSeconds * w.modRevive;
+      ui.setRing(s, Math.max(0, w.pTimer[s]! / BALANCE.player.downedSeconds), Math.min(1, w.pRevive[s]! / need), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true, w.pRevive[s]! > 0);
+    }
+    // arrows at the screen edge for teammates who are out of view
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      const far = s !== localSlot && !!w.pActive[s] && w.pState[s] !== PlayerState.Dead && (mode === 'online' || dev.bots > 0);
+      if (!far) {
+        ui.setArrow(s, '', '#000', 0, 0, 0, false);
+        continue;
+      }
+      _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 1.0, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
+      const out = Math.abs(_p.x) > 0.96 || Math.abs(_p.y) > 0.94;
+      if (!out) {
+        ui.setArrow(s, '', '#000', 0, 0, 0, false);
+        continue;
+      }
+      // the point where the line from the screen centre to the teammate leaves the screen
+      const k = Math.max(Math.abs(_p.x) / 0.9, Math.abs(_p.y) / 0.86);
+      const ex = _p.x / k;
+      const ey = _p.y / k;
+      ui.setArrow(s, names[s] ?? 'P' + (s + 1), colorFor(s), ((ex + 1) / 2) * app.clientWidth, ((1 - ey) / 2) * app.clientHeight, Math.atan2(-_p.y, _p.x), true, w.pState[s] === PlayerState.Downed);
+    }
     audio.setListener(fx0, fy0);
     audio.tick(w, localSlot, dt);
     crowd.update(w, alpha, nowSec);
@@ -644,16 +721,31 @@ function frame(nowMs: number): void {
     pickups.update(w, nowSec);
 
     let n = 0;
+    strength.length = 0;
     for (let i = 0; i < MAX_BULLETS; i++) {
       if (!w.bActive[i]) continue;
-      dummy.position.set(w.bX[i]!, BALANCE.weapons[WEAPON_IDS[w.pWeapon[w.bOwner[i]!]!]!].muzzleH, -w.bY[i]!);
+      const wid = WEAPON_IDS[w.pWeapon[w.bOwner[i]!]!]!;
+      const tr = TRACER[wid];
+      const owner = w.bOwner[i]!;
+      if (!strength[owner]) strength[owner] = strengthOf(w, owner);
+      const st = strength[owner]!;
+      dummy.position.set(w.bX[i]!, BALANCE.weapons[wid].muzzleH, -w.bY[i]!);
       q.setFromUnitVectors(fwd, dir.set(w.bVx[i]!, 0, -w.bVy[i]!).normalize());
       dummy.quaternion.copy(q);
+      // upgrades show in the rounds: damage fattens and reddens them, piercing stretches them, crits flash gold
+      const fat = 1 + Math.min(1.2, st.damage * 1.4);
+      dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * (1 + Math.min(1.5, st.pierce * 0.5 + st.damage * 0.4))));
       dummy.updateMatrix();
-      bulletMesh.setMatrixAt(n++, dummy.matrix);
+      bulletMesh.setMatrixAt(n, dummy.matrix);
+      tracerColor.copy(tr.color).lerp(HOT, Math.min(0.85, st.damage * 1.2));
+      if (st.pierce > 0.2) tracerColor.lerp(COOL, Math.min(0.6, st.pierce * 0.3));
+      if (st.crit > 0 && (i * 7 + w.tick) % 5 === 0) tracerColor.set('#ffd21f');
+      bulletMesh.setColorAt(n++, tracerColor);
     }
+    dummy.scale.setScalar(1);
     bulletMesh.count = n;
     bulletMesh.instanceMatrix.needsUpdate = true;
+    if (bulletMesh.instanceColor) bulletMesh.instanceColor.needsUpdate = true;
     let gn = 0;
     for (let i = 0; i < MAX_GRENADES; i++) {
       if (!w.gActive[i]) continue;
@@ -745,3 +837,5 @@ requestAnimationFrame(frame);
     return ws;
   },
 };
+
+hideLoading();

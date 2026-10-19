@@ -57,7 +57,7 @@ describe('sim rules', () => {
     expect(d).toBeCloseTo(6 / 30, 6);
   });
 
-  it('pistol fires about 8 shots per second with infinite ammo', () => {
+  it('pistol fires about 3 shots per second with infinite ammo', () => {
     const w = createWorld(1);
     addPlayer(w, 0, 0, 0);
     let shots = 0;
@@ -65,8 +65,8 @@ describe('sim rules', () => {
       step(w, [{ moveX: 0, moveY: 0, aim: 0, buttons: Buttons.Fire }]);
       shots += w.events.filter((e) => e.type === 'shot').length;
     }
-    expect(shots).toBeGreaterThanOrEqual(7);
-    expect(shots).toBeLessThanOrEqual(9);
+    expect(shots).toBeGreaterThanOrEqual(3);
+    expect(shots).toBeLessThanOrEqual(4);
     expect(w.pAmmo[0]).toBe(-1);
   });
 

@@ -1,3 +1,4 @@
+import { Character } from '../render/character';
 import { mountVersionBadge } from '../buildinfo';
 import { Stage } from '../render/stage';
 import { measured, tests, type Ctx, type Result } from './tests';
@@ -103,6 +104,7 @@ $('runAll').onclick = () => void runAll();
 $('copy').onclick = () => void navigator.clipboard.writeText(JSON.stringify(report, null, 2));
 $('measured').onclick = () => void navigator.clipboard.writeText(JSON.stringify(measured, null, 2));
 
+(window as unknown as Record<string, unknown>).__Character = Character;
 (window as unknown as Record<string, unknown>).__qa = {
   runAll,
   runOne,

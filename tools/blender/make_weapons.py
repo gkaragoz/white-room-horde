@@ -157,11 +157,11 @@ def sniper(b):
     b.cyl("root", (0, -2.18, 0.12), 0.1, 0.22, DARK2, rot=(math.pi / 2, 0, 0))   # muzzle brake
     for k in range(3):
         b.cyl("root", (0, -2.0 - 0.07 * k, 0.12), 0.115, 0.03, METAL, rot=(math.pi / 2, 0, 0))
-    b.cyl("root", (0, -0.45, 0.4), 0.11, 0.8, DARK2, rot=(math.pi / 2, 0, 0))    # scope tube
-    b.cyl("root", (0, -0.86, 0.4), 0.15, 0.1, ACC, rot=(math.pi / 2, 0, 0))      # objective lens
-    b.cyl("root", (0, -0.04, 0.4), 0.13, 0.1, ACC2, rot=(math.pi / 2, 0, 0))     # eyepiece
+    b.cyl("root", (0, -0.45, 0.3), 0.11, 0.8, DARK2, rot=(math.pi / 2, 0, 0))    # scope tube
+    b.cyl("root", (0, -0.86, 0.3), 0.15, 0.1, ACC, rot=(math.pi / 2, 0, 0))      # objective lens
+    b.cyl("root", (0, -0.04, 0.3), 0.13, 0.1, ACC2, rot=(math.pi / 2, 0, 0))     # eyepiece
     for y in (-0.65, -0.25):
-        b.box("root", (0, y, 0.27), (0.1, 0.08, 0.14), DARK2)                # scope mounts
+        b.box("root", (0, y, 0.2), (0.1, 0.08, 0.12), DARK2)                # scope mounts
     b.box("root", (0, 0.3, 0.02), (0.2, 0.8, 0.34), ACC2, rot=(-0.04, 0, 0))   # stock
     b.box("root", (0, 0.35, 0.22), (0.2, 0.5, 0.1), ACC)                     # cheek rest
     b.box("root", (0, 0.72, -0.02), (0.22, 0.1, 0.42), DARK2)                # butt pad
@@ -176,10 +176,174 @@ def sniper(b):
 
 # support (left) hand target for runtime two-bone IK; grip (right hand) is the origin
 GRIP_L = {"pistol": (0, -0.18, -0.22), "smg": (0, -0.85, -0.22), "ar": (0, -1.1, -0.04), "shotgun": (0, -0.78, -0.22), "hmg": (0, -1.0, -0.14),
-          "minigun": (0, -0.55, -0.42), "sniper": (0, -0.95, -0.08)}
+          "minigun": (0, -0.55, -0.42), "sniper": (0, -0.95, -0.08),
+          "revolver": (0, -0.55, -0.18), "mp": (0, -0.55, -0.2), "dbl": (0, -0.6, -0.12), "dmr": (0, -1.0, -0.06), "flamer": (0, -0.75, -0.18), "gl": (0, -0.75, -0.2)}
 
 
-WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade)]
+def revolver(b):
+    b.box("root", (0, -0.12, 0.05), (0.2, 0.55, 0.34), DARK)                 # frame
+    b.cyl("root", (0, -0.42, 0.12), 0.25, 0.46, METAL, rot=(math.pi / 2, 0, 0))   # cylinder drum
+    for k in range(6):                                                         # chamber marks
+        a = k * math.pi / 3
+        b.cyl("root", (0.17 * math.cos(a), -0.67, 0.12 + 0.17 * math.sin(a)), 0.045, 0.04, DARK2, rot=(math.pi / 2, 0, 0))
+    b.cyl("root", (0, -1.12, 0.2), 0.085, 1.0, DARK, rot=(math.pi / 2, 0, 0))   # barrel
+    b.box("root", (0, -1.0, 0.07), (0.12, 0.9, 0.12), DARK2)                 # ejector shroud
+    b.box("root", (0, -1.62, 0.3), (0.05, 0.08, 0.1), ACC)                   # front sight
+    b.box("root", (0, 0.1, 0.27), (0.07, 0.16, 0.14), METAL, rot=(0.5, 0, 0))   # hammer
+    b.box("root", (0, 0.13, -0.26), (0.2, 0.26, 0.5), ACC2, rot=(-0.28, 0, 0))   # wooden grip
+    b.box("root", (0, 0.2, -0.54), (0.22, 0.28, 0.08), METAL, rot=(-0.28, 0, 0))   # butt cap
+    b.torus("root", (0, -0.04, -0.12), 0.1, 0.025, DARK2, rot=(0, math.pi / 2, 0), major=8, minor=4)
+    return (0, -1.64, 0.2)
+
+
+def mp(b):
+    b.box("root", (0, -0.3, 0.1), (0.2, 0.9, 0.24), DARK)                    # slide
+    b.box("root", (0, -0.3, 0.26), (0.08, 0.7, 0.05), DARK2)
+    b.box("root", (0, -0.62, 0.0), (0.12, 0.36, 0.1), ACC)                   # compensator block
+    for k in range(3):
+        b.box("root", (0, -0.78 - 0.07 * k, 0.12), (0.16, 0.04, 0.2), METAL)
+    b.box("root", (0, 0.08, -0.22), (0.19, 0.22, 0.46), DARK2, rot=(-0.18, 0, 0))   # grip
+    b.box("root", (0, -0.05, -0.62), (0.15, 0.2, 0.86), ACC, rot=(0.05, 0, 0))     # extended magazine
+    b.box("root", (0, -0.03, -1.07), (0.18, 0.24, 0.1), ACC2)                # mag base
+    b.box("root", (0, 0.4, 0.02), (0.05, 0.6, 0.05), METAL)                  # wire stock top
+    b.box("root", (0, 0.68, -0.12), (0.18, 0.06, 0.34), DARK2)               # stock plate
+    b.box("root", (0, 0.1, 0.3), (0.12, 0.05, 0.08), DARK2)                  # rear sight
+    b.box("root", (0, -0.62, 0.3), (0.05, 0.06, 0.09), ACC)                  # front sight
+    return (0, -0.98, 0.12)
+
+
+def dbl(b):
+    for sx in (-1, 1):
+        b.cyl("root", (sx * 0.075, -0.95, 0.12), 0.095, 1.65, DARK, rot=(math.pi / 2, 0, 0))   # two barrels
+        b.cyl("root", (sx * 0.075, -1.8, 0.12), 0.11, 0.1, METAL, rot=(math.pi / 2, 0, 0))
+    b.box("root", (0, -0.95, 0.24), (0.1, 1.55, 0.05), DARK2)                # rib
+    b.box("root", (0, -0.55, -0.1), (0.3, 0.7, 0.2), ACC)                    # forend
+    b.box("root", (0, -0.02, 0.04), (0.3, 0.45, 0.34), DARK2)                # receiver / hinge
+    b.cyl("root", (0, -0.28, 0.0), 0.08, 0.34, METAL, rot=(0, math.pi / 2, 0))   # hinge pin
+    b.box("root", (0, 0.5, -0.06), (0.24, 0.9, 0.36), ACC2, rot=(-0.12, 0, 0))   # stock
+    b.box("root", (0, 0.98, -0.12), (0.26, 0.1, 0.46), DARK2, rot=(-0.12, 0, 0))
+    b.box("root", (0, 0.04, -0.28), (0.16, 0.16, 0.34), DARK2, rot=(-0.2, 0, 0))   # grip
+    b.box("root", (0, -1.8, 0.28), (0.05, 0.06, 0.08), ACC)
+    for sx in (-1, 1):
+        b.box("root", (sx * 0.16, -0.04, 0.0), (0.02, 0.34, 0.06), METAL)    # locking lugs
+    return (0, -1.86, 0.12)
+
+
+def dmr(b):
+    b.cyl("root", (0, -1.05, 0.12), 0.07, 1.5, METAL, rot=(math.pi / 2, 0, 0))   # barrel
+    b.box("root", (0, -0.35, 0.12), (0.24, 1.1, 0.3), DARK)                  # receiver
+    b.box("root", (0, -0.9, 0.0), (0.18, 0.8, 0.2), ACC)                     # handguard
+    b.box("root", (0, -0.3, 0.32), (0.14, 0.9, 0.06), DARK2)                 # top rail
+    b.cyl("root", (0, -0.28, 0.36), 0.1, 0.5, DARK2, rot=(math.pi / 2, 0, 0))    # short scope
+    b.cyl("root", (0, -0.55, 0.36), 0.13, 0.08, ACC2, rot=(math.pi / 2, 0, 0))
+    b.cyl("root", (0, 0.0, 0.36), 0.12, 0.08, ACC2, rot=(math.pi / 2, 0, 0))
+    b.box("root", (0, -0.28, 0.27), (0.1, 0.1, 0.1), DARK2)
+    b.cyl("root", (0, -1.84, 0.12), 0.1, 0.24, DARK2, rot=(math.pi / 2, 0, 0))   # muzzle brake
+    b.box("root", (0, -0.4, -0.28), (0.14, 0.2, 0.46), ACC2, rot=(0.1, 0, 0))   # magazine
+    b.box("root", (0, 0.1, -0.2), (0.18, 0.2, 0.42), ACC, rot=(-0.18, 0, 0))    # grip
+    b.box("root", (0, 0.5, 0.08), (0.2, 0.9, 0.28), ACC2)                    # skeleton stock
+    b.box("root", (0, 0.5, 0.2), (0.16, 0.5, 0.08), DARK2)
+    b.box("root", (0, 0.98, 0.04), (0.22, 0.08, 0.4), DARK2)
+    b.box("root", (0.14, -0.1, 0.14), (0.1, 0.2, 0.05), METAL)               # charging handle
+    return (0, -2.0, 0.12)
+
+
+def flamer(b):
+    b.cyl("root", (0, -0.5, 0.1), 0.12, 1.3, DARK2, rot=(math.pi / 2, 0, 0))     # pipe
+    b.box("root", (0, -0.2, 0.06), (0.28, 0.7, 0.32), DARK)                  # body
+    for sx in (-1, 1):                                                         # fuel bottles on the sides
+        b.cyl("root", (sx * 0.3, -0.2, 0.0), 0.15, 0.95, ACC, rot=(math.pi / 2, 0, 0))
+        b.sphere("root", (sx * 0.3, -0.68, 0.0), 0.15, (1, 1, 1), ACC, seg=8, rings=4)
+        b.cyl("root", (sx * 0.3, 0.3, 0.0), 0.07, 0.06, METAL, rot=(math.pi / 2, 0, 0))
+    b.cyl("root", (0, -1.2, 0.1), 0.2, 0.34, METAL, rot=(math.pi / 2, 0, 0), r2=0.13)   # flared nozzle
+    b.cyl("root", (0, -1.42, 0.1), 0.23, 0.1, DARK2, rot=(math.pi / 2, 0, 0))
+    b.sphere("root", (0, -1.55, 0.1), 0.08, (1, 1, 1), "#FF9A2E", seg=6, rings=4)   # pilot light
+    b.box("root", (0, 0.12, -0.24), (0.18, 0.2, 0.44), ACC2, rot=(-0.2, 0, 0))     # grip
+    b.box("root", (0, 0.4, 0.04), (0.16, 0.5, 0.2), DARK2)                   # stock
+    b.cyl("root", (0, -0.2, 0.38), 0.05, 0.3, METAL)                         # pressure gauge stem
+    b.sphere("root", (0, -0.2, 0.5), 0.1, (1, 1, 0.5), "#F4F0E6", seg=8, rings=4)   # gauge face
+    return (0, -1.6, 0.1)
+
+
+def gl(b):
+    b.cyl("root", (0, -0.7, 0.14), 0.22, 1.3, DARK, rot=(math.pi / 2, 0, 0))     # fat launch tube
+    b.cyl("root", (0, -1.4, 0.14), 0.27, 0.18, METAL, rot=(math.pi / 2, 0, 0))   # muzzle ring
+    for k in range(3):
+        b.cyl("root", (0, -0.5 - 0.3 * k, 0.14), 0.25, 0.05, DARK2, rot=(math.pi / 2, 0, 0))
+    b.box("root", (0, -0.05, 0.1), (0.3, 0.6, 0.4), DARK2)                   # receiver
+    b.cyl("root", (0, -0.15, -0.1), 0.34, 0.3, ACC, rot=(math.pi / 2, 0, 0))     # revolving drum
+    b.cyl("root", (0, -0.15, -0.1), 0.1, 0.34, DARK2, rot=(math.pi / 2, 0, 0))
+    b.box("root", (0, 0.4, 0.04), (0.22, 0.6, 0.3), ACC2)                    # stock
+    b.box("root", (0, 0.74, 0.0), (0.24, 0.08, 0.4), DARK2)
+    b.box("root", (0, 0.06, -0.3), (0.18, 0.18, 0.4), ACC, rot=(-0.2, 0, 0))   # grip
+    b.box("root", (0, -0.7, -0.15), (0.14, 0.2, 0.3), DARK2)                 # foregrip
+    b.box("root", (0, -0.35, 0.46), (0.06, 0.4, 0.14), METAL)                # ladder sight
+    b.box("root", (0, -0.28, 0.52), (0.1, 0.04, 0.06), ACC)
+    return (0, -1.5, 0.14)
+
+
+WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade), ("revolver", revolver), ("mp", mp), ("dbl", dbl), ("dmr", dmr), ("flamer", flamer), ("gl", gl)]
+
+
+def cull_hidden(mesh):
+    """Delete faces that z-fight or cannot be seen: faces buried inside another part, and coplanar faces that lie on top
+    of a larger one. The parts are separate boxes and cylinders glued together, so without this the overlapping
+    polygons flicker."""
+    import bmesh
+    from mathutils.bvhtree import BVHTree
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    bm.faces.ensure_lookup_table()
+    tree = BVHTree.FromBMesh(bm, epsilon=1e-5)
+    dirs = [Vector(d).normalized() for d in ((1, 0.31, 0.17), (-0.27, 1, 0.23), (0.19, -0.33, 1))]
+
+    def inside(p):
+        votes = 0
+        for d in dirs:
+            n, o = 0, p.copy()
+            for _ in range(64):
+                hit = tree.ray_cast(o, d)
+                if hit[0] is None:
+                    break
+                n += 1
+                o = hit[0] + d * 1e-4
+            votes += n % 2
+        return votes >= 2
+
+    kill = set()
+    for f in bm.faces:
+        c = f.calc_center_median()
+        if inside(c + f.normal * 0.006):
+            kill.add(f.index)
+    # coplanar duplicates: same plane and same facing, the smaller face goes
+    faces = [f for f in bm.faces if f.index not in kill]
+    for i, a in enumerate(faces):
+        if a.index in kill:
+            continue
+        ca, na = a.calc_center_median(), a.normal
+        for b in faces[i + 1:]:
+            if b.index in kill or na.dot(b.normal) < 0.999:
+                continue
+            if abs((b.calc_center_median() - ca).dot(na)) > 2e-3:
+                continue
+            small, big = (a, b) if a.calc_area() <= b.calc_area() else (b, a)
+            # the smaller one is hidden when its centre lies within the bigger face's footprint
+            cs = small.calc_center_median()
+            bb = [v.co for v in big.verts]
+            lo = Vector((min(v.x for v in bb), min(v.y for v in bb), min(v.z for v in bb)))
+            hi = Vector((max(v.x for v in bb), max(v.y for v in bb), max(v.z for v in bb)))
+            if all(lo[k] - 1e-4 <= cs[k] <= hi[k] + 1e-4 for k in range(3)):
+                kill.add(small.index)
+                if small is a:
+                    break
+    doomed = [f for f in bm.faces if f.index in kill]
+    bmesh.ops.delete(bm, geom=doomed, context="FACES")
+    loose = [v for v in bm.verts if not v.link_faces]
+    bmesh.ops.delete(bm, geom=loose, context="VERTS")
+    bm.to_mesh(mesh.data)
+    bm.free()
+    return len(kill)
+
 
 
 def build(wid, fn, mats):
@@ -195,6 +359,8 @@ def build(wid, fn, mats):
         bpy.ops.object.join()
     mesh = bpy.context.view_layer.objects.active
     mesh.vertex_groups.clear()
+    removed = cull_hidden(mesh)
+    print("weapon", wid, "removed hidden/coplanar faces:", removed)
     mesh.name = "weapon_" + wid
     mesh.data.name = "weapon_" + wid
     empties = []
@@ -240,7 +406,7 @@ def lineup(items):
             break
         except TypeError:
             pass
-    sc.render.resolution_x, sc.render.resolution_y = 1920, 1000
+    sc.render.resolution_x, sc.render.resolution_y = 1500, 1500
     try:
         sc.eevee.taa_render_samples = 48
     except Exception:
@@ -257,8 +423,9 @@ def lineup(items):
     fl = bpy.context.active_object
     fl.scale = (30, 30, 0.1)
     fl.data.materials.append(fm)
-    order = ["pistol", "smg", "ar", "shotgun", "hmg", "minigun", "sniper", "grenade"]
-    pos = {"pistol": (-8.4, 3.0), "smg": (-3.2, 3.0), "ar": (3.2, 3.0), "shotgun": (9.6, 3.0), "hmg": (-7.4, -3.2), "minigun": (-0.6, -3.2), "sniper": (6.8, -3.2), "grenade": (10.6, -3.2)}
+    order = ["pistol", "smg", "ar", "shotgun", "hmg", "minigun", "sniper", "grenade", "revolver", "mp", "dbl", "dmr", "flamer", "gl"]
+    pos = {"pistol": (-8.4, 3.0), "smg": (-3.2, 3.0), "ar": (3.2, 3.0), "shotgun": (9.6, 3.0), "hmg": (-7.4, -3.2), "minigun": (-0.6, -3.2), "sniper": (6.8, -3.2), "grenade": (10.6, -3.2),
+           "revolver": (-8.4, -9.4), "mp": (-3.2, -9.4), "dbl": (3.2, -9.4), "dmr": (9.6, -9.4), "flamer": (-4.0, -15.0), "gl": (4.0, -15.0)}
     for (wid, mesh, emp) in items:
         x, y = pos[wid]
         mesh.location = (x + 1.2, y, 0)
@@ -272,9 +439,9 @@ def lineup(items):
     bpy.ops.object.camera_add()
     cam = bpy.context.active_object
     cam.data.type = "ORTHO"
-    cam.data.ortho_scale = 25
+    cam.data.ortho_scale = 36
     cam.rotation_euler = (math.radians(55), 0, math.radians(0))
-    cam.location = Vector((1.2, 0.0, 0.2)) + cam.rotation_euler.to_matrix() @ Vector((0, 0, 30))
+    cam.location = Vector((1.2, -6.0, 0.2)) + cam.rotation_euler.to_matrix() @ Vector((0, 0, 30))
     sc.camera = cam
     os.makedirs(os.path.dirname(PREVIEW_PATH), exist_ok=True)
     sc.render.filepath = PREVIEW_PATH

@@ -140,6 +140,7 @@ export class Character {
       for (const m of collectSkinned(copy)) {
         m.removeFromParent();
         m.bind(skeleton, m.bindMatrix);
+        m.userData.accessory = true;
         m.castShadow = true;
         m.frustumCulled = false;
         tint(m, opts.color);
@@ -252,6 +253,74 @@ export class Character {
     this.bones.get('handR')?.getObjectByName('weapon')?.removeFromParent();
   }
 
+  /** How the right arm is aimed: sideways, forward and downward weights (tuned with the head-clearance QA test). */
+  static aimPose = { side: 0.9, fwd: 0.45, down: 0.25, drop: 0.4, out: 0.2, push: 0.35 };
+  lastHeadBox = new THREE.Vector3();
+  private headVerts: { mesh: THREE.SkinnedMesh; ids: number[] } | null = null;
+
+  /** The skull as a sphere: mean and largest distance of the vertices that follow the head bone, in the current pose. */
+  headSphere(): { centre: THREE.Vector3; radius: number } {
+    const headBone = this.bones.get('head');
+    const body = collectSkinned(this.model).find((m) => !m.userData.accessory && m.skeleton.bones.includes(headBone!));
+    const centre = new THREE.Vector3();
+    if (!headBone || !body) return { centre: centre.set(0, 1.65, 0).add(this.root.position), radius: 0.62 };
+    if (!this.headVerts) {
+      const idx = body.skeleton.bones.indexOf(headBone);
+      const si = body.geometry.getAttribute('skinIndex');
+      const sw = body.geometry.getAttribute('skinWeight');
+      const ids: number[] = [];
+      for (let i = 0; i < si.count; i++) {
+        for (let k = 0; k < 4; k++) if (si.getComponent(i, k) === idx && sw.getComponent(i, k) > 0.6) ids.push(i);
+      }
+      this.headVerts = { mesh: body, ids };
+    }
+    const { mesh, ids } = this.headVerts;
+    mesh.updateWorldMatrix(true, false);
+    mesh.skeleton.update();
+    const v = new THREE.Vector3();
+    const pts: THREE.Vector3[] = [];
+    for (const i of ids) {
+      mesh.getVertexPosition(i, v);
+      pts.push(v.clone().applyMatrix4(mesh.matrixWorld));
+    }
+    const box = new THREE.Box3();
+    for (const p of pts) box.expandByPoint(p);
+    box.getCenter(centre);
+    const size = box.getSize(new THREE.Vector3());
+    // an ellipsoid in reality; as a sphere take the horizontal half-width so a rifle above the chin is not blamed
+    const radius = Math.max(size.x, size.z) / 2;
+    this.lastHeadBox = size;
+    return { centre, radius };
+  }
+
+  /** World position of the head bone (the neck). */
+  headCentre(out = new THREE.Vector3()): THREE.Vector3 {
+    const h = this.bones.get('head');
+    if (!h) return out.set(0, 1.65, 0).add(this.root.position);
+    h.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(h.matrixWorld);
+  }
+
+  /** Deepest the weapon reaches into a sphere of radius `r` around `centre` (0 = clear). Samples the weapon's vertices. */
+  weaponPenetration(centre: THREE.Vector3, r: number): number {
+    const node = this.weaponNode();
+    if (!node) return 0;
+    node.updateWorldMatrix(true, true);
+    const v = new THREE.Vector3();
+    let worst = 0;
+    node.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || o.userData.ghost) return;
+      const pos = m.geometry.getAttribute('position');
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        const d = r - v.distanceTo(centre);
+        if (d > worst) worst = d;
+      }
+    });
+    return worst;
+  }
+
   /** World position of a named weapon node (`grip`, `muzzle`, `grip_l`). */
   weaponPoint(name: string, out = new THREE.Vector3()): THREE.Vector3 | null {
     const n = this.weaponNode()?.getObjectByName(name);
@@ -292,7 +361,8 @@ export class Character {
     this.root.updateMatrixWorld(true);
     const right = new THREE.Vector3(-dir.z, 0, dir.x).normalize(); // the character's right hand side
     // arm points inward and forward so the weapon sits close to the body centre line
-    const armDir = right.clone().multiplyScalar(-0.9).addScaledVector(dir, 0.45).addScaledVector(UP, -0.25).normalize();
+    const T = Character.aimPose;
+    const armDir = right.clone().multiplyScalar(-T.side).addScaledVector(dir, T.fwd).addScaledVector(UP, -T.down).normalize();
     pointBone(armR, armDir);
     pointBone(handR, dir);
     // roll about the barrel so the weapon's up axis is world up
@@ -304,6 +374,17 @@ export class Character {
     if (Number.isFinite(ang)) {
       const q = new THREE.Quaternion().setFromAxisAngle(dir, ang);
       rotateBoneWorld(handR, q);
+    }
+    // seat the weapon lower, further out to the right and a bit forward so sights, scopes and stocks clear the big head
+    weapon.position.copy(HAND_ATTACH.position);
+    if (T.drop !== 0 || T.out !== 0 || T.push !== 0) {
+      const hand = weapon.parent!;
+      hand.updateWorldMatrix(true, false);
+      const wp = weapon.getWorldPosition(new THREE.Vector3());
+      wp.y -= T.drop;
+      wp.addScaledVector(right, T.out).addScaledVector(dir, T.push);
+      weapon.position.copy(hand.worldToLocal(wp));
+      this.root.updateMatrixWorld(true);
     }
     // support hand to grip_l
     const armL = this.bones.get('armL');

@@ -1,0 +1,23 @@
+{
+ "id": "dbl",
+ "tris": 192,
+ "muzzle": [
+  0.0,
+  -1.86,
+  0.12
+ ],
+ "grip_l": [
+  0,
+  -0.6,
+  -0.12
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

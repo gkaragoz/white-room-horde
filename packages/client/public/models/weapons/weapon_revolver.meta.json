@@ -1,0 +1,23 @@
+{
+ "id": "revolver",
+ "tris": 282,
+ "muzzle": [
+  0.0,
+  -1.64,
+  0.2
+ ],
+ "grip_l": [
+  0,
+  -0.55,
+  -0.18
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

@@ -12,12 +12,12 @@ import {
   type WeaponId,
 } from '@wrh/shared';
 import { clamp, cos, sin, sqrt, TAU } from './detmath';
-import { bulletVsEnemies, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
+import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
 import { out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { Crc32 } from './hash';
 import { updatePickups } from './pickups';
 import { updateCards } from './progression';
-import { equipWeapon } from './loadout';
+import { equipLoadout, selectSlot } from './loadout';
 import { createWorld, type World } from './state';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
@@ -45,7 +45,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pState[slot] = PlayerState.Alive;
   w.pTimer[slot] = 0;
   w.pRevive[slot] = 0;
-  equipWeapon(w, slot, WEAPON_IDS.indexOf(weapon));
+  equipLoadout(w, slot, WEAPON_IDS.indexOf(weapon));
   w.pMoving[slot] = 0;
   w.pIFrames[slot] = 0;
   w.pGren[slot] = BALANCE.grenade.max;
@@ -79,7 +79,26 @@ export function joinPlayer(w: World, slot: number, weapon: WeaponId): void {
   w.pIFrames[slot] = BALANCE.progression.revive.iFrames;
 }
 
-function spawnBullet(w: World, owner: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number): void {
+/** A round ends: it disappears, and an explosive one bursts where it stopped. */
+function endBullet(w: World, i: number, x: number, y: number): void {
+  w.bActive[i] = 0;
+  const owner = w.bOwner[i]!;
+  const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[owner]!]!];
+  const out = x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H;
+  if (st.blast !== undefined && !out) {
+    // explosive round: bursts where it ends (wall, enemy or end of its range)
+    w.events.push({ type: 'explosion', x, y, radius: st.blast * w.modBlast });
+    blastFrom(w, owner, x, y, st.blast * w.modBlast, (st.blastDamage ?? 0) * w.modBlast * w.modDamage * w.pModDmg[owner]!);
+  } else {
+    w.events.push({ type: 'bulletGone', x, y });
+  }
+}
+
+/**
+ * Launch a round from the muzzle. The stretch between the shooter and the muzzle is swept first, so a wall right in
+ * front of the player stops the shot and enemies standing closer than the muzzle can still be hit.
+ */
+function spawnBullet(w: World, owner: number, ox: number, oy: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number): void {
   for (let i = 0; i < MAX_BULLETS; i++) {
     if (w.bActive[i]) continue;
     w.bActive[i] = 1;
@@ -92,6 +111,11 @@ function spawnBullet(w: World, owner: number, x: number, y: number, angle: numbe
     w.bOwner[i] = owner;
     w.bPierce[i] = pierce;
     w.bHit.fill(-1, i * 4, i * 4 + 4);
+    if (segmentBlocked(ox, oy, x, y)) {
+      endBullet(w, i, ox, oy);
+    } else if (w.enemyCount > 0 && bulletVsEnemies(w, i, ox, oy, x, y)) {
+      endBullet(w, i, w.bX[i]!, w.bY[i]!);
+    }
     return;
   }
 }
@@ -170,6 +194,7 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
   }
   let shots = 0;
   while ((inp.buttons & Buttons.Fire) !== 0 && w.pCooldown[s]! <= 0 && shots < 3 && w.pMag[s]! > 0) {
+    if (w.enemyCount > 0) rebuildGrid(w);
     for (let p = 0; p < stats.pellets; p++) {
       const a = angle + (w.rng.float() - 0.5) * 2 * stats.spread;
       // the shot leaves the muzzle: forward along the aim and a little to the right-hand side
@@ -177,7 +202,7 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
       // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
       const crit = w.modCrit > 0 && w.rng.float() < w.modCrit ? 2 : 1;
-      spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * crit, stats.pierce + w.modPierce + w.pModPierce[s]!);
+      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * crit, stats.pierce + w.modPierce + w.pModPierce[s]!);
     }
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
     w.pMag[s] = w.pMag[s]! - 1;
@@ -191,6 +216,18 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
 
 function canReloadNow(w: World, s: number, ammo: number): boolean {
   return ammo < 0 || w.pAmmo[s]! > 0;
+}
+
+/** Is a downed teammate within reviving range of player `s`? */
+function downedNear(w: World, s: number): boolean {
+  const range2 = BALANCE.player.reviveRange * BALANCE.player.reviveRange;
+  for (let d = 0; d < MAX_PLAYERS; d++) {
+    if (d === s || !w.pActive[d] || w.pState[d] !== PlayerState.Downed) continue;
+    const dx = w.pX[s]! - w.pX[d]!;
+    const dy = w.pY[s]! - w.pY[d]!;
+    if (dx * dx + dy * dy <= range2) return true;
+  }
+  return false;
 }
 
 /** Downed players crawl; a living teammate holding Revive nearby brings them back. */
@@ -217,7 +254,8 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
         w.events.push({ type: 'playerRevive', slot: d });
       }
     } else {
-      w.pRevive[d] = 0;
+      // interrupted (let go of the key or moved away): the progress drains, so a short slip does not cost everything
+      w.pRevive[d] = Math.max(0, w.pRevive[d]! - TICK_DT * BALANCE.player.reviveDrain);
       w.pTimer[d] = w.pTimer[d]! - TICK_DT;
       if (w.pTimer[d]! <= 0) {
         w.pState[d] = PlayerState.Dead;
@@ -251,8 +289,17 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
       movePlayer(w, s, inp, BALANCE.player.crawlSpeed, false);
       continue;
     }
-    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed * w.pModSpeed[s]!, true);
-    fireWeapon(w, s, inp, angle);
+    // while no card offer is open, the card buttons select a weapon slot: 1 the main weapon, 2 the sidearm
+    if (w.cardOffer[0]! < 0) {
+      if (inp.buttons & Buttons.Card1) selectSlot(w, s, 0);
+      else if (inp.buttons & Buttons.Card2) selectSlot(w, s, 1);
+    }
+    // the main weapon ran dry: fall back to the sidearm by itself
+    if (w.pSel[s] === 0 && w.pMag[s] === 0 && w.pAmmo[s]! === 0 && w.pReload[s]! <= 0) selectSlot(w, s, 1, true);
+    // a helper holding Revive next to a downed teammate is busy: slower, no shooting (moving off interrupts the revive)
+    const busy = (inp.buttons & Buttons.Revive) !== 0 && downedNear(w, s);
+    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed * w.pModSpeed[s]! * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
+    if (!busy) fireWeapon(w, s, inp, angle);
   }
   updateRevive(w, inputs);
   updateGrenades(w, inputs);
@@ -273,10 +320,7 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     if (!spent && w.enemyCount > 0) spent = bulletVsEnemies(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
     const x = w.bX[i]!;
     const y = w.bY[i]!;
-    if (spent || w.bLife[i]! <= 0 || x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H) {
-      w.bActive[i] = 0;
-      w.events.push({ type: 'bulletGone', x, y });
-    }
+    if (spent || w.bLife[i]! <= 0 || x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H) endBullet(w, i, x, y);
   }
 
   // life cycle: zero hp means downed; nobody left standing ends the run
@@ -316,7 +360,7 @@ export function hashWorld(w: World): number {
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
   c.typed(w.kActive).typed(w.kData).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
-  c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo);
+  c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pSel).typed(w.pStashW).typed(w.pStashMag).typed(w.pStashAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
   return c.digest();

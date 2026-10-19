@@ -18,6 +18,9 @@ export interface WeaponStats {
   /** Rounds per magazine and seconds to reload. */
   mag: number;
   reload: number;
+  /** Explosive rounds: radius and damage of the blast where the round ends. */
+  blast?: number;
+  blastDamage?: number;
   spinUp?: number;
   spinDown?: number;
 }
@@ -76,6 +79,6 @@ export const BALANCE = data as unknown as {
   progression: ProgressionConfig;
   enemies: Record<EnemyType, EnemyStats>;
   waves: WaveConfig;
-  player: { hp: number; speed: number; iFrames: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };
+  player: { reviveMoveMul: number; reviveDrain: number; hp: number; speed: number; iFrames: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };
   weapons: Record<WeaponId, WeaponStats>;
 };
