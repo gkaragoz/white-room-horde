@@ -1,4 +1,5 @@
 import { BALANCE, Buttons, CARD_IDS, MAX_PLAYERS, PlayerState, TICK_RATE, WEAPON_IDS, type PlayerInput } from '@wrh/shared';
+import { equipWeapon } from './loadout';
 import type { World } from './state';
 
 const CARDS = CARD_IDS.length;
@@ -34,7 +35,7 @@ function openOffer(w: World): void {
   w.events.push({ type: 'cardOffer', cards: picked });
 }
 
-function applyCard(w: World, card: number): void {
+function applyCard(w: World, card: number, by: number): void {
   const c = BALANCE.progression.cards;
   switch (CARD_IDS[card]) {
     case 'damage':
@@ -60,8 +61,19 @@ function applyCard(w: World, card: number): void {
     case 'arsenal':
       for (let s = 0; s < MAX_PLAYERS; s++) {
         if (!w.pActive[s]) continue;
-        w.pWeapon[s] = (w.pWeapon[s]! + 1) % WEAPON_IDS.length;
-        w.pAmmo[s] = BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!].ammo;
+        equipWeapon(w, s, (w.pWeapon[s]! + 1) % WEAPON_IDS.length);
+      }
+      break;
+    case 'sharp':
+      if (by >= 0) w.pModDmg[by] = w.pModDmg[by]! + c.sharp;
+      break;
+    case 'sprint':
+      if (by >= 0) w.pModSpeed[by] = w.pModSpeed[by]! + c.sprint;
+      break;
+    case 'bulk':
+      if (by >= 0) {
+        w.pMaxHp[by] = w.pMaxHp[by]! + c.bulk;
+        if (w.pState[by] === PlayerState.Alive) w.pHp[by] = w.pHp[by]! + c.bulk;
       }
       break;
     case 'heal':
@@ -90,7 +102,11 @@ export function updateCards(w: World, inputs: ReadonlyArray<PlayerInput | undefi
   if (choice < 0) return;
   const card = w.cardOffer[choice]!;
   w.cardOffer.fill(-1);
-  applyCard(w, card);
+  if (by < 0) {
+    // nobody chose in time: personal cards go to the first living player
+    for (let s = 0; s < MAX_PLAYERS && by < 0; s++) if (w.pActive[s] && w.pState[s] === PlayerState.Alive) by = s;
+  }
+  applyCard(w, card, by);
   w.events.push({ type: 'cardPicked', card, by });
   if (w.pendingLevels > 0) openOffer(w);
 }

@@ -1,9 +1,10 @@
-import { MAX_PLAYERS, NO_INPUT, WEAPON_IDS, clampInput, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { Bin, decodeInputMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type ServerMsg } from './protocol';
+import { MAP_COUNT, MAX_PLAYERS, NO_INPUT, TICK_RATE, WEAPON_IDS, clampInput, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { Bin, decodeInputMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
 export interface Conn {
   send(data: string | Uint8Array): void;
+  close?(): void;
 }
 
 interface Member {
@@ -12,6 +13,9 @@ interface Member {
   host: boolean;
   conn: Conn | null;
   weapon: WeaponId;
+  acc: number;
+  /** Secret that lets this player reattach to the slot after a dropped connection. */
+  token: string;
   /** Set once the member is part of the running simulation (join command emitted). */
   joined: boolean;
   /** Input tagged by target tick, and the last one that was applied. */
@@ -20,68 +24,137 @@ interface Member {
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+/** Anyone arriving later than this many ticks into the game gets a snapshot instead of the whole history. */
+export const DEFAULT_CATCHUP_LIMIT = 450;
+const MAX_SNAPSHOT_BYTES = 2_000_000;
+const MAX_AHEAD_TICKS = 300;
+
+function randomToken(): string {
+  let s = '';
+  for (let i = 0; i < 24; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return s;
+}
+
+interface SnapJob {
+  slot: number;
+  /** Also send the bundles after the snapshot (a joiner or returning player); a resync only needs the state. */
+  history: boolean;
+}
 
 export class Room {
   readonly members: (Member | null)[] = new Array<Member | null>(MAX_PLAYERS).fill(null);
   started = false;
   tick = 0;
   seed = 0;
-  /** Every bundle sent so far, for late joiners. */
+  options: RoomOptions = { map: 0, difficulty: 1 };
+  /** The layout actually in use once the game has started. */
+  map = 0;
+  password = '';
+  /** Manager tick of the last message from anybody (for idle clean-up). */
+  lastActive = 0;
+  /** Every bundle sent so far (index = tick), for late joiners. */
   readonly history: Uint8Array[] = [];
   private pendingJoins: { slot: number; weaponIndex: number }[] = [];
   private readonly votes = new Map<number, Map<number, number>>();
   private readonly diverged = new Set<number>();
-  private snapshotFor = -1;
+  private readonly jobs: SnapJob[] = [];
+  private startPlayers: { slot: number; weapon: WeaponId }[] = [];
 
-  constructor(readonly code: string) {}
+  constructor(
+    readonly code: string,
+    private readonly catchUpLimit = DEFAULT_CATCHUP_LIMIT,
+  ) {}
 
   private info(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon });
+    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc });
     return out;
   }
 
   broadcastRoom(): void {
     for (const m of this.members) {
-      if (m?.conn) send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started });
+      if (m?.conn) {
+        send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started, options: this.options, token: m.token, locked: this.password !== '' });
+      }
     }
   }
 
-  add(conn: Conn, name: string, weapon: WeaponId): Member | null {
+  private sendStart(conn: Conn): void {
+    send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, difficulty: this.options.difficulty });
+  }
+
+  add(conn: Conn, name: string, weapon: WeaponId, acc = 0): Member | null {
     const slot = this.members.findIndex((m) => m === null);
     if (slot < 0) return null;
     const host = this.members.every((m) => m === null);
-    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, joined: false, pending: new Map(), last: undefined };
+    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, token: randomToken(), joined: false, pending: new Map(), last: undefined };
     this.members[slot] = m;
     if (this.started) {
-      // late join: tell the client how the game started, replay the history, then add the player at the next tick
+      // late join: add the player at the next tick and bring the client up to date
       this.pendingJoins.push({ slot, weaponIndex: WEAPON_IDS.indexOf(weapon) });
       m.joined = true;
-      send(conn, { t: 'start', seed: this.seed, players: this.startPlayers });
-      for (const b of this.history) conn.send(b);
+      this.sendStart(conn);
+      this.catchUp(m);
     }
     return m;
   }
 
-  private startPlayers: { slot: number; weapon: WeaponId }[] = [];
+  /** A returning player reattaches to the slot their token belongs to. */
+  rejoin(conn: Conn, token: string): Member | null {
+    const m = this.members.find((x) => x && x.token === token) ?? null;
+    if (!m) return null;
+    if (m.conn && m.conn !== conn) m.conn.close?.();
+    m.conn = conn;
+    m.pending.clear();
+    if (this.started) {
+      this.sendStart(conn);
+      this.catchUp(m);
+    }
+    return m;
+  }
+
+  /** Send a client the history it missed: all of it for young games, otherwise a donor's snapshot plus what came after. */
+  private catchUp(m: Member): void {
+    if (!m.conn) return;
+    if (this.history.length <= this.catchUpLimit) {
+      for (const b of this.history) m.conn.send(b);
+      return;
+    }
+    const donor = this.members.find((x) => x && x.conn && x.joined && x.slot !== m.slot && !this.diverged.has(x.slot));
+    if (!donor?.conn) {
+      for (const b of this.history) m.conn.send(b);
+      return;
+    }
+    this.jobs.push({ slot: m.slot, history: true });
+    send(donor.conn, { t: 'snapshotRequest' });
+  }
+
+  setOptions(o: Partial<RoomOptions>): void {
+    if (this.started) return;
+    if (typeof o.map === 'number' && Number.isInteger(o.map) && o.map >= -1 && o.map < MAP_COUNT) this.options.map = o.map;
+    if (typeof o.difficulty === 'number' && Number.isInteger(o.difficulty) && o.difficulty >= 0 && o.difficulty <= 2) this.options.difficulty = o.difficulty;
+    this.broadcastRoom();
+  }
 
   start(): void {
     if (this.started) return;
     this.started = true;
     this.seed = (Math.floor(Math.random() * 0xffffffff) + 1) >>> 0;
+    this.map = this.options.map >= 0 ? this.options.map : Math.floor(Math.random() * MAP_COUNT);
     this.startPlayers = [];
     for (const m of this.members) {
       if (!m) continue;
       m.joined = true;
       this.startPlayers.push({ slot: m.slot, weapon: m.weapon });
     }
-    for (const m of this.members) if (m?.conn) send(m.conn, { t: 'start', seed: this.seed, players: this.startPlayers });
+    for (const m of this.members) if (m?.conn) this.sendStart(m.conn);
     this.broadcastRoom();
   }
 
-  disconnect(slot: number): void {
+  disconnect(slot: number, conn?: Conn): void {
     const m = this.members[slot];
     if (!m) return;
+    if (conn && m.conn !== conn) return; // an old connection closing after a rejoin
     m.conn = null;
     m.pending.clear();
     m.last = undefined;
@@ -108,7 +181,7 @@ export class Room {
 
   input(slot: number, tick: number, input: PlayerInput): void {
     const m = this.members[slot];
-    if (!m || tick < this.tick) return; // too late: dropped, the previous input stays in force
+    if (!m || tick < this.tick || tick > this.tick + MAX_AHEAD_TICKS) return; // too late (the previous input stays) or absurdly early
     m.pending.set(tick, clampInput(input));
   }
 
@@ -144,22 +217,22 @@ export class Room {
 
   /** A diverged client asks for a fresh state: pick a healthy donor and have it upload a snapshot. */
   resync(slot: number): void {
-    for (const m of this.members) {
-      if (m?.conn && m.joined && m.slot !== slot && !this.diverged.has(m.slot)) {
-        this.snapshotFor = slot;
-        send(m.conn, { t: 'snapshotRequest' });
-        return;
-      }
-    }
+    const donor = this.members.find((m) => m?.conn && m.joined && m.slot !== slot && !this.diverged.has(m.slot));
+    if (!donor?.conn) return;
+    this.jobs.push({ slot, history: false });
+    send(donor.conn, { t: 'snapshotRequest' });
   }
 
   snapshot(from: number, data: Uint8Array): void {
-    const target = this.members[this.snapshotFor];
-    if (!target?.conn || from === this.snapshotFor) return;
-    const t = decodeSnapshot(data).tick;
-    target.conn.send(encodeSnapshot(Bin.SnapshotDeliver, t, decodeSnapshot(data).data));
-    this.diverged.delete(this.snapshotFor);
-    this.snapshotFor = -1;
+    if (data.length > MAX_SNAPSHOT_BYTES || data.length < 6) return;
+    const job = this.jobs.shift();
+    if (!job) return; // nobody asked for one
+    const target = this.members[job.slot];
+    if (!target?.conn || from === job.slot) return;
+    const { tick, data: world } = decodeSnapshot(data);
+    target.conn.send(encodeSnapshot(Bin.SnapshotDeliver, tick, world));
+    this.diverged.delete(job.slot);
+    if (job.history) for (let t = tick; t < this.history.length; t++) target.conn.send(this.history[t]!);
   }
 
   /** Produce and broadcast the confirmed inputs for the current tick. Called at the tick rate. */
@@ -199,10 +272,37 @@ interface Attached {
   slot: number;
 }
 
+interface Bucket {
+  tokens: number;
+  last: number;
+  dropped: number;
+}
+
+export interface ManagerOptions {
+  catchUpLimit?: number;
+  maxRooms?: number;
+  /** Messages per second a single connection may send (inputs are about 30 per second). */
+  rate?: number;
+  /** Seconds before a room nobody is connected to is deleted. */
+  idleSeconds?: number;
+}
+
+function validName(v: unknown): string {
+  // eslint-disable-next-line no-control-regex
+  return typeof v === 'string' ? v.replace(/[\u0000-\u001f<>]/g, '').slice(0, 16) : '';
+}
+
 /** Room registry and message router. Transport agnostic: the Node server and the tests both drive it. */
 export class RoomManager {
   readonly rooms = new Map<string, Room>();
   private readonly attached = new Map<Conn, Attached>();
+  private readonly buckets = new Map<Conn, Bucket>();
+  private now = 0;
+  private readonly opts: Required<ManagerOptions>;
+
+  constructor(opts: ManagerOptions = {}) {
+    this.opts = { catchUpLimit: DEFAULT_CATCHUP_LIMIT, maxRooms: 300, rate: 150, idleSeconds: 120, ...opts };
+  }
 
   private newCode(): string {
     for (;;) {
@@ -212,31 +312,58 @@ export class RoomManager {
     }
   }
 
+  /** Token bucket per connection: drop what exceeds the allowance and cut off connections that keep flooding. */
+  private allow(conn: Conn): boolean {
+    const t = performance.now();
+    let b = this.buckets.get(conn);
+    if (!b) {
+      b = { tokens: this.opts.rate * 2, last: t, dropped: 0 };
+      this.buckets.set(conn, b);
+    }
+    b.tokens = Math.min(this.opts.rate * 2, b.tokens + ((t - b.last) / 1000) * this.opts.rate);
+    b.last = t;
+    if (b.tokens >= 1) {
+      b.tokens -= 1;
+      return true;
+    }
+    if (++b.dropped > this.opts.rate * 20) conn.close?.();
+    return false;
+  }
+
   handle(conn: Conn, data: string | Uint8Array): void {
+    if (!this.allow(conn)) return;
+    const a = this.attached.get(conn);
+    if (a) a.room.lastActive = this.now;
     if (typeof data !== 'string') {
-      const a = this.attached.get(conn);
-      if (a && data[0] === Bin.Input && data.length >= 10) {
+      if (!a) return;
+      if (data[0] === Bin.Input && data.length === 10) {
         const { tick, input } = decodeInputMsg(data);
-        a.room.input(a.slot, tick, input);
-      } else if (a && data[0] === Bin.Snapshot) {
+        if (Number.isFinite(tick)) a.room.input(a.slot, tick, input);
+      } else if (data[0] === Bin.Snapshot) {
         a.room.snapshot(a.slot, data);
       }
       return;
     }
+    if (data.length > 600) return;
     let msg: ClientMsg;
     try {
       msg = JSON.parse(data) as ClientMsg;
     } catch {
       return;
     }
-    const a = this.attached.get(conn);
-    const weaponOf = (w?: WeaponId): WeaponId => (w && WEAPON_IDS.includes(w) ? w : 'pistol');
+    if (!msg || typeof msg !== 'object' || typeof (msg as { t?: unknown }).t !== 'string') return;
+    const weaponOf = (w: unknown): WeaponId => (typeof w === 'string' && (WEAPON_IDS as readonly string[]).includes(w) ? (w as WeaponId) : 'pistol');
+    const accOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 16 ? v : 0);
+    const isHost = (): boolean => !!a && a.room.members[a.slot]?.host === true;
     switch (msg.t) {
       case 'create': {
         if (a) return;
-        const room = new Room(this.newCode());
+        if (this.rooms.size >= this.opts.maxRooms) return send(conn, { t: 'error', message: 'server is full' });
+        const room = new Room(this.newCode(), this.opts.catchUpLimit);
+        room.lastActive = this.now;
+        if (typeof msg.password === 'string') room.password = msg.password.slice(0, 24);
         this.rooms.set(room.code, room);
-        const m = room.add(conn, msg.name, weaponOf(msg.weapon))!;
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc))!;
         this.attached.set(conn, { room, slot: m.slot });
         room.broadcastRoom();
         break;
@@ -245,46 +372,79 @@ export class RoomManager {
         if (a) return;
         const room = this.rooms.get(String(msg.code).toUpperCase());
         if (!room) return send(conn, { t: 'error', message: 'room not found' });
-        const m = room.add(conn, msg.name, weaponOf(msg.weapon));
+        if (room.password && room.password !== msg.password) return send(conn, { t: 'error', message: 'wrong password' });
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc));
         if (!m) return send(conn, { t: 'error', message: 'room is full' });
+        room.lastActive = this.now;
+        this.attached.set(conn, { room, slot: m.slot });
+        room.broadcastRoom();
+        break;
+      }
+      case 'rejoin': {
+        if (a) return;
+        const room = this.rooms.get(String(msg.code).toUpperCase());
+        const m = room && typeof msg.token === 'string' ? room.rejoin(conn, msg.token) : null;
+        if (!room || !m) return send(conn, { t: 'error', message: 'cannot rejoin' });
+        room.lastActive = this.now;
         this.attached.set(conn, { room, slot: m.slot });
         room.broadcastRoom();
         break;
       }
       case 'start':
-        if (a && a.room.members[a.slot]?.host) a.room.start();
+        if (isHost()) a!.room.start();
+        break;
+      case 'options':
+        if (isHost()) a!.room.setOptions({ map: msg.map, difficulty: msg.difficulty });
         break;
       case 'hash':
-        if (a) a.room.hash(a.slot, msg.tick, msg.hash);
+        if (a && Number.isFinite(msg.tick) && Number.isFinite(msg.hash)) a.room.hash(a.slot, msg.tick, msg.hash);
         break;
       case 'ping':
-        send(conn, { t: 'pong', ts: msg.ts });
+        if (Number.isFinite(msg.ts)) send(conn, { t: 'pong', ts: msg.ts });
         break;
       case 'resync':
         if (a) a.room.resync(a.slot);
         break;
       case 'weapon':
-        if (a && !a.room.started && WEAPON_IDS.includes(msg.weapon)) {
+        if (a && !a.room.started && (WEAPON_IDS as readonly string[]).includes(msg.weapon)) {
           a.room.members[a.slot]!.weapon = msg.weapon;
           a.room.broadcastRoom();
         }
         break;
+      case 'look':
+        if (a && !a.room.started) {
+          a.room.members[a.slot]!.acc = accOf(msg.acc);
+          a.room.broadcastRoom();
+        }
+        break;
       case 'leave':
-        this.close(conn);
+        this.close(conn, true);
         break;
     }
   }
 
-  close(conn: Conn): void {
+  /** A connection ended. `final` (the player chose to leave) forgets their slot's token in a running game. */
+  close(conn: Conn, final = false): void {
+    this.buckets.delete(conn);
     const a = this.attached.get(conn);
     if (!a) return;
     this.attached.delete(conn);
-    a.room.disconnect(a.slot);
-    if (a.room.empty) this.rooms.delete(a.room.code);
+    a.room.disconnect(a.slot, conn);
+    if (final && a.room.started) {
+      const m = a.room.members[a.slot];
+      if (m) m.token = randomToken(); // nobody can rejoin this slot any more
+    }
+    if (a.room.empty && !a.room.started) this.rooms.delete(a.room.code);
   }
 
-  /** Advance every running room by one tick. */
+  /** Advance every running room by one tick and now and then drop rooms nobody is in. */
   tick(): void {
+    this.now++;
     for (const r of this.rooms.values()) r.advance();
+    if (this.now % (TICK_RATE * 15) === 0) {
+      for (const [code, r] of this.rooms) {
+        if (r.empty && this.now - r.lastActive > this.opts.idleSeconds * TICK_RATE) this.rooms.delete(code);
+      }
+    }
   }
 }

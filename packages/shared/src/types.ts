@@ -39,8 +39,10 @@ export const EnemyState = { Move: 0, Attack: 1, Spawn: 2 } as const;
 export const PlayerState = { Alive: 0, Downed: 1, Dead: 2 } as const;
 
 /** Team upgrade cards offered on level up (index = card id). */
-export const CARD_IDS = ['damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal'] as const;
+export const CARD_IDS = ['damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal', 'sharp', 'sprint', 'bulk'] as const;
+/** Cards that only help the player who picked them. */
+export const PERSONAL_CARDS: readonly string[] = ['sharp', 'sprint', 'bulk'];
 export type CardId = (typeof CARD_IDS)[number];
 
 /** Pickup kinds (kType). */
-export const PickupType = { Ammo: 0, Health: 1, Grenade: 2 } as const;
+export const PickupType = { Ammo: 0, Health: 1, Grenade: 2, Weapon: 3 } as const;

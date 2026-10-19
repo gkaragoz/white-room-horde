@@ -1,8 +1,9 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, WEAPON_IDS } from '@wrh/shared';
 import { clamp, cos, sin, sqrt } from './detmath';
+import { equipWeapon, reserveMax } from './loadout';
 import type { World } from './state';
 
-export function spawnPickup(w: World, kind: number, x: number, y: number): void {
+export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0): void {
   for (let i = 0; i < MAX_PICKUPS; i++) {
     if (w.kActive[i]) continue;
     w.kActive[i] = 1;
@@ -10,6 +11,7 @@ export function spawnPickup(w: World, kind: number, x: number, y: number): void 
     w.kX[i] = clamp(x, -ARENA_HALF_W + 0.8, ARENA_HALF_W - 0.8);
     w.kY[i] = clamp(y, -ARENA_HALF_H + 0.8, ARENA_HALF_H - 0.8);
     w.kLife[i] = BALANCE.pickups.lifeSeconds;
+    w.kData[i] = data;
     w.events.push({ type: 'pickupDrop', kind, x: w.kX[i]!, y: w.kY[i]! });
     return;
   }
@@ -19,7 +21,7 @@ export function spawnPickup(w: World, kind: number, x: number, y: number): void 
 function ammoStarved(w: World): boolean {
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive) continue;
-    const max = BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!].ammo;
+    const max = reserveMax(w, s);
     if (max > 0 && w.pAmmo[s]! < max * 0.25) return true;
   }
   return false;
@@ -44,6 +46,7 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
   if (r < ammoChance) spawnPickup(w, PickupType.Ammo, x, y);
   else if (r < ammoChance + cfg.chance.health) spawnPickup(w, PickupType.Health, x, y);
   else if (r < ammoChance + cfg.chance.health + cfg.chance.grenade) spawnPickup(w, PickupType.Grenade, x, y);
+  else if (r < ammoChance + cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) spawnPickup(w, PickupType.Weapon, x, y, w.rng.int(WEAPON_IDS.length));
 }
 
 /** Magnet drift toward the nearest living player, then pickup on contact; expire after their lifetime. */
@@ -65,7 +68,7 @@ export function updatePickups(w: World): void {
       const dx = w.pX[s]! - w.kX[i]!;
       const dy = w.pY[s]! - w.kY[i]!;
       const d2 = dx * dx + dy * dy;
-      if (d2 < bd2 && wants(w, s, w.kType[i]!)) {
+      if (d2 < bd2 && wants(w, s, w.kType[i]!, i)) {
         bd2 = d2;
         best = s;
       }
@@ -85,10 +88,11 @@ export function updatePickups(w: World): void {
 }
 
 /** Would this player gain anything from the pickup? (A full player leaves it for a teammate.) */
-function wants(w: World, s: number, kind: number): boolean {
+function wants(w: World, s: number, kind: number, i: number): boolean {
   if (kind === PickupType.Health) return w.pHp[s]! < w.pMaxHp[s]!;
   if (kind === PickupType.Grenade) return w.pGren[s]! < BALANCE.grenade.max;
-  const max = BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!].ammo;
+  if (kind === PickupType.Weapon) return w.pWeapon[s]! !== w.kData[i]!;
+  const max = reserveMax(w, s);
   // infinite weapons turn an ammo crate into a grenade
   return max > 0 ? w.pAmmo[s]! < max : w.pGren[s]! < BALANCE.grenade.max;
 }
@@ -100,8 +104,10 @@ function collect(w: World, s: number, i: number): void {
     w.pHp[s] = hp > w.pMaxHp[s]! ? w.pMaxHp[s]! : hp;
   } else if (kind === PickupType.Grenade) {
     w.pGren[s] = w.pGren[s]! + 1;
+  } else if (kind === PickupType.Weapon) {
+    equipWeapon(w, s, w.kData[i]!);
   } else {
-    const max = BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!].ammo;
+    const max = reserveMax(w, s);
     if (max > 0) w.pAmmo[s] = max;
     else w.pGren[s] = w.pGren[s]! + 1;
   }

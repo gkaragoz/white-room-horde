@@ -16,6 +16,10 @@ export type SimEvent =
   | { type: 'spit'; x: number; y: number; angle: number }
   | { type: 'pickupDrop'; kind: number; x: number; y: number }
   | { type: 'pickup'; kind: number; slot: number; x: number; y: number }
+  | { type: 'reloadStart'; slot: number }
+  | { type: 'reloadDone'; slot: number }
+  | { type: 'dash'; slot: number; x: number; y: number }
+  | { type: 'bossAbility'; kind: 'charge' | 'summon' | 'aura'; x: number; y: number }
   | { type: 'playerDown'; slot: number; x: number; y: number }
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
@@ -37,6 +41,9 @@ export interface World {
   kills: number;
   enemyCount: number;
   gameOver: number;
+  /** 0 easy, 1 normal, 2 hard (scales enemy hp, count and damage) and the arena layout index. */
+  difficulty: number;
+  map: number;
   xp: number;
   level: number;
   pendingLevels: number;
@@ -66,6 +73,15 @@ export interface World {
   pWeapon: Int32Array;
   pAmmo: Int32Array;
   pMoving: Uint8Array;
+  /** Rounds in the magazine, reload countdown (s), dash ticks left / cooldown (s) / direction, personal card multipliers. */
+  pMag: Int32Array;
+  pReload: Float64Array;
+  pDash: Int32Array;
+  pDashCd: Float64Array;
+  pDashX: Float64Array;
+  pDashY: Float64Array;
+  pModDmg: Float64Array;
+  pModSpeed: Float64Array;
   pGren: Int32Array;
   pGrenCharge: Float64Array;
   pGrenCd: Float64Array;
@@ -79,6 +95,8 @@ export interface World {
   eAngle: Float64Array;
   eHp: Float64Array;
   eBoss: Uint8Array;
+  /** Per-enemy scratch: boss charge ticks left. */
+  eAux: Float64Array;
   eCooldown: Float64Array;
   // grenades
   gActive: Uint8Array;
@@ -94,6 +112,8 @@ export interface World {
   kX: Float64Array;
   kY: Float64Array;
   kLife: Float64Array;
+  /** Weapon index for weapon pickups. */
+  kData: Int32Array;
   // spitter projectiles
   sActive: Uint8Array;
   sX: Float64Array;
@@ -119,7 +139,7 @@ export interface World {
   grid: SpatialHash;
 }
 
-export function createWorld(seed: number): World {
+export function createWorld(seed: number, map = 0, difficulty = 1): World {
   const w: World = {
     tick: 0,
     rng: new Rng(seed),
@@ -130,6 +150,8 @@ export function createWorld(seed: number): World {
     kills: 0,
     enemyCount: 0,
     gameOver: 0,
+    difficulty,
+    map,
     xp: 0,
     level: 1,
     pendingLevels: 0,
@@ -154,6 +176,14 @@ export function createWorld(seed: number): World {
     pWeapon: new Int32Array(MAX_PLAYERS),
     pAmmo: new Int32Array(MAX_PLAYERS),
     pMoving: new Uint8Array(MAX_PLAYERS),
+    pMag: new Int32Array(MAX_PLAYERS),
+    pReload: new Float64Array(MAX_PLAYERS),
+    pDash: new Int32Array(MAX_PLAYERS),
+    pDashCd: new Float64Array(MAX_PLAYERS),
+    pDashX: new Float64Array(MAX_PLAYERS),
+    pDashY: new Float64Array(MAX_PLAYERS),
+    pModDmg: new Float64Array(MAX_PLAYERS).fill(1),
+    pModSpeed: new Float64Array(MAX_PLAYERS).fill(1),
     pGren: new Int32Array(MAX_PLAYERS).fill(BALANCE.grenade.max),
     pGrenCharge: new Float64Array(MAX_PLAYERS),
     pGrenCd: new Float64Array(MAX_PLAYERS),
@@ -166,6 +196,7 @@ export function createWorld(seed: number): World {
     eAngle: new Float64Array(MAX_ENEMIES),
     eHp: new Float64Array(MAX_ENEMIES),
     eBoss: new Uint8Array(MAX_ENEMIES),
+    eAux: new Float64Array(MAX_ENEMIES),
     eCooldown: new Float64Array(MAX_ENEMIES),
     gActive: new Uint8Array(MAX_GRENADES),
     gX: new Float64Array(MAX_GRENADES),
@@ -179,6 +210,7 @@ export function createWorld(seed: number): World {
     kX: new Float64Array(MAX_PICKUPS),
     kY: new Float64Array(MAX_PICKUPS),
     kLife: new Float64Array(MAX_PICKUPS),
+    kData: new Int32Array(MAX_PICKUPS),
     sActive: new Uint8Array(MAX_SPIT),
     sX: new Float64Array(MAX_SPIT),
     sY: new Float64Array(MAX_SPIT),
@@ -199,6 +231,6 @@ export function createWorld(seed: number): World {
     field: new FlowField(),
     grid: new SpatialHash(),
   };
-  applyObstacles(w.field);
+  applyObstacles(w.field, map);
   return w;
 }

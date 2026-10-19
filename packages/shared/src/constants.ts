@@ -20,16 +20,72 @@ export const PLAYER_COLORS = [
 export const MAX_GRENADES = 32;
 export const MAX_SPIT = 160;
 
-/** Static cover: axis-aligned boxes (centre x, y in sim coordinates, full width and height). Shared by sim and renderer. */
-export const OBSTACLES: readonly { x: number; y: number; w: number; h: number }[] = [
-  { x: -10, y: 6, w: 4, h: 2 },
-  { x: 9, y: -5, w: 2, h: 5 },
-  { x: 0, y: 12, w: 6, h: 1.5 },
-  { x: -18, y: -8, w: 2, h: 6 },
-  { x: 16, y: 10, w: 3, h: 3 },
-  { x: -6, y: -12, w: 5, h: 2 },
-  { x: 22, y: -14, w: 2, h: 2 },
-  { x: -24, y: 12, w: 2, h: 2 },
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Arena layouts: axis-aligned boxes (centre x, y in sim coordinates, full width and height). Shared by sim and renderer. */
+export const MAPS: readonly { id: string; boxes: readonly Box[] }[] = [
+  {
+    id: 'warehouse',
+    boxes: [
+      { x: -10, y: 6, w: 4, h: 2 },
+      { x: 9, y: -5, w: 2, h: 5 },
+      { x: 0, y: 12, w: 6, h: 1.5 },
+      { x: -18, y: -8, w: 2, h: 6 },
+      { x: 16, y: 10, w: 3, h: 3 },
+      { x: -6, y: -12, w: 5, h: 2 },
+      { x: 22, y: -14, w: 2, h: 2 },
+      { x: -24, y: 12, w: 2, h: 2 },
+    ],
+  },
+  {
+    id: 'courtyard',
+    boxes: [
+      { x: 9, y: 0, w: 2, h: 2 },
+      { x: 6.4, y: 6.4, w: 2, h: 2 },
+      { x: 0, y: 9, w: 2, h: 2 },
+      { x: -6.4, y: 6.4, w: 2, h: 2 },
+      { x: -9, y: 0, w: 2, h: 2 },
+      { x: -6.4, y: -6.4, w: 2, h: 2 },
+      { x: 0, y: -9, w: 2, h: 2 },
+      { x: 6.4, y: -6.4, w: 2, h: 2 },
+      { x: 20, y: 12, w: 6, h: 1.5 },
+      { x: -20, y: 12, w: 6, h: 1.5 },
+      { x: 20, y: -12, w: 6, h: 1.5 },
+      { x: -20, y: -12, w: 6, h: 1.5 },
+    ],
+  },
+  {
+    id: 'corridors',
+    boxes: [
+      { x: -14, y: 7, w: 16, h: 1.2 },
+      { x: 14, y: 7, w: 16, h: 1.2 },
+      { x: -14, y: -7, w: 16, h: 1.2 },
+      { x: 14, y: -7, w: 16, h: 1.2 },
+      { x: 23, y: 0, w: 1.2, h: 8 },
+      { x: -23, y: 0, w: 1.2, h: 8 },
+      { x: 0, y: 14, w: 4, h: 2 },
+      { x: 0, y: -14, w: 4, h: 2 },
+    ],
+  },
+  {
+    id: 'field',
+    boxes: [
+      { x: -14, y: -9, w: 3, h: 3 },
+      { x: 13, y: 8, w: 3, h: 3 },
+      { x: -4, y: 10, w: 2, h: 2 },
+      { x: 5, y: -11, w: 4, h: 1.5 },
+      { x: 24, y: 0, w: 2, h: 6 },
+    ],
+  },
 ];
+export const MAP_COUNT = MAPS.length;
+/** The first layout (kept for code that only needs one set of cover). */
+export const OBSTACLES: readonly Box[] = MAPS[0]!.boxes;
+
 
 export const MAX_PICKUPS = 64;

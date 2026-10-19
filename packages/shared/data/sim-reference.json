@@ -5,19 +5,19 @@
       "seed": 1,
       "ticks": 200,
       "players": 4,
-      "hash": 2017562023
+      "hash": 2866637719
     },
     {
       "seed": 42,
       "ticks": 600,
       "players": 4,
-      "hash": 2982923622
+      "hash": 3770851770
     },
     {
       "seed": 7,
       "ticks": 900,
       "players": 8,
-      "hash": 1533901529
+      "hash": 1942029984
     }
   ]
 }

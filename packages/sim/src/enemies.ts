@@ -13,6 +13,7 @@ const T_SPITTER = ENEMY_TYPES.indexOf('spitter');
 const T_SPAWNER = ENEMY_TYPES.indexOf('spawner');
 const T_GRUNT = ENEMY_TYPES.indexOf('grunt');
 const T_TANK = ENEMY_TYPES.indexOf('tank');
+const T_RUNNER = ENEMY_TYPES.indexOf('runner');
 const T_SHIELDER = ENEMY_TYPES.indexOf('shielder');
 
 // per-type stats flattened for the hot loops
@@ -73,7 +74,7 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     if (w.eActive[i]) continue;
     let players = 0;
     for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) players++;
-    const hp = HP[type]! * w.hpMul * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
+    const hp = HP[type]! * w.hpMul * BALANCE.difficulty.hp[w.difficulty]! * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
     w.eActive[i] = 1;
     w.eBoss[i] = 0;
     w.eType[i] = type;
@@ -88,6 +89,80 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     return i;
   }
   return -1;
+}
+
+const auraX = new Float64Array(8);
+const auraY = new Float64Array(8);
+let auraN = 0;
+
+/** Swarm-leader bosses (variant 4) speed up every enemy standing near them. */
+function collectAuras(w: World): void {
+  auraN = 0;
+  for (let i = 0; i < MAX_ENEMIES && auraN < 8; i++) {
+    if (w.eActive[i] && w.eBoss[i] === 4) {
+      auraX[auraN] = w.eX[i]!;
+      auraY[auraN] = w.eY[i]!;
+      auraN++;
+    }
+  }
+}
+
+function inAura(x: number, y: number): boolean {
+  const r2 = BALANCE.progression.boss.auraRadius * BALANCE.progression.boss.auraRadius;
+  for (let k = 0; k < auraN; k++) {
+    const dx = x - auraX[k]!;
+    const dy = y - auraY[k]!;
+    if (dx * dx + dy * dy <= r2) return true;
+  }
+  return false;
+}
+
+/** Ring of summoned enemies around a boss. */
+function summonRing(w: World, x: number, y: number, type: number, n: number): void {
+  for (let k = 0; k < n && w.enemyCount < BALANCE.waves.cap; k++) {
+    const a = (k / n) * 6.283185307179586;
+    spawnEnemy(w, type, clamp(x + cos(a) * 2.5, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(y + sin(a) * 2.5, -ARENA_HALF_H + 1, ARENA_HALF_H - 1));
+  }
+}
+
+/**
+ * The four bosses fight differently: the brute charges, the king summons grunts, the queen spits out spitters, the
+ * swarm leader speeds up its horde (see collectAuras) and calls runners.
+ */
+function bossAbilities(w: World, i: number, x: number, y: number, dist: number): void {
+  const cfg = BALANCE.progression.boss;
+  const variant = w.eBoss[i]!;
+  const t = w.tick - w.waveTick;
+  if (t <= 0) return;
+  const callState = (): void => {
+    w.eState[i] = EnemyState.Attack;
+    w.eStateTick[i] = w.tick;
+  };
+  if (variant === 1) {
+    if (t % (cfg.chargeSeconds * TICK_RATE) === 0 && dist > 4 && w.eAux[i]! <= 0) {
+      w.eAux[i] = cfg.chargeTicks;
+      w.events.push({ type: 'bossAbility', kind: 'charge', x, y });
+      callState();
+    }
+  } else if (variant === 2) {
+    if (t % (cfg.summonSeconds * TICK_RATE) === 0) {
+      summonRing(w, x, y, T_GRUNT, cfg.summonCount);
+      w.events.push({ type: 'bossAbility', kind: 'summon', x, y });
+      callState();
+    }
+  } else if (variant === 3) {
+    if (t % (cfg.queenSummonSeconds * TICK_RATE) === 0) {
+      summonRing(w, x, y, T_SPITTER, cfg.queenCount);
+      w.events.push({ type: 'bossAbility', kind: 'summon', x, y });
+      callState();
+    }
+  } else if (variant === 4) {
+    if (t % (cfg.summonSeconds * TICK_RATE) === 0) {
+      summonRing(w, x, y, T_RUNNER, cfg.summonCount);
+      w.events.push({ type: 'bossAbility', kind: 'aura', x, y });
+      callState();
+    }
+  }
 }
 
 export function spawnBoss(w: World): number {
@@ -158,7 +233,7 @@ function runWaves(w: World, playerCount: number): void {
     if (boss) spawnBoss(w);
   }
   if (playerCount === 0) return;
-  let target = Math.floor((cfg.baseCount + cfg.perPlayer * playerCount) * w.countMul);
+  let target = Math.floor((cfg.baseCount + cfg.perPlayer * playerCount) * w.countMul * BALANCE.difficulty.count[w.difficulty]!);
   if (target > cfg.cap) target = cfg.cap;
   for (let n = 0; n < cfg.spawnPerTick && w.enemyCount < target; n++) {
     let ok = false;
@@ -170,7 +245,8 @@ function runWaves(w: World, playerCount: number): void {
   }
 }
 
-export function hurtPlayer(w: World, slot: number, damage: number, x: number, y: number): boolean {
+export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number): boolean {
+  const damage = rawDamage * BALANCE.difficulty.damage[w.difficulty]!;
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
   const hp = w.pHp[slot]! - damage;
   w.pHp[slot] = hp > 0 ? hp : 0;
@@ -235,6 +311,7 @@ function refreshField(w: World): void {
 export function updateEnemies(w: World): void {
   const playerCount = livingPlayers(w);
   runWaves(w, playerCount);
+  collectAuras(w);
   rebuildGrid(w);
   refreshField(w);
   if (playerCount === 0) return;
@@ -281,16 +358,7 @@ export function updateEnemies(w: World): void {
     let my = 0;
     if (state === EnemyState.Move) {
       let wantMove = true;
-      if (boss && (w.tick - w.waveTick) % (BALANCE.progression.boss.summonSeconds * TICK_RATE) === 0 && w.tick > w.waveTick && w.enemyCount < BALANCE.waves.cap) {
-        // the boss calls a ring of grunts then keeps coming
-        const n = BALANCE.progression.boss.summonCount;
-        for (let k = 0; k < n; k++) {
-          const a = (k / n) * 6.283185307179586;
-          spawnEnemy(w, T_GRUNT, clamp(x + cos(a) * 2.5, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(y + sin(a) * 2.5, -ARENA_HALF_H + 1, ARENA_HALF_H - 1));
-        }
-        w.eState[i] = EnemyState.Attack;
-        w.eStateTick[i] = w.tick;
-      }
+      if (boss) bossAbilities(w, i, x, y, dist);
       if (type === T_SPITTER) {
         if (dist < SPIT_HOLD) wantMove = false;
         if (dist <= SPIT_RANGE && w.eCooldown[i]! <= 0 && !segmentBlocked(x, y, w.pX[best]!, w.pY[best]!)) {
@@ -329,7 +397,12 @@ export function updateEnemies(w: World): void {
             dy = field.dirY[c]!;
           }
         }
-        const sp = SPEED[type]! * (0.9 + ((i * 37) % 16) * 0.0125);
+        let sp = SPEED[type]! * (0.9 + ((i * 37) % 16) * 0.0125);
+        if (w.eAux[i]! > 0) {
+          sp *= BALANCE.progression.boss.chargeSpeedMul; // the brute is charging
+          w.eAux[i] = w.eAux[i]! - 1;
+        }
+        if (auraN > 0 && !boss && inAura(x, y)) sp *= BALANCE.progression.boss.auraSpeedMul;
         mx = dx * sp * TICK_DT;
         my = dy * sp * TICK_DT;
         w.eAngle[i] = atan2(dy, dx);

@@ -6,14 +6,17 @@
   "dependencies": {
     "@wrh/net": "workspace:*",
     "@wrh/shared": "workspace:*",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "@wrh/sim": "workspace:*"
   },
   "scripts": {
     "start": "tsx src/main.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/ws": "^8.5.12",
-    "tsx": "^4.19.0"
+    "tsx": "^4.19.0",
+    "vitest": "^5.0.5"
   }
 }

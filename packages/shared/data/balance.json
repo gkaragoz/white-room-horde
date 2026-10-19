@@ -22,7 +22,9 @@
       "muzzleFwd": 1.21,
       "muzzleSide": 0.09,
       "muzzleH": 1.09,
-      "pierce": 0
+      "pierce": 0,
+      "mag": 12,
+      "reload": 0.9
     },
     "smg": {
       "damage": 6,
@@ -35,7 +37,9 @@
       "muzzleFwd": 2.29,
       "muzzleSide": 0.09,
       "muzzleH": 1.06,
-      "pierce": 0
+      "pierce": 0,
+      "mag": 30,
+      "reload": 1.3
     },
     "ar": {
       "damage": 14,
@@ -48,7 +52,9 @@
       "muzzleFwd": 2.95,
       "muzzleSide": 0.09,
       "muzzleH": 1.09,
-      "pierce": 0
+      "pierce": 0,
+      "mag": 30,
+      "reload": 1.5
     },
     "shotgun": {
       "damage": 7,
@@ -61,7 +67,9 @@
       "muzzleFwd": 2.62,
       "muzzleSide": 0.09,
       "muzzleH": 1.06,
-      "pierce": 0
+      "pierce": 0,
+      "mag": 6,
+      "reload": 2.0
     },
     "hmg": {
       "damage": 12,
@@ -74,7 +82,9 @@
       "muzzleFwd": 3.31,
       "muzzleSide": 0.09,
       "muzzleH": 1.12,
-      "pierce": 2
+      "pierce": 2,
+      "mag": 60,
+      "reload": 2.4
     },
     "minigun": {
       "damage": 8,
@@ -89,7 +99,9 @@
       "muzzleFwd": 3.25,
       "muzzleSide": 0.09,
       "muzzleH": 1.06,
-      "pierce": 1
+      "pierce": 1,
+      "mag": 120,
+      "reload": 3.2
     },
     "sniper": {
       "damage": 120,
@@ -102,7 +114,9 @@
       "muzzleFwd": 3.4,
       "muzzleSide": 0.09,
       "muzzleH": 1.09,
-      "pierce": 5
+      "pierce": 5,
+      "mag": 5,
+      "reload": 2.2
     }
   },
   "enemies": {
@@ -206,7 +220,14 @@
       "radiusMul": 1.7,
       "summonSeconds": 6,
       "summonCount": 6,
-      "xp": 40
+      "xp": 40,
+      "chargeSeconds": 5,
+      "chargeSpeedMul": 3.2,
+      "chargeTicks": 24,
+      "queenSummonSeconds": 8,
+      "queenCount": 4,
+      "auraRadius": 6,
+      "auraSpeedMul": 1.4
     },
     "revive": {
       "hpFraction": 0.5,
@@ -217,7 +238,10 @@
       "rate": 0.12,
       "speed": 0.08,
       "hp": 20,
-      "pierce": 1
+      "pierce": 1,
+      "sharp": 0.3,
+      "sprint": 0.2,
+      "bulk": 40
     },
     "ragdollPower": 22
   },
@@ -248,7 +272,8 @@
     "chance": {
       "ammo": 0.06,
       "health": 0.03,
-      "grenade": 0.02
+      "grenade": 0.02,
+      "weapon": 0.012
     },
     "lowAmmoBonus": 0.1,
     "healthAmount": 30,
@@ -257,5 +282,28 @@
       "health": 2,
       "grenade": 1
     }
+  },
+  "dash": {
+    "seconds": 0.2,
+    "speedMul": 3.4,
+    "cooldown": 2.5,
+    "iFrames": 0.25
+  },
+  "difficulty": {
+    "hp": [
+      0.75,
+      1.0,
+      1.45
+    ],
+    "count": [
+      0.8,
+      1.0,
+      1.3
+    ],
+    "damage": [
+      0.7,
+      1.0,
+      1.35
+    ]
   }
 }

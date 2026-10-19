@@ -1,9 +1,22 @@
-import { ARENA_HALF_H, ARENA_HALF_W, OBSTACLES } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, MAPS, type Box } from '@wrh/shared';
 import { FF_H, FF_W, type FlowField } from './flowfield';
 import { sqrt } from './detmath';
 
+let OBSTACLES: readonly Box[] = MAPS[0]!.boxes;
+let activeMap = 0;
+
+/** Select the arena layout used by the collision helpers (called at the start of every step; cheap). */
+export function useMap(map: number): void {
+  if (map !== activeMap) {
+    activeMap = map;
+    OBSTACLES = MAPS[map]?.boxes ?? MAPS[0]!.boxes;
+  }
+}
+
 /** Mark the flow field cells covered by obstacles (with a small margin so paths keep clear of corners). */
-export function applyObstacles(field: FlowField): void {
+export function applyObstacles(field: FlowField, map = 0): void {
+  useMap(map);
+  field.blocked.fill(0);
   for (const o of OBSTACLES) {
     const x0 = o.x - o.w / 2 - 0.3;
     const x1 = o.x + o.w / 2 + 0.3;

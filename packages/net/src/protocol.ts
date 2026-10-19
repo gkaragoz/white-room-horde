@@ -9,21 +9,38 @@ export interface PlayerInfo {
   host: boolean;
   connected: boolean;
   weapon: WeaponId;
+  /** Accessory index chosen in the lobby (cosmetic). */
+  acc: number;
+}
+
+export interface RoomOptions {
+  /** Arena layout index, or -1 for a random one when the game starts. */
+  map: number;
+  /** 0 easy, 1 normal, 2 hard. */
+  difficulty: number;
+}
+
+export interface JoinOpts {
+  password?: string;
+  acc?: number;
 }
 
 export type ClientMsg =
-  | { t: 'create'; name: string; weapon?: WeaponId }
-  | { t: 'join'; code: string; name: string; weapon?: WeaponId }
+  | ({ t: 'create'; name: string; weapon?: WeaponId } & JoinOpts)
+  | ({ t: 'join'; code: string; name: string; weapon?: WeaponId } & JoinOpts)
+  | { t: 'rejoin'; code: string; token: string }
   | { t: 'start' }
   | { t: 'hash'; tick: number; hash: number }
   | { t: 'ping'; ts: number }
   | { t: 'resync' }
   | { t: 'weapon'; weapon: WeaponId }
+  | { t: 'options'; map: number; difficulty: number }
+  | { t: 'look'; acc: number }
   | { t: 'leave' };
 
 export type ServerMsg =
-  | { t: 'room'; code: string; slot: number; players: PlayerInfo[]; started: boolean }
-  | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId }[] }
+  | { t: 'room'; code: string; slot: number; players: PlayerInfo[]; started: boolean; options: RoomOptions; token: string; locked: boolean }
+  | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId }[]; map: number; difficulty: number }
   | { t: 'desync'; tick: number; slots: number[] }
   | { t: 'pong'; ts: number }
   | { t: 'snapshotRequest' }

@@ -1,6 +1,6 @@
 import { INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, restoreWorld, serializeWorld, step, type World } from '@wrh/sim';
-import { Bin, decodeBundle, decodeSnapshot, encodeInputMsg, encodeSnapshot, type Bundle, type ClientMsg, type PlayerInfo, type ServerMsg } from './protocol';
+import { Bin, decodeBundle, decodeSnapshot, encodeInputMsg, encodeSnapshot, type Bundle, type ClientMsg, type JoinOpts, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 export interface Transport {
   send(data: string | Uint8Array): void;
@@ -21,6 +21,10 @@ export class NetSession {
   code = '';
   slot = -1;
   players: PlayerInfo[] = [];
+  options: RoomOptions = { map: 0, difficulty: 1 };
+  /** Secret for rejoining this slot after a dropped connection (kept by the page in sessionStorage). */
+  token = '';
+  locked = false;
   world: World | null = null;
   error = '';
   /** Slots reported as diverged by the server (desync detection). */
@@ -51,14 +55,28 @@ export class NetSession {
     this.transport.send(JSON.stringify(m));
   }
 
-  create(name: string, weapon: WeaponId = 'pistol'): void {
+  create(name: string, weapon: WeaponId = 'pistol', opts: JoinOpts = {}): void {
     this.weapon = weapon;
-    this.sendJson({ t: 'create', name, weapon });
+    this.sendJson({ t: 'create', name, weapon, ...opts });
   }
 
-  join(code: string, name: string, weapon: WeaponId = 'pistol'): void {
+  join(code: string, name: string, weapon: WeaponId = 'pistol', opts: JoinOpts = {}): void {
     this.weapon = weapon;
-    this.sendJson({ t: 'join', code, name, weapon });
+    this.sendJson({ t: 'join', code, name, weapon, ...opts });
+  }
+
+  /** Reattach to a slot after the connection dropped (token from an earlier `room` message). */
+  rejoin(code: string, token: string): void {
+    this.sendJson({ t: 'rejoin', code, token });
+  }
+
+  /** Host only, before the game starts. */
+  setOptions(map: number, difficulty: number): void {
+    this.sendJson({ t: 'options', map, difficulty });
+  }
+
+  setLook(acc: number): void {
+    this.sendJson({ t: 'look', acc });
   }
 
   start(): void {
@@ -94,11 +112,17 @@ export class NetSession {
         this.code = m.code;
         this.slot = m.slot;
         this.players = m.players;
-        if (this.state === 'idle') this.state = 'lobby';
+        this.options = m.options;
+        this.token = m.token;
+        this.locked = m.locked;
+        if (this.state === 'idle') this.state = m.started ? 'playing' : 'lobby';
         break;
       case 'start':
         this.pendingStart = { seed: m.seed, players: m.players };
-        this.world = createGame({ seed: m.seed, players: m.players });
+        this.world = createGame({ seed: m.seed, players: m.players, map: m.map, difficulty: m.difficulty });
+        this.history.clear();
+        this.bundles.clear();
+        this.received = -1;
         this.applied = -1;
         this.state = 'playing';
         break;

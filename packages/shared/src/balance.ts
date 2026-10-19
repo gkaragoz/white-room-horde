@@ -15,6 +15,9 @@ export interface WeaponStats {
   muzzleH: number;
   /** Extra enemies a bullet passes through. */
   pierce: number;
+  /** Rounds per magazine and seconds to reload. */
+  mag: number;
+  reload: number;
   spinUp?: number;
   spinDown?: number;
 }
@@ -49,13 +52,15 @@ export interface ProgressionConfig {
   ragdollPower: number;
   cardSeconds: number;
   xp: Record<EnemyType, number>;
-  boss: { everyWaves: number; hpMul: number; damage: number; radiusMul: number; summonSeconds: number; summonCount: number; xp: number };
+  boss: { everyWaves: number; hpMul: number; damage: number; radiusMul: number; summonSeconds: number; summonCount: number; xp: number; chargeSeconds: number; chargeSpeedMul: number; chargeTicks: number; queenSummonSeconds: number; queenCount: number; auraRadius: number; auraSpeedMul: number };
   revive: { hpFraction: number; iFrames: number };
-  cards: { damage: number; rate: number; speed: number; hp: number; pierce: number };
+  cards: { damage: number; rate: number; speed: number; hp: number; pierce: number; sharp: number; sprint: number; bulk: number };
 }
 
 export const BALANCE = data as unknown as {
-  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; chance: { ammo: number; health: number; grenade: number }; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number } };
+  dash: { seconds: number; speedMul: number; cooldown: number; iFrames: number };
+  difficulty: { hp: number[]; count: number[]; damage: number[] };
+  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; chance: { ammo: number; health: number; grenade: number; weapon: number }; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number } };
   grenade: { max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
   spit: { speed: number; life: number; radius: number };
   shielder: { frontDot: number; frontMul: number };

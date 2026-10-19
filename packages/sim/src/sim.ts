@@ -13,10 +13,11 @@ import {
 } from '@wrh/shared';
 import { clamp, cos, sin, sqrt, TAU } from './detmath';
 import { bulletVsEnemies, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
-import { out, pushOut, segmentBlocked } from './obstacles';
+import { out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { Crc32 } from './hash';
 import { updatePickups } from './pickups';
 import { updateCards } from './progression';
+import { equipWeapon } from './loadout';
 import { createWorld, type World } from './state';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
@@ -29,6 +30,9 @@ export interface GameSetup {
   seed: number;
   /** Players present at the start: slot and starting weapon. */
   players: { slot: number; weapon: WeaponId }[];
+  /** Arena layout index (MAPS) and difficulty 0 easy / 1 normal / 2 hard. */
+  map?: number;
+  difficulty?: number;
 }
 
 export function addPlayer(w: World, slot: number, x: number, y: number, weapon: WeaponId = 'pistol'): void {
@@ -41,19 +45,21 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pState[slot] = PlayerState.Alive;
   w.pTimer[slot] = 0;
   w.pRevive[slot] = 0;
-  w.pCooldown[slot] = 0;
-  w.pWeapon[slot] = WEAPON_IDS.indexOf(weapon);
-  w.pAmmo[slot] = BALANCE.weapons[weapon].ammo;
+  equipWeapon(w, slot, WEAPON_IDS.indexOf(weapon));
   w.pMoving[slot] = 0;
   w.pIFrames[slot] = 0;
   w.pGren[slot] = BALANCE.grenade.max;
   w.pGrenCharge[slot] = 0;
   w.pGrenCd[slot] = 0;
+  w.pDash[slot] = 0;
+  w.pDashCd[slot] = 0;
+  w.pModDmg[slot] = 1;
+  w.pModSpeed[slot] = 1;
 }
 
 /** Deterministic game start used by every client and by replays: players spread on a ring around the centre. */
 export function createGame(setup: GameSetup): World {
-  const w = createWorld(setup.seed);
+  const w = createWorld(setup.seed, setup.map ?? 0, setup.difficulty ?? 1);
   const n = setup.players.length;
   for (let i = 0; i < n; i++) {
     const p = setup.players[i]!;
@@ -86,7 +92,7 @@ function spawnBullet(w: World, owner: number, x: number, y: number, angle: numbe
   }
 }
 
-function movePlayer(w: World, s: number, inp: PlayerInput, speed: number): number {
+function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDash: boolean): number {
   let mx = inp.moveX / 127;
   let my = inp.moveY / 127;
   const len = sqrt(mx * mx + my * my);
@@ -94,7 +100,30 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number): numbe
     mx /= len;
     my /= len;
   }
-  w.pMoving[s] = len > 0.05 ? 1 : 0;
+  const angle = inp.aim * AIM_TO_RAD;
+  const dc = BALANCE.dash;
+  if (canDash) {
+    if (w.pDashCd[s]! > 0) w.pDashCd[s] = w.pDashCd[s]! - TICK_DT;
+    if ((inp.buttons & Buttons.Dash) !== 0 && w.pDashCd[s]! <= 0 && w.pDash[s]! === 0) {
+      // dash along the move direction (or the aim when standing still)
+      const l = len > 0.2 ? len : 1;
+      w.pDashX[s] = len > 0.2 ? mx / l : cos(angle);
+      w.pDashY[s] = len > 0.2 ? my / l : sin(angle);
+      w.pDash[s] = Math.ceil(dc.seconds * 30);
+      w.pDashCd[s] = dc.cooldown;
+      if (w.pIFrames[s]! < dc.iFrames) w.pIFrames[s] = dc.iFrames;
+      w.events.push({ type: 'dash', slot: s, x: w.pX[s]!, y: w.pY[s]! });
+    }
+  }
+  if (w.pDash[s]! > 0) {
+    // committed to the dash: move fast along its direction
+    mx = w.pDashX[s]! * dc.speedMul;
+    my = w.pDashY[s]! * dc.speedMul;
+    w.pDash[s] = w.pDash[s]! - 1;
+    w.pMoving[s] = 1;
+  } else {
+    w.pMoving[s] = len > 0.05 ? 1 : 0;
+  }
   const r = BALANCE.player.radius;
   w.pX[s] = clamp(w.pX[s]! + mx * speed * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
   w.pY[s] = clamp(w.pY[s]! + my * speed * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
@@ -102,30 +131,60 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number): numbe
     w.pX[s] = out.x;
     w.pY[s] = out.y;
   }
-  const angle = inp.aim * AIM_TO_RAD;
   w.pAngle[s] = angle;
   return angle;
+}
+
+function startReload(w: World, s: number, stats: { reload: number }): void {
+  w.pReload[s] = stats.reload;
+  w.events.push({ type: 'reloadStart', slot: s });
 }
 
 function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void {
   const id = WEAPON_IDS[w.pWeapon[s]!]!;
   const stats = BALANCE.weapons[id];
+  const infinite = stats.ammo < 0;
   w.pCooldown[s] = w.pCooldown[s]! - TICK_DT;
+  // reloading: nothing fires until the timer runs out, then the magazine is refilled from the reserve
+  if (w.pReload[s]! > 0) {
+    w.pReload[s] = w.pReload[s]! - TICK_DT;
+    if (w.pReload[s]! <= 0) {
+      w.pReload[s] = 0;
+      const need = stats.mag - w.pMag[s]!;
+      const take = infinite ? need : need < w.pAmmo[s]! ? need : w.pAmmo[s]!;
+      w.pMag[s] = w.pMag[s]! + take;
+      if (!infinite) w.pAmmo[s] = w.pAmmo[s]! - take;
+      w.events.push({ type: 'reloadDone', slot: s });
+    }
+    if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
+    return;
+  }
+  const canReload = w.pMag[s]! < stats.mag && (infinite || w.pAmmo[s]! > 0);
+  if ((inp.buttons & Buttons.Reload) !== 0 && canReload) {
+    startReload(w, s, stats);
+    return;
+  }
   let shots = 0;
-  while ((inp.buttons & Buttons.Fire) !== 0 && w.pCooldown[s]! <= 0 && shots < 3 && (stats.ammo < 0 || w.pAmmo[s]! > 0)) {
+  while ((inp.buttons & Buttons.Fire) !== 0 && w.pCooldown[s]! <= 0 && shots < 3 && w.pMag[s]! > 0) {
     for (let p = 0; p < stats.pellets; p++) {
       const a = angle + (w.rng.float() - 0.5) * 2 * stats.spread;
       // the shot leaves the muzzle: forward along the aim and a little to the right-hand side
       const ox = cos(angle) * stats.muzzleFwd + sin(angle) * stats.muzzleSide;
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
-      spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage, stats.pierce + w.modPierce);
+      spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]!, stats.pierce + w.modPierce);
     }
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
-    if (stats.ammo >= 0) w.pAmmo[s] = w.pAmmo[s]! - 1;
+    w.pMag[s] = w.pMag[s]! - 1;
     w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate);
     shots++;
   }
   if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
+  // an empty magazine reloads by itself when the player keeps pulling the trigger
+  if (w.pMag[s]! === 0 && canReloadNow(w, s, stats.ammo) && (inp.buttons & Buttons.Fire) !== 0) startReload(w, s, stats);
+}
+
+function canReloadNow(w: World, s: number, ammo: number): boolean {
+  return ammo < 0 || w.pAmmo[s]! > 0;
 }
 
 /** Downed players crawl; a living teammate holding Revive nearby brings them back. */
@@ -168,6 +227,7 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
  */
 export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): void {
   w.events.length = 0;
+  useMap(w.map);
   if (w.gameOver) {
     w.tick++;
     return;
@@ -182,10 +242,10 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
       continue;
     }
     if (w.pState[s] === PlayerState.Downed) {
-      movePlayer(w, s, inp, BALANCE.player.crawlSpeed);
+      movePlayer(w, s, inp, BALANCE.player.crawlSpeed, false);
       continue;
     }
-    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed);
+    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed * w.pModSpeed[s]!, true);
     fireWeapon(w, s, inp, angle);
   }
   updateRevive(w, inputs);
@@ -240,16 +300,17 @@ export function hashWorld(w: World): number {
   const c = new Crc32();
   c.u32(w.tick);
   for (const v of w.rng.getState()) c.u32(v);
-  c.u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver).u32(w.xp).u32(w.level).u32(w.pendingLevels).u32(w.cardTimer);
+  c.u32(w.difficulty).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver).u32(w.xp).u32(w.level).u32(w.pendingLevels).u32(w.cardTimer);
   c.typed(w.cardOffer);
   c.typed(new Float64Array([w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modHp]));
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);
   c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);
+  c.typed(w.pMag).typed(w.pReload).typed(w.pDash).typed(w.pDashCd).typed(w.pDashX).typed(w.pDashY).typed(w.pModDmg).typed(w.pModSpeed);
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
-  c.typed(w.kActive).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
+  c.typed(w.kActive).typed(w.kData).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo);
-  c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
+  c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
   return c.digest();
 }
