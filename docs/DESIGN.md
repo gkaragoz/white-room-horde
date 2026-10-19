@@ -187,7 +187,7 @@ Bosslar her 5. dalgada çıkar; dalga 25'ten sonra aynı dört boss sırayla, he
 | 15 | Sayacı Ana | Düşman yumurtlar; yavruları temizlemeden zarar vermek zor, patlayıcı ve alan hasarı ödüllendirilir. |
 | 20 | Koşucu Sürü Lideri | Hızlı, periyodik kopyalar üretir (gerçeği ayırt etmek için renk parıltısı); dash ve ateş gücü önemlidir. |
 
-Boss ödülü: herkese bir "boss kartı" (seçili silahın efsane sürümü) ve kısa sakin ara (10 sn, düşman akışı durur).
+Boss ödülü: herkese bir "boss kartı" (seçili silahın efsane sürümü); ara yok, spawn akışı kesilmez, sadece kart seçim süresi (10 sn) bölüm 12'deki gibi oyun akarken işler.
 
 Zorluk eğrisi:
 - Eşzamanlı düşman hedefi: `N(w) = min(500, N0(p) x 1.12^(w-1))`, `N0(p) = 30 + 10 x p` (p oyuncu sayısı). 2 kişide ~50 ile başlar ve tavana ~dalga 21'de, 11 kişide ~140 ile başlar ve tavana ~dalga 12'de varır.
@@ -304,7 +304,15 @@ Karar: tek büyük sabit arena, 3 harita arasından lobide seçilir (oylama veya
 | Depo | Raflar, kasalar, koridorlar | Paralel raf koridorları (ateş hattı kırar), merkez boşluk |
 | Arıtma tesisi | Dev tank, borular, platformlar | Ortada yuvarlak tank (dolanılır), çevrede halka koridor |
 
-- Siperler: duvar ve kasalar mermiyi tutar (oyuncu ve düşman mermisi), düşman yol bulma basit (navigasyon ızgarası, sabit, deterministik; engel çevresinde kayma). Yok edilebilir siper yok (ilk sürüm), böylece ızgara sabit kalır.
+- Siperler: duvar ve kasalar mermiyi tutar (oyuncu ve düşman mermisi). Yok edilebilir siper yok (ilk sürüm), böylece navigasyon ızgarası sabit kalır.
+- Düşman yol bulma ve sürü davranışı (gelişmiş, deterministik, ucuz):
+  - Navigasyon ızgarası: 1 birimlik hücreler (60x40 = 2400), engel hücreleri harita yüklenirken bir kez işaretlenir; ek olarak her hücre için duvara mesafe alanı (sürünme ve köşe payı).
+  - Paylaşımlı çok kaynaklı akış alanı (multi-source flow field): tüm canlı oyuncuların hücreleri kaynak, Dijkstra/Dial ile "en yakın oyuncuya maliyet" alanı hesaplanır (tek alan, 11 ayrı alan değil); her düşman kendi hücresinde azalan komşuya gider. Yenileme: 3 tickte bir (~10 Hz), maliyet ~2400 hücre. Tamsayı/sabit sırada tarama (deterministik; eşitlikte hücre indeksi).
+  - Maliyet ağırlıkları: duvar yakınında artan maliyet, patlayıcı fıçı çevresi hafif ceza, yerdeki boss tehlike alanlarına yaklaşmama (düşman değil, sadece telegraflı alanlar için gerekirse).
+  - Yerel yönlendirme: akış yönüne ek olarak ayrışma (separation, spatial hash komşuları, en fazla K=6 komşu), duvardan itme (mesafe alanı gradyanı) ve hafif sürü uyumu (cohesion yok); hız ve dönüş hızı sınırlı (yumuşak kalabalık, üst üste binmeme).
+  - Hedef seçimi: hedefe akış alanı verir; menzilli düşmanlar (tükürüklü) menzile girince durur, patlayıcı koşar, sayacı yavaş gelir ve geride kalır; kalkancı en yakın oyuncuya yüzünü döner.
+  - Boss'lar: kendi 8 yönlü yönelme ve tehlike alanı kuralları (bölüm 14), akış alanından hedef yönü alır.
+  - Bütçe: sim 500 düşman < 12 ms/tick içinde; ayrışma komşu sorguları spatial hash ile sabit üst sınırlı. Hesap yükü profil kancasında ayrı gösterilir.
 - Spawn: düşmanlar kamera kenarı çemberinde (leash) arenanın içinden doğar; harita başına sabit "kapı" noktaları yok. Boss'lar arena merkezine veya karşı kapıdan girer.
 - Patlayıcı fıçılar: arena genelinde sabit noktalar, vurulunca patlar (alan hasarı + itme), yakındaki fıçıları zincirler; düşmana hasar verir, dosta hasar yok (itme ve sarsma var), yeniden doğmaz (dalga başına 1-2 yenisi gelir). Sim'de tohumlu yerleşim.
 - Toplanabilir kutular: silah kutusu (SMG/pompalı/HMG) ve mermi kutusu; belirli noktalarda yeniden doğar (30 sn), ayrıca düşmandan düşer (düşük şans). Kutu üstüne basarak alınır; HMG kutusu nadir (dalga başına 1-2).
@@ -383,8 +391,6 @@ Mermi biterse pistole dönülür. Kritik: temel %5, hasar x2.
 ## 21. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
 - Kalan düşman ve boss renkleri (patlayıcı, tükürüklü, kalkancı, sayacı, 4 boss) ve görsel ayrışma kuralı.
-- Düşman yol bulma yöntemi: tek hedefe akış alanı (flow field) mi, doğrudan kovalama + engelden kayma mı (500 düşman CPU bütçesi için karar gerekir).
-- Boss sonrası "sakin ara" (10 sn): sürekli akış kuralıyla uyumu (spawn durur mu, mevcutlar kalır mı).
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - Sunucu barındırma: ilk aşamada yerel; Cloudflare Tunnel sonra.
 - Sonraki sürüm: kalıcı meta ilerleme (yerel), yeni haritalar, WebRTC aktarımı, sıralama tablosu.
