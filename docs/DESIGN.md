@@ -250,10 +250,53 @@ white-room-horde/
 5. Ağ: bundle, host, client, desync, geç katılım, host devri.
 6. Kartlar, dalga/boss, UI, ses, cila.
 
-## 16. Açık kararlar
+## 16. Model üretim hattı (Blender + LLAMA + Mixamo)
+Karar: Mixamo animasyonları standart Mixamo iskeletiyle indirilir, Blender'da kendi 12 kemikli chibi rig'e retarget edilir (chibi mesh Mixamo'ya yüklenmez). Animasyon seti minimum.
+
+**Araçlar ve çalışma şekli**
+- Blender 5.2 + `blender-mcp` + LLAMA web UI (Gemma 4 26B-A4B, 16k bağlam), ship-rpg deneyiminden öğrenilen kurallar: LLAMA kod yazmaz; betikler repo'da `tools/blender/` altında yaşar, LLAMA sabit bir wrapper ile `exec` eder (tek görev, tek `execute_blender_code`), sonuç diskten kontrol edilir. Her çağrıyı onay kutusundan geçirmek gerekir.
+- Kurallar: kullanıcının açık sahnesine dokunma (Scratch/Sandbox), sadece kendi nesneni dışa aktar (`use_selection`), idempotent, isimler `[A-Za-z0-9_-]`, doğrulama başarısızsa hiçbir şey yazma, önce headless duman testi (`blender -b --factory-startup --python ...`).
+- Betikler: `make_chibi.py` (mesh + rig + palet atlası), `retarget_mixamo.py`, `bake_vat.py`, `make_weapons.py`, `make_gibs.py`, `make_props.py`. Faz 0 sahne betiği (`C:lender_scenes\make_scene.py`) başlangıç noktası olarak `tools/blender/` altına taşınır.
+
+**Rig (12 kemik)**
+`root, hips, spine, head, arm.L, arm.R, hand.L, hand.R, thigh.L, thigh.R, foot.L, foot.R`. Chibi oranı: büyük kafa, kısa uzuv, boyun yok. Silah soketi `hand.R`'de (+ `hand.L` yardımcı), namlu ucu için silah GLB'sinde `muzzle` boş nesnesi. Ragdoll için aynı kemikler fizik gövdeleri olur (kafa küre, gövde kapsül, uzuvlar kapsül).
+
+**Mixamo hattı**
+1. Mixamo'dan standart karakter üzerinde klipler "FBX, Without Skin, 30 fps" olarak indirilir (indirme her dosya için kullanıcıya adı, kaynağı, boyutuyla sorularak ve Adobe oturumu kullanıcı tarafından açılmış olarak yapılır; şifre girişini kullanıcı yapar).
+2. Ham FBX'ler repo dışına (`assets-src/`, gitignore) konur; Mixamo şartlarına göre sadece oyun içinde kullanım, ham dosya yeniden dağıtımı yok. Repo'ya yalnızca pişirilmiş çıktılar girer (şartlar indirmeden önce doğrulanır).
+3. `retarget_mixamo.py`: kemik eşleştirme tablosu (Mixamo `mixamorig:*` -> bizim 12 kemik), ölçek ve uzuv kısalığı için konum/rotasyon düzeltme, ayak kayması önleme (ayağı yere sabitle), köprü kemikler (omuz, dirsek) göz ardı edilir. Sonuç Blender action olarak pişirilir (30 fps).
+4. Oyuncu klipleri (minimum, ~12-16): idle, run 8 yön (ileri, geri, sol, sağ, 4 çapraz, silah yönünden bağımsız alt vücut + ayrı üst vücut nişan katmanı), ateş (üst vücut), reload, revive (yaralıyı kaldırma), yaralı yatma, ölüm-düşüş (ragdoll'a devir). Mixamo klip adları sitedeki karşılıkları (Rifle Idle/Run/Strafe, Firing Rifle, Reloading, vb.) indirmeden önce doğrulanır.
+5. Düşman klipleri: yürüyüş, koşu, saldırı, doğma/çıkış (spawn), ölüm; tür farkı hız çarpanı ve animasyon kayması ile (zombi setinden). Boss'lar: yürüyüş, saldırı 1-2, öfke, ölüm.
+
+**Modeller ve bütçeler**
+| Varlık | Üçgen bütçesi | Not |
+|---|---|---|
+| Oyuncu chibi | <= 1500 | Beyaz kafa, yelek rengi atlas satırı ile; skinned GLB |
+| Grunt / Koşucu | <= 800 | VAT için tek mesh, yelek/kafa tint attribute |
+| Tank / Kalkancı / Patlayıcı / Tükürüklü / Sayacı | <= 1200 | Ek plakalar aynı mesh içinde |
+| Boss (x4) | <= 4000 | Ayrı skinned, VAT yok (az sayıda) |
+| Silahlar (5) | <= 500 | Statik GLB, `muzzle` soket |
+| Gibs (küre, küp, uzuv) | <= 100 | Instanced parçalar |
+Malzeme: tek renk paleti atlası (vertex color + 1 doku), PBR yok (düz renk + yumuşak aydınlatma), 2 malzemeden fazlası yok.
+
+**VAT pişirme**
+- `bake_vat.py` her düşman türü ve klip için vertex konumlarını (ve gerekirse normalleri) dokuya pişirir: satır = kare, sütun = vertex; 16-bit float, `vat.bin` + `meta.json` (klip adları, kare sayıları, fps, sınırlar). Kare sayısı küçük tutulur (klip başına 16-32 kare). Çıktı `packages/client/public/models/...`.
+- İstemci `InstancedMesh`'e örnek başına animasyon id ve faz verir (bkz. bölüm 15).
+
+**Çıktı sözleşmesi ve testler**
+- `tests/assets.test.ts` (client içinde): GLB isimleri, üçgen bütçeleri, malzeme sayısı, rig kemik listesi (12), silah `muzzle` soketi, VAT meta alanları ve kare sınırları. Ship-rpg'deki sözleşme testi yaklaşımı.
+- Çıktılar tekrarlanabilir (aynı girdi, aynı bayt); betikler tohumlu ve idempotent.
+
+**Sıra**
+1. `make_chibi.py` (oyuncu + grunt, rig) + GLB çıktı + sözleşme testi.
+2. Silahlar (5) ve gibs.
+3. Mixamo indirme listesi ve `retarget_mixamo.py` (oyuncu klipleri), sonra düşman klipleri.
+4. `bake_vat.py` ve client'ta VAT doğrulaması (500 düşman performans testi).
+5. Tüm düşman türleri ve boss'lar.
+
+## 17. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
-- Silah ve düşman modellerinin Blender'da üretimi (LLAMA/Blender MCP hattı) ve GLB sözleşmesi.
 - CI dağıtım ve sunucu barındırma detayı.
 - Sinyal/oda sunucusu barındırma (WebSocket) ve maliyet.
 - Sonraki sürüm: kalıcı meta ilerleme, yeni haritalar, sıralama tablosu.
