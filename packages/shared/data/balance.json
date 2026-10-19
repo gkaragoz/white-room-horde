@@ -218,7 +218,8 @@
       "speed": 0.08,
       "hp": 20,
       "pierce": 1
-    }
+    },
+    "ragdollPower": 22
   },
   "grenade": {
     "max": 3,

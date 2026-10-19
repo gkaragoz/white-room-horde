@@ -37,7 +37,7 @@ export class Room {
 
   private info(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null });
+    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon });
     return out;
   }
 
@@ -262,6 +262,12 @@ export class RoomManager {
         break;
       case 'resync':
         if (a) a.room.resync(a.slot);
+        break;
+      case 'weapon':
+        if (a && !a.room.started && WEAPON_IDS.includes(msg.weapon)) {
+          a.room.members[a.slot]!.weapon = msg.weapon;
+          a.room.broadcastRoom();
+        }
         break;
       case 'leave':
         this.close(conn);

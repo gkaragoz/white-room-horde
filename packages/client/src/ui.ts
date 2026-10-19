@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS } from '@wrh/shared';
+import { BALANCE, CARD_IDS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 
 export type Lang = 'en' | 'tr';
@@ -34,6 +34,10 @@ const T = {
     settings: 'Settings',
     volume: 'Volume',
     shadows: 'Shadows',
+    aa: 'Anti-aliasing',
+    reloads: 'reloads the page',
+    bounce: 'Bounce light (fake GI)',
+    on: 'On',
     quality: 'Render scale',
     language: 'Language',
     close: 'Close',
@@ -43,6 +47,7 @@ const T = {
     desync: 'Desync detected!',
     connecting: 'Connecting...',
     controls: 'WASD move · mouse aim · click/space fire · right-click/G grenade · E revive · 1-3 cards',
+    weapon: 'Starting weapon',
     ammo: 'Ammo',
     grenades: 'Grenades',
     cards: {
@@ -86,6 +91,10 @@ const T = {
     settings: 'Ayarlar',
     volume: 'Ses',
     shadows: 'Gölgeler',
+    aa: 'Kenar yumuşatma',
+    reloads: 'sayfayı yeniler',
+    bounce: 'Sekme ışığı (sahte GI)',
+    on: 'Açık',
     quality: 'Çözünürlük ölçeği',
     language: 'Dil',
     close: 'Kapat',
@@ -95,6 +104,7 @@ const T = {
     desync: 'Senkron bozuldu!',
     connecting: 'Bağlanıyor...',
     controls: 'WASD hareket · fare nişan · tık/boşluk ateş · sağ tık/G el bombası · E kaldır · 1-3 kart',
+    weapon: 'Başlangıç silahı',
     ammo: 'Mermi',
     grenades: 'Bomba',
     cards: {
@@ -114,15 +124,18 @@ export interface UiHandlers {
   onSolo(name: string): void;
   onHost(name: string, server: string): void;
   onJoin(name: string, code: string, server: string): void;
+  onWeapon(weapon: WeaponId): void;
   onStart(): void;
   onLeave(): void;
   onCard(index: number): void;
   onAgain(): void;
   onReplay(): void;
-  onSetting(key: 'volume' | 'shadows' | 'scale' | 'lang', value: number | string): void;
+  onSetting(key: 'volume' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce', value: number | string | boolean): void;
 }
 
 export interface Settings {
+  aa: 'off' | 'msaa' | 'smaa';
+  bounce: boolean;
   volume: number;
   shadows: 0 | 1 | 2;
   scale: number;
@@ -142,6 +155,9 @@ const CSS = `
 .wrh-ui button.alt{background:#8e9aaf}
 .wrh-ui button.warn{background:#e0524a}
 .wrh-ui button:hover{filter:brightness(1.08)}
+.wrh-weapons{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 10px}
+.wrh-ui button.wrh-wp{background:#e6dcc8;color:#3a352d;font-size:12px;padding:6px 9px;margin:0;border:2px solid transparent}
+.wrh-ui button.wrh-wp.on{background:#fff;border-color:#1fa2ff}
 .wrh-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .wrh-plist{margin:8px 0;padding:0;list-style:none}
 .wrh-plist li{display:flex;align-items:center;gap:8px;padding:3px 0}
@@ -183,6 +199,8 @@ function esc(s: string): string {
 export class Ui {
   readonly root = document.createElement('div');
   lang: Lang = 'en';
+  /** Starting weapon chosen in the menu or lobby. */
+  weapon: WeaponId = 'pistol';
   private readonly screen = document.createElement('div');
   private readonly hud = document.createElement('div');
   private readonly dev = document.createElement('div');
@@ -234,6 +252,7 @@ export class Ui {
     this.screen.innerHTML = `<div class="wrh-panel wrh-center">
       <h1>${t.title}</h1><p class="sub">${t.tag}</p>
       <label>${t.name}</label><input id="wrh-name" maxlength="16" value="${esc(saved)}" placeholder="player">
+      <label>${t.weapon}</label><div class="wrh-weapons" id="wrh-weapons">${this.weaponButtons()}</div>
       <button id="wrh-solo">${t.solo}</button>
       <button id="wrh-host" class="alt">${t.host}</button>
       <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD"></div><button id="wrh-join" class="alt">${t.join}</button></div>
@@ -241,6 +260,7 @@ export class Ui {
       <p class="sub" style="margin:6px 0 0">${t.controls}</p>
       ${error ? `<p style="color:#c8242c;font-weight:700">${esc(error)}</p>` : ''}
     </div>`;
+    this.bindWeapons();
     const q = <E extends HTMLElement>(id: string): E => this.screen.querySelector<E>('#' + id)!;
     const name = (): string => {
       const n = q<HTMLInputElement>('wrh-name').value.trim() || 'player';
@@ -256,19 +276,36 @@ export class Ui {
     q('wrh-join').onclick = () => this.h.onJoin(name(), q<HTMLInputElement>('wrh-code').value.trim().toUpperCase(), q<HTMLInputElement>('wrh-server').value.trim());
   }
 
+  private weaponButtons(): string {
+    const names = this.t.weapons as Record<string, string>;
+    return WEAPON_IDS.map((w) => `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}">${names[w]}</button>`).join('');
+  }
+
+  private bindWeapons(): void {
+    this.screen.querySelectorAll<HTMLElement>('.wrh-wp').forEach((el) => {
+      el.onclick = () => {
+        this.weapon = el.dataset.w as WeaponId;
+        this.screen.querySelectorAll('.wrh-wp').forEach((x) => x.classList.toggle('on', x === el));
+        this.h.onWeapon(this.weapon);
+      };
+    });
+  }
+
   showConnecting(): void {
     this.screen.innerHTML = `<div class="wrh-panel wrh-center"><h1>${this.t.connecting}</h1></div>`;
   }
 
-  showLobby(code: string, players: { slot: number; name: string; host: boolean; connected: boolean }[], iAmHost: boolean): void {
+  showLobby(code: string, players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId }[], iAmHost: boolean): void {
     const t = this.t;
-    const list = players.map((p) => `<li><span class="wrh-dot" style="background:${PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''}</li>`).join('');
+    const list = players.map((p) => `<li><span class="wrh-dot" style="background:${PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]}</small></li>`).join('');
     this.screen.innerHTML = `<div class="wrh-panel wrh-center">
       <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span></h1>
       <p class="sub">${iAmHost ? '' : t.waiting}</p>
       <label>${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist">${list}</ul>
+      <label>${t.weapon}</label><div class="wrh-weapons">${this.weaponButtons()}</div>
       ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-leave" class="warn">${t.leave}</button>
     </div>`;
+    this.bindWeapons();
     const s = this.screen.querySelector<HTMLElement>('#wrh-start');
     if (s) s.onclick = () => this.h.onStart();
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
@@ -340,6 +377,8 @@ export class Ui {
       <label>${t.volume}</label><input id="s-vol" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}">
       <label>${t.shadows}</label><input id="s-sh" type="range" min="0" max="2" step="1" value="${s.shadows}">
       <label>${t.quality} (${s.scale.toFixed(2)})</label><input id="s-sc" type="range" min="50" max="100" step="5" value="${Math.round(s.scale * 100)}">
+      <label>${t.aa} <small>(${t.reloads})</small></label><div class="wrh-row">${(['off', 'msaa', 'smaa'] as const).map((m) => `<button class="wrh-wp${s.aa === m ? ' on' : ''}" data-aa="${m}">${m === 'off' ? t.off : m.toUpperCase()}</button>`).join('')}</div>
+      <label>${t.bounce}</label><div class="wrh-row"><button class="wrh-wp${s.bounce ? ' on' : ''}" id="s-bn1">${t.on}</button><button class="wrh-wp${!s.bounce ? ' on' : ''}" id="s-bn0">${t.off}</button></div>
       <label>${t.language}</label><div class="wrh-row"><button class="alt" id="s-en">English</button><button class="alt" id="s-tr">Türkçe</button></div>
       <button id="s-close">${t.close}</button>
     </div>`;
@@ -347,6 +386,11 @@ export class Ui {
     q('s-vol').oninput = (e) => this.h.onSetting('volume', Number((e.target as HTMLInputElement).value) / 100);
     q('s-sh').oninput = (e) => this.h.onSetting('shadows', Number((e.target as HTMLInputElement).value));
     q('s-sc').oninput = (e) => this.h.onSetting('scale', Number((e.target as HTMLInputElement).value) / 100);
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-aa]').forEach((el) => {
+      el.onclick = () => this.h.onSetting('aa', el.dataset.aa!);
+    });
+    q('s-bn1').onclick = () => this.h.onSetting('bounce', true);
+    q('s-bn0').onclick = () => this.h.onSetting('bounce', false);
     q('s-en').onclick = () => this.h.onSetting('lang', 'en');
     q('s-tr').onclick = () => this.h.onSetting('lang', 'tr');
     q('s-close').onclick = () => this.toggleSettings();

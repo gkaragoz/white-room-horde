@@ -45,6 +45,8 @@ export interface WaveConfig {
 export interface ProgressionConfig {
   xpBase: number;
   xpPerLevel: number;
+  /** Kills with at least this much damage become physical ragdolls on the client. */
+  ragdollPower: number;
   cardSeconds: number;
   xp: Record<EnemyType, number>;
   boss: { everyWaves: number; hpMul: number; damage: number; radiusMul: number; summonSeconds: number; summonCount: number; xp: number };

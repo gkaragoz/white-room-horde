@@ -2,6 +2,10 @@ import { Buttons, ENEMY_TYPES, TICK_DT } from '@wrh/shared';
 import { addPlayer, createWorld, spawnEnemy, step, type World } from '@wrh/sim';
 import { BOSS_TYPES, Crowd } from '../render/crowd';
 import { Fx } from '../render/fx';
+import { RagdollPool } from '../render/ragdoll';
+import * as THREE from 'three';
+import { Audio, BANK_FILES } from '../audio';
+import { Stage, type AaMode } from '../render/stage';
 import type { Ctx, QaTest } from './tests';
 
 interface VatMeta {
@@ -247,6 +251,132 @@ export const crowdTests: QaTest[] = [
       if (fx.particleCount !== 0) problems.push(`${fx.particleCount} particles never expired`);
       ctx.stage.scene.remove(fx.group);
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join('\n') : `${burst} particles at the kill, corpse knocked back and then at rest` };
+    },
+  },
+  {
+    id: 'ragdoll.physics',
+    title: 'Ragdolls fall, tumble along the shot, never sink into the floor and come to rest',
+    async run(ctx) {
+      const pool = await RagdollPool.create(6);
+      await pool.preload(['grunt', 'tank']);
+      ctx.stage.scene.add(pool.group);
+      const problems: string[] = [];
+      const notes: string[] = [];
+      try {
+        for (const type of ['grunt', 'tank']) {
+          pool.clear();
+          const ok = pool.spawn(type, 0, 0, 0.5, 'z_walk', 0.4, { x: 1, z: 0 }, { x: 1, z: 0, power: 40 });
+          if (!ok) {
+            problems.push(`${type}: spawn failed`);
+            continue;
+          }
+          const start = pool.debugJoint('hips')!.clone();
+          let minY = 9;
+          let maxSpeed = 0;
+          let last = start.clone();
+          for (let i = 0; i < 60 * 6; i++) {
+            pool.update(1 / 60);
+            for (const j of ['hips', 'head', 'handL', 'footR'] as const) minY = Math.min(minY, pool.debugJoint(j)!.y);
+            const h = pool.debugJoint('hips')!;
+            maxSpeed = Math.max(maxSpeed, h.distanceTo(last) * 60);
+            last = h.clone();
+          }
+          const end = pool.debugJoint('hips')!;
+          const thrown = end.x - start.x;
+          const drawn = pool.debugBoneWorld('hips')!;
+          const headBone = pool.debugBoneWorld('head')!;
+          const headPart = pool.debugJoint('head')!;
+          if (minY < 0.05) problems.push(`${type}: a joint went through the floor (y ${f(minY, 3)})`);
+          if (thrown < 0.4) problems.push(`${type}: barely thrown along the shot (${f(thrown)} u)`);
+          if (maxSpeed > 30) problems.push(`${type}: unstable, hips reached ${f(maxSpeed)} u/s`);
+          if (pool.awakeCount !== 0) problems.push(`${type}: still simulating after 6 s`);
+          if (drawn.distanceTo(end) > 0.15) problems.push(`${type}: hips bone is ${f(drawn.distanceTo(end))} u from its physics joint`);
+          if (headBone.distanceTo(headPart) > 0.9) problems.push(`${type}: head bone ${f(headBone.distanceTo(headPart))} u from its physics joint (skeleton follows poorly)`);
+          if (end.y > 1.0) problems.push(`${type}: resting hips are ${f(end.y)} u high, not lying down`);
+          notes.push(`${type}: thrown ${f(thrown)} u, rests at hip height ${f(end.y)}, peak ${f(maxSpeed)} u/s`);
+        }
+      } finally {
+        pool.clear();
+        ctx.stage.scene.remove(pool.group);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : notes.join('; ') };
+    },
+  },
+  {
+    id: 'audio.bank',
+    title: 'Every recorded sound effect decodes in this browser and has a sane length',
+    async run() {
+      const a = new Audio();
+      a.unlock();
+      const { loaded, durations } = await a.whenLoaded();
+      const missing = BANK_FILES.filter((x) => !loaded.includes(x));
+      const long = Object.entries(durations).filter(([, d]) => d > 6 || d < 0.03);
+      const problems: string[] = [];
+      if (missing.length) problems.push(`not decoded: ${missing.join(', ')}`);
+      if (long.length) problems.push(`odd lengths: ${long.map(([k, d]) => `${k} ${f(d)}s`).join(', ')}`);
+      const total = Object.values(durations).reduce((x, y) => x + y, 0);
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${loaded.length} samples, ${f(total, 1)} s of audio` };
+    },
+  },
+  {
+    id: 'stage.aa-modes',
+    title: 'Anti-aliasing modes render correctly: same brightness, smoother edges than off',
+    async run() {
+      const results: Record<string, { mean: number; edge: number; cube: number }> = {};
+      for (const mode of ['off', 'msaa', 'smaa'] as AaMode[]) {
+        const div = document.createElement('div');
+        div.style.cssText = 'position:fixed;left:0;top:0;width:400px;height:300px;opacity:0;pointer-events:none';
+        document.body.appendChild(div);
+        const st = new Stage(div, { aa: mode, bounce: true });
+        st.renderer.setPixelRatio(1);
+        st.resize();
+        if (mode === 'smaa') await new Promise((r) => setTimeout(r, 600)); // SMAA lookup textures load asynchronously
+        const read = (): { px: Uint8Array; w: number; h: number } => {
+          const gl = st.renderer.getContext();
+          const w = gl.drawingBufferWidth;
+          const h = gl.drawingBufferHeight;
+          const px = new Uint8Array(w * h * 4);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          return { px, w, h };
+        };
+        st.follow(0, 0);
+        st.render();
+        const bg = read();
+        const cube = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial({ color: '#d02020' }));
+        cube.rotation.set(0.4, 0.7, 0.2);
+        cube.position.set(0, 1, 0);
+        st.scene.add(cube);
+        st.render();
+        const img = read();
+        // contrast of every pixel against the empty scene; interior pixels have the full contrast, edge pixels in between
+        const diff = new Float32Array(img.w * img.h);
+        let sum = 0;
+        let full = 0;
+        for (let i = 0; i < diff.length; i++) {
+          const d = Math.abs(img.px[i * 4]! - bg.px[i * 4]!) + Math.abs(img.px[i * 4 + 1]! - bg.px[i * 4 + 1]!) + Math.abs(img.px[i * 4 + 2]! - bg.px[i * 4 + 2]!);
+          diff[i] = d;
+          sum += img.px[i * 4]! + img.px[i * 4 + 1]! + img.px[i * 4 + 2]!;
+          if (d > full) full = d;
+        }
+        let cubePx = 0;
+        let soft = 0;
+        for (let i = 0; i < diff.length; i++) {
+          if (diff[i]! > full * 0.85) cubePx++;
+          else if (diff[i]! > full * 0.12) soft++;
+        }
+        results[mode] = { mean: sum / diff.length / 3, edge: soft, cube: cubePx };
+        st.renderer.dispose();
+        st.renderer.forceContextLoss();
+        div.remove();
+      }
+      const problems: string[] = [];
+      const r = results as Record<AaMode, { mean: number; edge: number; cube: number }>;
+      for (const m of ['off', 'msaa', 'smaa'] as const) if (r[m].cube < 300) problems.push(`${m}: test cube not visible (${r[m].cube} px)`);
+      for (const m of ['msaa', 'smaa'] as const) {
+        if (Math.abs(r[m].mean - r.off.mean) > r.off.mean * 0.15 + 3) problems.push(`${m}: brightness ${f(r[m].mean, 1)} vs off ${f(r.off.mean, 1)} (tone mapping or colour space differs)`);
+        if (r[m].edge < r.off.edge * 1.3 + 40) problems.push(`${m}: edges are not smoother than off (${r[m].edge} vs ${r.off.edge} soft-edge pixels)`);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : Object.entries(r).map(([k, v]) => `${k}: mean ${f(v.mean, 1)}, cube ${v.cube}px, soft edges ${v.edge}`).join('; ') };
     },
   },
 ];

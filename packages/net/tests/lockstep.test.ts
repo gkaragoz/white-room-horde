@@ -108,6 +108,18 @@ describe('lockstep over a laggy network', () => {
     for (const c of net.clients) expect(c.session.state).toBe('playing');
   });
 
+  it('lets players pick their starting weapon in the lobby and starts with it', () => {
+    const net = lobby([30, 30]);
+    net.clients[1]!.session.setWeapon('shotgun');
+    net.advance(300);
+    expect(net.clients[0]!.session.players.find((p) => p.slot === 1)!.weapon).toBe('shotgun');
+    net.clients[0]!.session.start();
+    net.advance(800);
+    const w = net.clients[0]!.session.world!;
+    expect(w.pWeapon[1]).toBe(3); // shotgun index
+    expect(w.pWeapon[0]).toBe(0);
+  });
+
   it('keeps clients with different latency on identical hashes at every checkpoint', () => {
     const net = lobby([20, 60, 120, 40]);
     net.clients[0]!.session.start();

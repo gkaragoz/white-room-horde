@@ -1,13 +1,38 @@
 import { WEAPON_IDS } from '@wrh/shared';
 import type { SimEvent } from '@wrh/sim';
 
-type Sfx = 'shot' | 'heavyShot' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive' | 'level' | 'pick' | 'wave' | 'boss' | 'over';
+type Sfx = 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'throw' | 'heavyShot' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive' | 'level' | 'pick' | 'wave' | 'boss' | 'over';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
-const GAP: Record<Sfx, number> = { shot: 0.035, heavyShot: 0.05, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3, level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1 };
+const GAP: Record<Sfx, number> = { midShot: 0.04, bigShot: 0.05, cannonShot: 0.08, throw: 0.1, shot: 0.035, heavyShot: 0.05, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3, level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1 };
+
+/** Recorded effects (CC0, see public/sfx/CREDITS.md). Each name picks a random file and varies the pitch a little. */
+const n3 = (p: string): string[] => [0, 1, 2].map((i) => `${p}_00${i}`);
+const BANK: Partial<Record<Sfx, { files: string[]; gain: number; rate: [number, number] }>> = {
+  shot: { files: ['shot_01', 'shot_02', 'shot_03'], gain: 0.55, rate: [0.95, 1.08] },
+  midShot: { files: ['bang_01', 'bang_02', 'bang_03', 'bang_04', 'bang_05', 'bang_06'], gain: 0.6, rate: [0.95, 1.05] },
+  bigShot: { files: ['bang_07', 'bang_08', 'bang_09', 'bang_10'], gain: 0.75, rate: [0.9, 1.0] },
+  cannonShot: { files: ['cannon_01', 'cannon_02', 'cannon_03'], gain: 0.8, rate: [0.9, 1.0] },
+  heavyShot: { files: ['bang_07', 'bang_08', 'cannon_01'], gain: 0.8, rate: [0.9, 1.0] },
+  boom: { files: ['explosion', 'cannon_04', 'cannon_05'], gain: 1, rate: [0.8, 0.95] },
+  hit: { files: [...n3('impactPunch_medium'), ...n3('impactSoft_medium')], gain: 0.35, rate: [0.9, 1.2] },
+  death: { files: n3('impactSoft_heavy'), gain: 0.55, rate: [0.8, 1.05] },
+  hurt: { files: n3('impactPunch_heavy'), gain: 0.8, rate: [0.9, 1.0] },
+  down: { files: n3('impactSoft_heavy'), gain: 0.9, rate: [0.6, 0.7] },
+  throw: { files: n3('impactMetal_light'), gain: 0.7, rate: [0.9, 1.1] },
+  pick: { files: n3('impactBell_heavy'), gain: 0.5, rate: [1.1, 1.25] },
+  level: { files: ['bell_01'], gain: 0.7, rate: [1, 1] },
+  revive: { files: ['bell_01'], gain: 0.6, rate: [1.3, 1.3] },
+  wave: { files: ['gong_01'], gain: 0.6, rate: [1, 1] },
+  boss: { files: ['gong_02', 'cannon_05'], gain: 1, rate: [0.7, 0.7] },
+  over: { files: ['gong_02'], gain: 0.9, rate: [0.55, 0.55] },
+};
+
+/** Every file the bank refers to (QA checks they all decode). */
+export const BANK_FILES: string[] = [...new Set(Object.values(BANK).flatMap((b) => b.files))];
 
 /**
- * Synthesised placeholder sound effects (WebAudio, no files). Real recorded effects from a free library replace these
+ * Recorded effects with a synthesised fallback (browser cannot decode ogg, or a file is missing). sound effects (WebAudio, no files). Real recorded effects from a free library replace these
  * later (docs/DESIGN.md section 10); this gives the game feedback, volume control and positional-free mixing now.
  */
 export class Audio {
@@ -15,6 +40,8 @@ export class Audio {
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private readonly last = new Map<Sfx, number>();
+  private readonly buffers = new Map<string, AudioBuffer>();
+  private loading = false;
   volume = 0.6;
   muted = false;
 
@@ -35,6 +62,68 @@ export class Audio {
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    void this.loadBank();
+  }
+
+  /** Fetch and decode every file of the bank once; failures just leave the synth fallback in place. */
+  private async loadBank(): Promise<void> {
+    if (this.loading || !this.ctx) return;
+    this.loading = true;
+    const names = new Set<string>();
+    for (const b of Object.values(BANK)) for (const f of b.files) names.add(f);
+    await Promise.all(
+      [...names].map(async (n) => {
+        try {
+          const res = await fetch(`/sfx/${n}.ogg`);
+          const buf = await this.ctx!.decodeAudioData(await res.arrayBuffer());
+          this.buffers.set(n, buf);
+        } catch {
+          /* synth fallback */
+        }
+      }),
+    );
+  }
+
+  /** QA: wait until the bank is decoded (or time runs out) and report what loaded. */
+  async whenLoaded(ms = 6000): Promise<{ loaded: string[]; durations: Record<string, number> }> {
+    const t0 = performance.now();
+    while (this.buffers.size < BANK_FILES.length && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50));
+    const durations: Record<string, number> = {};
+    for (const [k, v] of this.buffers) durations[k] = v.duration;
+    return { loaded: [...this.buffers.keys()], durations };
+  }
+
+  get loadedSamples(): number {
+    return this.buffers.size;
+  }
+
+  private playBank(name: Sfx): boolean {
+    const b = BANK[name];
+    if (!b || !this.ctx || !this.master) return false;
+    const avail = b.files.filter((f) => this.buffers.has(f));
+    if (!avail.length) return false;
+    const file = avail[Math.floor(Math.random() * avail.length)]!;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.buffers.get(file)!;
+    src.playbackRate.value = b.rate[0] + Math.random() * (b.rate[1] - b.rate[0]);
+    const g = this.ctx.createGain();
+    g.gain.value = b.gain * (0.9 + Math.random() * 0.2);
+    src.connect(g).connect(this.master);
+    src.start();
+    // the big explosion and the boss roar layer a second sample
+    if (name === 'boom' || name === 'boss') {
+      const extra = avail[Math.floor(Math.random() * avail.length)]!;
+      if (extra !== file) {
+        const s2 = this.ctx.createBufferSource();
+        s2.buffer = this.buffers.get(extra)!;
+        s2.playbackRate.value = b.rate[0];
+        const g2 = this.ctx.createGain();
+        g2.gain.value = b.gain * 0.6;
+        s2.connect(g2).connect(this.master);
+        s2.start();
+      }
+    }
+    return true;
   }
 
   setVolume(v: number): void {
@@ -84,7 +173,12 @@ export class Audio {
     const now = this.ctx.currentTime;
     if (now - (this.last.get(name) ?? -1) < GAP[name]) return;
     this.last.set(name, now);
+    if (this.playBank(name)) return;
     switch (name) {
+      case 'midShot':
+      case 'bigShot':
+      case 'cannonShot':
+      case 'throw':
       case 'shot':
         this.burst(0.09, 0.35, 5200);
         this.tone(220 + Math.random() * 40, 70, 0.07, 'square', 0.12);
@@ -136,12 +230,14 @@ export class Audio {
 
   onEvent(e: SimEvent, localSlot: number): void {
     switch (e.type) {
-      case 'shot':
+      case 'shot': {
         if (e.slot !== localSlot && Math.random() < 0.5) return; // thin out the squad's gunfire
-        this.play(e.weapon === WEAPON_IDS.indexOf('shotgun') || e.weapon === WEAPON_IDS.indexOf('sniper') || e.weapon === WEAPON_IDS.indexOf('hmg') ? 'heavyShot' : 'shot');
+        const w = WEAPON_IDS[e.weapon];
+        this.play(w === 'sniper' ? 'cannonShot' : w === 'shotgun' ? 'heavyShot' : w === 'hmg' ? 'bigShot' : w === 'ar' || w === 'minigun' ? 'midShot' : 'shot');
         break;
+      }
       case 'grenadeThrown':
-        this.play('pick');
+        this.play('throw');
         break;
       case 'enemyHit':
         this.play('hit');

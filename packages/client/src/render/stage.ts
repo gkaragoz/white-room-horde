@@ -1,5 +1,16 @@
 import * as THREE from 'three';
 import { CAMERA } from '@wrh/shared';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+
+export type AaMode = 'off' | 'msaa' | 'smaa';
+export interface StageOptions {
+  aa: AaMode;
+  /** Cheap fake global illumination: a warm bounce fill from the floor side. */
+  bounce: boolean;
+}
 
 /** Everything that is not a character: renderer, iso camera, warm sun, painted floor (docs/DESIGN.md sections 3b, 4, 5). */
 export class Stage {
@@ -10,9 +21,15 @@ export class Stage {
   private readonly camOffset: THREE.Vector3;
   private readonly sunOffset: THREE.Vector3;
 
-  constructor(private readonly container: HTMLElement) {
+  private composer: EffectComposer | null = null;
+  private readonly bounce: THREE.DirectionalLight;
+
+  constructor(
+    private readonly container: HTMLElement,
+    opts: StageOptions = { aa: 'msaa', bounce: true },
+  ) {
     // M1 uses WebGL2; the renderer is created only here so WebGPU can replace it later (design section 21).
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: opts.aa === 'msaa', powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.AgXToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -40,7 +57,20 @@ export class Stage {
     this.scene.add(this.sun, this.sun.target);
     this.scene.add(new THREE.HemisphereLight('#f2e6d0', '#b9a88f', 1.5));
 
+    // fake bounce light: sunlight reflected by the cream floor tints the shaded sides warmly
+    this.bounce = new THREE.DirectionalLight('#ffd9b0', 0.55);
+    this.bounce.position.set(-this.sunOffset.x, -this.sunOffset.y * 0.2 + 2, -this.sunOffset.z);
+    this.bounce.visible = opts.bounce;
+    this.scene.add(this.bounce);
+
     this.scene.add(makeFloor());
+    if (opts.aa === 'smaa') {
+      this.composer = new EffectComposer(this.renderer);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      // tone map first so SMAA sees display-referred colours (edge detection is tuned for those)
+      this.composer.addPass(new OutputPass());
+      this.composer.addPass(new SMAAPass());
+    }
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -74,6 +104,8 @@ export class Stage {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h);
+    this.composer?.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer?.setSize(w, h);
     const halfW = CAMERA.orthoWidth / 2;
     const halfH = halfW * (h / w);
     this.camera.left = -halfW;
@@ -93,8 +125,13 @@ export class Stage {
     this.sun.target.updateMatrixWorld();
   }
 
+  setBounce(on: boolean): void {
+    this.bounce.visible = on;
+  }
+
   render(): void {
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
   }
 }
 

@@ -112,6 +112,8 @@ export class Crowd {
   private readonly drawY = new Float32Array(MAX_ENEMIES);
   private readonly yaw = new Float32Array(MAX_ENEMIES);
   private readonly drawn = new Uint8Array(MAX_ENEMIES);
+  private readonly lastClip: string[] = new Array<string>(MAX_ENEMIES).fill('');
+  private readonly lastTime = new Float32Array(MAX_ENEMIES);
   /** Moves faster than this many units in one frame are treated as teleports (slot reuse). */
   readonly maxCorpses: number;
   triangles = 0;
@@ -195,9 +197,10 @@ export class Crowd {
   }
 
   /** Feed the events of one step (deaths become client-side corpses). */
-  onEvents(w: World, events: readonly SimEvent[], now: number): void {
+  onEvents(w: World, events: readonly SimEvent[], now: number, skip?: (e: Extract<SimEvent, { type: 'enemyDeath' }>) => boolean): void {
     for (const e of events) {
       if (e.type !== 'enemyDeath') continue;
+      if (skip?.(e)) continue;
       const name = ENEMY_TYPES[e.etype]!;
       if (name === 'exploder') continue; // blown to pieces
       const render = this.renderIndex(w, e.id, e.etype);
@@ -303,6 +306,8 @@ export class Crowd {
         }
         time = (this.phase[i]! % 1) * clip.duration;
       }
+      this.lastClip[i] = clip.id;
+      this.lastTime[i] = time;
       this.drawX[i] = x;
       this.drawY[i] = y;
       this.drawn[i] = 1;
@@ -329,6 +334,18 @@ export class Crowd {
       tris += t.count * ((t.geometry.index?.count ?? 0) / 3);
     }
     this.triangles = tris;
+  }
+
+  /** What an enemy was doing when it died (for a ragdoll to continue from): clip, time, velocity and heading. */
+  deathInfo(w: World, id: number): { clip: string; time: number; vx: number; vy: number; yaw: number; boss: boolean } {
+    return {
+      clip: this.lastClip[id] || 'z_walk',
+      time: this.lastTime[id]!,
+      vx: this.prevActive[id] ? (w.eX[id]! - this.prevX[id]!) / TICK_DT : 0,
+      vy: this.prevActive[id] ? (w.eY[id]! - this.prevY[id]!) / TICK_DT : 0,
+      yaw: this.drawn[id] ? this.yaw[id]! : w.eAngle[id]! + Math.PI / 2,
+      boss: w.eBoss[id] !== 0,
+    };
   }
 
   /** QA helper: show exactly one enemy in a given pose (type index or name), nothing else. */

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, OBSTACLES, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, ENEMY_TYPES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, OBSTACLES, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
@@ -7,6 +7,7 @@ import { pickPlayerClip } from './anim';
 import { Input } from './input';
 import { Character } from './render/character';
 import { Crowd } from './render/crowd';
+import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
 import { Stage } from './render/stage';
 import { Ui, type Settings } from './ui';
@@ -17,7 +18,7 @@ const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
 function loadSettings(): Settings {
-  const def: Settings = { volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
+  const def: Settings = { aa: 'msaa', bounce: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
   try {
     return { ...def, ...(JSON.parse(localStorage.getItem('wrh.settings') ?? '{}') as Partial<Settings>) };
   } catch {
@@ -26,13 +27,16 @@ function loadSettings(): Settings {
 }
 let settings = loadSettings();
 
-const stage = new Stage(app);
+const stage = new Stage(app, { aa: settings.aa, bounce: settings.bounce });
 const audio = new Audio();
 const input = new Input(stage.renderer.domElement, stage.camera);
 const fx = new Fx();
 stage.scene.add(fx.group);
 const crowd = await Crowd.create(150);
 stage.scene.add(crowd.group);
+const ragdolls = await RagdollPool.create(14);
+await ragdolls.preload([...ENEMY_TYPES]);
+stage.scene.add(ragdolls.group);
 
 const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.1, 0.7), new THREE.MeshBasicMaterial({ color: '#fff0a8' }), MAX_BULLETS);
 bulletMesh.frustumCulled = false;
@@ -66,6 +70,7 @@ function applySettings(): void {
   audio.setVolume(settings.volume);
   stage.setShadowQuality(settings.shadows);
   stage.setScale(settings.scale);
+  stage.setBounce(settings.bounce);
   ui.applySettings(settings);
   try {
     localStorage.setItem('wrh.settings', JSON.stringify(settings));
@@ -94,7 +99,7 @@ const dev = {
   wave: Number(params.get('wave') ?? 1),
 };
 const weaponParam = (params.get('weapon') ?? 'weapon_pistol').replace('weapon_', '');
-const startWeapon = (WEAPON_IDS as readonly string[]).includes(weaponParam) ? (weaponParam as WeaponId) : 'pistol';
+let startWeapon: WeaponId = (WEAPON_IDS as readonly string[]).includes(weaponParam) ? (weaponParam as WeaponId) : 'pistol';
 
 const ui = new Ui(
   document.body,
@@ -102,6 +107,10 @@ const ui = new Ui(
     onSolo: (name) => startSolo(name),
     onHost: (name, server) => connect(name, server, null),
     onJoin: (name, code, server) => connect(name, server, code),
+    onWeapon: (wp) => {
+      startWeapon = wp;
+      session?.setWeapon(wp);
+    },
     onStart: () => session?.start(),
     onLeave: () => location.reload(),
     onCard: (i) => input.queueButton([Buttons.Card1, Buttons.Card2, Buttons.Card3][i]!),
@@ -111,6 +120,13 @@ const ui = new Ui(
       if (key === 'volume') settings = { ...settings, volume: value as number };
       else if (key === 'shadows') settings = { ...settings, shadows: value as 0 | 1 | 2 };
       else if (key === 'scale') settings = { ...settings, scale: value as number };
+      else if (key === 'bounce') settings = { ...settings, bounce: value as boolean };
+      else if (key === 'aa') {
+        settings = { ...settings, aa: value as Settings['aa'] };
+        applySettings();
+        location.reload();
+        return;
+      }
       else settings = { ...settings, lang: value as 'en' | 'tr' };
       applySettings();
     },
@@ -119,6 +135,7 @@ const ui = new Ui(
 );
 window.addEventListener('pointerdown', () => audio.unlock());
 window.addEventListener('keydown', () => audio.unlock());
+ui.weapon = startWeapon;
 applySettings();
 
 // ---- characters ----
@@ -175,8 +192,18 @@ function afterStep(w: World): void {
     const dy = curY[s]! - prevY[s]!;
     if (dx * dx + dy * dy > 1e-6) moveAngle[s] = Math.atan2(dy, dx);
   }
-  if (!catchingUp) crowd.onEvents(w, w.events, nowSec);
+  if (!catchingUp) crowd.onEvents(w, w.events, nowSec, (e) => tryRagdoll(w, e));
   for (const e of w.events) handleEvent(e);
+}
+
+/** Hard hits and blasts throw the body as a physical ragdoll; lighter kills play the baked death animation. */
+function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boolean {
+  const type = ENEMY_TYPES[e.etype]!;
+  if (type === 'exploder' || w.eBoss[e.id] || !ragdolls.ready) return false;
+  if (!(e.power >= BALANCE.progression.ragdollPower || Math.random() < 0.25)) return false;
+  const info = crowd.deathInfo(w, e.id);
+  // sim (x, y) -> three (x, z = -y)
+  return ragdolls.spawn(type, e.x, -e.y, info.yaw, info.clip, info.time, { x: info.vx * 0.5, z: -info.vy * 0.5 }, { x: e.dx, z: -e.dy, power: e.power });
 }
 
 function handleEvent(e: SimEvent): void {
@@ -410,6 +437,7 @@ function frame(nowMs: number): void {
 
     crowd.update(w, alpha, nowSec);
     fx.update(dt);
+    ragdolls.update(dt);
 
     let n = 0;
     for (let i = 0; i < MAX_BULLETS; i++) {
@@ -504,6 +532,7 @@ requestAnimationFrame(frame);
   fx,
   perf,
   ui,
+  ragdolls,
   get ws() {
     return ws;
   },

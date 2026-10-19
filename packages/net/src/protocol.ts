@@ -8,6 +8,7 @@ export interface PlayerInfo {
   name: string;
   host: boolean;
   connected: boolean;
+  weapon: WeaponId;
 }
 
 export type ClientMsg =
@@ -17,6 +18,7 @@ export type ClientMsg =
   | { t: 'hash'; tick: number; hash: number }
   | { t: 'ping'; ts: number }
   | { t: 'resync' }
+  | { t: 'weapon'; weapon: WeaponId }
   | { t: 'leave' };
 
 export type ServerMsg =

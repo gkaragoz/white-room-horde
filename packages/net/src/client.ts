@@ -65,6 +65,12 @@ export class NetSession {
     this.sendJson({ t: 'start' });
   }
 
+  /** Pick the starting weapon while in the lobby. */
+  setWeapon(weapon: WeaponId): void {
+    this.weapon = weapon;
+    this.sendJson({ t: 'weapon', weapon });
+  }
+
   leave(): void {
     this.sendJson({ t: 'leave' });
     this.state = 'closed';
