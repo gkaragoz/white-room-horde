@@ -116,8 +116,12 @@ try {
   const p1 = await state();
   check('Esc pauses the game', p1.tick === p0.tick, `tick ${p0.tick} -> ${p1.tick}`);
   await page.keyboard.press('Escape');
-  await sleep(800);
-  const p2 = await state();
+  // software rendering in CI can be slow: give the simulation a few seconds to move on
+  let p2 = await state();
+  for (let i = 0; i < 20 && p2.tick <= p1.tick + 5; i++) {
+    await sleep(300);
+    p2 = await state();
+  }
   check('Esc again resumes it', p2.tick > p1.tick + 5);
 
   // the horde arrives
