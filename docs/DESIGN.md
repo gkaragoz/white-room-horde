@@ -176,8 +176,30 @@ Her dalga sonunda oyuncuya 3 kart: biri silaha bağlı, ikisi karışık. Nadirl
 | Kaos | Kanı hasara çevir (zemindeki kırmızı alan hasar verir), düşman patlamalarında zincir |
 | Boss ödülü | Boss ödülü: seçili silahın efsane sürümü |
 
-## 14. Açık kararlar
-- Oyuncu sayısına göre 7-11 renk listesi (kırmızı hariç).
-- Kart havuzu, ölçeklenme eğrisi, boss türleri.
-- Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı.
-- Ses/müzik yönü, UI taslağı.
+## 14. Boss'lar ve zorluk eğrisi
+Bosslar her 5. dalgada çıkar; dalga 25'ten sonra aynı dört boss sırayla, her turda +%50 can ve yeni saldırı kombinasyonuyla tekrar gelir.
+
+| Dalga | Boss | Mekanik |
+|---|---|---|
+| 5 | Dev Grunt | Yer sarsar (telegrafli, yerde kırmızı alan işareti), küçük düşman fırlatır. Öğretici boss. |
+| 10 | Kral Tank | Ön zırh plakaları vuruşla kopar, arkası açılır; biri önünü çeker, diğerleri arkadan vurur (takım koordinasyonu). |
+| 15 | Sayacı Ana | Düşman yumurtlar; yavruları temizlemeden zarar vermek zor, patlayıcı ve alan hasarı ödüllendirilir. |
+| 20 | Koşucu Sürü Lideri | Hızlı, periyodik kopyalar üretir (gerçeği ayırt etmek için renk parıltısı); dash ve ateş gücü önemlidir. |
+
+Boss ödülü: herkese bir "boss kartı" (seçili silahın efsane sürümü) ve kısa sakin ara (10 sn, düşman akışı durur).
+
+Zorluk eğrisi:
+- Eşzamanlı düşman hedefi: `N(w) = min(500, N0(p) x 1.12^(w-1))`, `N0(p) = 30 + 10 x p` (p oyuncu sayısı). 2 kişide ~50 ile başlar ve tavana ~dalga 21'de, 11 kişide ~140 ile başlar ve tavana ~dalga 12'de varır.
+- Düşman canı: dalga başı +%8. Tavan sonrası düşman hasarı da dalga başı +%4 artar.
+- Oyuncu sayısı çarpanı: can çarpanı `1 + 0.1 x (p - 2)` (kalabalıkta düşman biraz daha dayanıklı), sayı zaten N0 ile ölçeklenir.
+- Yeni düşman türleri: dalga 1 grunt, 3 koşucu, 6 tank, 9 patlayıcı, 12 tükürüklü, 15 zırhlı kalkancı, 18 sayacı (spawner).
+- Spawn: ekranın dışında, kamera kenarında (leash çemberi) dairesel dağılım, sim'de tohumlu RNG ile; aynı anda sınırlı spawn hızı (tick başına en fazla N) CPU piklerini önler.
+- Dengesizlik kontrolü: tavan 500 sabit; dalga 25+ ek zorluk sadece can/hasar ve boss gücüyle gelir (performans bütçesi korunur).
+
+## 15. Açık kararlar
+- Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
+- Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
+- Silah ve düşman modellerinin Blender'da üretimi (LLAMA/Blender MCP hattı) ve GLB sözleşmesi.
+- Teknik mimari: Three.js sahne yapısı, instanced skinning yaklaşımı (VAT veya GPU skinning), proje klasör düzeni, test ve CI (determinizm testi dahil).
+- Sinyal/oda sunucusu barındırma (WebSocket) ve maliyet.
+- Sonraki sürüm: kalıcı meta ilerleme, yeni haritalar, sıralama tablosu.
