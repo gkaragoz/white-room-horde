@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { asset } from '../assets';
 
 const loader = new GLTFLoader();
 const cache = new Map<string, Promise<GLTF>>();
@@ -88,7 +89,7 @@ export class Character {
   }
 
   static async createPlayer(opts: CharacterOptions): Promise<Character> {
-    const [base, anims] = await Promise.all([loadGLB('/models/characters/player_base.glb'), loadGLB('/models/anims/player_anims.glb')]);
+    const [base, anims] = await Promise.all([loadGLB(asset('models/characters/player_base.glb')), loadGLB(asset('models/anims/player_anims.glb'))]);
     const model = SkeletonUtils.clone(base.scene);
     const skinned = collectSkinned(model);
     for (const m of skinned) {
@@ -108,7 +109,7 @@ export class Character {
     for (const b of skeleton.bones) ch.bones.set(b.name, b);
 
     if (opts.accessory) {
-      const acc = await loadGLB(`/models/characters/${opts.accessory}.glb`);
+      const acc = await loadGLB(asset(`models/characters/${opts.accessory}.glb`));
       const copy = SkeletonUtils.clone(acc.scene);
       for (const m of collectSkinned(copy)) {
         m.removeFromParent();
@@ -126,7 +127,7 @@ export class Character {
   async attachWeapon(id: string): Promise<void> {
     const hand = this.bones.get('handR') ?? [...this.bones.values()].find((b) => /hand.?r/i.test(b.name));
     if (!hand) throw new Error('right hand bone not found: ' + [...this.bones.keys()].join(','));
-    const w = await loadGLB(`/models/weapons/${id}.glb`);
+    const w = await loadGLB(asset(`models/weapons/${id}.glb`));
     const g = SkeletonUtils.clone(w.scene);
     g.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) {

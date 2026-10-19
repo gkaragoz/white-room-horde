@@ -33,3 +33,17 @@ cloudflared tunnel --url http://localhost:8787   # optional: share a public link
 Open the page, "Host game" gives a 4-letter room code, friends use "Join game" with the code (the server field defaults to the page's own host). For development run `pnpm dev` (client on 5173) next to the server; the menu then defaults to `ws://localhost:8787/ws`. Late joiners fast-forward through the stored input history; the server compares state hashes every second and flags desyncs.
 
 Tests: `pnpm test` (sim determinism, enemies, replay, lockstep with simulated latency), `pnpm lint`, `pnpm typecheck`.
+
+## Live
+
+- Play (solo works out of the box): https://gkaragoz.github.io/white-room-horde/
+- Multiplayer needs the relay server above. Run it on your machine, expose it (for example `cloudflared tunnel --url http://localhost:8787`), then paste the tunnel address into the "Server" field of the menu (or open the page with `?server=wss://your-tunnel/ws`). Everyone joins with the room code.
+- The GitHub Pages build is produced by `.github/workflows/pages.yml` (`BASE=/white-room-horde/`).
+
+## Credits and licences
+
+- Game code: all rights reserved by the author unless a licence file says otherwise.
+- Sound effects: CC0, see `packages/client/public/sfx/CREDITS.md` (rubberduck on OpenGameArt, Kenney).
+- Animations: retargeted from Adobe Mixamo clips and baked into the model files; Mixamo's terms allow use inside games but not redistribution of the animations on their own. The raw Mixamo downloads are not in the repository.
+- Characters, weapons, enemies and the floor are procedural (built with the Blender scripts in `tools/blender`).
+- three.js (MIT).

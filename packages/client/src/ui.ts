@@ -251,7 +251,16 @@ export class Ui {
         return '';
       }
     })();
-    const defServer = location.port === '5173' ? `ws://${location.hostname}:8787/ws` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+    const stored = (() => {
+      try {
+        return localStorage.getItem('wrh.server') ?? '';
+      } catch {
+        return '';
+      }
+    })();
+    const fromParam = new URLSearchParams(location.search).get('server');
+    const hosted = location.hostname.endsWith('github.io');
+    const defServer = fromParam ?? (stored || (hosted ? '' : location.port === '5173' ? `ws://${location.hostname}:8787/ws` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
     this.screen.innerHTML = `<div class="wrh-panel wrh-center">
       <h1>${t.title}</h1><p class="sub">${t.tag}</p>
       <label>${t.name}</label><input id="wrh-name" maxlength="16" value="${esc(saved)}" placeholder="player">
@@ -259,7 +268,7 @@ export class Ui {
       <button id="wrh-solo">${t.solo}</button>
       <button id="wrh-host" class="alt">${t.host}</button>
       <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD"></div><button id="wrh-join" class="alt">${t.join}</button></div>
-      <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}">
+      <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}" placeholder="wss://your-tunnel.example.com/ws">
       <p class="sub" style="margin:6px 0 0">${t.controls}</p>
       ${error ? `<p style="color:#c8242c;font-weight:700">${esc(error)}</p>` : ''}
     </div>`;

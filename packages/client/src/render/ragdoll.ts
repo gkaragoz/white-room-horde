@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { loadGLB } from './character';
+import { asset } from '../assets';
 
 /** Authoring scale of each enemy rig (hips translation tracks are authored at 1.0). */
 const SCALE: Record<string, number> = { grunt: 1.35, runner: 1.05, tank: 2.5, exploder: 1.3, spitter: 1.35, shielder: 1.5, spawner: 1.5 };
@@ -80,7 +81,7 @@ export class RagdollPool {
 
   static async create(capacity = 14): Promise<RagdollPool> {
     const pool = new RagdollPool(capacity);
-    const [anims] = await Promise.all([loadGLB('/models/anims/enemy_anims.glb')]);
+    const [anims] = await Promise.all([loadGLB(asset('models/anims/enemy_anims.glb'))]);
     pool.anims = anims.animations;
     return pool;
   }
@@ -88,7 +89,7 @@ export class RagdollPool {
   private async template(type: string): Promise<THREE.Object3D> {
     let t = this.templates.get(type);
     if (!t) {
-      t = (await loadGLB(`/models/characters/${type}.glb`)).scene;
+      t = (await loadGLB(asset(`models/characters/${type}.glb`))).scene;
       this.templates.set(type, t);
     }
     return t;

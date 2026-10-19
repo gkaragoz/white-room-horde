@@ -289,7 +289,28 @@ function downloadReplay(): void {
   URL.revokeObjectURL(a.href);
 }
 
-function connect(name: string, server: string, code: string | null): void {
+/** Accept a pasted tunnel address in any form: https://host, wss://host or host/ws. */
+function normalizeServer(raw: string): string {
+  let s = raw.trim();
+  if (!s) return s;
+  if (/^https?:\/\//i.test(s)) s = s.replace(/^http/i, 'ws');
+  else if (!/^wss?:\/\//i.test(s)) s = (location.protocol === 'https:' ? 'wss://' : 'ws://') + s;
+  const u = new URL(s);
+  if (u.pathname === '/' || u.pathname === '') u.pathname = '/ws';
+  return u.toString();
+}
+
+function connect(name: string, rawServer: string, code: string | null): void {
+  const server = normalizeServer(rawServer);
+  if (!server) {
+    ui.showMenu('Enter the server address first');
+    return;
+  }
+  try {
+    localStorage.setItem('wrh.server', server);
+  } catch {
+    /* ignore */
+  }
   mode = 'online';
   ui.showConnecting();
   const sock = new WebSocket(server);

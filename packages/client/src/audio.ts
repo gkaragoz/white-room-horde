@@ -1,5 +1,6 @@
 import { WEAPON_IDS } from '@wrh/shared';
 import type { SimEvent } from '@wrh/sim';
+import { asset } from './assets';
 
 type Sfx = 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'throw' | 'heavyShot' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive' | 'level' | 'pick' | 'wave' | 'boss' | 'over';
 
@@ -74,7 +75,7 @@ export class Audio {
     await Promise.all(
       [...names].map(async (n) => {
         try {
-          const res = await fetch(`/sfx/${n}.ogg`);
+          const res = await fetch(asset(`sfx/${n}.ogg`));
           const buf = await this.ctx!.decodeAudioData(await res.arrayBuffer());
           this.buffers.set(n, buf);
         } catch {

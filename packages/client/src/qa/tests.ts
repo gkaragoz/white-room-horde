@@ -6,6 +6,7 @@ import { aimDirThree, decodeAim, encodeAim, keysToMove, yawForAim } from '../con
 import { Character, loadGLB } from '../render/character';
 import { Stage } from '../render/stage';
 import { crowdTests } from './crowd-tests';
+import { asset } from '../assets';
 
 export type Status = 'pass' | 'fail' | 'warn';
 export interface Result {
@@ -48,7 +49,7 @@ export const tests: QaTest[] = [
       const weapons = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper', 'grenade'];
       const problems: string[] = [];
       for (const c of chars) {
-        const g = await loadGLB(`/models/characters/${c}.glb`).catch(() => null);
+        const g = await loadGLB(asset(`models/characters/${c}.glb`)).catch(() => null);
         if (!g) problems.push('missing ' + c);
         else {
           const sk = g.scene.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh | undefined;
@@ -57,15 +58,15 @@ export const tests: QaTest[] = [
         }
       }
       for (const w of weapons) {
-        const g = await loadGLB(`/models/weapons/weapon_${w}.glb`).catch(() => null);
+        const g = await loadGLB(asset(`models/weapons/weapon_${w}.glb`)).catch(() => null);
         if (!g) problems.push('missing weapon ' + w);
         else {
           const need = w === 'grenade' ? ['grip'] : ['grip', 'muzzle', 'grip_l'];
           for (const n of need) if (!g.scene.getObjectByName(n)) problems.push(`weapon_${w}: node ${n} missing`);
         }
       }
-      const pa = await loadGLB('/models/anims/player_anims.glb');
-      const ea = await loadGLB('/models/anims/enemy_anims.glb');
+      const pa = await loadGLB(asset('models/anims/player_anims.glb'));
+      const ea = await loadGLB(asset('models/anims/enemy_anims.glb'));
       const pn = pa.animations.map((a) => a.name);
       const en = ea.animations.map((a) => a.name);
       for (const c of REQUIRED_PLAYER_CLIPS) if (!pn.includes(c)) problems.push('player clip ' + c + ' missing');

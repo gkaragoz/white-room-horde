@@ -8,6 +8,7 @@ import { Audio, BANK_FILES } from '../audio';
 import { Stage, type AaMode } from '../render/stage';
 import { webgpuSupported } from '../render/backend';
 import type { Ctx, QaTest } from './tests';
+import { asset } from '../assets';
 
 interface VatMeta {
   type: string;
@@ -71,8 +72,8 @@ export const crowdTests: QaTest[] = [
       const problems: string[] = [];
       let clips = 0;
       for (const type of CROWD_TYPES) {
-        const meta = (await fetch(`/models/vat/${type}.json`).then((r) => r.json())) as VatMeta;
-        const raw: ArrayBuffer = await fetch(`/models/vat/${type}.vat.bin`).then((r) => r.arrayBuffer());
+        const meta = (await fetch(asset(`models/vat/${type}.json`)).then((r) => r.json())) as VatMeta;
+        const raw: ArrayBuffer = await fetch(asset(`models/vat/${type}.vat.bin`)).then((r) => r.arrayBuffer());
         const buf = new Uint16Array(raw);
         const n = meta.vertexCount;
         if (buf.length !== meta.frames * n * 4) problems.push(`${type}: texture size ${buf.length} != ${meta.frames}x${n}x4`);

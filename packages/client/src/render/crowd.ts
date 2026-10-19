@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ENEMY_TYPES, EnemyState, MAX_ENEMIES, TICK_DT, type EnemyType } from '@wrh/shared';
 import type { SimEvent, World } from '@wrh/sim';
 import type { Backend } from './backend';
+import { asset } from '../assets';
 
 /** Baked vertex-animation data for one enemy type (tools/blender/bake_vat.py). */
 interface VatMeta {
@@ -152,7 +153,7 @@ export class Crowd {
   static async create(maxCorpses = 150, backend: Backend = 'webgl'): Promise<Crowd> {
     const crowd = new Crowd(maxCorpses);
     crowd.backend = backend;
-    const paint = await new THREE.TextureLoader().loadAsync('/models/vat/paint.png');
+    const paint = await new THREE.TextureLoader().loadAsync(asset('models/vat/paint.png'));
     paint.colorSpace = THREE.SRGBColorSpace;
     paint.magFilter = THREE.NearestFilter;
     paint.minFilter = THREE.NearestFilter;
@@ -164,7 +165,7 @@ export class Crowd {
   }
 
   private async loadType(id: string, paint: THREE.Texture): Promise<TypeRenderer> {
-    const base = `/models/vat/${id}`;
+    const base = asset(`models/vat/${id}`);
     const [meta, geoBuf, vatBuf] = await Promise.all([
       fetch(base + '.json').then((r) => r.json() as Promise<VatMeta>),
       fetch(base + '.geo.bin').then((r) => r.arrayBuffer()),
