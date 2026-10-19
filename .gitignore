@@ -4,3 +4,5 @@ assets-src/
 node_modules/
 *.blend1
 mixamo/
+dist/
+*.log

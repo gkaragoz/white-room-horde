@@ -367,11 +367,11 @@ SPECS = [
     ("boss_kral_tank", spec_kral_tank, 4.0, "boss", 1.7),
     ("boss_sayaci_ana", spec_sayaci_ana, 3.5, "boss", 1.7),
     ("boss_suru_lideri", spec_suru_lideri, 2.5, "boss", 1.7),
-    ("acc_bandana", acc_bandana, 1.35, "acc", 1.5),
-    ("acc_headphones", acc_headphones, 1.35, "acc", 1.5),
-    ("acc_helmet", acc_helmet, 1.35, "acc", 1.5),
-    ("acc_cap", acc_cap, 1.35, "acc", 1.5),
-    ("acc_goggles", acc_goggles, 1.35, "acc", 1.5),
+    ("acc_bandana", acc_bandana, 1.5, "acc", 1.5),
+    ("acc_headphones", acc_headphones, 1.5, "acc", 1.5),
+    ("acc_helmet", acc_helmet, 1.5, "acc", 1.5),
+    ("acc_cap", acc_cap, 1.5, "acc", 1.5),
+    ("acc_goggles", acc_goggles, 1.5, "acc", 1.5),
 ]
 
 

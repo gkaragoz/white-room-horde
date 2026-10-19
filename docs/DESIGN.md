@@ -296,6 +296,13 @@ white-room-horde/
 - Varlık sözleşmesi testi: GLB ve VAT dosyaları (isim, üçgen bütçesi, animasyon listesi) ship-rpg'deki `assets.test.ts` mantığıyla.
 - CI: GitHub Actions; yarış: lint + tsc + vitest + determinizm + build; ana dalda `server`/`client` dağıtım adımı sonra eklenir.
 
+**Milestone 1 durumu (tamam)**
+- pnpm monorepo (`shared`, `sim`, `client`), TypeScript 5.9 strict (TS 7 yerine 5.9 sabitlendi: typescript-eslint henüz 7'yi desteklemiyor), Vitest, ESLint determinizm kuralları (sim'de `Math.sin/cos/random`, `Date`, `performance` yasak; kural olumsuz testle doğrulandı).
+- `sim`: detmath (sin/cos/atan2 polinom), xorshift128 RNG, CRC32 durum hash'i, SoA dünya, oyuncu hareketi ve atış, mermi havuzu; 14 birim testi (aynı tohum ve girdi = aynı hash, sapmada hash değişir).
+- `client`: izometrik iso62 kamera, sıcak güneş + gölge, boyalı zemin, chibi oyuncu (tint yelek, aksesuar iskelete bağlı, silah sağ el kemiğinde), Mixamo animasyonları (8 yönlü koşu, ateş, idle), 30 Hz sabit adım + enterpolasyon, 165 FPS.
+- Sapma: M1'de renderer WebGL2 (`WebGLRenderer`); WebGPU geçişi M2'de VAT shader'larıyla birlikte (renderer yalnızca `stage.ts` içinde oluşturuluyor).
+- Bilinen eksikler: silah için sol el IK'ı yok (`grip_l` hazır), üst gövde/alt gövde katman ayrımı yok (ateşle koşu için yalnızca ileri yönde `fire_run`), düşman yok.
+
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
 2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).
