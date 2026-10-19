@@ -184,6 +184,65 @@ def make_player_spec(kind, acc):
     return fn
 
 
+def player_marker(m, r, x, y, col, PS):
+    """Make player characters readable at a glance: coloured outline hull, glowing floor ring, floating arrow."""
+    # inverted-hull outline (players only), emissive in the player colour
+    om = emissive("outline_" + col.strip("#"), col, 3.0)
+    om.use_backface_culling = True
+    if os.environ.get("NOHULL"):
+        hull = None
+    else:
+        hull = m.copy()
+    if hull is not None:
+        hull.data = m.data.copy()
+        scene.collection.objects.link(hull)
+        hull.parent = r
+        for mod in hull.modifiers:
+            if mod.type == "ARMATURE":
+                mod.object = r
+        sol = hull.modifiers.new("hull", "SOLIDIFY")
+        sol.thickness = 0.05
+        sol.offset = 1
+        sol.use_flip_normals = True
+        sol.use_rim = False
+        # solidify must run before the armature modifier
+        while hull.modifiers.find("hull") > 0:
+            bpy.context.view_layer.objects.active = hull
+            with bpy.context.temp_override(object=hull, active_object=hull):
+                bpy.ops.object.modifier_move_up(modifier="hull")
+        hull.data.materials.clear()
+        hull.data.materials.append(om)
+        for pg in hull.data.polygons:
+            pg.material_index = 0
+        hull.hide_render = False
+        hull.hide_viewport = False
+        hull.visible_shadow = False
+    # floor ring + soft disc
+    ringm = emissive("ring_" + col.strip("#"), col, 4.5)
+    discm = emissive("disc_" + col.strip("#"), col, 0.8)
+    bpy.ops.mesh.primitive_torus_add(major_radius=1.05, minor_radius=0.07, major_segments=24, minor_segments=4, location=(x, y, 0.04))
+    bpy.context.active_object.data.materials.append(ringm)
+    bpy.context.active_object.visible_shadow = False
+    bpy.ops.mesh.primitive_cylinder_add(radius=1.0, depth=0.02, vertices=24, location=(x, y, 0.025))
+    bpy.context.active_object.data.materials.append(discm)
+    bpy.context.active_object.visible_shadow = False
+    # floating arrow above the head
+    bpy.ops.mesh.primitive_cone_add(vertices=5, radius1=0.26, radius2=0.0, depth=0.5, location=(x, y, 1.5 * PS + 0.95), rotation=(math.pi, 0, 0))
+    bpy.context.active_object.data.materials.append(emissive("arrow_" + col.strip("#"), col, 6.0))
+    bpy.context.active_object.visible_shadow = False
+    bpy.ops.object.light_add(type="POINT", location=(x - 0.3, y - 0.6, 3.6))
+    K_ = bpy.context.active_object
+    K_.data.energy = 420
+    K_.data.color = lin("#FFF4E2")
+    K_.data.shadow_soft_size = 0.8
+    K_.data.use_shadow = False
+    bpy.ops.object.light_add(type="POINT", location=(x, y, 1.0))
+    L = bpy.context.active_object
+    L.data.energy = 60
+    L.data.color = lin(col)
+    L.data.shadow_soft_size = 1.2
+
+
 # ------------------------------------------------------------------ scene
 def clear_or_new():
     global scene
@@ -307,23 +366,25 @@ def place_characters(mats):
     fixed, tint = mats
     out = {"muzzles": [], "enemies_y": []}
     # players
+    PS = 1.5
     players = [
-        (-4.8, -3.4, 168, "pistol", "#6CC4F9", "bandana"),
-        (-1.6, -3.9, 175, "smg", "#F995B3", "headphones"),
-        (1.9, -3.8, 160, "shotgun", "#FDE56C", "helmet"),
-        (5.0, -3.3, 152, "hmg", "#C4A0ED", "goggles"),
+        (-4.8, -3.4, 168, "pistol", "#1FA2FF", "bandana"),
+        (-1.6, -3.9, 175, "smg", "#FF4F9A", "headphones"),
+        (1.9, -3.8, 160, "shotgun", "#FFD21F", "helmet"),
+        (5.0, -3.3, 152, "hmg", "#9A63FF", "goggles"),
     ]
     for (x, y, rzd, kind, col, acc) in players:
         tm = make_materials(col)[1]
-        base = base_char("player_" + kind, make_player_spec(kind, acc), 1.35, 1.5, HIGH, (fixed, tm))
+        base = base_char("player_" + kind, make_player_spec(kind, acc), PS, 1.5, HIGH, (fixed, tm))
         m, r = clone(base, (x, y, 0), math.radians(rzd))
         pose_shoot(r)
         pb = r.pose.bones["hand.R"]
-        dist = (0.5 - WEAPON[kind]) * 1.35
+        dist = (0.5 - WEAPON[kind]) * PS
         wm = r.matrix_world @ pb.matrix
         muzzle = wm @ Vector((0, dist, 0))
         direction = (wm.to_3x3() @ Vector((0, 1, 0))).normalized()
         out["muzzles"].append((muzzle, direction, kind))
+        player_marker(m, r, x, y, col, PS)
     # enemy templates (low detail, rigged)
     grunt = base_char("grunt", K["spec_grunt"], 1.35, 1.5, LOW, mats)
     runner = base_char("runner", K["spec_runner"], 1.05, 1.55, LOW, mats)

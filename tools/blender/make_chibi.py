@@ -355,7 +355,7 @@ def acc_goggles(b):
 
 # id, builder, scale, budget key, head_top
 SPECS = [
-    ("player_base", spec_player, 1.35, "player", 1.5),
+    ("player_base", spec_player, 1.5, "player", 1.5),
     ("grunt", spec_grunt, 1.35, "grunt", 1.5),
     ("runner", spec_runner, 1.05, "runner", 1.55),
     ("tank", spec_tank, 2.5, "tank", 1.45),
