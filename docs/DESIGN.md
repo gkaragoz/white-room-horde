@@ -130,7 +130,53 @@ Kural: gore tamamen yerel kozmetiktir. Ağda gitmez, simülasyon sonucunu etkile
 - Etki için kozmetikler: hit-stop, ekran sarsıntısı, kan damlası parçacıkları (instanced), kovan atımı.
 - Varsayılan kapatılabilir "gore azalt" ayarı (düşük donanım ve erişilebilirlik).
 
-## 11. Açık kararlar
+## 11. Ses ve müzik
+Karar: ses ve müzik prosedürel üretilmez, hazır ve ücretsiz kütüphanelerden alınır. Ton: oyuncak/kartun SFX ("pop, splat, boing"), ağır silahta baslı vuruş; vurduğunda net "hit marker" sesi.
+
+- Kaynaklar (kullanımdan önce her varlığın lisansı kendi sayfasında doğrulanır):
+  - [Kenney](https://kenney.nl): çoğu paket CC0; arayüz, çarpma, jingle (kısa kazanç/kayıp sesleri). İlk tercih.
+  - [Freesound](https://freesound.org): en geniş kütüphane, CC0 filtresi zorunlu (CC-BY-NC ticari kullanımı yasaklar).
+  - [OpenGameArt](https://opengameart.org): CC0 filtresiyle müzik ve SFX; mağaza için CC0 veya OGA-BY.
+  - [Pixabay Music](https://pixabay.com/music/): atıfsız, ticari kullanım; Pixabay lisansı, dosyayı tek başına yeniden dağıtmak yok.
+  - [itch.io ses paketleri](https://itch.io/game-assets/top-sellers/free/tag-sound-effects): örn. HZSmith Free SFX (CC0), Morphonaut Cartoon Comic (129 kartun efekt, CC0, ~1 USD).
+  - [Big Sound Bank](https://bigsoundbank.com): tekil CC0 efektler (kartun, çevre).
+  - Sonniss GDC paketleri: atıfsız, telifsiz profesyonel SFX (silah/patlama için).
+  - Atıf gerektirenler (Incompetech CC BY, ZapSplat) sadece gerekirse ve credits ekranına yazılarak.
+- Silah sesleri için ayrı arama gerekiyor (kartun paketlerinde atış sesi çıkmadı): Freesound CC0 + Sonniss.
+- Lisans defteri: `docs/audio-licenses.md` dosyasında her ses için kaynak URL, lisans, atıf gereksinimi, indirme tarihi. Defterde olmayan ses oyuna girmez.
+- Müzik: tempolu, enerjik elektronik/chiptune seçkisi, hazır parçalar dalga yoğunluğuna göre çapraz geçişle (crossfade) değişir (sakin, orta, kaos, boss). Dinamik katman için parçalar aynı BPM/anahtarda seçilir.
+- Teknik: Web Audio, ses havuzu (aynı anda sınırlı voice), 500 düşmanda aynı sesi sınırlamak için öncelik ve mesafe, düşman başına ses yok (kümelenmiş "kalabalık" katmanı). Dosyalar OGG/Opus, kısa SFX için mono, toplam <20 MB hedefi.
+- Ses sim dışıdır: oyun mantığı ses durumuna bağlı değildir, her client yerelde çalar.
+
+## 12. UI ve HUD
+- Düzen: minimal. Altta kendi can çubuğu, silah ikonu ve mermi sayısı (büyük, oyuncak tarzı kalın yazı). Üstte dalga numarası ve sonraki dalgaya sayaç. Sol kenarda takım üyelerinin renkli küçük can çubukları (yerde olan yanıp söner). 11 oyuncuya kadar kenarda sıralanır, aktif olmayanlar silikleşir.
+- Ekran dışı oyuncular: kamera kenarında oyuncu renginde ok; yerde olan (revive bekleyen) için yanıp sönen ok ve zamanlayıcı halka.
+- Kart seçimi: alt orta kısımda 3 kart çubuğu, oyun akışı kesilmez, 10 sn süreli, tuşlar 1-2-3 veya fare; seçilmezse otomatik rastgele seçilir. Kartlar kişiseldir (diğerleri sadece "seçiyor" göstergesini görür).
+- Geri bildirim: hasar sayıları kalabalıkta sınırlı (sadece kritik ve öldürücü vuruşlar, ölçekli), her vuruşta değil. Hit marker: kısa çizgi + ses. Can azlığında kırmızı kenar vignette ve kalp atışı sesi. Dalga başı kısa büyük "Wave N" yazısı.
+- Stil: yuvarlak, kalın, oyuncak; beyaz zemin üstünde koyu gri metin, oyuncu rengi vurgu, kan kırmızısı sadece hasar ve tehlike için.
+- Menüler: ana menü (oda kur / odaya katıl kodla), lobi (oyuncu renkleri, hazır durumu), maç sonu (ulaşılan dalga, öldürme sayısı, en iyi silah, toplam kan kapladığı alan yüzdesi).
+- Erişilebilirlik: "gore azalt", renk körlüğü için oyuncu renklerine şekil işareti (yelek deseni), titreme/ekran sarsıntısı kaydırıcısı, yeniden atanabilir tuşlar.
+
+## 13. Kart havuzu (onaylandı)
+Her dalga sonunda oyuncuya 3 kart: biri silaha bağlı, ikisi karışık. Nadirlik: sık (beyaz), nadir (mavi), efsane (altın). Yükseltmeler maç boyunca birikir, maç sonunda sıfırlanır.
+
+| Silah | Kart örnekleri |
+|---|---|
+| Pistol | Çift atış, delici mermi, kritik şansı, sonsuz mermi korunur |
+| SMG | Atış hızı +%20, kovan sıçraması hasar verir, sarj süresi azalır |
+| Pompalı | +2 saçma, geri tepme düşmanı iter, yakın hasar x2 |
+| HMG | Isınma yok, tambur kapasitesi, yavaşlatma azalır |
+| Bomba | Küme bombası, itme yarıçapı, ikinci bomba |
+
+| Pasif | Kart örnekleri |
+|---|---|
+| Hareket | Hız +%15, kısa dash, yerde kayma |
+| Hayatta kalma | Öldürdükçe iyileş, azami can +%20, revive süresi azalır |
+| Takım | Yakındaki dostlara hız ver, revive mesafesi, ortak mermi paylaşımı |
+| Kaos | Kanı hasara çevir (zemindeki kırmızı alan hasar verir), düşman patlamalarında zincir |
+| Boss ödülü | Boss ödülü: seçili silahın efsane sürümü |
+
+## 14. Açık kararlar
 - Oyuncu sayısına göre 7-11 renk listesi (kırmızı hariç).
 - Kart havuzu, ölçeklenme eğrisi, boss türleri.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı.
