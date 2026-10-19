@@ -40,18 +40,7 @@ LIMBS = {  # target bone -> (source head bone, source tail bone)
 ROTS = {"hips": "Hips", "spine": "Spine1", "head": "Head"}
 ORDER = ["hips", "spine", "head", "arm.L", "hand.L", "arm.R", "hand.R", "thigh.L", "foot.L", "thigh.R", "foot.R"]
 
-# Rifle 8-Way pack: file-name keywords -> game clip ids (everything else is kept as loco_<slug>)
-LOCO_RULES = [
-    (r"idle", "loco_idle"),
-    (r"(run|jog).*forward|^run$|rifle_run$|forward.*run", "run_f"),
-    (r"(run|jog).*backward|backwards.*run", "run_b"),
-    (r"run.*left|left.*run", "run_l"),
-    (r"run.*right|right.*run", "run_r"),
-    (r"sprint", "sprint"),
-    (r"walk.*forward|^walk$|rifle_walk$", "walk_f"),
-    (r"walk.*backward", "walk_b"),
-    (r"jump", "jump"),
-]
+# Rifle 8-Way pack clips keep their own slugified file names (idle, idle_aiming, walk_forward_left, run_backward, sprint_left, jump_loop, death_from_front, ...)
 
 
 def short(n):
@@ -242,7 +231,7 @@ def run():
             missing.append(c["id"])
             continue
         used.add(p)
-        in_place = c["id"] not in ("get_up", "death", "hit_down", "z_death_back", "z_death_fwd", "z_standup")
+        in_place = True  # horizontal root motion is always removed (the game moves the character); vertical bob/fall is kept
         n = clip_from_fbx(p, libs[c["rig"]], c["id"], in_place=in_place)
         meta["clips"][c["rig"]].append({"id": c["id"], "frames": n, "loop": c["loop"], "file": os.path.basename(p)})
     unmapped = []
@@ -256,19 +245,13 @@ def run():
             for fn in sorted(os.listdir(pack_dir)):
                 if not fn.lower().endswith(".fbx"):
                     continue
-                sl = slug(os.path.splitext(fn)[0])
-                cid = None
-                for rx, gid in LOCO_RULES:
-                    if re.search(rx, sl):
-                        cid = gid
-                        break
-                if cid is None:
-                    cid = "loco_" + sl
-                    unmapped.append(fn)
-                if any(cl["id"] == cid for cl in meta["clips"]["player"]):
-                    cid = "loco_" + sl  # keep duplicates under their own name
-                n = clip_from_fbx(os.path.join(pack_dir, fn), libs["player"], cid, in_place=True)
-                meta["clips"]["player"].append({"id": cid, "frames": n, "loop": True, "file": fn})
+                cid = slug(os.path.splitext(fn)[0])  # e.g. run_forward_left, walk_crouching_right, death_from_front
+                try:
+                    n = clip_from_fbx(os.path.join(pack_dir, fn), libs["player"], cid, in_place=True)
+                except ValueError:
+                    unmapped.append(fn + " (no animation, skipped)")
+                    continue
+                meta["clips"]["player"].append({"id": cid, "frames": n, "loop": not cid.startswith(("death", "jump", "turn", "crouching_turn")), "file": fn})
     for kind, tgt in libs.items():
         if meta["clips"][kind]:
             export_lib(tgt, os.path.join(OUT_DIR, kind + "_anims.glb"))

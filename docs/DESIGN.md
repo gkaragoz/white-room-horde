@@ -337,6 +337,18 @@ Malzeme (en çok 2): `fixed` (vertex color x paylaşılan boyalı gürültü dok
 - `bake_vat.py` her düşman türü ve klip için vertex konumlarını (ve gerekirse normalleri) dokuya pişirir: satır = kare, sütun = vertex; 16-bit float, `vat.bin` + `meta.json` (klip adları, kare sayıları, fps, sınırlar). Kare sayısı küçük tutulur (klip başına 16-32 kare). Çıktı `packages/client/public/models/...`.
 - İstemci `InstancedMesh`'e örnek başına animasyon id ve faz verir (bkz. bölüm 15).
 
+**Animasyon durumu (üretildi)**
+- Mixamo klipleri indirildi (28 tekil + Rifle 8-Way paketi, 49 klip) ve `tools/blender/retarget_mixamo.py` ile 12 kemikli chibi rig'e aktarıldı: `packages/client/public/models/anims/player_anims.glb` (62 klip) ve `enemy_anims.glb` (15 klip), `anims.meta.json` (kare sayısı, döngü). Ham FBX'ler `mixamo/` ve `assets-src/` altında, git dışında.
+- Oyuncu klipleri: `aim_idle`, `fire_stand`, `fire_run`, `reload_stand/run`, `hit_down`, `down_idle`, `death`, `revive_giver/taker`, `get_up`, `throw`, `throw_run` + paketten 8 yönlü `idle*`, `walk_*`, `run_*`, `sprint_*`, çömelme yürüyüşleri, dönüşler, zıplama, yönlü ölümler (`death_from_front`, `death_from_the_back`, `death_from_right`, baş vuruşları).
+- Düşman klipleri: `z_idle`, `z_walk`, `z_walk_creep`, `z_run`, `z_attack_swipe`, `z_attack_overhead`, `z_punch`, `z_kick`, `z_headbutt`, `z_scream`, `z_hit`, `z_death_back`, `z_death_fwd`, `z_crawl`, `z_standup`.
+- Retarget: uzuvlar yön tabanlı (T-pozu ile chibi dinlenme pozu farkını çözer), kalça/omurga/kafa dünya rotasyon deltası; yatay kök hareketi her klipten silinir (oyun karakteri hareket ettirir), dikey hareket kalır. Kalça konum izleri ölçek 1.0 için yazıldı, istemci karakter ölçeğiyle çarpar.
+
+**Silah tutuşu ve IK (karar)**
+- Sağ el: silahın `grip` noktası `hand.R` kemiğine takılır (silah GLB'sinde `grip` boş nesnesi orijindedir).
+- Sol el: silah GLB'lerinde `grip_l` (destek eli noktası). İstemcide sol kol iki kemikli IK ile (`arm.L`, `hand.L`) bu noktaya çekilir; böylece her silahta eller doğru yerde durur ve animasyon seti silahtan bağımsız kalır. Tek elli silahlarda (pistol, bomba) IK isteğe bağlıdır, pistolde sol el kabzayı destekler.
+- Nişan: üst gövde (spine, head) imleç yönüne döner, alt gövde hareket yönünü izler (8 yönlü koşu klipleri); ateşte kısa geri tepme yalnızca üst gövde katmanına eklenir.
+- Namlu ucu için `muzzle` boş nesnesi (efekt ve mermi başlangıcı); tüm silahlarda `grip`, `muzzle`, `grip_l` adları birebir aynıdır.
+
 **Çıktı sözleşmesi ve testler**
 - `tests/assets.test.ts` (client içinde): GLB isimleri, üçgen bütçeleri, malzeme sayısı, rig kemik listesi (12), silah `muzzle` soketi, VAT meta alanları ve kare sınırları. Ship-rpg'deki sözleşme testi yaklaşımı.
 - Çıktılar tekrarlanabilir (aynı girdi, aynı bayt); betikler tohumlu ve idempotent.

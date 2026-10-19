@@ -15,7 +15,7 @@
     "name": "Rifle 8-Way Locomotion Pack",
     "animations": 49,
     "folder": "assets-src/mixamo/rifle_8way",
-    "use": "Idle, walk and run in 8 directions, sprint (dash), jump, turns. Clip names are read from the extracted file names; script maps them with LOCO_RULES."
+    "use": "Idle, walk, run and sprint in 8 directions, crouch walk, turns, jumps, directional deaths. Clip ids are the slugified file names (run_forward_left, death_from_front, ...)."
   },
   "clips": [
     { "id": "aim_idle", "rig": "player", "name": "Rifle Aiming Idle", "description": "Rifle Standing Aiming Idle", "loop": true, "use": "Standing still while aiming" },

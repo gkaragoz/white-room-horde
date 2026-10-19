@@ -4,7 +4,7 @@ Source list: [manifest.json](manifest.json) (names and descriptions verified on 
 
 ## Download settings (every clip)
 - Format **FBX Binary (.fbx)**, Skin **Without Skin**, **30 fps**, Keyframe Reduction **none**.
-- Tick **In Place** for looping locomotion and zombie clips (`aim_idle`, `fire_*`, `down_idle`, `revive_*`, `z_idle`, `z_walk*`, `z_run`, `z_crawl`). Leave it off for `get_up`, `death`, `hit_down`, `z_death_*`, `z_standup`.
+- The Mixamo "In Place" tickbox does not matter: the retarget script removes horizontal root motion from every clip and keeps vertical motion.
 - Pack: **Rifle 8-Way Locomotion Pack** (49 animations) as one ZIP; extract into `assets-src/mixamo/rifle_8way/`.
 - Rename every single-clip download to `<id>.fbx` from the manifest (several clips share a name, the description tells them apart) and put it in `assets-src/mixamo/`.
 

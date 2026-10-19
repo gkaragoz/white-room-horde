@@ -1,0 +1,473 @@
+{
+ "fps": 30,
+ "authoredScale": 1.0,
+ "note": "hips translation tracks are for scale 1.0; multiply by the character scale",
+ "clips": {
+  "player": [
+   {
+    "id": "aim_idle",
+    "frames": 94,
+    "loop": true,
+    "file": "aim_idle.fbx"
+   },
+   {
+    "id": "fire_stand",
+    "frames": 9,
+    "loop": true,
+    "file": "fire_stand.fbx"
+   },
+   {
+    "id": "fire_run",
+    "frames": 29,
+    "loop": true,
+    "file": "fire_run.fbx"
+   },
+   {
+    "id": "reload_stand",
+    "frames": 100,
+    "loop": false,
+    "file": "reload_stand.fbx"
+   },
+   {
+    "id": "reload_run",
+    "frames": 111,
+    "loop": false,
+    "file": "reload_run.fbx"
+   },
+   {
+    "id": "hit_down",
+    "frames": 54,
+    "loop": false,
+    "file": "hit_down.fbx"
+   },
+   {
+    "id": "down_idle",
+    "frames": 153,
+    "loop": true,
+    "file": "down_idle.fbx"
+   },
+   {
+    "id": "death",
+    "frames": 115,
+    "loop": false,
+    "file": "death.fbx"
+   },
+   {
+    "id": "revive_giver",
+    "frames": 260,
+    "loop": true,
+    "file": "revive_giver.fbx"
+   },
+   {
+    "id": "revive_taker",
+    "frames": 260,
+    "loop": true,
+    "file": "revive_taker.fbx"
+   },
+   {
+    "id": "get_up",
+    "frames": 38,
+    "loop": false,
+    "file": "get_up.fbx"
+   },
+   {
+    "id": "throw",
+    "frames": 97,
+    "loop": false,
+    "file": "throw.fbx"
+   },
+   {
+    "id": "throw_run",
+    "frames": 89,
+    "loop": false,
+    "file": "throw_run.fbx"
+   },
+   {
+    "id": "crouching_turn_90_left",
+    "frames": 39,
+    "loop": false,
+    "file": "crouching turn 90 left.fbx"
+   },
+   {
+    "id": "crouching_turn_90_right",
+    "frames": 39,
+    "loop": false,
+    "file": "crouching turn 90 right.fbx"
+   },
+   {
+    "id": "death_crouching_headshot_front",
+    "frames": 58,
+    "loop": false,
+    "file": "death crouching headshot front.fbx"
+   },
+   {
+    "id": "death_from_back_headshot",
+    "frames": 112,
+    "loop": false,
+    "file": "death from back headshot.fbx"
+   },
+   {
+    "id": "death_from_front_headshot",
+    "frames": 86,
+    "loop": false,
+    "file": "death from front headshot.fbx"
+   },
+   {
+    "id": "death_from_right",
+    "frames": 100,
+    "loop": false,
+    "file": "death from right.fbx"
+   },
+   {
+    "id": "death_from_the_back",
+    "frames": 90,
+    "loop": false,
+    "file": "death from the back.fbx"
+   },
+   {
+    "id": "death_from_the_front",
+    "frames": 104,
+    "loop": false,
+    "file": "death from the front.fbx"
+   },
+   {
+    "id": "idle_aiming",
+    "frames": 64,
+    "loop": true,
+    "file": "idle aiming.fbx"
+   },
+   {
+    "id": "idle_crouching_aiming",
+    "frames": 61,
+    "loop": true,
+    "file": "idle crouching aiming.fbx"
+   },
+   {
+    "id": "idle_crouching",
+    "frames": 64,
+    "loop": true,
+    "file": "idle crouching.fbx"
+   },
+   {
+    "id": "idle",
+    "frames": 64,
+    "loop": true,
+    "file": "idle.fbx"
+   },
+   {
+    "id": "jump_down",
+    "frames": 21,
+    "loop": false,
+    "file": "jump down.fbx"
+   },
+   {
+    "id": "jump_loop",
+    "frames": 29,
+    "loop": false,
+    "file": "jump loop.fbx"
+   },
+   {
+    "id": "jump_up",
+    "frames": 17,
+    "loop": false,
+    "file": "jump up.fbx"
+   },
+   {
+    "id": "run_backward_left",
+    "frames": 16,
+    "loop": true,
+    "file": "run backward left.fbx"
+   },
+   {
+    "id": "run_backward_right",
+    "frames": 16,
+    "loop": true,
+    "file": "run backward right.fbx"
+   },
+   {
+    "id": "run_backward",
+    "frames": 16,
+    "loop": true,
+    "file": "run backward.fbx"
+   },
+   {
+    "id": "run_forward_left",
+    "frames": 16,
+    "loop": true,
+    "file": "run forward left.fbx"
+   },
+   {
+    "id": "run_forward_right",
+    "frames": 16,
+    "loop": true,
+    "file": "run forward right.fbx"
+   },
+   {
+    "id": "run_forward",
+    "frames": 16,
+    "loop": true,
+    "file": "run forward.fbx"
+   },
+   {
+    "id": "run_left",
+    "frames": 16,
+    "loop": true,
+    "file": "run left.fbx"
+   },
+   {
+    "id": "run_right",
+    "frames": 16,
+    "loop": true,
+    "file": "run right.fbx"
+   },
+   {
+    "id": "sprint_backward_left",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint backward left.fbx"
+   },
+   {
+    "id": "sprint_backward_right",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint backward right.fbx"
+   },
+   {
+    "id": "sprint_backward",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint backward.fbx"
+   },
+   {
+    "id": "sprint_forward_left",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint forward left.fbx"
+   },
+   {
+    "id": "sprint_forward_right",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint forward right.fbx"
+   },
+   {
+    "id": "sprint_forward",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint forward.fbx"
+   },
+   {
+    "id": "sprint_left",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint left.fbx"
+   },
+   {
+    "id": "sprint_right",
+    "frames": 16,
+    "loop": true,
+    "file": "sprint right.fbx"
+   },
+   {
+    "id": "turn_90_left",
+    "frames": 31,
+    "loop": false,
+    "file": "turn 90 left.fbx"
+   },
+   {
+    "id": "turn_90_right",
+    "frames": 31,
+    "loop": false,
+    "file": "turn 90 right.fbx"
+   },
+   {
+    "id": "walk_backward_left",
+    "frames": 31,
+    "loop": true,
+    "file": "walk backward left.fbx"
+   },
+   {
+    "id": "walk_backward_right",
+    "frames": 31,
+    "loop": true,
+    "file": "walk backward right.fbx"
+   },
+   {
+    "id": "walk_backward",
+    "frames": 30,
+    "loop": true,
+    "file": "walk backward.fbx"
+   },
+   {
+    "id": "walk_crouching_backward_left",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching backward left.fbx"
+   },
+   {
+    "id": "walk_crouching_backward_right",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching backward right.fbx"
+   },
+   {
+    "id": "walk_crouching_backward",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching backward.fbx"
+   },
+   {
+    "id": "walk_crouching_forward_left",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching forward left.fbx"
+   },
+   {
+    "id": "walk_crouching_forward_right",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching forward right.fbx"
+   },
+   {
+    "id": "walk_crouching_forward",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching forward.fbx"
+   },
+   {
+    "id": "walk_crouching_left",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching left.fbx"
+   },
+   {
+    "id": "walk_crouching_right",
+    "frames": 31,
+    "loop": true,
+    "file": "walk crouching right.fbx"
+   },
+   {
+    "id": "walk_forward_left",
+    "frames": 31,
+    "loop": true,
+    "file": "walk forward left.fbx"
+   },
+   {
+    "id": "walk_forward_right",
+    "frames": 31,
+    "loop": true,
+    "file": "walk forward right.fbx"
+   },
+   {
+    "id": "walk_forward",
+    "frames": 31,
+    "loop": true,
+    "file": "walk forward.fbx"
+   },
+   {
+    "id": "walk_left",
+    "frames": 31,
+    "loop": true,
+    "file": "walk left.fbx"
+   },
+   {
+    "id": "walk_right",
+    "frames": 31,
+    "loop": true,
+    "file": "walk right.fbx"
+   }
+  ],
+  "enemy": [
+   {
+    "id": "z_idle",
+    "frames": 131,
+    "loop": true,
+    "file": "z_idle.fbx"
+   },
+   {
+    "id": "z_walk",
+    "frames": 47,
+    "loop": true,
+    "file": "z_walk.fbx"
+   },
+   {
+    "id": "z_walk_creep",
+    "frames": 122,
+    "loop": true,
+    "file": "z_walk_creep.fbx"
+   },
+   {
+    "id": "z_run",
+    "frames": 25,
+    "loop": true,
+    "file": "z_run.fbx"
+   },
+   {
+    "id": "z_attack_swipe",
+    "frames": 80,
+    "loop": false,
+    "file": "z_attack_swipe.fbx"
+   },
+   {
+    "id": "z_attack_overhead",
+    "frames": 140,
+    "loop": false,
+    "file": "z_attack_overhead.fbx"
+   },
+   {
+    "id": "z_punch",
+    "frames": 32,
+    "loop": false,
+    "file": "z_punch.fbx"
+   },
+   {
+    "id": "z_kick",
+    "frames": 102,
+    "loop": false,
+    "file": "z_kick.fbx"
+   },
+   {
+    "id": "z_headbutt",
+    "frames": 79,
+    "loop": false,
+    "file": "z_headbutt.fbx"
+   },
+   {
+    "id": "z_scream",
+    "frames": 85,
+    "loop": false,
+    "file": "z_scream.fbx"
+   },
+   {
+    "id": "z_hit",
+    "frames": 61,
+    "loop": false,
+    "file": "z_hit.fbx"
+   },
+   {
+    "id": "z_death_back",
+    "frames": 90,
+    "loop": false,
+    "file": "z_death_back.fbx"
+   },
+   {
+    "id": "z_death_fwd",
+    "frames": 101,
+    "loop": false,
+    "file": "z_death_fwd.fbx"
+   },
+   {
+    "id": "z_crawl",
+    "frames": 155,
+    "loop": true,
+    "file": "z_crawl.fbx"
+   },
+   {
+    "id": "z_standup",
+    "frames": 94,
+    "loop": false,
+    "file": "z_standup.fbx"
+   }
+  ]
+ }
+}

@@ -174,6 +174,11 @@ def sniper(b):
     return (0, -2.32, 0.12)
 
 
+# support (left) hand target for runtime two-bone IK; grip (right hand) is the origin
+GRIP_L = {"pistol": (0, -0.18, -0.22), "smg": (0, -0.85, -0.22), "ar": (0, -1.1, -0.04), "shotgun": (0, -0.78, -0.22), "hmg": (0, -1.0, -0.14),
+          "minigun": (0, -0.55, -0.42), "sniper": (0, -0.95, -0.08)}
+
+
 WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade)]
 
 
@@ -193,7 +198,7 @@ def build(wid, fn, mats):
     mesh.name = "weapon_" + wid
     mesh.data.name = "weapon_" + wid
     empties = []
-    for nm, loc in (("grip", (0, 0, 0)), ("muzzle", muzzle)):
+    for nm, loc in (("grip", (0, 0, 0)), ("muzzle", muzzle), ("grip_l", GRIP_L.get(wid))):
         if loc is None:
             continue
         e = bpy.data.objects.new(nm + "_" + wid if False else nm, None)
@@ -219,7 +224,8 @@ def export(wid, mesh, empties, out_dir):
     bpy.context.view_layer.objects.active = mesh
     path = os.path.join(out_dir, "weapon_" + wid + ".glb")
     bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_apply=False, export_yup=True)
-    meta = {"id": wid, "tris": tris(mesh.data), "muzzle": [round(c, 3) for c in empties[-1].location] if len(empties) > 1 else None,
+    meta = {"id": wid, "tris": tris(mesh.data), "muzzle": [round(c, 3) for c in next(e for e in empties if e.name.startswith("muzzle")).location] if any(e.name.startswith("muzzle") for e in empties) else None,
+            "grip_l": GRIP_L.get(wid),
             "grip": [0, 0, 0], "forward": "-Y (Blender) / -Z (glTF)", "materials": [m.name for m in mesh.data.materials]}
     with open(os.path.join(out_dir, "weapon_" + wid + ".meta.json"), "w") as f:
         json.dump(meta, f, indent=1)
@@ -290,7 +296,9 @@ def run():
             errs.append("%s: %d tris > %d" % (wid, t, BUDGET))
             continue
         res[wid] = export(wid, mesh, emp, OUT_DIR)["tris"]
-        items.append((wid, mesh, emp))
+        for e in emp:  # free the names so the next weapon exports clean `grip`/`muzzle`/`grip_l`
+            bpy.data.objects.remove(e, do_unlink=True)
+        items.append((wid, mesh, []))
     if errs:
         raise ValueError("; ".join(errs))
     if PREVIEW and bpy.app.background:

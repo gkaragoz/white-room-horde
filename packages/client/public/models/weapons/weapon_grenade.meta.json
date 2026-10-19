@@ -2,6 +2,7 @@
  "id": "grenade",
  "tris": 310,
  "muzzle": null,
+ "grip_l": null,
  "grip": [
   0,
   0,
