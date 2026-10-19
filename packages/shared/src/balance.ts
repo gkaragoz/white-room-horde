@@ -53,6 +53,9 @@ export interface ProgressionConfig {
 }
 
 export const BALANCE = data as unknown as {
+  grenade: { max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
+  spit: { speed: number; life: number; radius: number };
+  shielder: { frontDot: number; frontMul: number };
   progression: ProgressionConfig;
   enemies: Record<EnemyType, EnemyStats>;
   waves: WaveConfig;

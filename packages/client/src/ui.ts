@@ -41,8 +41,9 @@ const T = {
     high: 'High',
     desync: 'Desync detected!',
     connecting: 'Connecting...',
-    controls: 'WASD move · mouse aim · click/space fire · E revive · 1-3 cards',
+    controls: 'WASD move · mouse aim · click/space fire · right-click/G grenade · E revive · 1-3 cards',
     ammo: 'Ammo',
+    grenades: 'Grenades',
     cards: {
       damage: ['Heavy rounds', '+15% damage for everyone'],
       rate: ['Quick fingers', '+12% fire rate for everyone'],
@@ -91,8 +92,9 @@ const T = {
     high: 'Yüksek',
     desync: 'Senkron bozuldu!',
     connecting: 'Bağlanıyor...',
-    controls: 'WASD hareket · fare nişan · tık/boşluk ateş · E kaldır · 1-3 kart',
+    controls: 'WASD hareket · fare nişan · tık/boşluk ateş · sağ tık/G el bombası · E kaldır · 1-3 kart',
     ammo: 'Mermi',
+    grenades: 'Bomba',
     cards: {
       damage: ['Ağır mermiler', 'Herkese +%15 hasar'],
       rate: ['Çevik parmaklar', 'Herkese +%12 ateş hızı'],
@@ -404,7 +406,7 @@ export class Ui {
     if (world.pActive[slot]) {
       const wid = WEAPON_IDS[world.pWeapon[slot]!]!;
       const ammo = world.pAmmo[slot]!;
-      set('h-me', `${(t.weapons as Record<string, string>)[wid]}${ammo >= 0 ? ` &middot; ${t.ammo} ${ammo}` : ' &infin;'}`);
+      set('h-me', `${(t.weapons as Record<string, string>)[wid]}${ammo >= 0 ? ` &middot; ${t.ammo} ${ammo}` : ' &infin;'} &middot; &#128163; ${world.pGren[slot]}`);
       const st = world.pState[slot]!;
       if (st === PlayerState.Downed) {
         const sec = Math.ceil(world.pTimer[slot]!);

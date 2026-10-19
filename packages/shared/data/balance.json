@@ -219,5 +219,24 @@
       "hp": 20,
       "pierce": 1
     }
+  },
+  "grenade": {
+    "max": 3,
+    "rechargeSeconds": 10,
+    "range": 8,
+    "flight": 0.6,
+    "fuse": 0.9,
+    "radius": 3.2,
+    "damage": 70,
+    "cooldown": 0.5
+  },
+  "spit": {
+    "speed": 9,
+    "life": 1.6,
+    "radius": 0.35
+  },
+  "shielder": {
+    "frontDot": -0.35,
+    "frontMul": 0.15
   }
 }

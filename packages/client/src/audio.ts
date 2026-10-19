@@ -140,6 +140,9 @@ export class Audio {
         if (e.slot !== localSlot && Math.random() < 0.5) return; // thin out the squad's gunfire
         this.play(e.weapon === WEAPON_IDS.indexOf('shotgun') || e.weapon === WEAPON_IDS.indexOf('sniper') || e.weapon === WEAPON_IDS.indexOf('hmg') ? 'heavyShot' : 'shot');
         break;
+      case 'grenadeThrown':
+        this.play('pick');
+        break;
       case 'enemyHit':
         this.play('hit');
         break;

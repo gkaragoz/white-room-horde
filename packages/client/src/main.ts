@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, MAX_BULLETS, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, OBSTACLES, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { createGame, hashWorld, scriptedInput, setWave, step, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
@@ -38,6 +38,29 @@ const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.1, 0.7),
 bulletMesh.frustumCulled = false;
 bulletMesh.count = 0;
 stage.scene.add(bulletMesh);
+
+// cover boxes
+const crateMat = new THREE.MeshStandardMaterial({ color: '#c8b393', roughness: 0.9, flatShading: true });
+const crateTop = new THREE.MeshStandardMaterial({ color: '#e0d2b4', roughness: 0.9, flatShading: true });
+for (const o of OBSTACLES) {
+  const h = 1.1;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(o.w, h, o.h), [crateMat, crateMat, crateTop, crateMat, crateMat, crateMat]);
+  box.position.set(o.x, h / 2, -o.y);
+  box.castShadow = true;
+  box.receiveShadow = true;
+  stage.scene.add(box);
+  const rim = new THREE.Mesh(new THREE.BoxGeometry(o.w + 0.1, 0.12, o.h + 0.1), new THREE.MeshStandardMaterial({ color: '#8b7a5e', roughness: 1, flatShading: true }));
+  rim.position.set(o.x, 0.06, -o.y);
+  stage.scene.add(rim);
+}
+
+// grenades and spit
+const grenadeMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 10, 8), new THREE.MeshStandardMaterial({ color: '#4d6b3a', roughness: 0.7, flatShading: true }), MAX_GRENADES);
+grenadeMesh.frustumCulled = false;
+grenadeMesh.castShadow = true;
+const spitMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: '#9bff4a' }), MAX_SPIT);
+spitMesh.frustumCulled = false;
+stage.scene.add(grenadeMesh, spitMesh);
 
 function applySettings(): void {
   audio.setVolume(settings.volume);
@@ -367,6 +390,29 @@ function frame(nowMs: number): void {
     }
     bulletMesh.count = n;
     bulletMesh.instanceMatrix.needsUpdate = true;
+    let gn = 0;
+    for (let i = 0; i < MAX_GRENADES; i++) {
+      if (!w.gActive[i]) continue;
+      const left = w.gFuse[i]! - BALANCE.grenade.fuse;
+      const arc = left > 0 ? Math.sin((1 - left / BALANCE.grenade.flight) * Math.PI) * 1.4 : 0;
+      dummy.position.set(w.gX[i]!, 0.3 + arc, -w.gY[i]!);
+      dummy.quaternion.identity();
+      dummy.scale.setScalar(left > 0 ? 1 : 1 + Math.sin(nowSec * 30) * 0.12);
+      dummy.updateMatrix();
+      grenadeMesh.setMatrixAt(gn++, dummy.matrix);
+    }
+    dummy.scale.setScalar(1);
+    grenadeMesh.count = gn;
+    grenadeMesh.instanceMatrix.needsUpdate = true;
+    let sn = 0;
+    for (let i = 0; i < MAX_SPIT; i++) {
+      if (!w.sActive[i]) continue;
+      dummy.position.set(w.sX[i]!, 1.0, -w.sY[i]!);
+      dummy.updateMatrix();
+      spitMesh.setMatrixAt(sn++, dummy.matrix);
+    }
+    spitMesh.count = sn;
+    spitMesh.instanceMatrix.needsUpdate = true;
     ui.update(w, localSlot, fx.hurt, nowMs, names);
   } else {
     fx.update(dt);

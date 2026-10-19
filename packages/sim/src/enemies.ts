@@ -1,7 +1,8 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, ENEMY_TYPES, EnemyState, MAX_ENEMIES, MAX_PLAYERS, TICK_DT, TICK_RATE } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
 import { cellIndex } from './flowfield';
+import { out, pushOut, segmentBlocked } from './obstacles';
 import { SH_H, SH_W } from './spatial';
 import type { World } from './state';
 
@@ -11,6 +12,7 @@ const T_SPITTER = ENEMY_TYPES.indexOf('spitter');
 const T_SPAWNER = ENEMY_TYPES.indexOf('spawner');
 const T_GRUNT = ENEMY_TYPES.indexOf('grunt');
 const T_TANK = ENEMY_TYPES.indexOf('tank');
+const T_SHIELDER = ENEMY_TYPES.indexOf('shielder');
 
 // per-type stats flattened for the hot loops
 const HP = new Float64Array(N_TYPES);
@@ -181,6 +183,7 @@ function explode(w: World, i: number): void {
   const y = w.eY[i]!;
   const radius = BLAST[T_EXPLODER]!;
   w.events.push({ type: 'explosion', x, y, radius });
+  blastEnemies(w, x, y, radius, DAMAGE[T_EXPLODER]! * 1.5);
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
     const dx = w.pX[s]! - x;
@@ -288,12 +291,11 @@ export function updateEnemies(w: World): void {
       }
       if (type === T_SPITTER) {
         if (dist < SPIT_HOLD) wantMove = false;
-        if (dist <= SPIT_RANGE && w.eCooldown[i]! <= 0) {
-          if (hurtPlayer(w, best, DAMAGE[type]!, w.pX[best]!, w.pY[best]!)) {
-            w.eCooldown[i] = INTERVAL[type]!;
-            w.eState[i] = EnemyState.Attack;
-            w.eStateTick[i] = w.tick;
-          }
+        if (dist <= SPIT_RANGE && w.eCooldown[i]! <= 0 && !segmentBlocked(x, y, w.pX[best]!, w.pY[best]!)) {
+          spawnSpit(w, x, y, tx, ty);
+          w.eCooldown[i] = INTERVAL[type]!;
+          w.eState[i] = EnemyState.Attack;
+          w.eStateTick[i] = w.tick;
         }
       } else if (type === T_SPAWNER) {
         if (w.eCooldown[i]! <= 0) {
@@ -318,7 +320,7 @@ export function updateEnemies(w: World): void {
       if (wantMove && w.eState[i] === EnemyState.Move) {
         let dx = tx;
         let dy = ty;
-        if (dist > 3) {
+        if (dist > 3 || segmentBlocked(x, y, w.pX[best]!, w.pY[best]!)) {
           const c = cellIndex(x, y);
           if (field.dirX[c]! !== 0 || field.dirY[c]! !== 0) {
             dx = field.dirX[c]!;
@@ -367,6 +369,10 @@ export function updateEnemies(w: World): void {
     }
     x = clamp(x + mx + sx, -ARENA_HALF_W + r0, ARENA_HALF_W - r0);
     y = clamp(y + my + sy, -ARENA_HALF_H + r0, ARENA_HALF_H - r0);
+    if (pushOut(x, y, r0 * 0.8)) {
+      x = out.x;
+      y = out.y;
+    }
     w.eX[i] = x;
     w.eY[i] = y;
   }
@@ -416,7 +422,15 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
     hits[b * 4 + 2] = hits[b * 4 + 3]!;
     hits[b * 4 + 3] = bestSlot;
     const sp = sqrt(w.bVx[b]! * w.bVx[b]! + w.bVy[b]! * w.bVy[b]!);
-    damageEnemy(w, bestSlot, w.bDamage[b]!, sp > 0 ? w.bVx[b]! / sp : 0, sp > 0 ? w.bVy[b]! / sp : 0);
+    const bdx = sp > 0 ? w.bVx[b]! / sp : 0;
+    const bdy = sp > 0 ? w.bVy[b]! / sp : 0;
+    let dmg = w.bDamage[b]!;
+    if (w.eType[bestSlot] === T_SHIELDER) {
+      // the riot shield soaks bullets that arrive from the front
+      const facing = bdx * cos(w.eAngle[bestSlot]!) + bdy * sin(w.eAngle[bestSlot]!);
+      if (facing < BALANCE.shielder.frontDot) dmg *= BALANCE.shielder.frontMul;
+    }
+    damageEnemy(w, bestSlot, dmg, bdx, bdy);
     if (w.bPierce[b]! <= 0) {
       w.bX[b] = x0 + sx * bestT;
       w.bY[b] = y0 + sy * bestT;
@@ -426,3 +440,120 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
   }
 }
 
+
+/** Damage every enemy inside a circle (explosions). Dies and chains through killEnemy. */
+export function blastEnemies(w: World, x: number, y: number, radius: number, damage: number): void {
+  const g = w.grid;
+  const cx0 = g.cellX(x - radius);
+  const cx1 = g.cellX(x + radius);
+  const cy0 = g.cellY(y - radius);
+  const cy1 = g.cellY(y + radius);
+  for (let gy = cy0; gy <= cy1; gy++) {
+    for (let gx = cx0; gx <= cx1; gx++) {
+      for (let j = g.head[gy * SH_W + gx]!; j >= 0; j = g.next[j]!) {
+        if (!w.eActive[j]) continue;
+        const dx = w.eX[j]! - x;
+        const dy = w.eY[j]! - y;
+        const R = radius + rad(w, j);
+        const d2 = dx * dx + dy * dy;
+        if (d2 > R * R) continue;
+        const d = sqrt(d2);
+        // closer to the centre hurts more
+        const k = 1 - (d / R) * 0.5;
+        damageEnemy(w, j, damage * k, d > 1e-6 ? dx / d : 0, d > 1e-6 ? dy / d : 0);
+      }
+    }
+  }
+}
+
+function spawnSpit(w: World, x: number, y: number, dx: number, dy: number): void {
+  for (let i = 0; i < MAX_SPIT; i++) {
+    if (w.sActive[i]) continue;
+    w.sActive[i] = 1;
+    w.sX[i] = x;
+    w.sY[i] = y;
+    w.sVx[i] = dx * BALANCE.spit.speed;
+    w.sVy[i] = dy * BALANCE.spit.speed;
+    w.sLife[i] = BALANCE.spit.life;
+    w.events.push({ type: 'spit', x, y, angle: atan2(dy, dx) });
+    return;
+  }
+}
+
+/** Throw a grenade along the aim direction (called from the player step). */
+export function throwGrenade(w: World, slot: number, angle: number): void {
+  const cfg = BALANCE.grenade;
+  for (let i = 0; i < MAX_GRENADES; i++) {
+    if (w.gActive[i]) continue;
+    const speed = cfg.range / cfg.flight;
+    w.gActive[i] = 1;
+    w.gX[i] = w.pX[slot]!;
+    w.gY[i] = w.pY[slot]!;
+    w.gVx[i] = cos(angle) * speed;
+    w.gVy[i] = sin(angle) * speed;
+    w.gFuse[i] = cfg.flight + cfg.fuse;
+    w.gOwner[i] = slot;
+    w.pGren[slot] = w.pGren[slot]! - 1;
+    w.pGrenCd[slot] = cfg.cooldown;
+    w.events.push({ type: 'grenadeThrown', owner: slot, x: w.pX[slot]!, y: w.pY[slot]! });
+    return;
+  }
+}
+
+/** Grenade recharge and throwing from the confirmed inputs. */
+export function updateGrenades(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): void {
+  const cfg = BALANCE.grenade;
+  for (let s = 0; s < MAX_PLAYERS; s++) {
+    if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive) continue;
+    if (w.pGrenCd[s]! > 0) w.pGrenCd[s] = w.pGrenCd[s]! - TICK_DT;
+    if (w.pGren[s]! < cfg.max) {
+      w.pGrenCharge[s] = w.pGrenCharge[s]! + TICK_DT;
+      if (w.pGrenCharge[s]! >= cfg.rechargeSeconds) {
+        w.pGrenCharge[s] = 0;
+        w.pGren[s] = w.pGren[s]! + 1;
+      }
+    }
+    const inp = inputs[s];
+    if (inp && (inp.buttons & Buttons.Grenade) !== 0 && w.pGren[s]! > 0 && w.pGrenCd[s]! <= 0) throwGrenade(w, s, w.pAngle[s]!);
+  }
+}
+
+/** Flying grenades and spitter projectiles. Runs after the spatial hash is rebuilt. */
+export function updateProjectiles(w: World): void {
+  const cfg = BALANCE.grenade;
+  for (let i = 0; i < MAX_GRENADES; i++) {
+    if (!w.gActive[i]) continue;
+    w.gFuse[i] = w.gFuse[i]! - TICK_DT;
+    if (w.gFuse[i]! > cfg.fuse) {
+      w.gX[i] = clamp(w.gX[i]! + w.gVx[i]! * TICK_DT, -ARENA_HALF_W + 0.3, ARENA_HALF_W - 0.3);
+      w.gY[i] = clamp(w.gY[i]! + w.gVy[i]! * TICK_DT, -ARENA_HALF_H + 0.3, ARENA_HALF_H - 0.3);
+    }
+    if (w.gFuse[i]! <= 0) {
+      w.gActive[i] = 0;
+      w.events.push({ type: 'explosion', x: w.gX[i]!, y: w.gY[i]!, radius: cfg.radius });
+      blastEnemies(w, w.gX[i]!, w.gY[i]!, cfg.radius, cfg.damage);
+    }
+  }
+  const r2 = (BALANCE.spit.radius + BALANCE.player.radius) * (BALANCE.spit.radius + BALANCE.player.radius);
+  for (let i = 0; i < MAX_SPIT; i++) {
+    if (!w.sActive[i]) continue;
+    const x0 = w.sX[i]!;
+    const y0 = w.sY[i]!;
+    const x1 = x0 + w.sVx[i]! * TICK_DT;
+    const y1 = y0 + w.sVy[i]! * TICK_DT;
+    w.sX[i] = x1;
+    w.sY[i] = y1;
+    w.sLife[i] = w.sLife[i]! - TICK_DT;
+    let dead = w.sLife[i]! <= 0 || segmentBlocked(x0, y0, x1, y1);
+    for (let s = 0; s < MAX_PLAYERS && !dead; s++) {
+      if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
+      const dx = w.pX[s]! - x1;
+      const dy = w.pY[s]! - y1;
+      if (dx * dx + dy * dy <= r2) {
+        hurtPlayer(w, s, DAMAGE[T_SPITTER]!, w.pX[s]!, w.pY[s]!);
+        dead = true;
+      }
+    }
+    if (dead) w.sActive[i] = 0;
+  }
+}

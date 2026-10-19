@@ -7,6 +7,7 @@ export class Input {
   private readonly keys = new Set<string>();
   private mouse = new THREE.Vector2(0, 0);
   private mouseDown = false;
+  private rightDown = false;
   private readonly ray = new THREE.Raycaster();
   private readonly plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly hit = new THREE.Vector3();
@@ -28,11 +29,13 @@ export class Input {
       const r = dom.getBoundingClientRect();
       this.mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     });
-    dom.addEventListener('pointerdown', () => {
-      this.mouseDown = true;
+    dom.addEventListener('pointerdown', (e) => {
+      if (e.button === 2) this.rightDown = true;
+      else this.mouseDown = true;
     });
-    window.addEventListener('pointerup', () => {
-      this.mouseDown = false;
+    window.addEventListener('pointerup', (e) => {
+      if (e.button === 2) this.rightDown = false;
+      else this.mouseDown = false;
     });
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
   }
@@ -62,6 +65,7 @@ export class Input {
       buttons:
         (this.enabled && (this.mouseDown || this.keys.has('Space')) ? Buttons.Fire : 0) |
         (this.keys.has('KeyE') ? Buttons.Revive : 0) |
+        (this.enabled && (this.rightDown || this.keys.has('KeyG')) ? Buttons.Grenade : 0) |
         (this.keys.has('Digit1') ? Buttons.Card1 : 0) |
         (this.keys.has('Digit2') ? Buttons.Card2 : 0) |
         (this.keys.has('Digit3') ? Buttons.Card3 : 0) |

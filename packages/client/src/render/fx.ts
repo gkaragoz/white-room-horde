@@ -55,6 +55,7 @@ export class Fx {
   private readonly decalCtx: CanvasRenderingContext2D;
   private readonly decalTex: THREE.CanvasTexture;
   private decalDirty = false;
+  private decalAge = 0;
   private readonly flashes: { mesh: THREE.Mesh; life: number; max: number; grow: number }[] = [];
   private readonly flashGeo = new THREE.SphereGeometry(1, 10, 8);
   private readonly dummy = new THREE.Object3D();
@@ -198,9 +199,11 @@ export class Fx {
   update(dt: number): void {
     this.shake *= Math.max(0, 1 - dt * 7);
     this.hurt = Math.max(0, this.hurt - dt * 2.2);
-    if (this.decalDirty) {
+    this.decalAge += dt;
+    if (this.decalDirty && this.decalAge > 0.1) {
       this.decalTex.needsUpdate = true;
       this.decalDirty = false;
+      this.decalAge = 0;
     }
     for (let k = this.flashes.length - 1; k >= 0; k--) {
       const f = this.flashes[k]!;

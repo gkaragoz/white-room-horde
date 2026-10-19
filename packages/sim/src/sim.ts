@@ -12,7 +12,8 @@ import {
   type WeaponId,
 } from '@wrh/shared';
 import { clamp, cos, sin, sqrt, TAU } from './detmath';
-import { bulletVsEnemies, setWave, spawnBoss, spawnEnemy, updateEnemies } from './enemies';
+import { bulletVsEnemies, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
+import { out, pushOut, segmentBlocked } from './obstacles';
 import { Crc32 } from './hash';
 import { updateCards } from './progression';
 import { createWorld, type World } from './state';
@@ -44,6 +45,9 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pAmmo[slot] = BALANCE.weapons[weapon].ammo;
   w.pMoving[slot] = 0;
   w.pIFrames[slot] = 0;
+  w.pGren[slot] = BALANCE.grenade.max;
+  w.pGrenCharge[slot] = 0;
+  w.pGrenCd[slot] = 0;
 }
 
 /** Deterministic game start used by every client and by replays: players spread on a ring around the centre. */
@@ -93,6 +97,10 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number): numbe
   const r = BALANCE.player.radius;
   w.pX[s] = clamp(w.pX[s]! + mx * speed * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
   w.pY[s] = clamp(w.pY[s]! + my * speed * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+  if (pushOut(w.pX[s]!, w.pY[s]!, r)) {
+    w.pX[s] = out.x;
+    w.pY[s] = out.y;
+  }
   const angle = inp.aim * AIM_TO_RAD;
   w.pAngle[s] = angle;
   return angle;
@@ -180,8 +188,10 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     fireWeapon(w, s, inp, angle);
   }
   updateRevive(w, inputs);
+  updateGrenades(w, inputs);
 
   updateEnemies(w);
+  updateProjectiles(w);
 
   // bullets
   for (let i = 0; i < MAX_BULLETS; i++) {
@@ -191,7 +201,8 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     w.bX[i] = x0 + w.bVx[i]! * TICK_DT;
     w.bY[i] = y0 + w.bVy[i]! * TICK_DT;
     w.bLife[i] = w.bLife[i]! - TICK_DT;
-    const spent = w.enemyCount > 0 && bulletVsEnemies(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
+    let spent = segmentBlocked(x0, y0, w.bX[i]!, w.bY[i]!);
+    if (!spent && w.enemyCount > 0) spent = bulletVsEnemies(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
     const x = w.bX[i]!;
     const y = w.bY[i]!;
     if (spent || w.bLife[i]! <= 0 || x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H) {
@@ -231,6 +242,9 @@ export function hashWorld(w: World): number {
   c.typed(w.cardOffer);
   c.typed(new Float64Array([w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modHp]));
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);
+  c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);
+  c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
+  c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);

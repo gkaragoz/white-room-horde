@@ -1,5 +1,6 @@
-import { MAX_BULLETS, MAX_ENEMIES, MAX_PLAYERS } from '@wrh/shared';
+import { BALANCE, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT } from '@wrh/shared';
 import { FlowField } from './flowfield';
+import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
 import { SpatialHash } from './spatial';
 
@@ -11,6 +12,8 @@ export type SimEvent =
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
   | { type: 'explosion'; x: number; y: number; radius: number }
+  | { type: 'grenadeThrown'; owner: number; x: number; y: number }
+  | { type: 'spit'; x: number; y: number; angle: number }
   | { type: 'playerDown'; slot: number; x: number; y: number }
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
@@ -61,6 +64,9 @@ export interface World {
   pWeapon: Int32Array;
   pAmmo: Int32Array;
   pMoving: Uint8Array;
+  pGren: Int32Array;
+  pGrenCharge: Float64Array;
+  pGrenCd: Float64Array;
   // enemies
   eActive: Uint8Array;
   eType: Uint8Array;
@@ -72,6 +78,21 @@ export interface World {
   eHp: Float64Array;
   eBoss: Uint8Array;
   eCooldown: Float64Array;
+  // grenades
+  gActive: Uint8Array;
+  gX: Float64Array;
+  gY: Float64Array;
+  gVx: Float64Array;
+  gVy: Float64Array;
+  gFuse: Float64Array;
+  gOwner: Int32Array;
+  // spitter projectiles
+  sActive: Uint8Array;
+  sX: Float64Array;
+  sY: Float64Array;
+  sVx: Float64Array;
+  sVy: Float64Array;
+  sLife: Float64Array;
   // bullets
   bActive: Uint8Array;
   bX: Float64Array;
@@ -91,7 +112,7 @@ export interface World {
 }
 
 export function createWorld(seed: number): World {
-  return {
+  const w: World = {
     tick: 0,
     rng: new Rng(seed),
     wave: 1,
@@ -125,6 +146,9 @@ export function createWorld(seed: number): World {
     pWeapon: new Int32Array(MAX_PLAYERS),
     pAmmo: new Int32Array(MAX_PLAYERS),
     pMoving: new Uint8Array(MAX_PLAYERS),
+    pGren: new Int32Array(MAX_PLAYERS).fill(BALANCE.grenade.max),
+    pGrenCharge: new Float64Array(MAX_PLAYERS),
+    pGrenCd: new Float64Array(MAX_PLAYERS),
     eActive: new Uint8Array(MAX_ENEMIES),
     eType: new Uint8Array(MAX_ENEMIES),
     eState: new Uint8Array(MAX_ENEMIES),
@@ -135,6 +159,19 @@ export function createWorld(seed: number): World {
     eHp: new Float64Array(MAX_ENEMIES),
     eBoss: new Uint8Array(MAX_ENEMIES),
     eCooldown: new Float64Array(MAX_ENEMIES),
+    gActive: new Uint8Array(MAX_GRENADES),
+    gX: new Float64Array(MAX_GRENADES),
+    gY: new Float64Array(MAX_GRENADES),
+    gVx: new Float64Array(MAX_GRENADES),
+    gVy: new Float64Array(MAX_GRENADES),
+    gFuse: new Float64Array(MAX_GRENADES),
+    gOwner: new Int32Array(MAX_GRENADES),
+    sActive: new Uint8Array(MAX_SPIT),
+    sX: new Float64Array(MAX_SPIT),
+    sY: new Float64Array(MAX_SPIT),
+    sVx: new Float64Array(MAX_SPIT),
+    sVy: new Float64Array(MAX_SPIT),
+    sLife: new Float64Array(MAX_SPIT),
     bActive: new Uint8Array(MAX_BULLETS),
     bX: new Float64Array(MAX_BULLETS),
     bY: new Float64Array(MAX_BULLETS),
@@ -149,4 +186,6 @@ export function createWorld(seed: number): World {
     field: new FlowField(),
     grid: new SpatialHash(),
   };
+  applyObstacles(w.field);
+  return w;
 }
