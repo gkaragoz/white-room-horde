@@ -2,6 +2,7 @@ import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CA
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS, keyLabel } from './input';
+import { THEMES } from './render/arena';
 import { discoverRelay } from './relay';
 import { Preview } from './render/preview';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
@@ -382,6 +383,25 @@ const CSS = `
 .wrh-warn{position:absolute;left:50%;top:60px;transform:translateX(-50%);color:#fff;background:#d8362e;padding:4px 12px;border-radius:8px;font-weight:700}
 .wrh-mini{position:absolute;right:14px;bottom:52px;width:180px;height:120px;border:2px solid #cdbfa5;border-radius:8px;background:rgba(250,244,232,.78);box-shadow:0 3px 10px rgba(60,45,20,.25)}
 .wrh-dmg{position:absolute;font-weight:800;font-size:15px;color:#fff;text-shadow:0 0 3px #7d0d14,0 0 3px #7d0d14,0 1px 0 #7d0d14;pointer-events:none;will-change:transform,opacity}
+.wrh-menu{width:min(900px,94vw)}
+.wrh-cols{display:grid;grid-template-columns:1fr 1fr;gap:6px 26px;align-items:start}
+@media (max-width:820px){.wrh-cols{grid-template-columns:1fr}}
+.wrh-logo{font-size:38px!important;letter-spacing:1px;text-align:center;background:linear-gradient(180deg,#2b3a52,#1fa2ff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:0!important}
+.wrh-menu .sub{text-align:center}
+.wrh-arenas{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin:4px 0 12px}
+.wrh-ui button.wrh-arena{display:flex;flex-direction:column;gap:4px;align-items:center;padding:5px;margin:0;border-radius:11px;background:#efe7d6;color:#3a352d;border:3px solid transparent;font-size:12px;box-shadow:0 2px 5px rgba(60,45,20,.15);transition:transform .12s}
+.wrh-ui button.wrh-arena:hover{transform:translateY(-2px)}
+.wrh-ui button.wrh-arena.on{background:#fff;border-color:#1fa2ff;box-shadow:0 0 0 2px rgba(31,162,255,.25),0 4px 10px rgba(60,45,20,.2)}
+.wrh-arena img,.wrh-arena .wrh-dice{width:100%;aspect-ratio:3/2;border-radius:7px;object-fit:cover;display:block}
+.wrh-dice{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#dfe4ea,#dfe4ea 8px,#d3dae2 8px,#d3dae2 16px);font-size:34px;font-weight:800;color:#7d8896}
+.wrh-diffs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
+.wrh-ui button.wrh-diff{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;margin:0;border-radius:11px;background:#efe7d6;color:#3a352d;border:3px solid transparent;font-size:13px;box-shadow:0 2px 5px rgba(60,45,20,.15)}
+.wrh-ui button.wrh-diff.on{background:#fff;border-color:#d8362e;box-shadow:0 0 0 2px rgba(216,54,46,.2)}
+.wrh-sk-row{display:inline-flex;gap:2px;align-items:center}
+.wrh-skull{display:block}
+.wrh-ro{display:flex;gap:10px;align-items:center;margin:6px 0 10px;font-size:13px}
+.wrh-thumb-s{width:84px;aspect-ratio:3/2;border-radius:7px;object-fit:cover}
+.wrh-ui button.wrh-play{width:100%;font-size:19px;padding:13px;margin:6px 0 4px;background:linear-gradient(180deg,#38b6ff,#1488e6);box-shadow:0 3px 0 #0e6fba}
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
 .wrh-arrow-off{position:absolute;pointer-events:none;display:none;transform:translate(-50%,-50%)}
 .wrh-arrow-off i{display:block;width:0;height:0;border-left:18px solid var(--c);border-top:10px solid transparent;border-bottom:10px solid transparent;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
@@ -410,6 +430,66 @@ function esc(s: string): string {
 }
 
 /** DOM overlay: menu, lobby, HUD, cards, down/dead/game-over screens, settings. */
+const thumbCache = new Map<number, string>();
+
+/** A little top-down picture of an arena layout, painted from the same data the game uses (cached as a data URL). */
+function arenaThumb(index: number): string {
+  const hit = thumbCache.get(index);
+  if (hit) return hit;
+  const W = 240, H = 160;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  if (!g) return '';
+  const s = W / (ARENA_HALF_W * 2);
+  const X = (x: number): number => W / 2 + x * s;
+  const Y = (y: number): number => H / 2 - y * s;
+  const grad = g.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#e6ebf0');
+  grad.addColorStop(1, '#d3dae2');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(120,135,150,.25)';
+  g.lineWidth = 1;
+  for (let x = -ARENA_HALF_W; x <= ARENA_HALF_W; x += 5) {
+    g.beginPath(); g.moveTo(X(x), 0); g.lineTo(X(x), H); g.stroke();
+  }
+  for (let y = -ARENA_HALF_H; y <= ARENA_HALF_H; y += 5) {
+    g.beginPath(); g.moveTo(0, Y(y)); g.lineTo(W, Y(y)); g.stroke();
+  }
+  const theme = THEMES[index] ?? THEMES[0]!;
+  for (const b of MAPS[index]?.boxes ?? []) {
+    const x = X(b.x - b.w / 2), y = Y(b.y + b.h / 2), w = b.w * s, h = b.h * s;
+    g.fillStyle = 'rgba(40,50,65,.28)';
+    g.fillRect(x + 2.5, y + 3, w, h); // shadow
+    g.fillStyle = theme.side;
+    g.fillRect(x, y + 2, w, h); // front face
+    g.fillStyle = theme.top;
+    g.fillRect(x, y, w, h);
+    g.strokeStyle = theme.rim;
+    g.lineWidth = 1;
+    g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  }
+  // the barrier fence around the floor
+  g.strokeStyle = '#7d8896';
+  g.lineWidth = 5;
+  g.setLineDash([9, 4]);
+  g.strokeRect(2.5, 2.5, W - 5, H - 5);
+  g.setLineDash([]);
+  const url = c.toDataURL('image/png');
+  thumbCache.set(index, url);
+  return url;
+}
+
+/** A skull icon: bone white when lit, faint when not. */
+function skull(lit: boolean, size = 22): string {
+  const body = lit ? '#fbf6ea' : '#cfc6b3';
+  const line = lit ? '#3a352d' : '#a89f8c';
+  const eye = lit ? '#2b2118' : '#a89f8c';
+  return `<svg class="wrh-skull" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><path d="M12 2.2C6.9 2.2 3.2 5.7 3.2 10.4c0 2.7 1.3 4.8 3.3 6.1V20c0 .6.4 1 1 1H9v-2h1.2v2h3.6v-2H15v2h1.5c.6 0 1-.4 1-1v-3.5c2-1.3 3.3-3.4 3.3-6.1 0-4.7-3.7-8.2-8.8-8.2z" fill="${body}" stroke="${line}" stroke-width="1.4" stroke-linejoin="round"/><ellipse cx="8.6" cy="11" rx="2.4" ry="2.7" fill="${eye}"/><ellipse cx="15.4" cy="11" rx="2.4" ry="2.7" fill="${eye}"/><path d="M12 13.3l-1.1 2.2h2.2z" fill="${eye}"/></svg>`;
+}
+
 export class Ui {
   readonly root = document.createElement('div');
   lang: Lang = 'en';
@@ -494,11 +574,6 @@ export class Ui {
     return items
       .map((i) => `<button type="button" class="wrh-wp${i.id === value ? ' on' : ''}" data-${attr}="${i.id}"${i.disabled ? ' disabled' : ''}${i.tip ? ` title="${esc(i.tip)}"` : ''}>${i.label}</button>`)
       .join('');
-  }
-
-  private mapItems(): { id: string; label: string }[] {
-    const names = this.t.maps as Record<string, string>;
-    return ['-1', '0', '1', '2', '3'].map((id) => ({ id, label: names[id]! }));
   }
 
   private bindGroup(attr: string, pick: (id: string) => void): void {
@@ -665,15 +740,29 @@ export class Ui {
 
   /** Option rows shared by the menu and the lobby: arena and difficulty (host or solo) and the player's look. */
   private optionRows(editable: boolean, map: number, difficulty: number): string {
+    return this.previewBlock() + this.arenaRows(editable, map, difficulty);
+  }
+
+  /** Arena pictures and the skull difficulty row (read-only text for guests in a lobby). */
+  private arenaRows(editable: boolean, map: number, difficulty: number): string {
     const t = this.t;
-    const diffs = (t.diffs as readonly string[]).map((label, i) => ({ id: String(i), label }));
-    return (
-      this.previewBlock() +
-      (editable
-        ? `<label>${t.arena}</label><div class="wrh-weapons">${this.group(this.mapItems(), String(map), 'map')}</div>` +
-          `<label>${t.difficulty}</label><div class="wrh-weapons">${this.group(diffs, String(difficulty), 'diff')}</div>`
-        : `<label>${t.arena}: <b>${(t.maps as Record<string, string>)[String(map)]}</b> &middot; ${t.difficulty}: <b>${(t.diffs as readonly string[])[difficulty]}</b></label>`)
-    );
+    const names = t.maps as Record<string, string>;
+    const diffNames = t.diffs as readonly string[];
+    const skulls = (n: number): string => [0, 1, 2].map((k) => skull(k <= n)).join('');
+    if (!editable) {
+      const pic = map >= 0 ? `<img class="wrh-thumb-s" src="${arenaThumb(map)}" alt="">` : '<span class="wrh-thumb-s wrh-dice">?</span>';
+      return `<div class="wrh-ro">${pic}<span><b>${names[String(map)]}</b><br><span class="wrh-sk-row">${skulls(difficulty)}</span> <b>${diffNames[difficulty]}</b></span></div>`;
+    }
+    const cards = ['-1', '0', '1', '2', '3']
+      .map((id) => {
+        const pic = id === '-1' ? '<span class="wrh-dice">?</span>' : `<img src="${arenaThumb(Number(id))}" alt="">`;
+        return `<button type="button" class="wrh-arena${id === String(map) ? ' on' : ''}" data-map="${id}">${pic}<span>${names[id]}</span></button>`;
+      })
+      .join('');
+    const diffs = diffNames
+      .map((label, i) => `<button type="button" class="wrh-diff${i === difficulty ? ' on' : ''}" data-diff="${i}"><span class="wrh-sk-row">${skulls(i)}</span><span>${label}</span></button>`)
+      .join('');
+    return `<label>${t.arena}</label><div class="wrh-arenas">${cards}</div><label>${t.difficulty}</label><div class="wrh-diffs">${diffs}</div>`;
   }
 
   showMenu(error = ''): void {
@@ -703,19 +792,23 @@ export class Ui {
     const hosted = location.hostname.endsWith('github.io');
     const defServer = fromParam ?? (stored || (hosted ? '' : location.port === '5173' ? `ws://${location.hostname}:8787/ws` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
     const rejoin = loadRejoin();
-    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
-      <h1>${t.title}</h1><p class="sub">${t.tag} &middot; ${t.best}: ${profile.bestWave} / ${profile.bestKills}</p>
+    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll wrh-menu">
+      <h1 class="wrh-logo">${t.title}</h1><p class="sub">${t.tag} &middot; ${t.best}: ${profile.bestWave} / ${profile.bestKills}</p>
       ${inviteCode ? `<p class="wrh-invite">&#127881; ${t.invited} <b>${esc(inviteCode)}</b>. ${t.invitedHint}</p>` : ''}
+      <div class="wrh-cols"><div>
       <label>${t.name}</label><input id="wrh-name" maxlength="16" value="${esc(saved)}" placeholder="player">
       <label>${t.weapon}</label><div class="wrh-weapons" id="wrh-weapons">${this.weaponButtons()}</div>
-      ${this.optionRows(true, this.map, this.difficulty)}
-      <button id="wrh-solo">${t.solo}</button>
+      ${this.previewBlock()}
+      </div><div>
+      ${this.arenaRows(true, this.map, this.difficulty)}
+      <button id="wrh-solo" class="wrh-play">${t.solo}</button>
       <button id="wrh-host" class="alt">${t.host}</button>
       ${rejoin ? `<button id="wrh-rejoin" class="alt">${t.rejoin} (${esc(rejoin.code)})</button>` : ''}
       <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD" value="${esc(inviteCode)}"></div><button id="wrh-join" class="alt">${t.join}</button></div>
       <label>${t.password}</label><input id="wrh-pass" maxlength="24" autocomplete="off">
       <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}" placeholder="wss://your-tunnel.example.com/ws"><p class="sub" id="wrh-relay-note" style="margin:-6px 0 8px"></p>
-      <p class="sub" style="margin:6px 0 0">${t.controls}</p>
+      </div></div>
+      <p class="sub" style="margin:10px 0 0;text-align:center">${t.controls}</p>
       ${error ? `<p style="color:#c8242c;font-weight:700">${esc(error)}</p>` : ''}
     </div>`;
     this.bindWeapons();
