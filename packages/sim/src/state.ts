@@ -10,7 +10,15 @@ export type SimEvent =
   | { type: 'enemyHit'; id: number; etype: number; x: number; y: number }
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
-  | { type: 'explosion'; x: number; y: number; radius: number };
+  | { type: 'explosion'; x: number; y: number; radius: number }
+  | { type: 'playerDown'; slot: number; x: number; y: number }
+  | { type: 'playerDead'; slot: number }
+  | { type: 'playerRevive'; slot: number }
+  | { type: 'waveStart'; wave: number; boss: boolean }
+  | { type: 'levelUp'; level: number }
+  | { type: 'cardOffer'; cards: number[] }
+  | { type: 'cardPicked'; card: number; by: number }
+  | { type: 'gameOver'; wave: number; kills: number };
 
 /** Struct-of-arrays world (docs/DESIGN.md section 15): fixed-size pools, ids are slot indices. */
 export interface World {
@@ -23,12 +31,31 @@ export interface World {
   hpMul: number;
   kills: number;
   enemyCount: number;
+  gameOver: number;
+  xp: number;
+  level: number;
+  pendingLevels: number;
+  /** Open card offer (card ids) or all -1; cardTimer counts ticks left to choose. */
+  cardOffer: Int32Array;
+  cardTimer: number;
+  /** Team modifiers from cards. */
+  modDamage: number;
+  modRate: number;
+  modSpeed: number;
+  modPierce: number;
+  modHp: number;
   // players
   pActive: Uint8Array;
   pX: Float64Array;
   pY: Float64Array;
   pAngle: Float64Array;
   pHp: Float64Array;
+  pMaxHp: Float64Array;
+  pState: Uint8Array;
+  /** Downed countdown (seconds). */
+  pTimer: Float64Array;
+  /** Revive progress (seconds) while being revived. */
+  pRevive: Float64Array;
   pCooldown: Float64Array;
   pIFrames: Float64Array;
   pWeapon: Int32Array;
@@ -43,6 +70,7 @@ export interface World {
   eY: Float64Array;
   eAngle: Float64Array;
   eHp: Float64Array;
+  eBoss: Uint8Array;
   eCooldown: Float64Array;
   // bullets
   bActive: Uint8Array;
@@ -72,11 +100,26 @@ export function createWorld(seed: number): World {
     hpMul: 1,
     kills: 0,
     enemyCount: 0,
+    gameOver: 0,
+    xp: 0,
+    level: 1,
+    pendingLevels: 0,
+    cardOffer: new Int32Array(3).fill(-1),
+    cardTimer: 0,
+    modDamage: 1,
+    modRate: 1,
+    modSpeed: 1,
+    modPierce: 0,
+    modHp: 0,
     pActive: new Uint8Array(MAX_PLAYERS),
     pX: new Float64Array(MAX_PLAYERS),
     pY: new Float64Array(MAX_PLAYERS),
     pAngle: new Float64Array(MAX_PLAYERS),
     pHp: new Float64Array(MAX_PLAYERS),
+    pMaxHp: new Float64Array(MAX_PLAYERS),
+    pState: new Uint8Array(MAX_PLAYERS),
+    pTimer: new Float64Array(MAX_PLAYERS),
+    pRevive: new Float64Array(MAX_PLAYERS),
     pCooldown: new Float64Array(MAX_PLAYERS),
     pIFrames: new Float64Array(MAX_PLAYERS),
     pWeapon: new Int32Array(MAX_PLAYERS),
@@ -90,6 +133,7 @@ export function createWorld(seed: number): World {
     eY: new Float64Array(MAX_ENEMIES),
     eAngle: new Float64Array(MAX_ENEMIES),
     eHp: new Float64Array(MAX_ENEMIES),
+    eBoss: new Uint8Array(MAX_ENEMIES),
     eCooldown: new Float64Array(MAX_ENEMIES),
     bActive: new Uint8Array(MAX_BULLETS),
     bX: new Float64Array(MAX_BULLETS),

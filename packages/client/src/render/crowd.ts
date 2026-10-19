@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ENEMY_TYPES, EnemyState, MAX_ENEMIES, TICK_DT, type EnemyType } from '@wrh/shared';
+import { BALANCE, ENEMY_TYPES, EnemyState, MAX_ENEMIES, TICK_DT, type EnemyType } from '@wrh/shared';
 import type { SimEvent, World } from '@wrh/sim';
 
 /** Baked vertex-animation data for one enemy type (tools/blender/bake_vat.py). */
@@ -41,7 +41,8 @@ vec3 pb = texelFetch( uVat, ivec2( gl_VertexID, int( iAnim.y ) ), 0 ).xyz;
 vec3 transformed = mix( pa, pb, iAnim.z );
 float yc = cos( iPosYaw.w );
 float ys = sin( iPosYaw.w );
-transformed = vec3( yc * transformed.x + ys * transformed.z, transformed.y, - ys * transformed.x + yc * transformed.z ) + iPosYaw.xyz;
+transformed *= iPosYaw.y;
+transformed = vec3( yc * transformed.x + ys * transformed.z, transformed.y, - ys * transformed.x + yc * transformed.z ) + vec3( iPosYaw.x, 0.0, iPosYaw.z );
 `;
 
 function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolean): void {
@@ -73,6 +74,7 @@ interface Corpse {
   yaw: number;
   born: number;
   clip: string;
+  scale: number;
 }
 
 /** Hundreds of animated enemies per draw call: vertex-animation textures + instancing (docs/DESIGN.md section 15). */
@@ -83,6 +85,8 @@ export class Crowd {
   private readonly prevY = new Float32Array(MAX_ENEMIES);
   private readonly prevActive = new Uint8Array(MAX_ENEMIES);
   private corpses: Corpse[] = [];
+  private readonly flash = new Float32Array(MAX_ENEMIES);
+  private lastNow = 0;
   readonly maxCorpses: number;
   triangles = 0;
 
@@ -165,15 +169,15 @@ export class Crowd {
       // a push along the facing means it was shot in the back: fall forward when a clip exists
       const along = e.dx * Math.cos(w.eAngle[e.id]!) + e.dy * Math.sin(w.eAngle[e.id]!);
       const clip = along > 0.2 && spec.deathFwd ? spec.deathFwd : spec.death;
-      this.corpses.push({ type: e.etype, x: e.x, y: e.y, yaw, born: now, clip });
+      this.corpses.push({ type: e.etype, x: e.x, y: e.y, yaw, born: now, clip, scale: w.eBoss[e.id] ? BALANCE.progression.boss.radiusMul : 1 });
     }
     while (this.corpses.length > this.maxCorpses) this.corpses.shift();
   }
 
-  private put(t: TypeRenderer, x: number, z: number, yaw: number, rowA: number, rowB: number, mix: number, shade: number): void {
+  private put(t: TypeRenderer, x: number, z: number, yaw: number, rowA: number, rowB: number, mix: number, shade: number, scale = 1): void {
     const k = t.count * 4;
     t.posYaw[k] = x;
-    t.posYaw[k + 1] = 0;
+    t.posYaw[k + 1] = scale;
     t.posYaw[k + 2] = z;
     t.posYaw[k + 3] = yaw;
     t.anim[k] = rowA;
@@ -197,7 +201,15 @@ export class Crowd {
   }
 
   /** Fill the instance buffers for this frame. `alpha` is the sim tick interpolation factor, `now` is seconds. */
+  /** Brief white flash on a hit enemy. */
+  hit(id: number): void {
+    this.flash[id] = 1;
+  }
+
   update(w: World, alpha: number, now: number): void {
+    const dt = Math.min(0.1, now - this.lastNow);
+    this.lastNow = now;
+    for (let i = 0; i < MAX_ENEMIES; i++) if (this.flash[i]! > 0) this.flash[i] = Math.max(0, this.flash[i]! - dt * 8);
     for (const t of this.types) t.count = 0;
     for (let i = 0; i < MAX_ENEMIES; i++) {
       if (!w.eActive[i]) continue;
@@ -219,13 +231,13 @@ export class Crowd {
       const clip = t.clips.get(clipId) ?? t.clips.get(spec.move)!;
       const time = clip.loop ? now * 1.0 + i * 0.173 : age;
       const s = this.sample(clip, time);
-      this.put(t, x, -y, w.eAngle[i]! + Math.PI / 2, s.a, s.b, s.m, 0.9 + ((i * 53) % 10) * 0.02);
+      this.put(t, x, -y, w.eAngle[i]! + Math.PI / 2, s.a, s.b, s.m, 0.9 + ((i * 53) % 10) * 0.02 + this.flash[i]! * 1.6, w.eBoss[i] ? BALANCE.progression.boss.radiusMul : 1);
     }
     for (const c of this.corpses) {
       const t = this.types[c.type]!;
       const clip = t.clips.get(c.clip) ?? t.clips.get(CLIPS[ENEMY_TYPES[c.type]!].death)!;
       const s = this.sample(clip, now - c.born);
-      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8);
+      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale);
     }
     let tris = 0;
     for (const t of this.types) {

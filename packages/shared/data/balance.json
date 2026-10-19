@@ -185,5 +185,39 @@
       "shielder": 8,
       "spawner": 3
     }
+  },
+  "progression": {
+    "xpBase": 15,
+    "xpPerLevel": 12,
+    "cardSeconds": 10,
+    "xp": {
+      "grunt": 1,
+      "runner": 1,
+      "tank": 6,
+      "exploder": 2,
+      "spitter": 3,
+      "shielder": 4,
+      "spawner": 8
+    },
+    "boss": {
+      "everyWaves": 5,
+      "hpMul": 20,
+      "damage": 30,
+      "radiusMul": 1.7,
+      "summonSeconds": 6,
+      "summonCount": 6,
+      "xp": 40
+    },
+    "revive": {
+      "hpFraction": 0.5,
+      "iFrames": 2
+    },
+    "cards": {
+      "damage": 0.15,
+      "rate": 0.12,
+      "speed": 0.08,
+      "hp": 20,
+      "pierce": 1
+    }
   }
 }

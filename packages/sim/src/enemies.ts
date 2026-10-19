@@ -1,5 +1,6 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, ENEMY_TYPES, EnemyState, MAX_ENEMIES, MAX_PLAYERS, TICK_DT, TICK_RATE } from '@wrh/shared';
-import { atan2, clamp, sqrt } from './detmath';
+import { atan2, clamp, cos, sin, sqrt } from './detmath';
+import { awardXp } from './progression';
 import { cellIndex } from './flowfield';
 import { SH_H, SH_W } from './spatial';
 import type { World } from './state';
@@ -9,6 +10,7 @@ const T_EXPLODER = ENEMY_TYPES.indexOf('exploder');
 const T_SPITTER = ENEMY_TYPES.indexOf('spitter');
 const T_SPAWNER = ENEMY_TYPES.indexOf('spawner');
 const T_GRUNT = ENEMY_TYPES.indexOf('grunt');
+const T_TANK = ENEMY_TYPES.indexOf('tank');
 
 // per-type stats flattened for the hot loops
 const HP = new Float64Array(N_TYPES);
@@ -36,6 +38,11 @@ const SEP_MAX = 0.12;
 const SPAWN_MARGIN = 1.0;
 
 const sources = new Int32Array(MAX_PLAYERS);
+
+function rad(w: World, i: number): number {
+  const r = RADIUS[w.eType[i]!]!;
+  return w.eBoss[i] ? r * BALANCE.progression.boss.radiusMul : r;
+}
 
 /** Recompute the wave multipliers (repeated multiplication, no pow) and restart the wave clock. */
 export function setWave(w: World, wave: number): void {
@@ -65,6 +72,7 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) players++;
     const hp = HP[type]! * w.hpMul * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
     w.eActive[i] = 1;
+    w.eBoss[i] = 0;
     w.eType[i] = type;
     w.eState[i] = withScream ? EnemyState.Spawn : EnemyState.Move;
     w.eStateTick[i] = w.tick;
@@ -77,6 +85,16 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     return i;
   }
   return -1;
+}
+
+export function spawnBoss(w: World): number {
+  edgePoint(w);
+  const i = spawnEnemy(w, T_TANK, spawnX, spawnY);
+  if (i >= 0) {
+    w.eBoss[i] = 1;
+    w.eHp[i] = w.eHp[i]! * BALANCE.progression.boss.hpMul;
+  }
+  return i;
 }
 
 function pickType(w: World): number {
@@ -130,7 +148,12 @@ function farFromPlayers(w: World, x: number, y: number): boolean {
 
 function runWaves(w: World, playerCount: number): void {
   const cfg = BALANCE.waves;
-  if (w.tick - w.waveTick >= cfg.periodSeconds * TICK_RATE) setWave(w, w.wave + 1);
+  if (w.tick - w.waveTick >= cfg.periodSeconds * TICK_RATE) {
+    setWave(w, w.wave + 1);
+    const boss = w.wave % BALANCE.progression.boss.everyWaves === 0;
+    w.events.push({ type: 'waveStart', wave: w.wave, boss });
+    if (boss) spawnBoss(w);
+  }
   if (playerCount === 0) return;
   let target = Math.floor((cfg.baseCount + cfg.perPlayer * playerCount) * w.countMul);
   if (target > cfg.cap) target = cfg.cap;
@@ -173,6 +196,7 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   w.enemyCount--;
   w.kills++;
   w.events.push({ type: 'enemyDeath', id: i, etype: type, x: w.eX[i]!, y: w.eY[i]!, dx, dy, power });
+  awardXp(w, w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]);
   if (type === T_EXPLODER) explode(w, i);
 }
 
@@ -245,12 +269,23 @@ export function updateEnemies(w: World): void {
     const dist = sqrt(bd2);
     const tx = (w.pX[best]! - x) / (dist > 1e-6 ? dist : 1);
     const ty = (w.pY[best]! - y) / (dist > 1e-6 ? dist : 1);
-    const reach = RADIUS[type]! + pr;
+    const reach = rad(w, i) + pr;
+    const boss = w.eBoss[i] === 1;
 
     let mx = 0;
     let my = 0;
     if (state === EnemyState.Move) {
       let wantMove = true;
+      if (boss && (w.tick - w.waveTick) % (BALANCE.progression.boss.summonSeconds * TICK_RATE) === 0 && w.tick > w.waveTick && w.enemyCount < BALANCE.waves.cap) {
+        // the boss calls a ring of grunts then keeps coming
+        const n = BALANCE.progression.boss.summonCount;
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * 6.283185307179586;
+          spawnEnemy(w, T_GRUNT, clamp(x + cos(a) * 2.5, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(y + sin(a) * 2.5, -ARENA_HALF_H + 1, ARENA_HALF_H - 1));
+        }
+        w.eState[i] = EnemyState.Attack;
+        w.eStateTick[i] = w.tick;
+      }
       if (type === T_SPITTER) {
         if (dist < SPIT_HOLD) wantMove = false;
         if (dist <= SPIT_RANGE && w.eCooldown[i]! <= 0) {
@@ -274,7 +309,7 @@ export function updateEnemies(w: World): void {
         }
       } else if (dist <= reach + 0.15) {
         wantMove = false;
-        if (w.eCooldown[i]! <= 0 && hurtPlayer(w, best, DAMAGE[type]!, w.pX[best]!, w.pY[best]!)) {
+        if (w.eCooldown[i]! <= 0 && hurtPlayer(w, best, boss ? BALANCE.progression.boss.damage : DAMAGE[type]!, w.pX[best]!, w.pY[best]!)) {
           w.eCooldown[i] = INTERVAL[type]!;
           w.eState[i] = EnemyState.Attack;
           w.eStateTick[i] = w.tick;
@@ -304,14 +339,14 @@ export function updateEnemies(w: World): void {
     let sy = 0;
     const cx = g.cellX(x);
     const cy = g.cellY(y);
-    const r0 = RADIUS[type]!;
+    const r0 = rad(w, i);
     for (let gy = cy > 0 ? cy - 1 : 0; gy <= (cy < SH_H - 1 ? cy + 1 : SH_H - 1); gy++) {
       for (let gx = cx > 0 ? cx - 1 : 0; gx <= (cx < SH_W - 1 ? cx + 1 : SH_W - 1); gx++) {
         for (let j = g.head[gy * SH_W + gx]!; j >= 0; j = g.next[j]!) {
           if (j === i || !w.eActive[j]) continue;
           const dx = x - w.eX[j]!;
           const dy = y - w.eY[j]!;
-          const rr = (r0 + RADIUS[w.eType[j]!]!) * 0.85;
+          const rr = (r0 + rad(w, j)) * 0.85;
           const d2 = dx * dx + dy * dy;
           if (d2 >= rr * rr) continue;
           if (d2 < 1e-9) {
@@ -366,7 +401,7 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const px = ex - sx * t;
           const py = ey - sy * t;
-          const R = RADIUS[w.eType[j]!]! + 0.1;
+          const R = rad(w, j) + 0.1;
           if (px * px + py * py <= R * R && t < bestT) {
             bestT = t;
             bestSlot = j;

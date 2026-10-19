@@ -42,7 +42,18 @@ export interface WaveConfig {
   weights: Record<EnemyType, number>;
 }
 
+export interface ProgressionConfig {
+  xpBase: number;
+  xpPerLevel: number;
+  cardSeconds: number;
+  xp: Record<EnemyType, number>;
+  boss: { everyWaves: number; hpMul: number; damage: number; radiusMul: number; summonSeconds: number; summonCount: number; xp: number };
+  revive: { hpFraction: number; iFrames: number };
+  cards: { damage: number; rate: number; speed: number; hp: number; pierce: number };
+}
+
 export const BALANCE = data as unknown as {
+  progression: ProgressionConfig;
   enemies: Record<EnemyType, EnemyStats>;
   waves: WaveConfig;
   player: { hp: number; speed: number; iFrames: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };

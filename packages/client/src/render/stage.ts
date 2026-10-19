@@ -45,6 +45,31 @@ export class Stage {
     window.addEventListener('resize', () => this.resize());
   }
 
+  /** 0 = off, 1 = low (1024 map), 2 = high (2048 map). */
+  setShadowQuality(q: number): void {
+    this.renderer.shadowMap.enabled = q > 0;
+    this.sun.castShadow = q > 0;
+    const size = q >= 2 ? 2048 : 1024;
+    if (this.sun.shadow.mapSize.x !== size) {
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+      this.sun.shadow.mapSize.set(size, size);
+    }
+    this.scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true;
+    });
+  }
+
+  /** Render resolution scale (0.5..1) on top of the device pixel ratio. */
+  setScale(scale: number): void {
+    this.scale = scale;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * scale);
+    this.resize();
+  }
+
+  private scale = 1;
+
   resize(): void {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
@@ -59,8 +84,8 @@ export class Stage {
   }
 
   /** Follow a point on the floor (three coordinates). */
-  follow(x: number, z: number): void {
-    const t = new THREE.Vector3(x, 0.6, z);
+  follow(x: number, z: number, shake = 0): void {
+    const t = new THREE.Vector3(x + (Math.random() - 0.5) * shake * 0.5, 0.6, z + (Math.random() - 0.5) * shake * 0.5);
     this.camera.position.copy(t).add(this.camOffset);
     this.camera.lookAt(t);
     this.sun.position.set(x, 0, z).add(this.sunOffset);

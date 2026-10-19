@@ -1,0 +1,148 @@
+import { INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, step, type World } from '@wrh/sim';
+import { Bin, decodeBundle, encodeInputMsg, type Bundle, type ClientMsg, type PlayerInfo, type ServerMsg } from './protocol';
+
+export interface Transport {
+  send(data: string | Uint8Array): void;
+}
+
+export type NetState = 'idle' | 'lobby' | 'playing' | 'closed';
+
+/** Max bundles applied per `pump` call when catching up (smooths bursts and late-join fast forward). */
+const MAX_STEPS_PER_PUMP = 6;
+const MAX_SLOTS = 11;
+
+/**
+ * Client side of the lockstep protocol: sends this player's inputs tagged for a future tick, buffers the confirmed
+ * bundles from the server and applies them to the local simulation in strict tick order.
+ */
+export class NetSession {
+  state: NetState = 'idle';
+  code = '';
+  slot = -1;
+  players: PlayerInfo[] = [];
+  world: World | null = null;
+  error = '';
+  /** Slots reported as diverged by the server (desync detection). */
+  desyncTicks: number[] = [];
+  rttMs = 60;
+  /** Last confirmed tick applied to the world. */
+  applied = -1;
+  /** Highest tick whose bundle has arrived. */
+  received = -1;
+  /** Bundles stepped by the last pump (events of the last one are in world.events). */
+  lastSteps = 0;
+  private readonly bundles = new Map<number, Bundle>();
+  private weapon: WeaponId = 'pistol';
+  private pendingStart: { seed: number; players: { slot: number; weapon: WeaponId }[] } | null = null;
+  private nextPing = 0;
+
+  constructor(
+    private readonly transport: Transport,
+    private readonly clock: () => number = Date.now,
+  ) {}
+
+  private sendJson(m: ClientMsg): void {
+    this.transport.send(JSON.stringify(m));
+  }
+
+  create(name: string, weapon: WeaponId = 'pistol'): void {
+    this.weapon = weapon;
+    this.sendJson({ t: 'create', name, weapon });
+  }
+
+  join(code: string, name: string, weapon: WeaponId = 'pistol'): void {
+    this.weapon = weapon;
+    this.sendJson({ t: 'join', code, name, weapon });
+  }
+
+  start(): void {
+    this.sendJson({ t: 'start' });
+  }
+
+  leave(): void {
+    this.sendJson({ t: 'leave' });
+    this.state = 'closed';
+  }
+
+  /** Feed one message from the transport. */
+  onMessage(data: string | Uint8Array): void {
+    if (typeof data !== 'string') {
+      if (data[0] === Bin.Bundle) {
+        const b = decodeBundle(data, MAX_SLOTS);
+        this.bundles.set(b.tick, b);
+        if (b.tick > this.received) this.received = b.tick;
+      }
+      return;
+    }
+    const m = JSON.parse(data) as ServerMsg;
+    switch (m.t) {
+      case 'room':
+        this.code = m.code;
+        this.slot = m.slot;
+        this.players = m.players;
+        if (this.state === 'idle') this.state = 'lobby';
+        break;
+      case 'start':
+        this.pendingStart = { seed: m.seed, players: m.players };
+        this.world = createGame({ seed: m.seed, players: m.players });
+        this.applied = -1;
+        this.state = 'playing';
+        break;
+      case 'desync':
+        this.desyncTicks.push(m.tick);
+        break;
+      case 'pong':
+        this.rttMs = this.rttMs * 0.8 + (this.clock() - m.ts) * 0.2;
+        break;
+      case 'error':
+        this.error = m.message;
+        break;
+    }
+  }
+
+  /** The tick a new local input should be tagged with so it arrives in time. */
+  inputTick(): number {
+    const lead = Math.min(15, Math.max(INPUT_DELAY_TICKS, Math.ceil(this.rttMs / (TICK_DT * 1000)) + 2));
+    return Math.max(this.received, this.applied) + lead;
+  }
+
+  sendInput(input: PlayerInput): void {
+    if (this.state !== 'playing') return;
+    this.transport.send(encodeInputMsg(this.inputTick(), input));
+  }
+
+  /** Apply as many confirmed ticks as are available. Returns the number of ticks stepped. */
+  pump(max = MAX_STEPS_PER_PUMP, hooks?: { before?: (w: World) => void; after?: (w: World) => void }): number {
+    const w = this.world;
+    if (!w || this.state !== 'playing') return 0;
+    let n = 0;
+    const behind = this.received - this.applied;
+    const budget = behind > 120 ? 600 : max;
+    while (n < budget) {
+      const b = this.bundles.get(this.applied + 1);
+      if (!b) break;
+      this.bundles.delete(b.tick);
+      for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!);
+      hooks?.before?.(w);
+      step(w, b.inputs);
+      hooks?.after?.(w);
+      this.applied = b.tick;
+      n++;
+      if (w.tick % CHECKPOINT_TICKS === 0 && this.received - this.applied < 60) {
+        this.sendJson({ t: 'hash', tick: w.tick, hash: hashWorld(w) });
+      }
+    }
+    this.lastSteps = n;
+    const now = this.clock();
+    if (now >= this.nextPing) {
+      this.nextPing = now + 2000;
+      this.sendJson({ t: 'ping', ts: now });
+    }
+    return n;
+  }
+
+  get backlog(): number {
+    return this.received - this.applied;
+  }
+}

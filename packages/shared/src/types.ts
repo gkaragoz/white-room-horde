@@ -18,6 +18,9 @@ export const Buttons = {
   Revive: 1 << 2,
   Reload: 1 << 3,
   Dash: 1 << 4,
+  Card1: 1 << 5,
+  Card2: 1 << 6,
+  Card3: 1 << 7,
 } as const;
 
 export const NO_INPUT: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
@@ -31,3 +34,10 @@ export const ENEMY_TYPES: readonly EnemyType[] = ['grunt', 'runner', 'tank', 'ex
 
 /** Enemy animation state (eState). */
 export const EnemyState = { Move: 0, Attack: 1, Spawn: 2 } as const;
+
+/** Player life cycle (pState). */
+export const PlayerState = { Alive: 0, Downed: 1, Dead: 2 } as const;
+
+/** Team upgrade cards offered on level up (index = card id). */
+export const CARD_IDS = ['damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal'] as const;
+export type CardId = (typeof CARD_IDS)[number];

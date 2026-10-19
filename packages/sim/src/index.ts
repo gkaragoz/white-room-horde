@@ -4,3 +4,6 @@ export { Rng } from './rng';
 export { Crc32 } from './hash';
 export type { SimEvent } from './state';
 export { scriptedInput, runScripted } from './testkit';
+export * from './replay';
+export { xpForNext } from './progression';
+export { livingPlayers } from './enemies';

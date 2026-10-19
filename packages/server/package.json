@@ -1,0 +1,19 @@
+{
+  "name": "@wrh/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@wrh/net": "workspace:*",
+    "@wrh/shared": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.12",
+    "tsx": "^4.19.0"
+  }
+}

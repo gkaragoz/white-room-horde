@@ -22,3 +22,14 @@ WASD move, mouse aim, click or Space to fire. Query params: `?weapon=weapon_smg|
 - `packages/client`  Vite + Three.js renderer, input, animation
 - `packages/server`  (later) room and relay server
 - `tools/`           Blender and Mixamo pipelines (see tools/mixamo/README.md)
+
+
+## Play online
+```bash
+pnpm --filter @wrh/client build
+pnpm --filter @wrh/server start        # http://localhost:8787 (game + websocket relay)
+cloudflared tunnel --url http://localhost:8787   # optional: share a public link
+```
+Open the page, "Host game" gives a 4-letter room code, friends use "Join game" with the code (the server field defaults to the page's own host). For development run `pnpm dev` (client on 5173) next to the server; the menu then defaults to `ws://localhost:8787/ws`. Late joiners fast-forward through the stored input history; the server compares state hashes every second and flags desyncs.
+
+Tests: `pnpm test` (sim determinism, enemies, replay, lockstep with simulated latency), `pnpm lint`, `pnpm typecheck`.

@@ -10,6 +10,9 @@ export class Input {
   private readonly ray = new THREE.Raycaster();
   private readonly plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly hit = new THREE.Vector3();
+  private queued = 0;
+  /** Disabled while a menu is open so typing does not move the character. */
+  enabled = true;
 
   constructor(
     private readonly dom: HTMLElement,
@@ -34,6 +37,11 @@ export class Input {
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  /** A one-shot button press (card click) sent with the next sample. */
+  queueButton(mask: number): void {
+    this.queued |= mask;
+  }
+
   /** Aim point on the floor in sim coordinates. */
   aimPoint(): { x: number; y: number } {
     this.ray.setFromCamera(this.mouse, this.camera);
@@ -51,8 +59,15 @@ export class Input {
       moveX: Math.round(m.x * 127),
       moveY: Math.round(m.y * 127),
       aim: encodeAim(aimAngle),
-      buttons: this.mouseDown || this.keys.has('Space') ? Buttons.Fire : 0,
+      buttons:
+        (this.enabled && (this.mouseDown || this.keys.has('Space')) ? Buttons.Fire : 0) |
+        (this.keys.has('KeyE') ? Buttons.Revive : 0) |
+        (this.keys.has('Digit1') ? Buttons.Card1 : 0) |
+        (this.keys.has('Digit2') ? Buttons.Card2 : 0) |
+        (this.keys.has('Digit3') ? Buttons.Card3 : 0) |
+        this.queued,
     };
+    this.queued = 0;
     return { input, moveAngle: Math.atan2(m.y, m.x), aimAngle };
   }
 }

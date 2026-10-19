@@ -247,6 +247,20 @@ export class Character {
     if (name === this.currentName) return;
     const next = this.actions.get(name);
     if (!next) return;
+    next.setLoop(THREE.LoopRepeat, Infinity);
+    next.reset().play();
+    if (this.current) this.current.crossFadeTo(next, fade, false);
+    this.current = next;
+    this.currentName = name;
+  }
+
+  /** Play a clip once and hold its last frame (death, get up). */
+  playOnce(name: string, fade = 0.15): void {
+    if (name === this.currentName) return;
+    const next = this.actions.get(name);
+    if (!next) return;
+    next.setLoop(THREE.LoopOnce, 1);
+    next.clampWhenFinished = true;
     next.reset().play();
     if (this.current) this.current.crossFadeTo(next, fade, false);
     this.current = next;
