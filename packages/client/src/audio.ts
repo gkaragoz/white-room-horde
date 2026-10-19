@@ -48,7 +48,7 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   pickup: { files: ['ui_confirmation_002', 'ui_bong_001'], gain: 0.55, rate: [1, 1.2] },
   pickupDrop: { files: ['ui_drop_001'], gain: 0.3, rate: [0.9, 1.2] },
   spit: { files: ['ui_drop_001'], gain: 0.35, rate: [0.5, 0.65] },
-  uiClick: { files: ['ui_click_001', 'ui_click_002', 'ui_click_003'], gain: 0.5, rate: [0.97, 1.05] },
+  uiClick: { files: ['ui_click_001', 'ui_click_002'], gain: 0.5, rate: [0.97, 1.05] },
   uiConfirm: { files: ['ui_confirmation_001'], gain: 0.55, rate: [1, 1] },
   uiBack: { files: ['ui_back_001'], gain: 0.5, rate: [1, 1] },
   uiError: { files: ['ui_error_001'], gain: 0.5, rate: [1, 1] },

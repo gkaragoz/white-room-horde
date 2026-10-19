@@ -340,6 +340,12 @@ white-room-horde/
 - Grafik ayarları: çizim motoru WebGL2/WebGPU (WebGPU yoksa otomatik WebGL2; VAT için TSL düğüm malzemesi), kenar yumuşatma Kapalı/MSAA/SMAA, sekme ışığı (sahte GI: zeminden yansıyan sıcak dolgu ışığı). Gerçek GI (lightmap/prob) hâlâ yok.
 - QA (qa.html, 16 test): VAT verisi hareket ediyor mu, render edilen poz değişiyor mu / döngü kapanıyor mu / ölü poz yatıyor mu (piksel farkı), canlı kovalamada animasyon ve yön, ceset savrulması ve gore parçacıkları, ragdoll fiziği, ses dosyaları çözülüyor mu, AA modları, WebGPU'da aynı poz testleri.
 
+**Cila turu: ses, loot, arayüz (tamam)**
+- Loot (sim): düşmanlar mermi, can ve el bombası bırakır (kutular `balance.json > pickups`); mermisi azalan oyuncu varken mermi şansı artar, boss garanti 5 parça bırakır. Yaklaşınca mıknatıs gibi çekilir, dolu olan oyuncu almaz (takım arkadaşına kalır), 22 sn sonra kaybolur. Sonsuz mermili silahta mermi kutusu el bombasına dönüşür. Hash ve snapshot'a dahil; testler: toplama, mıknatıs, süre, boss seti, uçtan uca.
+- Ses: yönlü ses (ekran sağ/solu panorama, mesafeyle azalma), zombi sesleri (idle homurtu, vuruş, saldırı, ölüm, boss çığlığı), adım sesleri, 11 arayüz sesi, düşük canda kalp atışı, müzik döngüsü (Emma_MA "Determined Pursuit", CC0; boss ve game over'da kısılır), müzik ses ayarı, aynı anda en çok 28 ses. WAV kaynaklar `tools/blender/convert_audio.py` ile (Blender FFmpeg) Vorbis'e çevrildi.
+- Arayüz: radar/minimap (düşman, boss, loot, takım), hasar sayıları, sonraki dalga sayacı ve boss uyarısı, takım arkadaşı isim etiketleri, düşük can nabzı, düşük mermi uyarısı, Esc ile duraklatma (solo; çevrimiçi Esc ayarları açar, pencere odağı kaybolunca solo otomatik duraklar).
+- QA: 17 test (ses çözme + yönlü ses, loot çizimi dahil) ve rastgele oyun simülasyonu değişmezleri (sonlu sayılar, arena içi, can üst sınırı, sayaç tutarlılığı).
+
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
 2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).

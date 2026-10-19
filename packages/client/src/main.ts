@@ -506,6 +506,16 @@ function frame(nowMs: number): void {
     const fy0 = prevY[target]! + (curY[target]! - prevY[target]!) * alpha;
     stage.follow(fx0, -fy0, fx.shake);
 
+    // name tags over the other players
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      const show = s !== localSlot && !!w.pActive[s] && (mode === 'online' || dev.bots > 0) && w.pState[s] !== PlayerState.Dead;
+      if (!show) {
+        ui.setTag(s, '', '#000', 0, 0, false);
+        continue;
+      }
+      _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 2.7, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
+      ui.setTag(s, names[s] ?? 'P' + (s + 1), PLAYER_COLORS[s % PLAYER_COLORS.length]!, ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
+    }
     audio.setListener(fx0, fy0);
     audio.tick(w, localSlot, dt);
     crowd.update(w, alpha, nowSec);

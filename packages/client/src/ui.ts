@@ -19,6 +19,7 @@ const T = {
     players: 'Players',
     host_tag: 'host',
     wave: 'Wave',
+    nextWave: 'Next wave in',
     kills: 'Kills',
     level: 'Level',
     boss: 'BOSS',
@@ -80,6 +81,7 @@ const T = {
     players: 'Oyuncular',
     host_tag: 'host',
     wave: 'Dalga',
+    nextWave: 'Sonraki dalga',
     kills: 'Öldürme',
     level: 'Seviye',
     boss: 'BOSS',
@@ -202,6 +204,7 @@ const CSS = `
 .wrh-warn{position:absolute;left:50%;top:60px;transform:translateX(-50%);color:#fff;background:#d8362e;padding:4px 12px;border-radius:8px;font-weight:700}
 .wrh-mini{position:absolute;right:14px;bottom:52px;width:180px;height:120px;border:2px solid #cdbfa5;border-radius:8px;background:rgba(250,244,232,.78);box-shadow:0 3px 10px rgba(60,45,20,.25)}
 .wrh-dmg{position:absolute;font-weight:800;font-size:15px;color:#fff;text-shadow:0 0 3px #7d0d14,0 0 3px #7d0d14,0 1px 0 #7d0d14;pointer-events:none;will-change:transform,opacity}
+.wrh-tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(250,244,232,.85);border:2px solid;white-space:nowrap;pointer-events:none}
 .wrh-low{color:#d8362e}
 .wrh-hud-dev{position:absolute;left:12px;top:10px;font-size:12px;line-height:1.5}
 `;
@@ -317,6 +320,24 @@ export class Ui {
     this.screen.querySelector<HTMLElement>('#wrh-resume')!.onclick = () => this.h.onResume();
     this.screen.querySelector<HTMLElement>('#wrh-pset')!.onclick = () => this.toggleSettings();
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
+  }
+
+  private readonly tagEls: (HTMLDivElement | null)[] = new Array<HTMLDivElement | null>(MAX_PLAYERS).fill(null);
+
+  /** Name label floating over a teammate (screen position in px); `visible` false hides it. */
+  setTag(slot: number, text: string, color: string, px: number, py: number, visible: boolean): void {
+    let el = this.tagEls[slot];
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wrh-tag';
+      this.root.appendChild(el);
+      this.tagEls[slot] = el;
+    }
+    if (el.textContent !== text) el.textContent = text;
+    el.style.borderColor = color;
+    el.style.display = visible ? 'block' : 'none';
+    el.style.left = `${px}px`;
+    el.style.top = `${py}px`;
   }
 
   private floaters = 0;
@@ -539,7 +560,9 @@ export class Ui {
       const el = this.hud.querySelector<HTMLElement>('#' + id)!;
       if (el.innerHTML !== html) el.innerHTML = html;
     };
-    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.level}`);
+    const nextIn = Math.max(0, Math.ceil(BALANCE.waves.periodSeconds - (world.tick - world.waveTick) / TICK_RATE));
+    const bossNext = (world.wave + 1) % BALANCE.progression.boss.everyWaves === 0;
+    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.level}<br><small style="font-weight:600;opacity:.75">${t.nextWave} ${nextIn}s${bossNext ? ` &middot; <span class="wrh-low">${t.boss}!</span>` : ''}</small>`);
     (this.hud.querySelector('#h-xp') as HTMLElement).style.width = `${Math.min(100, (world.xp / xpForNext(world)) * 100)}%`;
 
     // boss bar
