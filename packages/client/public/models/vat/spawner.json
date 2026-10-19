@@ -1,0 +1,36 @@
+{
+ "type": "spawner",
+ "scale": 1.5,
+ "vertexCount": 731,
+ "indexCount": 2448,
+ "frames": 110,
+ "clips": [
+  {
+   "id": "z_walk_creep",
+   "start": 0,
+   "frames": 40,
+   "loop": true,
+   "duration": 4.0667
+  },
+  {
+   "id": "z_scream",
+   "start": 40,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  },
+  {
+   "id": "z_death_back",
+   "start": 74,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  }
+ ],
+ "extent": [
+  0.843,
+  2.146,
+  1.016
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

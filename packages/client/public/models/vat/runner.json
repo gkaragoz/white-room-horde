@@ -1,0 +1,43 @@
+{
+ "type": "runner",
+ "scale": 1.05,
+ "vertexCount": 516,
+ "indexCount": 1728,
+ "frames": 116,
+ "clips": [
+  {
+   "id": "z_run",
+   "start": 0,
+   "frames": 10,
+   "loop": true,
+   "duration": 0.8333
+  },
+  {
+   "id": "z_attack_swipe",
+   "start": 10,
+   "frames": 32,
+   "loop": false,
+   "duration": 2.6667
+  },
+  {
+   "id": "z_death_fwd",
+   "start": 42,
+   "frames": 40,
+   "loop": false,
+   "duration": 3.3667
+  },
+  {
+   "id": "z_scream",
+   "start": 82,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  0.659,
+  1.572,
+  0.815
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

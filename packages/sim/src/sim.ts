@@ -12,9 +12,10 @@ import {
 } from '@wrh/shared';
 import { clamp, cos, sin, sqrt, TAU } from './detmath';
 import { Crc32 } from './hash';
+import { bulletVsEnemies, setWave, spawnEnemy, updateEnemies } from './enemies';
 import { createWorld, type World } from './state';
 
-export { createWorld };
+export { createWorld, setWave, spawnEnemy };
 export type { World };
 
 /** Aim is a 16-bit angle (see PlayerInput); this is the factor to radians. */
@@ -30,9 +31,10 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pWeapon[slot] = WEAPON_IDS.indexOf(weapon);
   w.pAmmo[slot] = BALANCE.weapons[weapon].ammo;
   w.pMoving[slot] = 0;
+  w.pIFrames[slot] = 0;
 }
 
-function spawnBullet(w: World, owner: number, x: number, y: number, angle: number, speed: number, range: number, damage: number): void {
+function spawnBullet(w: World, owner: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number): void {
   for (let i = 0; i < MAX_BULLETS; i++) {
     if (w.bActive[i]) continue;
     w.bActive[i] = 1;
@@ -43,6 +45,8 @@ function spawnBullet(w: World, owner: number, x: number, y: number, angle: numbe
     w.bLife[i] = range / speed;
     w.bDamage[i] = damage;
     w.bOwner[i] = owner;
+    w.bPierce[i] = pierce;
+    w.bHit.fill(-1, i * 4, i * 4 + 4);
     return;
   }
 }
@@ -53,6 +57,7 @@ function spawnBullet(w: World, owner: number, x: number, y: number, angle: numbe
  */
 export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): void {
   w.events.length = 0;
+  for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pIFrames[s]! > 0) w.pIFrames[s] = w.pIFrames[s]! - TICK_DT;
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s]) continue;
     const inp = inputs[s];
@@ -87,7 +92,7 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
         // the shot leaves the muzzle: forward along the aim and a little to the right-hand side
         const ox = cos(angle) * stats.muzzleFwd + sin(angle) * stats.muzzleSide;
         const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
-        spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage);
+        spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage, stats.pierce);
       }
       w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
       if (stats.ammo >= 0) w.pAmmo[s] = w.pAmmo[s]! - 1;
@@ -97,15 +102,20 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
   }
 
+  updateEnemies(w);
+
   // bullets
   for (let i = 0; i < MAX_BULLETS; i++) {
     if (!w.bActive[i]) continue;
-    w.bX[i] = w.bX[i]! + w.bVx[i]! * TICK_DT;
-    w.bY[i] = w.bY[i]! + w.bVy[i]! * TICK_DT;
+    const x0 = w.bX[i]!;
+    const y0 = w.bY[i]!;
+    w.bX[i] = x0 + w.bVx[i]! * TICK_DT;
+    w.bY[i] = y0 + w.bVy[i]! * TICK_DT;
     w.bLife[i] = w.bLife[i]! - TICK_DT;
+    const spent = w.enemyCount > 0 && bulletVsEnemies(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
     const x = w.bX[i]!;
     const y = w.bY[i]!;
-    if (w.bLife[i]! <= 0 || x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H) {
+    if (spent || w.bLife[i]! <= 0 || x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H) {
       w.bActive[i] = 0;
       w.events.push({ type: 'bulletGone', x, y });
     }
@@ -118,7 +128,9 @@ export function hashWorld(w: World): number {
   const c = new Crc32();
   c.u32(w.tick);
   for (const v of w.rng.getState()) c.u32(v);
-  c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pCooldown).typed(w.pWeapon).typed(w.pAmmo);
-  c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner);
+  c.u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount);
+  c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo);
+  c.typed(w.eActive).typed(w.eType).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
+  c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
   return c.digest();
 }

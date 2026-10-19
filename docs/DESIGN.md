@@ -305,6 +305,14 @@ white-room-horde/
 - QA aracı: `packages/client/qa.html` (7 otomatik test, bkz. README). Sim hash'leri `sim-reference.json` ile tarayıcıda karşılaştırılır.
 - Bilinen eksikler: üst/alt gövde katman ayrımı yok (ateşle koşu için yalnızca ileri yönde `fire_run`), düşman yok.
 
+**Milestone 2 durumu (tamam)**
+- `sim`: düşman SoA havuzu (640 slot), çok kaynaklı Dijkstra akış alanı (60x40, tamsayı maliyet 10/14, 3 tick'te bir), 1.5 hücreli mekânsal hash (ayrışma + mermi çarpışması), dalga sistemi (ağırlıklar, açılış dalgaları, tekrarlı çarpımla sayı/HP büyümesi), temas hasarı + iFrame, patlayıcı, mermi delme (`pierce`, mermi başına son 4 vuruş), olaylar (`enemyHit/enemyDeath/playerHit/explosion`). Hash artık düşman/dalga alanlarını da kapsıyor; `sim-reference.json` yenilendi.
+- Geçici basitleştirmeler: spitter menzilli hasarı anlık (mermi yok), shielder kalkanı henüz hasar azaltmıyor, spawner her 6 sn bir grunt çıkarır. Bunlar M6'da gerçek mermi/kalkan ile değişecek.
+- Ölçüm (headless, 500 düşman + 8 ateş eden oyuncu): ortalama 1.1 ms/tick, p99 2.3 ms (bütçe 12 ms).
+- `client`: VAT + instancing (`render/crowd.ts`): tip başına 1 çizim, `gl_VertexID` + `texelFetch` ile iki kare arası karışım, `onBeforeCompile` ile MeshStandardMaterial'a enjekte (flat shading, vertex rengi x paint.png), gölge için `customDepthMaterial`, istemci tarafı ceset örnekleri (üst sınır 150, ölüm yönüne göre `death_fwd/back`).
+- Ölçüm (GTX 1080 Ti, tarayıcı paneli, 500 düşman + 8 oyuncu, gölge açık): 165 FPS (ekran sınırı), kare CPU süresi ~1.8 ms, 77 draw call, ~615k üçgen. Test için `?perf=1&wave=25&bots=7&auto=1&god=1`.
+- Karar: WebGPU geçişi M2'de yapılmadı; WebGL2 yolu bütçenin çok altında kaldığı için ertelendi (renderer yine yalnızca `stage.ts` içinde).
+
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
 2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).

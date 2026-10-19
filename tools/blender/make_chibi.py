@@ -138,16 +138,19 @@ class Builder:
 
     def sphere(self, bone, center, r, scale=(1, 1, 1), color="#FFFFFF", tint=False, rot=(0, 0, 0), seg=None, rings=None):
         bm = bmesh.new()
+        bm.loops.layers.uv.verify()
         bmesh.ops.create_uvsphere(bm, u_segments=seg or self.seg, v_segments=rings or self.rings, radius=r, matrix=self._mat(center, scale, rot), calc_uvs=True)
         return self._finish(bm, color, tint, bone)
 
     def box(self, bone, center, size, color="#FFFFFF", tint=False, rot=(0, 0, 0)):
         bm = bmesh.new()
+        bm.loops.layers.uv.verify()
         bmesh.ops.create_cube(bm, size=1.0, matrix=self._mat(center, size, rot), calc_uvs=True)
         return self._finish(bm, color, tint, bone)
 
     def cyl(self, bone, center, r, depth, color="#FFFFFF", tint=False, rot=(0, 0, 0), r2=None):
         bm = bmesh.new()
+        bm.loops.layers.uv.verify()
         bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=self.cylseg, radius1=r, radius2=r if r2 is None else r2, depth=depth,
                               matrix=self._mat(center, (1, 1, 1), rot), calc_uvs=True)
         return self._finish(bm, color, tint, bone)

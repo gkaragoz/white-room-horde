@@ -24,3 +24,10 @@ export const NO_INPUT: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 
 export type WeaponId = 'pistol' | 'smg' | 'ar' | 'shotgun' | 'hmg' | 'minigun' | 'sniper';
 export const WEAPON_IDS: readonly WeaponId[] = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper'];
+
+export type EnemyType = 'grunt' | 'runner' | 'tank' | 'exploder' | 'spitter' | 'shielder' | 'spawner';
+/** Index in this array is the numeric type stored in the sim and used by the renderer. */
+export const ENEMY_TYPES: readonly EnemyType[] = ['grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner'];
+
+/** Enemy animation state (eState). */
+export const EnemyState = { Move: 0, Attack: 1, Spawn: 2 } as const;

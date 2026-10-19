@@ -21,7 +21,8 @@
       "range": 14,
       "muzzleFwd": 1.21,
       "muzzleSide": 0.09,
-      "muzzleH": 1.09
+      "muzzleH": 1.09,
+      "pierce": 0
     },
     "smg": {
       "damage": 6,
@@ -33,7 +34,8 @@
       "range": 10,
       "muzzleFwd": 2.29,
       "muzzleSide": 0.09,
-      "muzzleH": 1.06
+      "muzzleH": 1.06,
+      "pierce": 0
     },
     "ar": {
       "damage": 14,
@@ -45,7 +47,8 @@
       "range": 18,
       "muzzleFwd": 2.95,
       "muzzleSide": 0.09,
-      "muzzleH": 1.09
+      "muzzleH": 1.09,
+      "pierce": 0
     },
     "shotgun": {
       "damage": 7,
@@ -57,7 +60,8 @@
       "range": 7,
       "muzzleFwd": 2.62,
       "muzzleSide": 0.09,
-      "muzzleH": 1.06
+      "muzzleH": 1.06,
+      "pierce": 0
     },
     "hmg": {
       "damage": 12,
@@ -69,7 +73,8 @@
       "range": 14,
       "muzzleFwd": 3.31,
       "muzzleSide": 0.09,
-      "muzzleH": 1.12
+      "muzzleH": 1.12,
+      "pierce": 2
     },
     "minigun": {
       "damage": 8,
@@ -83,7 +88,8 @@
       "spinDown": 0.8,
       "muzzleFwd": 3.25,
       "muzzleSide": 0.09,
-      "muzzleH": 1.06
+      "muzzleH": 1.06,
+      "pierce": 1
     },
     "sniper": {
       "damage": 120,
@@ -95,7 +101,89 @@
       "range": 40,
       "muzzleFwd": 3.4,
       "muzzleSide": 0.09,
-      "muzzleH": 1.09
+      "muzzleH": 1.09,
+      "pierce": 5
+    }
+  },
+  "enemies": {
+    "grunt": {
+      "hp": 20,
+      "speed": 2.2,
+      "radius": 0.55,
+      "damage": 8,
+      "interval": 0.8
+    },
+    "runner": {
+      "hp": 12,
+      "speed": 5.0,
+      "radius": 0.4,
+      "damage": 5,
+      "interval": 0.5
+    },
+    "tank": {
+      "hp": 150,
+      "speed": 1.4,
+      "radius": 1.2,
+      "damage": 25,
+      "interval": 1.2
+    },
+    "exploder": {
+      "hp": 15,
+      "speed": 4.0,
+      "radius": 0.5,
+      "damage": 40,
+      "interval": 0,
+      "blastRadius": 2.5
+    },
+    "spitter": {
+      "hp": 25,
+      "speed": 1.8,
+      "radius": 0.5,
+      "damage": 8,
+      "interval": 2.0
+    },
+    "shielder": {
+      "hp": 80,
+      "speed": 2.0,
+      "radius": 0.7,
+      "damage": 12,
+      "interval": 1.0
+    },
+    "spawner": {
+      "hp": 120,
+      "speed": 0.8,
+      "radius": 0.8,
+      "damage": 0,
+      "interval": 6.0
+    }
+  },
+  "waves": {
+    "periodSeconds": 60,
+    "baseCount": 30,
+    "perPlayer": 10,
+    "countGrowth": 1.12,
+    "hpGrowth": 0.08,
+    "playerHpGrowth": 0.1,
+    "cap": 500,
+    "spawnPerTick": 8,
+    "spawnMinDistance": 16,
+    "unlock": {
+      "grunt": 1,
+      "runner": 3,
+      "tank": 6,
+      "exploder": 9,
+      "spitter": 12,
+      "shielder": 15,
+      "spawner": 18
+    },
+    "weights": {
+      "grunt": 100,
+      "runner": 45,
+      "tank": 8,
+      "exploder": 12,
+      "spitter": 10,
+      "shielder": 8,
+      "spawner": 3
     }
   }
 }

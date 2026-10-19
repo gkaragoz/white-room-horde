@@ -1,0 +1,50 @@
+{
+ "type": "grunt",
+ "scale": 1.35,
+ "vertexCount": 516,
+ "indexCount": 1728,
+ "frames": 145,
+ "clips": [
+  {
+   "id": "z_walk",
+   "start": 0,
+   "frames": 19,
+   "loop": true,
+   "duration": 1.5667
+  },
+  {
+   "id": "z_attack_swipe",
+   "start": 19,
+   "frames": 32,
+   "loop": false,
+   "duration": 2.6667
+  },
+  {
+   "id": "z_hit",
+   "start": 51,
+   "frames": 24,
+   "loop": false,
+   "duration": 2.0333
+  },
+  {
+   "id": "z_death_back",
+   "start": 75,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  },
+  {
+   "id": "z_scream",
+   "start": 111,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  0.902,
+  1.931,
+  1.08
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

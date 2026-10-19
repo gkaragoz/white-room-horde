@@ -11,7 +11,7 @@ pnpm typecheck
 pnpm lint         # includes the determinism rules for packages/sim
 pnpm build
 ```
-WASD move, mouse aim, click or Space to fire. Query params: `?weapon=weapon_smg|weapon_ar|...`, `?acc=acc_helmet|acc_cap|acc_goggles|acc_headphones|acc_bandana`, `?color=0..10`.
+WASD move, mouse aim, click or Space to fire. Query params: `?weapon=weapon_smg|weapon_ar|...`, `?acc=acc_helmet|acc_cap|acc_goggles|acc_headphones|acc_bandana`, `?color=0..10`, `?perf=1` (frame/sim ms, draw calls, triangles), `?wave=N` (start at wave N), `?bots=0..10` (scripted extra players), `?auto=1` (scripted input for you), `?god=1` (no deaths). Stress test: `?perf=1&wave=25&bots=7&auto=1&god=1`.
 
 ## QA tool
 `http://localhost:5173/qa.html` (add `?auto=1` to run on load). Seven automatic checks: assets load, animations finite, weapon held along the aim line and upright (every weapon x clip x 12 aim angles), sim shot origin equals the visual muzzle, WASD/aim/facing mapping, simulation determinism against the Node reference hashes (`packages/shared/data/sim-reference.json`), render performance. "Copy measured muzzle data" exports the measured muzzle offsets for `balance.json`. In the game, `?debug=1` or F2 shows the muzzle (red), the sim shot origin (yellow) and the aim line (blue). From a script: `window.__qa.runAll()`.

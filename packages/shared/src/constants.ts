@@ -4,6 +4,7 @@ export const TICK_DT = 1 / TICK_RATE;
 export const INPUT_DELAY_TICKS = 3;
 export const MAX_PLAYERS = 11;
 export const MAX_BULLETS = 1024;
+export const MAX_ENEMIES = 640;
 export const ARENA_HALF_W = 30;
 export const ARENA_HALF_H = 20;
 
