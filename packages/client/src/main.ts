@@ -476,10 +476,12 @@ function adaptScale(currentFps: number, seconds: number): void {
   if (slowSeconds >= 1.5 && autoScale > 0.55) {
     autoScale = Math.max(0.55, autoScale - 0.1);
     stage.setScale(autoScale);
+    if (autoScale <= 0.65) crowd.setShadows(false); // last resort for slow machines: the horde stops casting shadows
     slowSeconds = 0;
   } else if (fastSeconds >= 6 && autoScale < settings.scale) {
     autoScale = Math.min(settings.scale, autoScale + 0.05);
     stage.setScale(autoScale);
+    if (autoScale >= 0.8) crowd.setShadows(true);
     fastSeconds = 0;
   }
 }

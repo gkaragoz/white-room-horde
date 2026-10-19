@@ -7,14 +7,18 @@ import { runScripted } from '../src/testkit';
  * compares its hash with this file. Regenerate deliberately with UPDATE_REF=1 when the simulation rules change.
  */
 const REF = new URL('../../shared/data/sim-reference.json', import.meta.url);
-const CASES = [
+const CASES: { seed: number; ticks: number; players: number; map?: number; difficulty?: number; wave?: number }[] = [
   { seed: 1, ticks: 200, players: 4 },
   { seed: 42, ticks: 600, players: 4 },
   { seed: 7, ticks: 900, players: 8 },
+  { seed: 11, ticks: 1500, players: 6, map: 1, difficulty: 2, wave: 6 },
+  { seed: 12, ticks: 1200, players: 3, map: 2, difficulty: 0, wave: 11 },
+  { seed: 13, ticks: 1800, players: 11, map: 3, difficulty: 1, wave: 9 },
+  { seed: 14, ticks: 2100, players: 5, map: 0, difficulty: 2, wave: 4 }, // crosses the wave 5 boss
 ];
 
 describe('sim reference hashes', () => {
-  const current = CASES.map((c) => ({ ...c, hash: runScripted(c.seed, c.ticks, c.players).hash }));
+  const current = CASES.map((c) => ({ ...c, hash: runScripted(c.seed, c.ticks, c.players, c).hash }));
 
   it('match the committed reference file', () => {
     if (process.env.UPDATE_REF === '1' || !existsSync(REF)) {

@@ -409,6 +409,11 @@ export class Crowd {
     return out;
   }
 
+  /** Crowd shadows are the most expensive part of a huge horde; the auto-quality controller switches them off first. */
+  setShadows(on: boolean): void {
+    for (const t of this.types) t.mesh.castShadow = on;
+  }
+
   get typeCount(): number {
     return this.types.length;
   }

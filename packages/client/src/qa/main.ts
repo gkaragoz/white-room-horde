@@ -2,20 +2,30 @@ import { Stage } from '../render/stage';
 import { measured, tests, type Ctx, type Result } from './tests';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
-const stage = await Stage.create($('stage'));
-stage.follow(0, 0);
-stage.render();
+// ?only=id1,id2 runs a subset (CI uses it for browsers without a usable WebGL context)
+const params = new URLSearchParams(location.search);
+const only = params.get('only')?.split(',');
+let stage: Stage | null = null;
+try {
+  stage = await Stage.create($('stage'));
+  stage.follow(0, 0);
+  stage.render();
+} catch (e) {
+  console.warn('no renderer in this browser:', e);
+}
 
 interface Row extends Result {
   id: string;
   title: string;
   ms: number;
 }
+const active = only ? tests.filter((t) => only.includes(t.id)) : tests;
+let finished = false;
 const report: Record<string, Row> = {};
 const rows = new Map<string, HTMLElement>();
 
 const ctx: Ctx = {
-  stage,
+  stage: stage as Stage, // null when the browser has no renderer; tests that need it then fail with a clear error
   log: (m) => {
     $('label').textContent = m;
   },
@@ -71,16 +81,17 @@ function summarize(): void {
   const p = all.filter((r) => r.status === 'pass').length;
   const fl = all.filter((r) => r.status === 'fail').length;
   const w = all.filter((r) => r.status === 'warn').length;
-  $('summary').textContent = `${all.length}/${tests.length} run: ${p} passed, ${fl} failed, ${w} warnings`;
-  $('summary').style.borderColor = fl ? 'var(--bad)' : all.length === tests.length ? 'var(--ok)' : 'var(--line)';
+  $('summary').textContent = `${all.length}/${active.length} run: ${p} passed, ${fl} failed, ${w} warnings`;
+  $('summary').style.borderColor = fl ? 'var(--bad)' : all.length === active.length ? 'var(--ok)' : 'var(--line)';
 }
 
 async function runAll(): Promise<Row[]> {
   $<HTMLButtonElement>('runAll').disabled = true;
   const out: Row[] = [];
-  for (const t of tests) out.push(await runOne(t.id));
+  for (const t of active) out.push(await runOne(t.id));
   $<HTMLButtonElement>('runAll').disabled = false;
   ctx.log('done');
+  finished = true;
   return out;
 }
 
@@ -90,5 +101,14 @@ $('runAll').onclick = () => void runAll();
 $('copy').onclick = () => void navigator.clipboard.writeText(JSON.stringify(report, null, 2));
 $('measured').onclick = () => void navigator.clipboard.writeText(JSON.stringify(measured, null, 2));
 
-(window as unknown as Record<string, unknown>).__qa = { runAll, runOne, report, measured, tests: tests.map((t) => t.id) };
-if (new URLSearchParams(location.search).get('auto') === '1') void runAll();
+(window as unknown as Record<string, unknown>).__qa = {
+  runAll,
+  runOne,
+  report,
+  measured,
+  tests: tests.map((t) => t.id),
+  get finished() {
+    return finished;
+  },
+};
+if (params.get('auto') === '1') void runAll();

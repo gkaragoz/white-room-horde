@@ -237,8 +237,8 @@ export const tests: QaTest[] = [
     async run() {
       const problems: string[] = [];
       for (const c of reference.cases) {
-        const a = runScripted(c.seed, c.ticks, c.players).hash;
-        const b = runScripted(c.seed, c.ticks, c.players).hash;
+        const a = runScripted(c.seed, c.ticks, c.players, c).hash;
+        const b = runScripted(c.seed, c.ticks, c.players, c).hash;
         if (a !== b) problems.push(`seed ${c.seed}: two runs differ (${a} vs ${b})`);
         if (a !== c.hash) problems.push(`seed ${c.seed}/${c.ticks} ticks: browser ${a} != Node reference ${c.hash}`);
       }

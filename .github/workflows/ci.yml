@@ -18,3 +18,22 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  # The in-browser QA page in real browsers: every test in Chromium, and the cross-engine determinism check
+  # (same simulation hashes as Node) in Firefox and WebKit.
+  browser-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @wrh/client build
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: node tools/ci/qa-browsers.mjs chromium firefox webkit
+      - run: node tools/ci/game-smoke.mjs chromium
+      - run: node tools/ci/game-smoke.mjs firefox
+      - run: node tools/ci/game-smoke.mjs webkit

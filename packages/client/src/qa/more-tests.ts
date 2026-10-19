@@ -1,11 +1,14 @@
 import * as THREE from 'three';
-import { Buttons, MAPS } from '@wrh/shared';
+import { Buttons, CARD_IDS, MAPS, WEAPON_IDS } from '@wrh/shared';
 import { addPlayer, createWorld } from '@wrh/sim';
 import { DEFAULT_BINDINGS, Input } from '../input';
 import { WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
 import { Character } from '../render/character';
 import { PlayerAnimator } from '../render/playerAnim';
+import { asset } from '../assets';
+import { BANK_FILES, MUSIC_FILES } from '../audio';
+import { UI_STRINGS } from '../ui';
 import type { QaTest } from './tests';
 
 const f = (n: number, d = 2): number => +n.toFixed(d);
@@ -167,6 +170,44 @@ export const moreTests: QaTest[] = [
         saveProfile(saved);
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'records and unlocks behave' };
+    },
+  },
+  {
+    id: 'ui.strings',
+    title: 'Both languages have every string: same keys, every card, weapon, map, difficulty and key action',
+    async run() {
+      const problems: string[] = [];
+      const keys = (o: unknown, prefix = ''): string[] =>
+        Object.entries(o as Record<string, unknown>).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? keys(v, `${prefix}${k}.`) : [`${prefix}${k}`]));
+      const en = keys(UI_STRINGS.en).sort();
+      const tr = keys(UI_STRINGS.tr).sort();
+      for (const k of en) if (!tr.includes(k)) problems.push(`tr is missing ${k}`);
+      for (const k of tr) if (!en.includes(k)) problems.push(`en is missing ${k}`);
+      for (const lang of ['en', 'tr'] as const) {
+        const t = UI_STRINGS[lang] as unknown as Record<string, Record<string, unknown>>;
+        for (const c of CARD_IDS) if (!Array.isArray(t.cards![c]) || (t.cards![c] as string[]).length !== 2) problems.push(`${lang}: card ${c} has no title and text`);
+        for (const wp of WEAPON_IDS) if (!t.weapons![wp]) problems.push(`${lang}: weapon ${wp} has no name`);
+        for (const id of ['-1', ...MAPS.map((_, i) => String(i))]) if (!t.maps![id]) problems.push(`${lang}: map ${id} has no name`);
+        for (const a of ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'card1', 'card2', 'card3', 'pause']) if (!t.actions![a]) problems.push(`${lang}: action ${a} has no label`);
+        if ((UI_STRINGS[lang].diffs as readonly string[]).length !== 3) problems.push(`${lang}: needs three difficulty names`);
+        if ((UI_STRINGS[lang].accs as readonly string[]).length !== 5) problems.push(`${lang}: needs five accessory names`);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 12).join(' | ') : `${en.length} strings in two languages` };
+    },
+  },
+  {
+    id: 'audio.formats',
+    title: 'Every sound ships in both Vorbis and MP3 (Safari cannot decode Vorbis)',
+    async run() {
+      const problems: string[] = [];
+      const names = [...BANK_FILES.map((n) => `sfx/${n}`), ...MUSIC_FILES.map((n) => `music/${n}`)];
+      for (const base of names) {
+        for (const ext of ['ogg', 'mp3']) {
+          const res = await fetch(asset(`${base}.${ext}`), { method: 'HEAD' });
+          if (!res.ok) problems.push(`${base}.${ext} is missing (${res.status})`);
+        }
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 6).join(' | ') : `${names.length} sounds in two formats` };
     },
   },
 ];

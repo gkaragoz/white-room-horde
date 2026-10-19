@@ -346,6 +346,14 @@ white-room-horde/
 - Arayüz: radar/minimap (düşman, boss, loot, takım), hasar sayıları, sonraki dalga sayacı ve boss uyarısı, takım arkadaşı isim etiketleri, düşük can nabzı, düşük mermi uyarısı, Esc ile duraklatma (solo; çevrimiçi Esc ayarları açar, pencere odağı kaybolunca solo otomatik duraklar).
 - QA: 17 test (ses çözme + yönlü ses, loot çizimi dahil) ve rastgele oyun simülasyonu değişmezleri (sonlu sayılar, arena içi, can üst sınırı, sayaç tutarlılığı).
 
+**Eksik listesinin kapatılması, ikinci tur (tamam)**
+- Sim: şarjör ve reload (R, boşalınca otomatik, reload sırasında ateş yok; şarjör/yedek ayrımı), dash (Shift; kısa hızlı hamle, iFrame, 2.5 sn bekleme), kişisel kartlar (Keskin nişancı, Koşucu, Kalın deri: sadece seçeni etkiler), yerden silah kutusu (silahı değiştirir), 4 boss'un 4 farklı davranışı (hücum eden dev, grunt çağıran kral, spitter çağıran ana, çevresini hızlandırıp koşucu çağıran sürü lideri), zorluk (kolay/normal/zor: düşman canı, sayısı, hasarı), 4 arena (depo, avlu, koridorlar, açık alan; her biri başlangıç halkasını ve kenarları açık, merkeze erişilebilir bırakır, test edilir). Yakın dövüş yapılmadı: giriş baytındaki 8 bit dolu (ateş, bomba, kaldır, doldur, atıl, 3 kart); eklemek için giriş formatını 16 bite çıkarmak gerekir.
+- Ağ: aynı slota geri bağlanma (jeton; tarayıcı yenilense de menüden "Geri dön"; kopma sırasında otomatik 6 deneme), oyunun ilk 15 saniyesinden sonra katılanlara/geri dönenlere tüm geçmiş yerine donörden snapshot + sonraki paketler, oda şifresi, oda seçenekleri (arena, zorluk) yalnız host'tan, bağlantı başına hız sınırı, alan doğrulaması, boş oda temizliği, en çok oda sayısı. Gerçek sunucu + gerçek WebSocket + gerçek sim ile uçtan uca test (`packages/server/tests/e2e.test.ts`).
+- İstemci: oyuncu animasyonları (bomba atma, reload, yere düşme, kaldırılma, kaldırma, ayağa kalkma), başlangıç silahı + görünüm (aksesuar) seçimi, kayıtlar ve açılan silahlar (shotgun dalga 3, hmg 5, sniper 7, minigun 9), tuş ayarı, oyun kolu, dokunmatik çubuklar, kare sınırı, doku detayı, otomatik çözünürlük, müzik yoğunluğu (kalabalıkla parlaklaşır), tam TR/EN metin denetimi.
+- Ses: her ses hem Vorbis hem MP3 (WebKit Vorbis çözemiyor; QA bunu yakaladı).
+- QA ve CI: tarayıcı QA'sı Playwright ile CI'da (`tools/ci/qa-browsers.mjs`): Chromium'da 23 test, Firefox ve WebKit'te determinizm. Sim hash'leri Node, Chromium (V8), Firefox (SpiderMonkey) ve WebKit (JavaScriptCore)'te birebir aynı; referans senaryolar bomba, reload, dash, kart, boss, harita ve zorluk kapsar.
+- Hâlâ yok: yakın dövüş (yukarıya bak), gerçek GI, mobilde gerçek cihaz testi (dokunmatik mantık test edildi, cihazda denenmedi), WebGPU CI'da (başsız tarayıcıda yok).
+
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).
 2. 500 düşman sim + VAT render, performans ölçümü (en riskli parça önce).

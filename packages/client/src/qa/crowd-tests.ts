@@ -309,6 +309,8 @@ export const crowdTests: QaTest[] = [
     id: 'audio.bank',
     title: 'Every recorded sound effect decodes in this browser and has a sane length',
     async run() {
+      const hasAudio = typeof window.AudioContext !== 'undefined' || typeof (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext !== 'undefined';
+      if (!hasAudio) return { status: 'warn', detail: 'this browser build has no WebAudio (the game then plays without sound), skipped' };
       const a = new Audio();
       a.unlock();
       const { loaded, durations } = await a.whenLoaded();

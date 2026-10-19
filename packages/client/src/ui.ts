@@ -5,7 +5,7 @@ import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, savePr
 
 export type Lang = 'en' | 'tr';
 
-const T = {
+export const UI_STRINGS = {
   en: {
     title: 'white-room-horde',
     tag: 'co-op horde survival',
@@ -91,6 +91,9 @@ const T = {
       pierce: ['Piercing tips', 'Bullets pass through +1 enemy'],
       arsenal: ['New toys', 'Everyone upgrades to the next weapon'],
       heal: ['First aid', 'Heal everyone to full'],
+      sharp: ['Sharpshooter', '+30% damage for you only'],
+      sprint: ['Sprinter', '+20% move speed for you only'],
+      bulk: ['Bulk up', '+40 max HP for you only'],
     },
     weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper' },
   },
@@ -179,6 +182,9 @@ const T = {
       pierce: ['Delici uçlar', 'Mermiler +1 düşmanı deler'],
       arsenal: ['Yeni oyuncaklar', 'Herkes bir sonraki silaha geçer'],
       heal: ['İlk yardım', 'Herkesin canı tam dolar'],
+      sharp: ['Keskin nişancı', 'Sadece sana +%30 hasar'],
+      sprint: ['Koşucu', 'Sadece sana +%20 hız'],
+      bulk: ['Kalın deri', 'Sadece sana +40 azami can'],
     },
     weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı' },
   },
@@ -334,8 +340,8 @@ export class Ui {
     return (this.t as unknown as Record<string, string>)[key]!;
   }
 
-  private get t(): (typeof T)['en'] {
-    return T[this.lang] as (typeof T)['en'];
+  private get t(): (typeof UI_STRINGS)['en'] {
+    return UI_STRINGS[this.lang] as (typeof UI_STRINGS)['en'];
   }
 
   setDev(html: string): void {

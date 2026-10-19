@@ -42,8 +42,14 @@ Tests: `pnpm test` (sim determinism, enemies, replay, lockstep with simulated la
 
 ## Credits and licences
 
-- Game code: all rights reserved by the author unless a licence file says otherwise.
+- Game code: MIT (see `LICENSE`, which also states what the licence does not cover).
 - Sound effects: CC0, see `packages/client/public/sfx/CREDITS.md` (rubberduck on OpenGameArt, Kenney).
 - Animations: retargeted from Adobe Mixamo clips and baked into the model files; Mixamo's terms allow use inside games but not redistribution of the animations on their own. The raw Mixamo downloads are not in the repository.
 - Characters, weapons, enemies and the floor are procedural (built with the Blender scripts in `tools/blender`).
 - three.js (MIT).
+
+## Quality checks
+
+- `pnpm test`: simulation (determinism, enemies, bosses, reload/dash, maps, pickups, replay, snapshots, random-play invariants), lockstep networking over a simulated bad network, and a real-server end-to-end test with real WebSockets (late join by snapshot, rejoin after a dropped socket).
+- `node tools/ci/qa-browsers.mjs chromium firefox webkit` (after `pnpm --filter @wrh/client build`): runs the in-browser QA page, 22 checks in Chromium (animation data and rendered poses, ragdolls, audio decoding, anti-aliasing, WebGPU when available, controls, strings) and the cross-engine determinism check in Firefox and WebKit. CI runs the same job.
+- `node tools/ci/game-smoke.mjs chromium|firefox|webkit`: plays the real game page with real keyboard and mouse events (menu, WASD, mouse fire, reload, dash, pause) and checks the simulation state each time.

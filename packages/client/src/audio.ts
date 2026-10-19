@@ -69,6 +69,15 @@ export const MUSIC_FILES = ['determined_pursuit'];
 
 const MAX_VOICES = 28;
 
+/** Formats to try, preferred first. Both are shipped: Vorbis is smaller, MP3 works everywhere (Safari has no Vorbis). */
+const FORMATS: readonly string[] = (() => {
+  try {
+    return document.createElement('audio').canPlayType('audio/ogg; codecs="vorbis"') ? ['ogg', 'mp3'] : ['mp3', 'ogg'];
+  } catch {
+    return ['ogg', 'mp3'];
+  }
+})();
+
 /**
  * Recorded effects with a synthesised fallback (browser cannot decode ogg, or a file is missing), positional pan and
  * distance falloff, ambient zombie voices and footsteps driven by the world, looped music with ducking.
@@ -123,21 +132,27 @@ export class Audio {
     void this.loadBank();
   }
 
-  private async load(name: string, url: string): Promise<void> {
-    try {
-      const res = await fetch(url);
-      this.buffers.set(name, await this.ctx!.decodeAudioData(await res.arrayBuffer()));
-    } catch {
-      /* synth fallback / no music */
+  /** Decode `<base>.ogg`, or `<base>.mp3` when the browser cannot play Vorbis (Safari); either one failing falls back to the other. */
+  private async load(name: string, base: string): Promise<void> {
+    for (const ext of FORMATS) {
+      try {
+        const res = await fetch(asset(`${base}.${ext}`));
+        if (!res.ok) continue;
+        this.buffers.set(name, await this.ctx!.decodeAudioData(await res.arrayBuffer()));
+        return;
+      } catch {
+        /* try the other format */
+      }
     }
+    /* synth fallback / no music */
   }
 
   /** Fetch and decode every file of the bank once; failures just leave the synth fallback in place. */
   private async loadBank(): Promise<void> {
     if (this.loading || !this.ctx) return;
     this.loading = true;
-    await Promise.all(BANK_FILES.map((n) => this.load(n, asset(`sfx/${n}.ogg`))));
-    await Promise.all(MUSIC_FILES.map((n) => this.load('music:' + n, asset(`music/${n}.ogg`))));
+    await Promise.all(BANK_FILES.map((n) => this.load(n, `sfx/${n}`)));
+    await Promise.all(MUSIC_FILES.map((n) => this.load('music:' + n, `music/${n}`)));
     if (this.wantMusic) this.startMusic();
   }
 
