@@ -294,7 +294,24 @@ Malzeme: tek renk paleti atlası (vertex color + 1 doku), PBR yok (düz renk + y
 4. `bake_vat.py` ve client'ta VAT doğrulaması (500 düşman performans testi).
 5. Tüm düşman türleri ve boss'lar.
 
-## 17. Açık kararlar
+## 17. Arena ve harita
+Karar: tek büyük sabit arena, 3 harita arasından lobide seçilir (oylama veya host seçimi). Kamera grubu takip eder. Boyut ~60x40 birim (kamera 17 birim genişlik gösterir, arenanın yaklaşık yarısı). Sabit harita deterministik sim için güvenlidir (tohum yalnız spawn ve RNG içindir).
+
+| Harita | Tema (beyaz sade) | Yerleşim |
+|---|---|---|
+| Laboratuvar | Beyaz zemin, cam bölmeler, sütunlar | Açık merkez, köşelerde siper blokları, kenarda yarım duvarlar |
+| Depo | Raflar, kasalar, koridorlar | Paralel raf koridorları (ateş hattı kırar), merkez boşluk |
+| Arıtma tesisi | Dev tank, borular, platformlar | Ortada yuvarlak tank (dolanılır), çevrede halka koridor |
+
+- Siperler: duvar ve kasalar mermiyi tutar (oyuncu ve düşman mermisi), düşman yol bulma basit (navigasyon ızgarası, sabit, deterministik; engel çevresinde kayma). Yok edilebilir siper yok (ilk sürüm), böylece ızgara sabit kalır.
+- Spawn: düşmanlar kamera kenarı çemberinde (leash) arenanın içinden doğar; harita başına sabit "kapı" noktaları yok. Boss'lar arena merkezine veya karşı kapıdan girer.
+- Patlayıcı fıçılar: arena genelinde sabit noktalar, vurulunca patlar (alan hasarı + itme), yakındaki fıçıları zincirler; düşmana hasar verir, dosta hasar yok (itme ve sarsma var), yeniden doğmaz (dalga başına 1-2 yenisi gelir). Sim'de tohumlu yerleşim.
+- Toplanabilir kutular: silah kutusu (SMG/pompalı/HMG) ve mermi kutusu; belirli noktalarda yeniden doğar (30 sn), ayrıca düşmandan düşer (düşük şans). Kutu üstüne basarak alınır; HMG kutusu nadir (dalga başına 1-2).
+- Görsel: zemin ve duvar beyaz/gri (bölüm 3), kan zeminde birikir; her haritanın tek vurgu rengi (laboratuvar mavi, depo turuncu, arıtma yeşil) sadece zemin işaretlerinde ve fıçılarda.
+- Erişilebilirlik: yerdeki kırmızı tehlike alanları (boss işaretleri) kan kırmızısından ayrışsın diye parlak sarı kontur ve desenli doldurma.
+- Ertelenenler: tehlikeli zemin (asit/elektrik), yok edilebilir siper, harita rotasyonu (daha sonra).
+
+## 18. Açık kararlar
 - Oyuncu renk listesi: 11 renk (kırmızı hariç) ve renk körlüğü için desen/şekil işareti.
 - Mixamo animasyonlarının chibi retarget sonucu ve ragdoll kemik yapısı (kısa uzuvlar, küre eklemler).
 - CI dağıtım ve sunucu barındırma detayı.
