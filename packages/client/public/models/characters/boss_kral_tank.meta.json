@@ -1,0 +1,23 @@
+{
+ "id": "boss_kral_tank",
+ "tris": 1404,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_fixed"
+ ],
+ "height": 7.24,
+ "attach": null
+}

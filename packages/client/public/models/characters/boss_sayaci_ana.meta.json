@@ -1,0 +1,23 @@
+{
+ "id": "boss_sayaci_ana",
+ "tris": 2244,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_fixed"
+ ],
+ "height": 6.335,
+ "attach": null
+}

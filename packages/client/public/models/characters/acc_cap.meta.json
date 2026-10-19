@@ -1,0 +1,23 @@
+{
+ "id": "acc_cap",
+ "tris": 112,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_tint"
+ ],
+ "height": 0.778,
+ "attach": "head"
+}

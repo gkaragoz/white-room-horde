@@ -1,0 +1,24 @@
+{
+ "id": "player_base",
+ "tris": 1200,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ],
+ "height": 2.007,
+ "attach": null
+}
