@@ -338,5 +338,6 @@ def selftest():
     return res
 
 
-RESULT = selftest() if SELFTEST else run()
-print(RESULT)
+if not globals().get("NO_RUN"):
+    RESULT = selftest() if SELFTEST else run()
+    print(RESULT)

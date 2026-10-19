@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLAYER_COLORS, TICK_DT, MAX_BULLETS } from '@wrh/shared';
+import { BALANCE, MAX_BULLETS, PLAYER_COLORS, TICK_DT, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { addPlayer, createWorld, hashWorld, step } from '@wrh/sim';
 import { pickPlayerClip } from './anim';
 import { Input } from './input';
@@ -10,8 +10,11 @@ const app = document.getElementById('app')!;
 const hud = document.getElementById('hud')!;
 
 const stage = new Stage(app);
+const params = new URLSearchParams(location.search);
+const weaponParam = (params.get('weapon') ?? 'weapon_pistol').replace('weapon_', '');
+const weaponId = (WEAPON_IDS as readonly string[]).includes(weaponParam) ? (weaponParam as WeaponId) : 'pistol';
 const world = createWorld(1);
-addPlayer(world, 0, 0, 0);
+addPlayer(world, 0, 0, 0, weaponId);
 const input = new Input(stage.renderer.domElement, stage.camera);
 
 // bullets: one InstancedMesh, positions come straight from the sim pool
@@ -20,14 +23,26 @@ bulletMesh.frustumCulled = false;
 bulletMesh.count = 0;
 stage.scene.add(bulletMesh);
 
-const params = new URLSearchParams(location.search);
 const player = await Character.createPlayer({
   color: PLAYER_COLORS[Number(params.get('color') ?? 0) % PLAYER_COLORS.length]!,
   accessory: params.get('acc') ?? 'acc_bandana',
-  weapon: params.get('weapon') ?? 'weapon_pistol',
+  weapon: 'weapon_' + weaponId,
 });
 stage.scene.add(player.root);
 console.log('bones:', [...player.bones.keys()].join(', '));
+
+// ?debug=1 (or F2): muzzle (red) vs the sim's shot origin (yellow) and the aim line
+const dbg = new THREE.Group();
+dbg.visible = params.get('debug') === '1';
+const markMuzzle = new THREE.Mesh(new THREE.SphereGeometry(0.09), new THREE.MeshBasicMaterial({ color: '#ff2a2a', depthTest: false }));
+const markOrigin = new THREE.Mesh(new THREE.SphereGeometry(0.09), new THREE.MeshBasicMaterial({ color: '#ffd400', depthTest: false }));
+const aimLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, 8)]), new THREE.LineBasicMaterial({ color: '#2a7bff', depthTest: false }));
+for (const o of [markMuzzle, markOrigin, aimLine]) o.renderOrder = 10;
+dbg.add(markMuzzle, markOrigin, aimLine);
+stage.scene.add(dbg);
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'F2') dbg.visible = !dbg.visible;
+});
 
 // fixed-step loop with interpolation
 let prevX = 0, prevY = 0, curX = 0, curY = 0, prevAngle = 0, curAngle = 0;
@@ -69,13 +84,22 @@ function frame(now: number): void {
   player.root.rotation.y = ang + Math.PI / 2;
   player.play(pickPlayerClip({ moving: world.pMoving[0] === 1, firing, moveAngle, facing: curAngle }));
   player.update(dt);
+  player.applyAim(new THREE.Vector3(Math.cos(ang), 0, -Math.sin(ang)));
+  if (dbg.visible) {
+    const mz = player.muzzleWorld();
+    if (mz) markMuzzle.position.copy(mz);
+    const st = BALANCE.weapons[weaponId];
+    markOrigin.position.set(x + Math.cos(ang) * st.muzzleFwd + Math.sin(ang) * st.muzzleSide, st.muzzleH, -(y + Math.sin(ang) * st.muzzleFwd - Math.cos(ang) * st.muzzleSide));
+    aimLine.position.copy(markOrigin.position);
+    aimLine.rotation.y = Math.atan2(Math.cos(ang), -Math.sin(ang));
+  }
   stage.follow(x, -y);
 
   // bullets
   let n = 0;
   for (let i = 0; i < MAX_BULLETS; i++) {
     if (!world.bActive[i]) continue;
-    dummy.position.set(world.bX[i]!, 1.1, -world.bY[i]!);
+    dummy.position.set(world.bX[i]!, BALANCE.weapons[WEAPON_IDS[world.pWeapon[world.bOwner[i]!]!]!].muzzleH, -world.bY[i]!);
     q.setFromUnitVectors(fwd, new THREE.Vector3(world.bVx[i]!, 0, -world.bVy[i]!).normalize());
     dummy.quaternion.copy(q);
     dummy.updateMatrix();

@@ -10,7 +10,7 @@ export class Stage {
   private readonly camOffset: THREE.Vector3;
   private readonly sunOffset: THREE.Vector3;
 
-  constructor(container: HTMLElement) {
+  constructor(private readonly container: HTMLElement) {
     // M1 uses WebGL2; the renderer is created only here so WebGPU can replace it later (design section 21).
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -46,8 +46,8 @@ export class Stage {
   }
 
   resize(): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w = this.container.clientWidth || window.innerWidth;
+    const h = this.container.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h);
     const halfW = CAMERA.orthoWidth / 2;
     const halfH = halfW * (h / w);

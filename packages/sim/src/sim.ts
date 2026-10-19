@@ -8,6 +8,7 @@ import {
   TICK_DT,
   WEAPON_IDS,
   type PlayerInput,
+  type WeaponId,
 } from '@wrh/shared';
 import { clamp, cos, sin, sqrt, TAU } from './detmath';
 import { Crc32 } from './hash';
@@ -19,15 +20,15 @@ export type { World };
 /** Aim is a 16-bit angle (see PlayerInput); this is the factor to radians. */
 const AIM_TO_RAD = TAU / 65536;
 
-export function addPlayer(w: World, slot: number, x: number, y: number): void {
+export function addPlayer(w: World, slot: number, x: number, y: number, weapon: WeaponId = 'pistol'): void {
   w.pActive[slot] = 1;
   w.pX[slot] = x;
   w.pY[slot] = y;
   w.pAngle[slot] = 0;
   w.pHp[slot] = BALANCE.player.hp;
   w.pCooldown[slot] = 0;
-  w.pWeapon[slot] = 0; // pistol
-  w.pAmmo[slot] = BALANCE.weapons.pistol.ammo;
+  w.pWeapon[slot] = WEAPON_IDS.indexOf(weapon);
+  w.pAmmo[slot] = BALANCE.weapons[weapon].ammo;
   w.pMoving[slot] = 0;
 }
 
@@ -83,7 +84,10 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     while ((inp.buttons & Buttons.Fire) !== 0 && w.pCooldown[s]! <= 0 && shots < 3 && (stats.ammo < 0 || w.pAmmo[s]! > 0)) {
       for (let p = 0; p < stats.pellets; p++) {
         const a = angle + (w.rng.float() - 0.5) * 2 * stats.spread;
-        spawnBullet(w, s, w.pX[s]! + cos(a) * 0.7, w.pY[s]! + sin(a) * 0.7, a, stats.bulletSpeed, stats.range, stats.damage);
+        // the shot leaves the muzzle: forward along the aim and a little to the right-hand side
+        const ox = cos(angle) * stats.muzzleFwd + sin(angle) * stats.muzzleSide;
+        const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
+        spawnBullet(w, s, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage);
       }
       w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
       if (stats.ammo >= 0) w.pAmmo[s] = w.pAmmo[s]! - 1;

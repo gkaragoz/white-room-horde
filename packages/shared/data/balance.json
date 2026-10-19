@@ -1,13 +1,101 @@
 {
   "_comment": "Initial balance (docs/DESIGN.md section 20). Units: 1 = one world unit, times in seconds.",
-  "player": { "hp": 100, "speed": 6, "iFrames": 0.4, "downedSeconds": 25, "crawlSpeed": 1.5, "reviveSeconds": 3, "reviveRange": 1.5, "radius": 0.45 },
+  "player": {
+    "hp": 100,
+    "speed": 6,
+    "iFrames": 0.4,
+    "downedSeconds": 25,
+    "crawlSpeed": 1.5,
+    "reviveSeconds": 3,
+    "reviveRange": 1.5,
+    "radius": 0.45
+  },
   "weapons": {
-    "pistol":  { "damage": 10, "rate": 8,   "pellets": 1, "ammo": -1,  "spread": 0.02, "bulletSpeed": 34, "range": 14 },
-    "smg":     { "damage": 6,  "rate": 15,  "pellets": 1, "ammo": 120, "spread": 0.06, "bulletSpeed": 32, "range": 10 },
-    "ar":      { "damage": 14, "rate": 6.5, "pellets": 1, "ammo": 150, "spread": 0.025, "bulletSpeed": 38, "range": 18 },
-    "shotgun": { "damage": 7,  "rate": 1.2, "pellets": 8, "ammo": 24,  "spread": 0.22, "bulletSpeed": 30, "range": 7 },
-    "hmg":     { "damage": 12, "rate": 12,  "pellets": 1, "ammo": 200, "spread": 0.05, "bulletSpeed": 34, "range": 14 },
-    "minigun": { "damage": 8,  "rate": 28,  "pellets": 1, "ammo": 400, "spread": 0.07, "bulletSpeed": 34, "range": 12, "spinUp": 1.2, "spinDown": 0.8 },
-    "sniper":  { "damage": 120, "rate": 0.8, "pellets": 1, "ammo": 20, "spread": 0.0,  "bulletSpeed": 70, "range": 40 }
+    "pistol": {
+      "damage": 10,
+      "rate": 8,
+      "pellets": 1,
+      "ammo": -1,
+      "spread": 0.02,
+      "bulletSpeed": 34,
+      "range": 14,
+      "muzzleFwd": 1.21,
+      "muzzleSide": 0.09,
+      "muzzleH": 1.09
+    },
+    "smg": {
+      "damage": 6,
+      "rate": 15,
+      "pellets": 1,
+      "ammo": 120,
+      "spread": 0.06,
+      "bulletSpeed": 32,
+      "range": 10,
+      "muzzleFwd": 2.29,
+      "muzzleSide": 0.09,
+      "muzzleH": 1.06
+    },
+    "ar": {
+      "damage": 14,
+      "rate": 6.5,
+      "pellets": 1,
+      "ammo": 150,
+      "spread": 0.025,
+      "bulletSpeed": 38,
+      "range": 18,
+      "muzzleFwd": 2.95,
+      "muzzleSide": 0.09,
+      "muzzleH": 1.09
+    },
+    "shotgun": {
+      "damage": 7,
+      "rate": 1.2,
+      "pellets": 8,
+      "ammo": 24,
+      "spread": 0.22,
+      "bulletSpeed": 30,
+      "range": 7,
+      "muzzleFwd": 2.62,
+      "muzzleSide": 0.09,
+      "muzzleH": 1.06
+    },
+    "hmg": {
+      "damage": 12,
+      "rate": 12,
+      "pellets": 1,
+      "ammo": 200,
+      "spread": 0.05,
+      "bulletSpeed": 34,
+      "range": 14,
+      "muzzleFwd": 3.31,
+      "muzzleSide": 0.09,
+      "muzzleH": 1.12
+    },
+    "minigun": {
+      "damage": 8,
+      "rate": 28,
+      "pellets": 1,
+      "ammo": 400,
+      "spread": 0.07,
+      "bulletSpeed": 34,
+      "range": 12,
+      "spinUp": 1.2,
+      "spinDown": 0.8,
+      "muzzleFwd": 3.25,
+      "muzzleSide": 0.09,
+      "muzzleH": 1.06
+    },
+    "sniper": {
+      "damage": 120,
+      "rate": 0.8,
+      "pellets": 1,
+      "ammo": 20,
+      "spread": 0.0,
+      "bulletSpeed": 70,
+      "range": 40,
+      "muzzleFwd": 3.4,
+      "muzzleSide": 0.09,
+      "muzzleH": 1.09
+    }
   }
 }

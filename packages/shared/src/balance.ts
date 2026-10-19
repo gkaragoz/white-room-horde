@@ -9,6 +9,10 @@ export interface WeaponStats {
   spread: number;
   bulletSpeed: number;
   range: number;
+  /** Muzzle geometry relative to the player: forward distance, right-hand offset, height (measured by the QA tool). */
+  muzzleFwd: number;
+  muzzleSide: number;
+  muzzleH: number;
   spinUp?: number;
   spinDown?: number;
 }

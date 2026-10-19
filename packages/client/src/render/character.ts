@@ -20,6 +20,32 @@ export const PLAYER_SCALE = 1.5;
 /** Weapon grip placement on the right hand bone (tuned visually, see docs/DESIGN.md "Silah tutusu ve IK"). */
 export const HAND_ATTACH = { position: new THREE.Vector3(0, 0.1, 0), rotation: new THREE.Euler(-Math.PI / 2, 0, 0) };
 
+const UP = new THREE.Vector3(0, 1, 0);
+const _q1 = new THREE.Quaternion();
+const _q2 = new THREE.Quaternion();
+const _v1 = new THREE.Vector3();
+
+/** Rotate a bone (world space) by `delta`, keeping its position. */
+function rotateBoneWorld(bone: THREE.Bone, delta: THREE.Quaternion): void {
+  bone.updateWorldMatrix(true, false);
+  bone.getWorldQuaternion(_q1); // current world rotation
+  _q1.premultiply(delta);
+  const parent = bone.parent;
+  if (parent) parent.getWorldQuaternion(_q2);
+  else _q2.identity();
+  bone.quaternion.copy(_q2.invert().multiply(_q1));
+  bone.updateMatrixWorld(true);
+}
+
+/** Make a bone's local +Y (the bone axis) point along a world direction. */
+function pointBone(bone: THREE.Bone, dir: THREE.Vector3): void {
+  bone.updateWorldMatrix(true, false);
+  bone.getWorldQuaternion(_q1);
+  const cur = _v1.set(0, 1, 0).applyQuaternion(_q1);
+  const delta = new THREE.Quaternion().setFromUnitVectors(cur, dir);
+  rotateBoneWorld(bone, delta);
+}
+
 function collectSkinned(root: THREE.Object3D): THREE.SkinnedMesh[] {
   const out: THREE.SkinnedMesh[] = [];
   root.traverse((o) => {
@@ -115,6 +141,102 @@ export class Character {
     holder.rotation.copy(HAND_ATTACH.rotation);
     holder.add(g);
     hand.add(holder);
+  }
+
+  /** Weapon node (`muzzle`, `grip`, `grip_l` empties live inside it). */
+  private weaponNode(): THREE.Object3D | undefined {
+    return this.bones.get('handR')?.getObjectByName('weapon') ?? undefined;
+  }
+
+  clipNames(): string[] {
+    return [...this.actions.keys()];
+  }
+
+  /** Freeze the skeleton at `fraction` (0..1) of a clip. Used by the QA tool and screenshots. */
+  poseAt(name: string, fraction: number): void {
+    const a = this.actions.get(name);
+    if (!a) throw new Error('unknown clip ' + name);
+    this.mixer.stopAllAction();
+    this.current = null;
+    this.currentName = '';
+    a.reset().play();
+    a.time = Math.min(0.9999, Math.max(0, fraction)) * a.getClip().duration;
+    this.mixer.update(0);
+    this.root.updateMatrixWorld(true);
+  }
+
+  detachWeapon(): void {
+    this.bones.get('handR')?.getObjectByName('weapon')?.removeFromParent();
+  }
+
+  /** World position of a named weapon node (`grip`, `muzzle`, `grip_l`). */
+  weaponPoint(name: string, out = new THREE.Vector3()): THREE.Vector3 | null {
+    const n = this.weaponNode()?.getObjectByName(name);
+    if (!n) return null;
+    n.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(n.matrixWorld);
+  }
+
+  /** World direction of the barrel axis and of the weapon's up axis. */
+  weaponAxes(): { barrel: THREE.Vector3; up: THREE.Vector3 } | null {
+    const w = this.weaponNode();
+    if (!w) return null;
+    w.updateWorldMatrix(true, false);
+    return {
+      barrel: new THREE.Vector3(0, 0, 1).transformDirection(w.matrixWorld),
+      up: new THREE.Vector3(0, 1, 0).transformDirection(w.matrixWorld),
+    };
+  }
+
+  /** World position of the weapon's muzzle (null when no weapon). */
+  muzzleWorld(out = new THREE.Vector3()): THREE.Vector3 | null {
+    const m = this.weaponNode()?.getObjectByName('muzzle');
+    if (!m) return null;
+    m.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(m.matrixWorld);
+  }
+
+  /**
+   * Aim the weapon: after the animation has posed the skeleton, rotate the right arm chain so the barrel points exactly
+   * along `dir` (a horizontal world direction), keep the weapon upright, and reach the left hand to the weapon's `grip_l`.
+   * The clip only supplies the body motion; this makes the held angle match where the shot leaves (docs/DESIGN.md IK note).
+   */
+  applyAim(dir: THREE.Vector3): void {
+    const armR = this.bones.get('armR');
+    const handR = this.bones.get('handR');
+    const weapon = this.weaponNode();
+    if (!armR || !handR || !weapon) return;
+    this.root.updateMatrixWorld(true);
+    const right = new THREE.Vector3(-dir.z, 0, dir.x).normalize(); // the character's right hand side
+    // arm points inward and forward so the weapon sits close to the body centre line
+    const armDir = right.clone().multiplyScalar(-0.9).addScaledVector(dir, 0.45).addScaledVector(UP, -0.25).normalize();
+    pointBone(armR, armDir);
+    pointBone(handR, dir);
+    // roll about the barrel so the weapon's up axis is world up
+    weapon.updateWorldMatrix(true, false);
+    const up = new THREE.Vector3(0, 1, 0).transformDirection(weapon.matrixWorld);
+    const want = UP.clone().addScaledVector(dir, -UP.dot(dir)).normalize();
+    up.addScaledVector(dir, -up.dot(dir)).normalize();
+    const ang = Math.atan2(new THREE.Vector3().crossVectors(up, want).dot(dir), up.dot(want));
+    if (Number.isFinite(ang)) {
+      const q = new THREE.Quaternion().setFromAxisAngle(dir, ang);
+      rotateBoneWorld(handR, q);
+    }
+    // support hand to grip_l
+    const armL = this.bones.get('armL');
+    const handL = this.bones.get('handL');
+    const gl = weapon.getObjectByName('grip_l');
+    if (armL && handL && gl) {
+      gl.updateWorldMatrix(true, false);
+      const target = new THREE.Vector3().setFromMatrixPosition(gl.matrixWorld);
+      armL.updateWorldMatrix(true, false);
+      const shoulder = new THREE.Vector3().setFromMatrixPosition(armL.matrixWorld);
+      pointBone(armL, target.clone().sub(shoulder).normalize());
+      handL.updateWorldMatrix(true, false);
+      const elbow = new THREE.Vector3().setFromMatrixPosition(handL.matrixWorld);
+      pointBone(handL, target.clone().sub(elbow).normalize());
+    }
+    this.root.updateMatrixWorld(true);
   }
 
   has(name: string): boolean {

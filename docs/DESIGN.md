@@ -301,7 +301,9 @@ white-room-horde/
 - `sim`: detmath (sin/cos/atan2 polinom), xorshift128 RNG, CRC32 durum hash'i, SoA dünya, oyuncu hareketi ve atış, mermi havuzu; 14 birim testi (aynı tohum ve girdi = aynı hash, sapmada hash değişir).
 - `client`: izometrik iso62 kamera, sıcak güneş + gölge, boyalı zemin, chibi oyuncu (tint yelek, aksesuar iskelete bağlı, silah sağ el kemiğinde), Mixamo animasyonları (8 yönlü koşu, ateş, idle), 30 Hz sabit adım + enterpolasyon, 165 FPS.
 - Sapma: M1'de renderer WebGL2 (`WebGLRenderer`); WebGPU geçişi M2'de VAT shader'larıyla birlikte (renderer yalnızca `stage.ts` içinde oluşturuluyor).
-- Bilinen eksikler: silah için sol el IK'ı yok (`grip_l` hazır), üst gövde/alt gövde katman ayrımı yok (ateşle koşu için yalnızca ileri yönde `fire_run`), düşman yok.
+- Silah tutuşu: clip yalnızca gövde hareketini verir; her karede `Character.applyAim` sağ kolu nişan yönüne hizalar (namlu nişan çizgisinde, silah dik, sol el `grip_l`'e uzanır). Mermi, `balance.json` içindeki silah başına `muzzleFwd/muzzleSide/muzzleH` ile gerçek namlu noktasından çıkar; bu değerler QA aracıyla ölçülür.
+- QA aracı: `packages/client/qa.html` (7 otomatik test, bkz. README). Sim hash'leri `sim-reference.json` ile tarayıcıda karşılaştırılır.
+- Bilinen eksikler: üst/alt gövde katman ayrımı yok (ateşle koşu için yalnızca ileri yönde `fire_run`), düşman yok.
 
 **Milestone sırası (kod başlarken)**
 1. Monorepo iskeleti, sim iskeleti (tek oyuncu hareket + ateş), tek renderer sahnesi (zemin, kamera, karakter küpü).

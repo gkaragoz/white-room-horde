@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>white-room-horde QA</title>
+    <style>
+      :root { --bg: #f4efe6; --panel: #fffaf0; --line: #d9ceb8; --ink: #2f2a22; --muted: #7a705f; --ok: #2d8a4e; --bad: #c4382c; --warn: #b9801a; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+      #root { display: grid; grid-template-columns: minmax(420px, 46%) 1fr; height: 100%; }
+      #left { overflow: auto; padding: 14px 16px; border-right: 1px solid var(--line); background: var(--panel); }
+      #right { position: relative; }
+      #stage { position: absolute; inset: 0; }
+      #label { position: absolute; left: 12px; top: 10px; font-size: 13px; color: var(--muted); pointer-events: none; }
+      h1 { font-size: 17px; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+      .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+      button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer; }
+      button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+      button:disabled { opacity: .5; cursor: default; }
+      .row { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: start; padding: 8px 4px; border-top: 1px solid var(--line); }
+      .dot { width: 14px; height: 14px; border-radius: 50%; margin-top: 3px; background: #c9c0ad; }
+      .pass .dot { background: var(--ok); } .fail .dot { background: var(--bad); } .warn .dot { background: var(--warn); } .run .dot { background: #4c8dd6; animation: pulse 1s infinite; }
+      @keyframes pulse { 50% { opacity: .3; } }
+      .title { font-weight: 600; }
+      .detail { color: var(--muted); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+      .time { color: var(--muted); font-size: 12px; }
+      .sum { margin: 8px 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
+      pre { margin: 6px 0 0; padding: 8px; background: #f2ecdd; border-radius: 6px; overflow: auto; font-size: 12px; max-height: 240px; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="left">
+        <h1>QA tool</h1>
+        <p class="sub">Automatic checks for assets, animation, weapon alignment, controls, determinism and performance. Add <code>?auto=1</code> to run on load.</p>
+        <div class="bar">
+          <button id="runAll" class="primary">Run all</button>
+          <button id="copy">Copy report (JSON)</button>
+          <button id="measured">Copy measured muzzle data</button>
+        </div>
+        <div id="summary" class="sum">Not run yet.</div>
+        <div id="list"></div>
+        <pre id="out" hidden></pre>
+      </div>
+      <div id="right">
+        <div id="stage"></div>
+        <div id="label"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/qa/main.ts"></script>
+  </body>
+</html>
