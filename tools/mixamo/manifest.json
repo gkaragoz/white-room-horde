@@ -1,0 +1,57 @@
+{
+  "_comment": "Verified against mixamo.com on 2026-10-19 (names + descriptions). Several clips share a name, so the description disambiguates. Downloaded files are renamed to <id>.fbx.",
+  "download": {
+    "format": "FBX Binary (.fbx)",
+    "skin": "Without Skin",
+    "fps": 30,
+    "keyframeReduction": "none",
+    "character": "default (Y Bot). The mesh is not needed, animation only.",
+    "inPlace": "tick 'In Place' for looping locomotion/zombie clips; leave off for get_up, death, stand-up"
+  },
+  "dest": "assets-src/mixamo",
+  "license": "Mixamo animations are free for personal and commercial use, but must not be redistributed as raw files. Raw FBX stays out of git (assets-src/ is ignored); only the retargeted, baked GLBs are committed. Re-check Adobe's terms before shipping.",
+  "pack": {
+    "id": "rifle_8way",
+    "name": "Rifle 8-Way Locomotion Pack",
+    "animations": 49,
+    "folder": "assets-src/mixamo/rifle_8way",
+    "use": "Idle, walk and run in 8 directions, sprint (dash), jump, turns. Clip names are read from the extracted file names; script maps them with LOCO_RULES."
+  },
+  "clips": [
+    { "id": "aim_idle", "rig": "player", "name": "Rifle Aiming Idle", "description": "Rifle Standing Aiming Idle", "loop": true, "use": "Standing still while aiming" },
+    { "id": "fire_stand", "rig": "player", "name": "Firing Rifle", "description": "Firing A Rifle While Standing", "loop": true, "use": "Upper-body fire layer" },
+    { "id": "fire_run", "rig": "player", "name": "Shoot Rifle", "description": "Running While Firing Rifle", "loop": true, "use": "Fire layer while moving" },
+    { "id": "reload_stand", "rig": "player", "name": "Reloading", "description": "Reloading Rifle While Standing", "loop": false, "use": "Reload (standing)" },
+    { "id": "reload_run", "rig": "player", "name": "Reload", "description": "Run While Reloading Rifle", "loop": false, "use": "Reload while moving" },
+    { "id": "hit_down", "rig": "player", "name": "Rifle Hit To Back", "description": "Rifle Getting Hit To Ground", "loop": false, "use": "Falls into the downed state" },
+    { "id": "down_idle", "rig": "player", "name": "Injured Wave Idle", "description": "Injured Wave For Help Idle", "loop": true, "use": "Downed, waiting for a revive" },
+    { "id": "death", "rig": "player", "name": "Rifle Death", "description": "Dying Reaction While Standing Holding A Rifle", "loop": false, "use": "Final death" },
+    { "id": "revive_giver", "rig": "player", "name": "Administering Cpr", "description": "Administering Cpr To A Victim On The Ground", "loop": true, "use": "Reviving a teammate" },
+    { "id": "revive_taker", "rig": "player", "name": "Receiving Cpr", "description": "Receiving Cpr On The Ground", "loop": true, "use": "Downed player being revived" },
+    { "id": "get_up", "rig": "player", "name": "Rifle Kneel To Stand", "description": "Rifle Kneeling To Standing", "loop": false, "use": "After a revive" },
+    { "id": "throw", "rig": "player", "name": "Toss Grenade", "description": "Throwing Something Holding Rifle Aimed", "loop": false, "use": "Grenade throw (standing)" },
+    { "id": "throw_run", "rig": "player", "name": "Run And Throw Grenade", "description": "Throw Grenade While Running", "loop": false, "use": "Grenade throw (moving)" },
+
+    { "id": "z_idle", "rig": "enemy", "name": "Zombie Idle", "description": "Zombie Standing Idle", "loop": true, "use": "Idle / spawn wait" },
+    { "id": "z_walk", "rig": "enemy", "name": "Walking", "description": "Zombie Walking", "loop": true, "use": "Grunt, tank, bosses" },
+    { "id": "z_walk_creep", "rig": "enemy", "name": "Walking", "description": "Creeping Zombie Walk", "loop": true, "use": "Spitter, spawner, shielder (slow)" },
+    { "id": "z_run", "rig": "enemy", "name": "Zombie Run", "description": "Zombie Running", "loop": true, "use": "Runner, exploder" },
+    { "id": "z_attack_swipe", "rig": "enemy", "name": "Zombie Attack", "description": "Zombie Swipe Attack", "loop": false, "use": "Grunt, runner contact attack" },
+    { "id": "z_attack_overhead", "rig": "enemy", "name": "Zombie Attack", "description": "Zombie Overhead Two-Hand Attack", "loop": false, "use": "Tank slam, Dev Grunt ground slam" },
+    { "id": "z_punch", "rig": "enemy", "name": "Zombie Punching", "description": "Zombie Jab Punch Attack Right Arm", "loop": false, "use": "Shielder, Swarm Leader" },
+    { "id": "z_kick", "rig": "enemy", "name": "Zombie Kicking", "description": "Zombie Snap Kick With Rear Foot", "loop": false, "use": "Swarm Leader" },
+    { "id": "z_headbutt", "rig": "enemy", "name": "Zombie Headbutt", "description": "Zombie Headbutt With Hand Grab", "loop": false, "use": "Kral Tank" },
+    { "id": "z_scream", "rig": "enemy", "name": "Zombie Scream", "description": "Zombie Screaming", "loop": false, "use": "Spawn roar, boss intro, Sayaci Ana spawn" },
+    { "id": "z_hit", "rig": "enemy", "name": "Zombie Reaction Hit", "description": "Zombie Reaction Hit Flinches", "loop": false, "use": "Hit flinch" },
+    { "id": "z_death_back", "rig": "enemy", "name": "Zombie Death", "description": "Zombie Getting Hit And Falling Onto Back", "loop": false, "use": "Death fallback when no ragdoll slot" },
+    { "id": "z_death_fwd", "rig": "enemy", "name": "Zombie Dying", "description": "Zombie Getting Hit And Falling Forward", "loop": false, "use": "Death fallback (variant)" },
+    { "id": "z_crawl", "rig": "enemy", "name": "Zombie Crawl", "description": "Zombie Crawling Forward", "loop": true, "use": "Legless / low-health variant (optional)" },
+    { "id": "z_standup", "rig": "enemy", "name": "Zombie Stand Up", "description": "Zombie Laying On Back To Standing Up", "loop": false, "use": "Spawner egg emerge" }
+  ],
+  "bossUse": {
+    "boss_dev_grunt": ["z_walk", "z_attack_overhead", "z_scream", "z_death_back"],
+    "boss_kral_tank": ["z_walk", "z_headbutt", "z_attack_overhead", "z_death_back"],
+    "boss_sayaci_ana": ["z_walk_creep", "z_scream", "z_attack_swipe", "z_death_back"],
+    "boss_suru_lideri": ["z_run", "z_punch", "z_kick", "z_death_fwd"]
+  }
+}

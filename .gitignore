@@ -1,0 +1,5 @@
+
+# raw downloaded source assets (licence: do not redistribute)
+assets-src/
+node_modules/
+*.blend1
