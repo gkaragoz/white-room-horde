@@ -5,6 +5,7 @@ import reference from '../../../shared/data/sim-reference.json';
 import { aimDirThree, decodeAim, encodeAim, keysToMove, yawForAim } from '../controls';
 import { Character, loadGLB } from '../render/character';
 import { Stage } from '../render/stage';
+import { crowdTests } from './crowd-tests';
 
 export type Status = 'pass' | 'fail' | 'warn';
 export interface Result {
@@ -275,3 +276,5 @@ export const tests: QaTest[] = [
     },
   },
 ];
+
+tests.push(...crowdTests);

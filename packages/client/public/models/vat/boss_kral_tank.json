@@ -1,0 +1,43 @@
+{
+ "type": "boss_kral_tank",
+ "scale": 4.0,
+ "vertexCount": 722,
+ "indexCount": 2244,
+ "frames": 129,
+ "clips": [
+  {
+   "id": "z_walk",
+   "start": 0,
+   "frames": 19,
+   "loop": true,
+   "duration": 1.5667
+  },
+  {
+   "id": "z_attack_overhead",
+   "start": 19,
+   "frames": 40,
+   "loop": false,
+   "duration": 4.6667
+  },
+  {
+   "id": "z_death_back",
+   "start": 59,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  },
+  {
+   "id": "z_scream",
+   "start": 95,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  4.16,
+  7.307,
+  6.071
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

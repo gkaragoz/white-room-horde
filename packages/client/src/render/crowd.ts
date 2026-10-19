@@ -1,17 +1,23 @@
 import * as THREE from 'three';
-import { BALANCE, ENEMY_TYPES, EnemyState, MAX_ENEMIES, TICK_DT, type EnemyType } from '@wrh/shared';
+import { ENEMY_TYPES, EnemyState, MAX_ENEMIES, TICK_DT, type EnemyType } from '@wrh/shared';
 import type { SimEvent, World } from '@wrh/sim';
 
 /** Baked vertex-animation data for one enemy type (tools/blender/bake_vat.py). */
 interface VatMeta {
   type: string;
+  scale: number;
   vertexCount: number;
   indexCount: number;
   frames: number;
   clips: { id: string; start: number; frames: number; loop: boolean; duration: number }[];
 }
 
+/** Boss looks, picked by the sim's eBoss value (1-based) and baked as their own VAT types. */
+export const BOSS_TYPES = ['boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri'] as const;
+const BOSS_CLIPS = { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' };
+
 interface ClipRef {
+  id: string;
   start: number;
   frames: number;
   loop: boolean;
@@ -65,6 +71,8 @@ interface TypeRenderer {
   clips: Map<string, ClipRef>;
   count: number;
   capacity: number;
+  /** Authoring scale of the baked model (world units per model unit), used for stride matching. */
+  scale: number;
 }
 
 interface Corpse {
@@ -75,6 +83,17 @@ interface Corpse {
   born: number;
   clip: string;
   scale: number;
+  /** Knock-back velocity (sim units/s), decays quickly. */
+  vx: number;
+  vy: number;
+  /** Index into `types` (boss looks live after the regular types). */
+  render: number;
+}
+
+/** Ground speed (model units per second, before scale) each baked locomotion clip was authored for. */
+function strideOf(clipId: string, scale: number, duration: number): number {
+  const speed = clipId === 'z_run' ? 3.0 : clipId === 'z_walk_creep' ? 0.6 : 1.0;
+  return speed * scale * duration;
 }
 
 /** Hundreds of animated enemies per draw call: vertex-animation textures + instancing (docs/DESIGN.md section 15). */
@@ -87,6 +106,13 @@ export class Crowd {
   private corpses: Corpse[] = [];
   private readonly flash = new Float32Array(MAX_ENEMIES);
   private lastNow = 0;
+  /** Walk/run phase in cycles, advanced by distance travelled so feet do not slide. */
+  private readonly phase = new Float32Array(MAX_ENEMIES);
+  private readonly drawX = new Float32Array(MAX_ENEMIES);
+  private readonly drawY = new Float32Array(MAX_ENEMIES);
+  private readonly yaw = new Float32Array(MAX_ENEMIES);
+  private readonly drawn = new Uint8Array(MAX_ENEMIES);
+  /** Moves faster than this many units in one frame are treated as teleports (slot reuse). */
   readonly maxCorpses: number;
   triangles = 0;
 
@@ -103,10 +129,11 @@ export class Crowd {
     paint.generateMipmaps = false;
     paint.wrapS = paint.wrapT = THREE.RepeatWrapping;
     for (const id of ENEMY_TYPES) crowd.types.push(await crowd.loadType(id, paint));
+    for (const id of BOSS_TYPES) crowd.types.push(await crowd.loadType(id, paint));
     return crowd;
   }
 
-  private async loadType(id: EnemyType, paint: THREE.Texture): Promise<TypeRenderer> {
+  private async loadType(id: string, paint: THREE.Texture): Promise<TypeRenderer> {
     const base = `/models/vat/${id}`;
     const [meta, geoBuf, vatBuf] = await Promise.all([
       fetch(base + '.json').then((r) => r.json() as Promise<VatMeta>),
@@ -148,7 +175,7 @@ export class Crowd {
 
     const clips = new Map<string, ClipRef>();
     for (const c of meta.clips) clips.set(c.id, c);
-    return { mesh, geometry, posYaw, anim, clips, count: 0, capacity };
+    return { mesh, geometry, posYaw, anim, clips, count: 0, capacity, scale: meta.scale };
   }
 
   /** Call before each sim step so the next frames can interpolate from the previous tick. */
@@ -158,18 +185,40 @@ export class Crowd {
     this.prevActive.set(w.eActive);
   }
 
+  private renderIndex(w: World, id: number, etype: number): number {
+    const boss = w.eBoss[id]!;
+    return boss ? ENEMY_TYPES.length + ((boss - 1) % BOSS_TYPES.length) : etype;
+  }
+
+  private specFor(render: number): { move: string; attack: string; spawn: string; death: string; deathFwd?: string } {
+    return render >= ENEMY_TYPES.length ? BOSS_CLIPS : CLIPS[ENEMY_TYPES[render]!];
+  }
+
   /** Feed the events of one step (deaths become client-side corpses). */
   onEvents(w: World, events: readonly SimEvent[], now: number): void {
     for (const e of events) {
       if (e.type !== 'enemyDeath') continue;
       const name = ENEMY_TYPES[e.etype]!;
       if (name === 'exploder') continue; // blown to pieces
-      const spec = CLIPS[name];
-      const yaw = w.eAngle[e.id]! + Math.PI / 2;
+      const render = this.renderIndex(w, e.id, e.etype);
+      const spec = this.specFor(render);
+      const ang = w.eAngle[e.id]!;
       // a push along the facing means it was shot in the back: fall forward when a clip exists
-      const along = e.dx * Math.cos(w.eAngle[e.id]!) + e.dy * Math.sin(w.eAngle[e.id]!);
+      const along = e.dx * Math.cos(ang) + e.dy * Math.sin(ang);
       const clip = along > 0.2 && spec.deathFwd ? spec.deathFwd : spec.death;
-      this.corpses.push({ type: e.etype, x: e.x, y: e.y, yaw, born: now, clip, scale: w.eBoss[e.id] ? BALANCE.progression.boss.radiusMul : 1 });
+      const kick = Math.min(5.5, 1.5 + e.power * 0.06);
+      this.corpses.push({
+        type: e.etype,
+        render,
+        x: e.x,
+        y: e.y,
+        yaw: this.drawn[e.id] ? this.yaw[e.id]! : ang + Math.PI / 2,
+        born: now,
+        clip,
+        scale: 1,
+        vx: e.dx * kick,
+        vy: e.dy * kick,
+      });
     }
     while (this.corpses.length > this.maxCorpses) this.corpses.shift();
   }
@@ -212,9 +261,13 @@ export class Crowd {
     for (let i = 0; i < MAX_ENEMIES; i++) if (this.flash[i]! > 0) this.flash[i] = Math.max(0, this.flash[i]! - dt * 8);
     for (const t of this.types) t.count = 0;
     for (let i = 0; i < MAX_ENEMIES; i++) {
-      if (!w.eActive[i]) continue;
-      const t = this.types[w.eType[i]!]!;
-      const spec = CLIPS[ENEMY_TYPES[w.eType[i]!]!];
+      if (!w.eActive[i]) {
+        this.drawn[i] = 0;
+        continue;
+      }
+      const ri = this.renderIndex(w, i, w.eType[i]!);
+      const t = this.types[ri]!;
+      const spec = this.specFor(ri);
       let x = w.eX[i]!;
       let y = w.eY[i]!;
       if (this.prevActive[i]) {
@@ -225,17 +278,46 @@ export class Crowd {
           y = this.prevY[i]! + dy * alpha;
         }
       }
+      // heading: ease toward the sim heading instead of snapping at 30 Hz
+      const target = w.eAngle[i]! + Math.PI / 2;
+      if (!this.drawn[i]) {
+        this.yaw[i] = target;
+        this.phase[i] = (i * 0.173) % 1;
+      } else {
+        let d = target - this.yaw[i]!;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        this.yaw[i] = this.yaw[i]! + d * Math.min(1, dt * 14);
+      }
       const state = w.eState[i]!;
       const age = (w.tick - w.eStateTick[i]! + alpha) * TICK_DT;
       const clipId = state === EnemyState.Attack ? spec.attack : state === EnemyState.Spawn ? spec.spawn : spec.move;
       const clip = t.clips.get(clipId) ?? t.clips.get(spec.move)!;
-      const time = clip.loop ? now * 1.0 + i * 0.173 : age;
+      let time = age;
+      if (clip.loop) {
+        // advance the cycle by the distance actually covered
+        if (this.drawn[i]) {
+          const mx = x - this.drawX[i]!;
+          const my = y - this.drawY[i]!;
+          const moved = Math.sqrt(mx * mx + my * my);
+          if (moved < 1.5) this.phase[i] = this.phase[i]! + moved / strideOf(clip.id, t.scale, clip.duration);
+        }
+        time = (this.phase[i]! % 1) * clip.duration;
+      }
+      this.drawX[i] = x;
+      this.drawY[i] = y;
+      this.drawn[i] = 1;
       const s = this.sample(clip, time);
-      this.put(t, x, -y, w.eAngle[i]! + Math.PI / 2, s.a, s.b, s.m, 0.9 + ((i * 53) % 10) * 0.02 + this.flash[i]! * 1.6, w.eBoss[i] ? BALANCE.progression.boss.radiusMul : 1);
+      this.put(t, x, -y, this.yaw[i]!, s.a, s.b, s.m, 0.9 + ((i * 53) % 10) * 0.02 + this.flash[i]! * 1.6, 1);
     }
     for (const c of this.corpses) {
-      const t = this.types[c.type]!;
-      const clip = t.clips.get(c.clip) ?? t.clips.get(CLIPS[ENEMY_TYPES[c.type]!].death)!;
+      const t = this.types[c.render]!;
+      const clip = t.clips.get(c.clip) ?? t.clips.get(this.specFor(c.render).death)!;
+      // knocked back by the killing shot, friction brings it to rest
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+      const f = Math.max(0, 1 - dt * 5);
+      c.vx *= f;
+      c.vy *= f;
       const s = this.sample(clip, now - c.born);
       this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale);
     }
@@ -247,6 +329,36 @@ export class Crowd {
       tris += t.count * ((t.geometry.index?.count ?? 0) / 3);
     }
     this.triangles = tris;
+  }
+
+  /** QA helper: show exactly one enemy in a given pose (type index or name), nothing else. */
+  debugPose(type: number | string, clipId: string, time: number, x = 0, y = 0, yaw = 0): { rows: number; clip: ClipRef } | null {
+    const names: string[] = [...ENEMY_TYPES, ...BOSS_TYPES];
+    const idx = typeof type === 'number' ? type : names.indexOf(type);
+    for (const t of this.types) t.count = 0;
+    const t = this.types[idx];
+    const clip = t?.clips.get(clipId);
+    if (!t || !clip) return null;
+    const s = this.sample(clip, time);
+    this.put(t, x, -y, yaw, s.a, s.b, s.m, 1, 1);
+    for (const r of this.types) {
+      r.geometry.instanceCount = r.count;
+      (r.geometry.getAttribute('iPosYaw') as THREE.InstancedBufferAttribute).needsUpdate = true;
+      (r.geometry.getAttribute('iAnim') as THREE.InstancedBufferAttribute).needsUpdate = true;
+    }
+    return { rows: clip.frames, clip };
+  }
+
+  /** QA helper: instance buffers of a type (rows, mix) for the first instances. */
+  debugInstances(type: number): { rowA: number; rowB: number; mix: number; x: number; z: number; yaw: number }[] {
+    const t = this.types[type]!;
+    const out = [];
+    for (let i = 0; i < t.count; i++) out.push({ rowA: t.anim[i * 4]!, rowB: t.anim[i * 4 + 1]!, mix: t.anim[i * 4 + 2]!, x: t.posYaw[i * 4]!, z: t.posYaw[i * 4 + 2]!, yaw: t.posYaw[i * 4 + 3]! });
+    return out;
+  }
+
+  get typeCount(): number {
+    return this.types.length;
   }
 
   get corpseCount(): number {

@@ -36,6 +36,12 @@ TYPES = {
     "shielder": ("spec_shielder", 1.5, 1.5, ["z_walk_creep", "z_punch", "z_death_back"]),
     "spawner": ("spec_spawner", 1.5, 1.5, ["z_walk_creep", "z_scream", "z_death_back"]),
 }
+# bosses: one look per boss wave (the client cycles through them)
+BOSS = ["z_walk", "z_attack_overhead", "z_death_back", "z_scream"]
+TYPES["boss_dev_grunt"] = ("spec_dev_grunt", 3.0, 1.7, BOSS)
+TYPES["boss_kral_tank"] = ("spec_kral_tank", 4.0, 1.7, BOSS)
+TYPES["boss_sayaci_ana"] = ("spec_sayaci_ana", 3.5, 1.7, BOSS)
+TYPES["boss_suru_lideri"] = ("spec_suru_lideri", 2.5, 1.7, BOSS)
 LOOPS = {"z_walk", "z_walk_creep", "z_run", "z_idle", "z_crawl"}
 
 man = json.load(open(os.path.join(REPO, "tools", "mixamo", "manifest.json"), encoding="utf-8"))
@@ -90,6 +96,7 @@ def bake(tid, spec_name, S, head_top, clip_ids, fixed, tint):
     tracks = rig.animation_data.nla_tracks
 
     def positions():
+        bpy.context.view_layer.update()
         dg = bpy.context.evaluated_depsgraph_get()
         eo = mesh.evaluated_get(dg)
         me = eo.to_mesh()
@@ -101,13 +108,14 @@ def bake(tid, spec_name, S, head_top, clip_ids, fixed, tint):
 
     for t in tracks:
         t.mute = True
+    rig.animation_data.action = None
     scene.frame_set(1)
     bind = positions()
     rows, clips = [], []
     for cid in clip_ids:
-        for t in tracks:
-            t.mute = t.name != cid
+        # evaluate the retargeted action directly (muted NLA tracks stay out of the way)
         st = tracks[cid].strips[0]
+        rig.animation_data.action = st.action
         f0, f1 = int(st.frame_start), int(st.frame_end)
         dur = f1 - f0 + 1
         loop = cid in LOOPS
@@ -117,6 +125,10 @@ def bake(tid, spec_name, S, head_top, clip_ids, fixed, tint):
         for f in frames:
             scene.frame_set(int(math.floor(f)), subframe=f - math.floor(f))
             rows.append(positions())
+        dev = float(np.abs(np.stack(rows[start:]) - rows[start]).max())
+        print("  clip %s frames=%d motion=%.3f" % (cid, n, dev))
+        if dev < 0.02:
+            raise ValueError("%s/%s: baked frames do not move (animation not evaluated)" % (tid, cid))
         clips.append({"id": cid, "start": start, "frames": n, "loop": loop, "duration": round(dur / SRC_FPS, 4)})
     data = np.zeros((len(rows), nverts, 4), dtype=np.float16)
     data[..., :3] = np.stack(rows).astype(np.float16)

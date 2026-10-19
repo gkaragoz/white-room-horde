@@ -93,7 +93,7 @@ export function spawnBoss(w: World): number {
   edgePoint(w);
   const i = spawnEnemy(w, T_TANK, spawnX, spawnY);
   if (i >= 0) {
-    w.eBoss[i] = 1;
+    w.eBoss[i] = 1 + ((((w.wave / BALANCE.progression.boss.everyWaves) | 0) - 1 + 4) % 4);
     w.eHp[i] = w.eHp[i]! * BALANCE.progression.boss.hpMul;
   }
   return i;
@@ -273,7 +273,7 @@ export function updateEnemies(w: World): void {
     const tx = (w.pX[best]! - x) / (dist > 1e-6 ? dist : 1);
     const ty = (w.pY[best]! - y) / (dist > 1e-6 ? dist : 1);
     const reach = rad(w, i) + pr;
-    const boss = w.eBoss[i] === 1;
+    const boss = w.eBoss[i]! !== 0;
 
     let mx = 0;
     let my = 0;

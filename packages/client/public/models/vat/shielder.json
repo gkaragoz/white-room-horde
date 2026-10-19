@@ -28,9 +28,9 @@
   }
  ],
  "extent": [
-  1.063,
-  2.094,
-  1.376
+  1.789,
+  2.152,
+  1.712
  ],
  "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
 }
