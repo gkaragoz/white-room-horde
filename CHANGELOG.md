@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.5.0 (2026-10-20)
+
 **Waves**
 - A wave now has a fixed number of enemies: they arrive in a rush (30%) and then as a stream over 25 seconds, and killing them does not make new ones appear. Clear the wave and you get a breather: the next wave starts at most 15 seconds later (or when the clock runs out if you are slower). The HUD shows how many enemies are left, and a "Wave cleared!" banner appears.
 
