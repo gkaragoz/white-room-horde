@@ -44,9 +44,9 @@ export const RANK_INDEX: readonly number[] = WEAPON_RANK.map((id) => WEAPON_IDS.
 /** Position of a weapon (index into WEAPON_IDS) in the ranking, 0 = weakest. */
 export const RANK_OF: readonly number[] = WEAPON_IDS.map((id) => WEAPON_RANK.indexOf(id));
 
-export type EnemyType = 'grunt' | 'runner' | 'tank' | 'exploder' | 'spitter' | 'shielder' | 'spawner' | 'crawler' | 'leaper' | 'bloater' | 'screamer';
+export type EnemyType = 'grunt' | 'runner' | 'tank' | 'exploder' | 'spitter' | 'shielder' | 'spawner' | 'crawler' | 'leaper' | 'bloater' | 'screamer' | 'acider' | 'rammer' | 'flamer' | 'mortar' | 'sledge' | 'lamper' | 'blinker' | 'marksman' | 'reviver' | 'magnetar';
 /** Index in this array is the numeric type stored in the sim and used by the renderer. */
-export const ENEMY_TYPES: readonly EnemyType[] = ['grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'crawler', 'leaper', 'bloater', 'screamer'];
+export const ENEMY_TYPES: readonly EnemyType[] = ['grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'crawler', 'leaper', 'bloater', 'screamer', 'acider', 'rammer', 'flamer', 'mortar', 'sledge', 'lamper', 'blinker', 'marksman', 'reviver', 'magnetar'];
 
 /** Enemy animation state (eState). */
 export const EnemyState = { Move: 0, Attack: 1, Spawn: 2 } as const;

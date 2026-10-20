@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
 import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { addTelegraph, addZone, launchPlayer, createGame, decodeReplay, encodeReplay, hashWorld, predictPlayer, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
+import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, encodeReplay, hashWorld, predictPlayer, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
 import { Input, type Action } from './input';
@@ -14,6 +14,7 @@ import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
 import { AmmoRing } from './render/ammoRing';
 import { GroundFx } from './render/groundFx';
+import { IceShards } from './render/ice';
 import { TargetMarker } from './render/targetMarker';
 import { PropsView } from './render/props';
 import { FloorClimb } from './render/floorFx';
@@ -97,6 +98,8 @@ stage.camera.updateMatrixWorld(true);
 fx.faceCamera(stage.camera.quaternion);
 const crowd = await Crowd.create(150, backend);
 stage.scene.add(crowd.group);
+const iceShards = await IceShards.create();
+stage.scene.add(iceShards.group);
 const ragdolls = await RagdollPool.create(40);
 await ragdolls.preload([...ENEMY_TYPES]);
 worldReady = true;
@@ -1237,6 +1240,14 @@ function frame(nowMs: number): void {
     crowd.update(w, alpha, animSec);
     ground.colorblind = settings.colorblind;
     ground.update(w, nowSec, catchingUp ? null : fx, dt);
+    ground.updateBars(w, stage.camera.quaternion, nowSec);
+    iceShards.update(w, crowd.frostLevel, nowSec, (i) => crowd.drawnPos(i), (i) => Math.min(2.4, Math.max(0.8, BALANCE.enemies[ENEMY_TYPES[w.eType[i]!]!].radius * 2.2 * (w.eBoss[i] ? 1.7 : 1))));
+    if (!catchingUp) {
+      for (const t of crowd.thawed) {
+        fx.sparkle(t.x, t.y, 0.8, '#cfefff', 14, 4.5);
+        audio.play('iceThaw', t);
+      }
+    }
     fx.update(dt);
     ragdolls.update(dt);
     pickups.update(w, nowSec);
@@ -1411,7 +1422,7 @@ setTimeout(() => stage.warmFlight(), 800);
   ui,
   ragdolls,
   spawnBoss: () => (world ? spawnBoss(world) : -1),
-  hazards: { addTelegraph, addZone, launchPlayer },
+  hazards: { addTelegraph, addZone, launchPlayer, spawnEnemy },
   cine,
   get ws() {
     return ws;

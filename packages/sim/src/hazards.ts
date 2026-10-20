@@ -82,6 +82,7 @@ function land(w: World, t: number): void {
   const effect = w.tEffect[t]!;
   const radius = w.tShape[t] === TeleShape.Circle ? w.tW[t]! : Math.max(w.tW[t]!, w.tL[t]!);
   w.events.push({ type: 'teleHit', shape: w.tShape[t]!, effect, x: w.tX[t]!, y: w.tY[t]!, radius });
+  if (effect === TeleEffect.None) return; // only shows where something is about to happen
   if (effect === TeleEffect.Acid) {
     addZone(w, w.tX[t]!, w.tY[t]!, w.tAmt[t]! > 0 ? w.tAmt[t]! : BALANCE.hazards.acid.radius, BALANCE.hazards.acid.seconds, ZoneKind.Acid);
     return;

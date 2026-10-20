@@ -1,0 +1,43 @@
+{
+ "type": "rammer",
+ "scale": 1.9,
+ "vertexCount": 764,
+ "indexCount": 2532,
+ "frames": 116,
+ "clips": [
+  {
+   "id": "z_run",
+   "start": 0,
+   "frames": 10,
+   "loop": true,
+   "duration": 0.8333
+  },
+  {
+   "id": "z_headbutt",
+   "start": 10,
+   "frames": 32,
+   "loop": false,
+   "duration": 2.6333
+  },
+  {
+   "id": "z_death_fwd",
+   "start": 42,
+   "frames": 40,
+   "loop": false,
+   "duration": 3.3667
+  },
+  {
+   "id": "z_scream",
+   "start": 82,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  1.632,
+  2.91,
+  2.314
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

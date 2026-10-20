@@ -446,6 +446,12 @@ export class Fx {
         }
         break;
       }
+      case 'blink':
+        for (const [x, y] of [[e.x0, e.y0], [e.x, e.y]] as const) {
+          this.burst(Kind.Smoke, x, y, 0.5, 8, 2.5, 0, 0, 6.28, 0.5, 0.3, '#6a6fd8');
+          this.sparkle(x, y, 0.9, '#8ff6ff', 10, 3);
+        }
+        break;
       case 'launch':
         this.burst(Kind.Smoke, e.x, e.y, 0.2, 10, 3, 0, 0, 6.28, 0.5, 0.3, '#d9cfc0');
         this.burst(Kind.Spark, e.x, e.y, 0.6, 8, 5, 0, 0, 6.28, 0.3, 0.07, '#ffe27a');

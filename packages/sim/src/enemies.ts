@@ -1,9 +1,9 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, ZoneKind, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
 import { ELITE, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
 import { dropLoot } from './pickups';
-import { addTelegraph, aimAt } from './hazards';
+import { addTelegraph, addZone, aimAt, launchPlayer } from './hazards';
 import { cellIndex } from './flowfield';
 import { applyObstacles, out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { SH_H, SH_W } from './spatial';
@@ -112,6 +112,10 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     w.eBoss[i] = 0;
     w.eMod[i] = 0;
     w.eFrost[i] = 0;
+    w.eAct[i] = 0;
+    w.eActT[i] = 0;
+    w.eAir[i] = 0;
+    w.eAux[i] = 0;
     w.eType[i] = type;
     w.eState[i] = withScream ? EnemyState.Spawn : EnemyState.Move;
     w.eStateTick[i] = w.tick;
@@ -157,6 +161,257 @@ function summonRing(w: World, x: number, y: number, type: number, n: number): vo
   for (let k = 0; k < n && w.enemyCount < BALANCE.waves.cap; k++) {
     const a = (k / n) * 6.283185307179586;
     spawnEnemy(w, type, clamp(x + cos(a) * 2.5, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(y + sin(a) * 2.5, -ARENA_HALF_H + 1, ARENA_HALF_H - 1));
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The newer enemy types (index >= FIRST_SPECIAL) act in phases kept in eAct / eActT: 0 free, 1 winding up (stands still, the
+// ground shows what is coming), 2 acting (a charge, a pull, a stream of fire), 3 recovering. eAux holds the length of the
+// windup so the client can draw a charge bar. They return true while busy, so the ordinary chase does not run.
+// ---------------------------------------------------------------------------------------------------------------------
+const FIRST_SPECIAL = ENEMY_TYPES.indexOf('acider');
+const SP = BALANCE.special;
+let spMX = 0;
+let spMY = 0;
+
+const secs = (s: number): number => Math.max(1, Math.round(s * TICK_RATE));
+
+function beginWindup(w: World, i: number, seconds: number): void {
+  const t = secs(seconds);
+  w.eAct[i] = 1;
+  w.eActT[i] = t;
+  w.eAux[i] = t;
+  w.events.push({ type: 'windup', id: i, etype: w.eType[i]!, x: w.eX[i]!, y: w.eY[i]! });
+}
+
+function endAct(w: World, i: number, recover: number): void {
+  w.eAct[i] = 3;
+  w.eActT[i] = secs(recover);
+}
+
+/** Throw an enemy through the air (it takes the blow first; if it dies it just dies). */
+function tossEnemy(w: World, j: number, vx: number, vy: number, damage: number): void {
+  const prev = killer;
+  killer = -1;
+  const dead = damageEnemy(w, j, damage, vx * 0.02, vy * 0.02);
+  killer = prev;
+  if (dead) return;
+  w.eVX[j] = vx;
+  w.eVY[j] = vy;
+  w.eAir[j] = 18;
+}
+
+/** Keeping a distance: returns true while it backs off (spMX/spMY set), false when the player is too far to bother. */
+function keepAway(w: World, i: number, type: number, dist: number, keep: number, range: number, tx: number, ty: number): 'back' | 'hold' | 'chase' {
+  w.eAngle[i] = atan2(ty, tx);
+  if (dist < keep) {
+    const sp = SPEED[type]! * TICK_DT;
+    spMX = -tx * sp;
+    spMY = -ty * sp;
+    return 'back';
+  }
+  return dist <= range ? 'hold' : 'chase';
+}
+
+function special(w: World, i: number, type: number, x: number, y: number, best: number, dist: number, tx: number, ty: number): boolean {
+  spMX = 0;
+  spMY = 0;
+  const name = ENEMY_TYPES[type]!;
+  const cfg = SP[name]!;
+  const px = w.pX[best]!;
+  const py = w.pY[best]!;
+  const act = w.eAct[i]!;
+  const face = atan2(ty, tx);
+  const sp = SPEED[type]! * TICK_DT;
+  if (act === 1) {
+    w.eActT[i] = w.eActT[i]! - 1;
+    if (name !== 'rammer' || w.eActT[i]! > 4) w.eAngle[i] = name === 'flamer' ? face : name === 'sledge' || name === 'marksman' ? w.eAngle[i]! : face;
+    if (w.eActT[i]! > 0) return true;
+    // the windup is over: do it
+    w.eState[i] = EnemyState.Attack;
+    w.eStateTick[i] = w.tick;
+    if (name === 'rammer' || name === 'magnetar' || name === 'flamer') w.events.push({ type: 'enemyAct', id: i, etype: type, x, y });
+    if (name === 'rammer') {
+      w.eAngle[i] = face;
+      w.eAct[i] = 2;
+      w.eActT[i] = cfg.ticks!;
+      w.eState[i] = EnemyState.Move;
+    } else if (name === 'magnetar') {
+      w.eAct[i] = 2;
+      w.eActT[i] = cfg.ticks!;
+    } else if (name === 'flamer') {
+      w.eAngle[i] = face;
+      w.eAct[i] = 2;
+      w.eActT[i] = cfg.ticks!;
+    } else {
+      if (name === 'mortar') {
+        for (let k = 0; k < cfg.shells!; k++) {
+          const ox = clamp(px + (w.rng.float() * 2 - 1) * 2.2 * (k > 0 ? 1 : 0), -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
+          const oy = clamp(py + (w.rng.float() * 2 - 1) * 2.2 * (k > 0 ? 1 : 0), -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
+          addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, cfg.radius!, 0, cfg.delay! + k * cfg.stagger!, cfg.damage!);
+        }
+      } else if (name === 'reviver') {
+        for (let k = 0; k < cfg.count! && w.enemyCount < BALANCE.waves.cap; k++) {
+          const a = (k / cfg.count!) * 6.283185307179586 + 0.5;
+          spawnEnemy(w, T_CRAWLER, clamp(x + cos(a) * 1.6, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(y + sin(a) * 1.6, -ARENA_HALF_H + 1, ARENA_HALF_H - 1));
+        }
+      } else if (name === 'blinker') {
+        const a = w.pAngle[best]!;
+        let bx = clamp(px - cos(a) * cfg.behind!, -ARENA_HALF_W + 1, ARENA_HALF_W - 1);
+        let by = clamp(py - sin(a) * cfg.behind!, -ARENA_HALF_H + 1, ARENA_HALF_H - 1);
+        if (pushOut(bx, by, 0.6)) {
+          bx = out.x;
+          by = out.y;
+        }
+        w.events.push({ type: 'blink', id: i, x0: x, y0: y, x: bx, y: by });
+        w.eX[i] = bx;
+        w.eY[i] = by;
+      }
+      endAct(w, i, cfg.recover ?? 0.5);
+    }
+    return true;
+  }
+  if (act === 2) {
+    w.eActT[i] = w.eActT[i]! - 1;
+    if (name === 'rammer') {
+      const a = w.eAngle[i]!;
+      const dx = cos(a);
+      const dy = sin(a);
+      spMX = dx * cfg.speed! * TICK_DT;
+      spMY = dy * cfg.speed! * TICK_DT;
+      const hit2 = cfg.hit! * cfg.hit!;
+      for (let s = 0; s < MAX_PLAYERS; s++) {
+        if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive || w.pHp[s]! <= 0) continue;
+        const ex = w.pX[s]! - x;
+        const ey = w.pY[s]! - y;
+        if (ex * ex + ey * ey > hit2) continue;
+        if (hurtPlayer(w, s, cfg.damage!, w.pX[s]!, w.pY[s]!, i)) {
+          const side = ex * -dy + ey * dx >= 0 ? 1 : -1;
+          launchPlayer(w, s, (dx - dy * 0.5 * side) * cfg.throw!, (dy + dx * 0.5 * side) * cfg.throw!, cfg.stun!, 16);
+        }
+      }
+      for (let j = 0; j < MAX_ENEMIES; j++) {
+        if (j === i || !w.eActive[j] || w.eType[j] === type || w.eAir[j]! > 0) continue;
+        const ex = w.eX[j]! - x;
+        const ey = w.eY[j]! - y;
+        if (ex * ex + ey * ey > hit2) continue;
+        const side = ex * -dy + ey * dx >= 0 ? 1 : -1;
+        tossEnemy(w, j, (dx - dy * 0.6 * side) * cfg.enemyThrow!, (dy + dx * 0.6 * side) * cfg.enemyThrow!, cfg.enemyDamage! * w.hpMul);
+      }
+      if (w.eActT[i]! <= 0) endAct(w, i, cfg.recover!);
+    } else if (name === 'magnetar') {
+      const r2 = cfg.radius! * cfg.radius!;
+      for (let s = 0; s < MAX_PLAYERS; s++) {
+        if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive || w.pHp[s]! <= 0) continue;
+        const ex = x - w.pX[s]!;
+        const ey = y - w.pY[s]!;
+        const d2 = ex * ex + ey * ey;
+        if (d2 > r2 || d2 < 2.5) continue;
+        const d = sqrt(d2);
+        w.pKnockX[s] = (ex / d) * cfg.pull!;
+        w.pKnockY[s] = (ey / d) * cfg.pull!;
+      }
+      if (w.eActT[i]! <= 0) endAct(w, i, cfg.recover!);
+    } else if (name === 'flamer') {
+      const a = w.eAngle[i]!;
+      if (w.eActT[i]! % cfg.every! === 0) {
+        const p = 1 - w.eActT[i]! / cfg.ticks!;
+        const d = cfg.near! + (cfg.far! - cfg.near!) * p;
+        const wob = (w.rng.float() * 2 - 1) * 0.6;
+        addZone(w, clamp(x + cos(a) * d - sin(a) * wob, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(y + sin(a) * d + cos(a) * wob, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), cfg.radius!, cfg.seconds!, ZoneKind.Fire);
+      }
+      if (w.eActT[i]! <= 0) endAct(w, i, cfg.recover!);
+    } else {
+      w.eAct[i] = 0;
+    }
+    return true;
+  }
+  if (act === 3) {
+    w.eActT[i] = w.eActT[i]! - 1;
+    if (w.eActT[i]! <= 0) w.eAct[i] = 0;
+    return true;
+  }
+  // free
+  const ready = w.eCooldown[i]! <= 0;
+  switch (name) {
+    case 'acider':
+      if ((w.tick + i) % cfg.trailEvery! === 0) addZone(w, x, y, cfg.trailRadius!, cfg.trailSeconds!, ZoneKind.Acid);
+      if (ready && dist <= cfg.range! && !segmentBlocked(x, y, px, py)) {
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Acid, px, py, 0, cfg.spitRadius!, 0, cfg.spitDelay!, cfg.spitRadius!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        w.eState[i] = EnemyState.Attack;
+        w.eStateTick[i] = w.tick;
+      }
+      return false;
+    case 'rammer':
+      if (ready && dist >= cfg.minRange! && dist <= cfg.maxRange! && !segmentBlocked(x, y, px, py)) {
+        w.eAngle[i] = face;
+        const len = dist + 4;
+        addTelegraph(w, TeleShape.Rect, TeleEffect.None, x + tx * len, y + ty * len, face, cfg.hit!, len, cfg.windup!, 0);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'sledge':
+      if (ready && dist <= cfg.reach!) {
+        w.eAngle[i] = face;
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x + tx * cfg.ahead!, y + ty * cfg.ahead!, 0, cfg.radius!, 0, cfg.windup!, cfg.damage!);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'lamper':
+      if (ready && dist <= cfg.reach!) {
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, cfg.radius!, 0, cfg.windup!, cfg.damage!);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'magnetar':
+      if (ready && dist <= cfg.range!) {
+        addTelegraph(w, TeleShape.Circle, TeleEffect.None, x, y, 0, cfg.radius!, 0, cfg.windup!, 0);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'flamer':
+      if (ready && dist <= cfg.range! && !segmentBlocked(x, y, px, py)) {
+        w.eAngle[i] = face;
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'blinker':
+      if (ready && dist >= cfg.minRange!) {
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'mortar':
+    case 'reviver':
+    case 'marksman': {
+      const mode = keepAway(w, i, type, dist, cfg.keep!, cfg.range!, tx, ty);
+      if (mode === 'chase') return false;
+      if (mode === 'back') return true;
+      if (ready && (name !== 'marksman' || !segmentBlocked(x, y, px, py))) {
+        if (name === 'marksman') {
+          const len = 26;
+          addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + tx * len, y + ty * len, face, cfg.width!, len, cfg.windup!, cfg.damage!);
+        }
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+      }
+      return true;
+    }
+    default:
+      void sp;
+      return false;
   }
 }
 
@@ -660,6 +915,14 @@ export function updateEnemies(w: World): void {
       w.eStateTick[i] = w.eStateTick[i]! + 1;
       continue;
     }
+    if (w.eAir[i]! > 0) {
+      // thrown through the air: carried along, nothing else
+      w.eAir[i] = w.eAir[i]! - 1;
+      shove(w, i, w.eVX[i]! * TICK_DT, w.eVY[i]! * TICK_DT);
+      w.eVX[i] = w.eVX[i]! * 0.94;
+      w.eVY[i] = w.eVY[i]! * 0.94;
+      continue;
+    }
     const type = w.eType[i]!;
     let x = w.eX[i]!;
     let y = w.eY[i]!;
@@ -698,7 +961,15 @@ export function updateEnemies(w: World): void {
     let my = 0;
     if (boss && state !== EnemyState.Spawn) bossAbilities(w, i, x, y, dist);
     state = w.eState[i]!;
-    if (state === EnemyState.Move) {
+    let busy = false;
+    if (type >= FIRST_SPECIAL && state !== EnemyState.Spawn) {
+      busy = special(w, i, type, x, y, best, dist, tx, ty);
+      mx = spMX;
+      my = spMY;
+    }
+    if (busy) {
+      // winding up, charging, backing off: handled above
+    } else if (state === EnemyState.Move) {
       let wantMove = true;
       if (type === T_SPITTER) {
         if (dist < SPIT_HOLD) wantMove = false;

@@ -15,7 +15,7 @@ interface VatMeta {
 }
 
 /** Boss looks, picked by the sim's eBoss value (1-based) and baked as their own VAT types. */
-export const BOSS_TYPES = ['boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri'] as const;
+export const BOSS_TYPES = ['boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri', 'boss_meteor_lord', 'boss_purger'] as const;
 const BOSS_CLIPS = { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' };
 
 interface ClipRef {
@@ -39,6 +39,16 @@ const CLIPS: Record<EnemyType, { move: string; attack: string; spawn: string; de
   leaper: { move: 'z_run', attack: 'z_kick', spawn: 'z_scream', death: 'z_death_fwd', deathFwd: 'z_death_fwd' },
   bloater: { move: 'z_walk_creep', attack: 'z_punch', spawn: 'z_scream', death: 'z_death_back' },
   screamer: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  acider: { move: 'z_walk_creep', attack: 'z_attack_swipe', spawn: 'z_scream', death: 'z_death_back' },
+  rammer: { move: 'z_run', attack: 'z_headbutt', spawn: 'z_scream', death: 'z_death_fwd', deathFwd: 'z_death_fwd' },
+  mortar: { move: 'z_walk_creep', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  sledge: { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' },
+  lamper: { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' },
+  reviver: { move: 'z_walk_creep', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  marksman: { move: 'z_walk_creep', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  blinker: { move: 'z_run', attack: 'z_kick', spawn: 'z_scream', death: 'z_death_fwd', deathFwd: 'z_death_fwd' },
+  magnetar: { move: 'z_walk', attack: 'z_punch', spawn: 'z_scream', death: 'z_death_back' },
+  flamer: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
 };
 
 const LEAP_TICKS = 9;
@@ -51,6 +61,9 @@ const VERTEX_DECL = /* glsl */ `
 attribute vec4 iPosYaw;
 attribute vec4 iAnim;
 attribute float iHop;
+attribute float iFrost;
+varying float vFrost;
+varying float vFrostH;
 uniform highp sampler2D uVat;
 `;
 
@@ -62,6 +75,25 @@ float yc = cos( iPosYaw.w );
 float ys = sin( iPosYaw.w );
 transformed *= iPosYaw.y;
 transformed = vec3( yc * transformed.x + ys * transformed.z, transformed.y, - ys * transformed.x + yc * transformed.z ) + vec3( iPosYaw.x, iHop, iPosYaw.z );
+vFrost = iFrost;
+vFrostH = transformed.y - iHop;
+`;
+
+const FROST_DECL = /* glsl */ `
+varying float vFrost;
+varying float vFrostH;
+`;
+
+const FROST_COLOR = /* glsl */ `
+float frostN = texture2D( map, vMapUv * 2.7 + vec2( 0.37, 0.11 ) ).g;
+float frostCover = smoothstep( 0.0, 0.32, vFrost * 2.1 - vFrostH * 0.5 + ( frostN - 0.5 ) * 0.75 ) * step( 0.001, vFrost );
+vec3 frostCol = mix( vec3( 0.58, 0.84, 1.0 ), vec3( 0.93, 0.98, 1.0 ), frostN );
+diffuseColor.rgb = mix( diffuseColor.rgb, frostCol, frostCover * 0.93 );
+`;
+
+const FROST_EMISSIVE = /* glsl */ `
+float frostSpark = step( 0.985, fract( sin( dot( floor( vMapUv * 70.0 ), vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) );
+totalEmissiveRadiance += vec3( 0.2, 0.42, 0.7 ) * frostCover * 0.5 + vec3( 0.7, 0.9, 1.0 ) * frostSpark * frostCover * 1.4;
 `;
 
 function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolean): void {
@@ -71,9 +103,15 @@ function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolea
     if (tint) {
       // per-instance brightness variation rides in iAnim.w
       shader.vertexShader = shader.vertexShader.replace('#include <color_vertex>', '#include <color_vertex>\n#ifdef USE_COLOR\nvColor.rgb *= iAnim.w;\n#endif');
+      // frost: an ice coat that creeps up from the feet (iFrost 0..1), noise from the paint texture breaks its edge
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\n' + FROST_DECL)
+        .replace('#include <color_fragment>', '#include <color_fragment>\n' + FROST_COLOR)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.16, frostCover );')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FROST_EMISSIVE);
     }
   };
-  material.customProgramCacheKey = () => (tint ? 'wrh-vat-lit' : 'wrh-vat-depth');
+  material.customProgramCacheKey = () => (tint ? 'wrh-vat-lit-frost' : 'wrh-vat-depth');
 }
 
 /**
@@ -83,10 +121,11 @@ function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolea
 async function makeNodeMaterial(vat: THREE.DataTexture, paint: THREE.Texture): Promise<THREE.Material> {
   const webgpu = await import('three/webgpu');
   const tsl = await import('three/tsl');
-  const { attribute, vertexIndex, textureLoad, ivec2, int, vec3, vec4, mix, cos, sin, texture } = tsl;
+  const { attribute, vertexIndex, textureLoad, ivec2, int, vec3, vec4, mix, cos, sin, texture, uv, positionWorld, smoothstep, float } = tsl;
   const posYaw = attribute('iPosYaw', 'vec4');
   const anim = attribute('iAnim', 'vec4');
   const hop = attribute('iHop', 'float');
+  const frost = attribute('iFrost', 'float');
   const idx = int(vertexIndex);
   const pa = textureLoad(vat, ivec2(idx, int(anim.x))).xyz;
   const pb = textureLoad(vat, ivec2(idx, int(anim.y))).xyz;
@@ -97,7 +136,13 @@ async function makeNodeMaterial(vat: THREE.DataTexture, paint: THREE.Texture): P
   const mat = new webgpu.MeshStandardNodeMaterial({ flatShading: true, roughness: 0.85, metalness: 0 });
   mat.positionNode = rotated.add(vec3(posYaw.x, hop, posYaw.z));
   const col = attribute('color', 'vec3');
-  mat.colorNode = vec4(texture(paint).rgb.mul(col).mul(anim.w), 1);
+  const base = texture(paint).rgb.mul(col).mul(anim.w);
+  const noise = texture(paint, uv().mul(2.7).add(vec3(0.37, 0.11, 0).xy)).g;
+  const cover = smoothstep(float(0), float(0.32), frost.mul(2.1).sub(positionWorld.y.mul(0.5)).add(noise.sub(0.5).mul(0.75)));
+  const ice = mix(vec3(0.58, 0.84, 1.0), vec3(0.93, 0.98, 1.0), noise);
+  mat.colorNode = vec4(mix(base, ice, cover.mul(0.93).mul(frost.greaterThan(0.001).select(1, 0))), 1);
+  mat.emissiveNode = vec3(0.2, 0.42, 0.7).mul(cover).mul(0.5);
+  mat.roughnessNode = mix(float(0.85), float(0.16), cover);
   return mat;
 }
 
@@ -107,6 +152,7 @@ interface TypeRenderer {
   posYaw: Float32Array;
   anim: Float32Array;
   hop: Float32Array;
+  frost: Float32Array;
   clips: Map<string, ClipRef>;
   count: number;
   capacity: number;
@@ -152,6 +198,11 @@ export class Crowd {
   /** Seconds a death animation stays on screen (a setting). */
   corpseLife = CORPSE_DEFAULT;
   private readonly flash = new Float32Array(MAX_ENEMIES);
+  /** How iced over each enemy is drawn (0..1), eased toward the sim's frozen state; a thaw is noticed when it drops from solid. */
+  readonly frostLevel = new Float32Array(MAX_ENEMIES);
+  private readonly frostWas = new Uint8Array(MAX_ENEMIES);
+  /** Enemies that were frozen solid and have just thawed this frame (for the shatter effect): x, y in sim axes. */
+  readonly thawed: { x: number; y: number }[] = [];
   private lastNow = 0;
   /** Walk/run phase in cycles, advanced by distance travelled so feet do not slide. */
   private readonly phase = new Float32Array(MAX_ENEMIES);
@@ -205,6 +256,8 @@ export class Crowd {
     const aAnim = new THREE.InstancedBufferAttribute(anim, 4).setUsage(THREE.DynamicDrawUsage);
     const hop = new Float32Array(capacity);
     geometry.setAttribute('iHop', new THREE.InstancedBufferAttribute(hop, 1).setUsage(THREE.DynamicDrawUsage));
+    const frost = new Float32Array(capacity);
+    geometry.setAttribute('iFrost', new THREE.InstancedBufferAttribute(frost, 1).setUsage(THREE.DynamicDrawUsage));
     geometry.setAttribute('iPosYaw', aPos);
     geometry.setAttribute('iAnim', aAnim);
     geometry.instanceCount = 0;
@@ -235,7 +288,7 @@ export class Crowd {
 
     const clips = new Map<string, ClipRef>();
     for (const c of meta.clips) clips.set(c.id, c);
-    return { mesh, geometry, posYaw, anim, hop, clips, count: 0, capacity, scale: meta.scale };
+    return { mesh, geometry, posYaw, anim, hop, frost, clips, count: 0, capacity, scale: meta.scale };
   }
 
   /** Call before each sim step so the next frames can interpolate from the previous tick. */
@@ -285,9 +338,10 @@ export class Crowd {
     while (this.corpses.length > this.maxCorpses) this.corpses.shift();
   }
 
-  private put(t: TypeRenderer, x: number, z: number, yaw: number, rowA: number, rowB: number, mix: number, shade: number, scale = 1, hop = 0): void {
+  private put(t: TypeRenderer, x: number, z: number, yaw: number, rowA: number, rowB: number, mix: number, shade: number, scale = 1, hop = 0, frost = 0): void {
     const k = t.count * 4;
     t.hop[t.count] = hop;
+    t.frost[t.count] = frost;
     t.posYaw[k] = x;
     t.posYaw[k + 1] = scale;
     t.posYaw[k + 2] = z;
@@ -322,6 +376,16 @@ export class Crowd {
     const dt = Math.min(0.1, now - this.lastNow);
     this.lastNow = now;
     for (let i = 0; i < MAX_ENEMIES; i++) if (this.flash[i]! > 0) this.flash[i] = Math.max(0, this.flash[i]! - dt * 8);
+    this.thawed.length = 0;
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      const on = w.eActive[i] === 1 && w.eFrost[i]! > 0;
+      const level = this.frostLevel[i]!;
+      // the ice grows over about a second and melts away over half a second
+      const next = on ? Math.min(1, level + dt * 1.1) : Math.max(0, level - dt * 2.2);
+      if (this.frostWas[i] && !on && level > 0.6 && w.eActive[i] && this.thawed.length < 24) this.thawed.push({ x: w.eX[i]!, y: w.eY[i]! });
+      this.frostLevel[i] = w.eActive[i] ? next : 0;
+      this.frostWas[i] = on ? 1 : 0;
+    }
     for (const t of this.types) t.count = 0;
     for (let i = 0; i < MAX_ENEMIES; i++) {
       if (!w.eActive[i]) {
@@ -356,9 +420,10 @@ export class Crowd {
       }
       const state = w.eState[i]!;
       const age = (w.tick - w.eStateTick[i]! + alpha) * TICK_DT;
-      const clipId = state === EnemyState.Attack ? spec.attack : state === EnemyState.Spawn ? spec.spawn : spec.move;
+      const winding = w.eAct[i] === 1 && w.eAux[i]! > 0;
+      const clipId = winding ? spec.spawn : state === EnemyState.Attack ? spec.attack : state === EnemyState.Spawn ? spec.spawn : spec.move;
       const clip = t.clips.get(clipId) ?? t.clips.get(spec.move)!;
-      let time = age;
+      let time = winding ? Math.max(0, (w.eAux[i]! - w.eActT[i]! + alpha) * TICK_DT) : age;
       if (clip.loop) {
         // advance the cycle by the distance actually covered
         if (this.drawn[i]) {
@@ -383,7 +448,30 @@ export class Crowd {
       const etype = w.eType[i]!;
       if (etype === LEAPER && w.eAux[i]! > 0) hop += 1.5 * Math.sin(Math.PI * Math.min(1, (LEAP_TICKS - w.eAux[i]! + alpha) / LEAP_TICKS));
       else if (clip.loop && state !== EnemyState.Attack && (etype === RUNNER || etype === CRAWLER || etype === EXPLODER || etype === LEAPER)) hop += Math.abs(Math.sin(this.phase[i]! * Math.PI * 2)) * 0.13;
-      this.put(t, x, -y, this.yaw[i]!, s.a, s.b, s.m, (0.9 + ((i * 53) % 10) * 0.02) * eliteShade + this.flash[i]! * 1.6, mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : 1, hop);
+      // the newer enemies wind up for their big moves: they stand still, tremble, swell and glow until it is time
+      let scale = mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : 1;
+      let glow = 0;
+      let yawOut = this.yaw[i]!;
+      let px = x;
+      let pz = -y;
+      const act = w.eAct[i]!;
+      if (act === 1 && w.eAux[i]! > 0) {
+        const p = Math.max(0, Math.min(1, 1 - (w.eActT[i]! - alpha) / w.eAux[i]!));
+        scale *= 1 + 0.26 * p;
+        glow = p * (0.7 + 0.3 * Math.sin(now * (14 + p * 30)));
+        const sh = 0.03 + 0.1 * p;
+        px += (Math.sin(now * 61 + i * 7.1) + Math.sin(now * 37 + i)) * 0.5 * sh;
+        pz += (Math.cos(now * 53 + i * 3.3) + Math.sin(now * 41 + i * 2)) * 0.5 * sh;
+      }
+      // thrown through the air: up in an arc, tumbling
+      if (w.eAir[i]! > 0) {
+        const f = 1 - Math.max(0, w.eAir[i]! - alpha) / 18;
+        hop += 2.6 * Math.sin(Math.PI * f);
+        yawOut += f * 9.4;
+      }
+      const frost = this.frostLevel[i]!;
+      if (frost > 0) scale *= 1 + 0.045 * frost;
+      this.put(t, px, pz, yawOut, s.a, s.b, s.m, (0.9 + ((i * 53) % 10) * 0.02) * eliteShade * (1 - 0.15 * frost) + this.flash[i]! * 1.6 + glow, scale, hop, frost);
     }
     // corpses do not pile up: after a few seconds they shrink away and only the blood stays on the floor
     for (let k = this.corpses.length - 1; k >= 0; k--) if (now - this.corpses[k]!.born > this.corpseLife) this.corpses.splice(k, 1);
@@ -406,6 +494,7 @@ export class Crowd {
       (t.geometry.getAttribute('iPosYaw') as THREE.InstancedBufferAttribute).needsUpdate = true;
       (t.geometry.getAttribute('iAnim') as THREE.InstancedBufferAttribute).needsUpdate = true;
       (t.geometry.getAttribute('iHop') as THREE.InstancedBufferAttribute).needsUpdate = true;
+      (t.geometry.getAttribute('iFrost') as THREE.InstancedBufferAttribute).needsUpdate = true;
       tris += t.count * ((t.geometry.index?.count ?? 0) / 3);
     }
     this.triangles = tris;
@@ -443,6 +532,7 @@ export class Crowd {
       (r.geometry.getAttribute('iPosYaw') as THREE.InstancedBufferAttribute).needsUpdate = true;
       (r.geometry.getAttribute('iAnim') as THREE.InstancedBufferAttribute).needsUpdate = true;
       (r.geometry.getAttribute('iHop') as THREE.InstancedBufferAttribute).needsUpdate = true;
+      (r.geometry.getAttribute('iFrost') as THREE.InstancedBufferAttribute).needsUpdate = true;
     }
     return { rows: clip.frames, clip };
   }

@@ -136,5 +136,5 @@ export const MISC = { Freeze: 0, Remaining: 1, Cleared: 2, Total: 3, Phase: 4, P
 
 /** Shapes and effects of a telegraphed ground attack (`world.tShape`, `world.tEffect`). */
 export const TeleShape = { Circle: 0, Rect: 1, Fill: 2 } as const;
-export const TeleEffect = { Hurt: 0, Half: 1, Kill: 2, Acid: 3 } as const;
+export const TeleEffect = { Hurt: 0, Half: 1, Kill: 2, Acid: 3, None: 4 } as const;
 export const ZoneKind = { Acid: 0, Fire: 1 } as const;

@@ -91,6 +91,8 @@ export const BALANCE = data as unknown as {
   elites: Record<EliteKey, number>;
   barrels: Record<BarrelKey, number>;
   knock: { perDamage: number; max: number };
+  /** Numbers of the special behaviours of the newer enemy types (see enemies.ts, `special`). */
+  special: Record<string, Record<string, number>>;
   hazards: { acid: { dps: number; radius: number; seconds: number }; fire: { dps: number; radius: number; seconds: number } };
   /** Past floor `start` enemies hit harder and have more health per floor than the base growth. */
   late: { start: number; damagePerFloor: number; hpPerFloor: number };

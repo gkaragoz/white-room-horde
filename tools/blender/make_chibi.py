@@ -19,7 +19,7 @@ ONLY = g.get("ONLY") or ([x for x in os.environ.get("ONLY", "").split(",") if x]
 
 BONES = ["root", "hips", "spine", "head", "arm.L", "arm.R", "hand.L", "hand.R", "thigh.L", "thigh.R", "foot.L", "foot.R"]
 BUDGET = {"player": 1500, "grunt": 650, "runner": 650, "tank": 900, "exploder": 900, "spitter": 900, "shielder": 900, "spawner": 900,
-          "boss": 4000, "acc": 500}
+          "special": 1300, "boss": 4000, "acc": 500}
 LOW = (8, 4, 8)  # sphere segments, rings, cylinder segments for crowd enemies (VAT instanced x500)
 HIGH = (10, 6, 10)
 SEG, RINGS, CYL = 10, 6, 10
@@ -322,6 +322,152 @@ def spec_screamer(b):
         b.sphere("head", (sx * 0.34, -0.3, 1.2), 0.07, (1, 1, 1), "#FFF2A8")
 
 
+# ---------------------------------------------------------------- the ten newer enemies (each with a carried prop)
+def _goo(b, bone, x, y, z, r=0.1, c="#B8F060"):
+    b.sphere(bone, (x, y, z), r, (1, 1, 0.8), c)
+
+
+def spec_acider(b):
+    """Toxic sprayer: a tank of acid on the back, a hose to a nozzle in the right hand, drips on the boots."""
+    body_parts(b, "#E4F5B0", "#9ACD3C", slim=0.95, belt="#4A5A22", glove="#2E3A14")
+    b.cyl("spine", (0, 0.33, 0.62), 0.2, 0.62, "#76B82A")
+    b.sphere("spine", (0, 0.33, 0.94), 0.2, (1, 1, 0.55), "#76B82A")
+    b.box("spine", (0, 0.33, 0.7), (0.5, 0.06, 0.08), "#3C4A1A")
+    b.box("spine", (0, 0.33, 0.52), (0.5, 0.06, 0.08), "#3C4A1A")
+    b.cyl("hand.R", (-0.36, -0.12, 0.4), 0.05, 0.42, "#4A5A22", rot=(1.35, 0, 0))
+    b.sphere("hand.R", (-0.36, -0.34, 0.42), 0.075, (1, 1, 1), "#D8FF5A")
+    for sx in (-1, 1):
+        _goo(b, "foot." + ("L" if sx == 1 else "R"), sx * 0.2, -0.1, 0.05, 0.1)
+    _goo(b, "hand.L", 0.36, 0, 0.28, 0.07)
+    b.sphere("head", (0.15, -0.38, 1.02), 0.1, (1, 0.6, 1), "#B8F060")
+
+
+def spec_rammer(b):
+    """Bull: huge shoulders, horns, a nose ring and an iron plate across the brow."""
+    body_parts(b, "#E8B9A0", "#B5543C", slim=1.3, head_k=0.82, belt="#4A2A22", glove="#2B1812")
+    for sx in (-1, 1):
+        side = "L" if sx == 1 else "R"
+        b.sphere("arm." + side, (sx * 0.52, 0, 0.7), 0.24, (1, 1, 0.9), "#7A7F8C")
+        b.cyl("arm." + side, (sx * 0.52, 0, 0.9), 0.06, 0.2, "#C9CED8", r2=0.0)
+        b.cyl("head", (sx * 0.34, -0.08, 1.38), 0.1, 0.5, "#F2E6CC", rot=(0, -sx * 0.9, 0), r2=0.02)
+    b.box("head", (0, -0.4, 1.08), (0.7, 0.12, 0.2), "#7A7F8C")
+    b.torus("head", (0, -0.5, 0.86), 0.09, 0.025, "#D8B24A", rot=(1.57, 0, 0), major=8, minor=4)
+    b.box("spine", (0, -0.33, 0.46), (0.62, 0.1, 0.5), "#7A7F8C")
+
+
+def spec_mortar(b):
+    """Grenadier: a mortar tube on the shoulder, a bandolier of shells and a helmet."""
+    body_parts(b, "#E2DCB4", "#7A8A4A", belt="#4A4A2A", glove="#2E2E1A")
+    b.cyl("spine", (-0.18, 0.2, 0.85), 0.13, 1.25, "#454B3A", rot=(0.35, -0.2, 0))
+    b.cyl("spine", (-0.18, 0.2, 1.45), 0.18, 0.12, "#2B2F24", rot=(0.35, -0.2, 0))
+    for k in range(3):
+        b.box("spine", (-0.3 + k * 0.1, 0.38, 0.35), (0.06, 0.06, 0.28), "#6A6F5A", rot=(0, 0, 0.35 * k))
+    for k in range(4):
+        b.sphere("spine", (-0.24 + k * 0.16, -0.31, 0.56 - k * 0.04), 0.08, (1, 1, 1.5), "#D8B24A")
+    b.sphere("head", (0, 0, 1.3), 0.4, (1.05, 1.05, 0.62), "#5C6640")
+    b.box("head", (0, -0.34, 1.16), (0.5, 0.2, 0.05), "#434A30")
+
+
+def spec_sledge(b):
+    """Sledge brute: a giant hammer in the right hand, bandaged fists, broad and slow."""
+    body_parts(b, "#E4D2C4", "#8A8D96", slim=1.35, head_k=0.8, belt="#3A3C44", glove="#D8C8AE")
+    b.cyl("hand.R", (-0.4, -0.05, 0.72), 0.055, 1.05, "#8A5A32")
+    b.box("hand.R", (-0.4, -0.05, 1.25), (0.62, 0.42, 0.4), "#555963")
+    b.box("hand.R", (-0.4, -0.05, 1.25), (0.7, 0.3, 0.3), "#3F434C")
+    b.box("hand.R", (-0.4, -0.05, 1.5), (0.2, 0.2, 0.08), "#555963")
+    for sx in (-1, 1):
+        side = "L" if sx == 1 else "R"
+        b.box("arm." + side, (sx * 0.46, 0, 0.56), (0.2, 0.2, 0.22), "#D8C8AE")
+    b.box("spine", (0, 0, 0.6), (0.9, 0.5, 0.1), "#B04A2C")
+
+
+def spec_lamper(b):
+    """Lamp spinner: a street lamp as a weapon, a hi-vis vest and a hard hat."""
+    body_parts(b, "#F3E6B8", "#D9A441", slim=1.1, belt="#4A4A52", glove="#2E2E36")
+    b.cyl("hand.R", (-0.4, -0.05, 0.95), 0.045, 1.9, "#4A5560")
+    b.cyl("hand.R", (-0.4, -0.05, 0.08), 0.1, 0.12, "#363E48")
+    b.box("hand.R", (-0.4, -0.3, 1.88), (0.1, 0.55, 0.08), "#4A5560")
+    b.sphere("hand.R", (-0.4, -0.56, 1.8), 0.15, (1.2, 1.2, 0.7), "#FFF2A8")
+    b.box("spine", (0, -0.31, 0.5), (0.58, 0.08, 0.5), "#FF8A1F")
+    b.box("spine", (0, -0.35, 0.5), (0.6, 0.04, 0.07), "#E8EEF2")
+    b.sphere("head", (0, 0, 1.32), 0.4, (1.05, 1.05, 0.6), "#F2D21F")
+    b.cyl("head", (0, -0.28, 1.22), 0.34, 0.04, "#F2D21F")
+
+
+def spec_reviver(b):
+    """Shaman: a hooded robe, a staff with a glowing orb, floating bone charms."""
+    body_parts(b, "#E6D9F2", "#6D4BA0", slim=1.0, head_k=0.85, belt="#3B2A5C", glove="#CDBBE8", arms=True)
+    b.cyl("spine", (0, 0, 0.32), 0.42, 0.6, "#7A55B8", r2=0.2)
+    b.sphere("head", (0, 0.04, 1.12), 0.5, (1.05, 1.05, 1.0), "#4A3478")
+    b.sphere("head", (0, -0.28, 1.04), 0.2, (1, 0.5, 1.05), "#1A1030")
+    for sx in (-1, 1):
+        b.sphere("head", (sx * 0.1, -0.4, 1.06), 0.045, (1, 0.5, 1), "#7DFFB0")
+    b.cyl("hand.L", (0.4, -0.05, 0.8), 0.04, 1.55, "#6B4A2A")
+    b.sphere("hand.L", (0.4, -0.05, 1.62), 0.17, (1, 1, 1), "#7DFFB0")
+    b.torus("hand.L", (0.4, -0.05, 1.62), 0.26, 0.03, "#C9B6F0", major=10, minor=4)
+    for k, (x, y, z) in enumerate(((-0.4, -0.2, 1.3), (0.5, 0.2, 1.1), (-0.5, 0.3, 0.8))):
+        b.sphere("spine", (x, y, z), 0.08, (1, 1, 1.2), "#F2EEDC")
+
+
+def spec_marksman(b):
+    """Sniper: slim, a long rifle with a scope, a beret and glowing red goggles."""
+    body_parts(b, "#D8D8DE", "#4A4A56", slim=0.82, head_k=0.9, belt="#2A2A32", glove="#1E1E24")
+    b.cyl("hand.R", (-0.2, -0.45, 0.62), 0.045, 1.5, "#33343C", rot=(1.5, 0, 0.1))
+    b.cyl("hand.R", (-0.2, -0.45, 0.72), 0.06, 0.38, "#1E1F26", rot=(1.5, 0, 0.1))
+    b.cyl("hand.R", (-0.22, -1.2, 0.6), 0.03, 0.2, "#1E1F26", rot=(1.5, 0, 0.1))
+    b.sphere("hand.R", (-0.2, -1.22, 0.6), 0.05, (1, 1, 1), "#FF3B3B")
+    for sx in (-1, 1):
+        b.sphere("head", (sx * 0.16, -0.42, 1.1), 0.1, (1, 0.6, 1), "#FF3B3B")
+    b.box("head", (0, -0.43, 1.1), (0.4, 0.05, 0.05), "#1E1E24")
+    b.cyl("head", (0.05, 0, 1.45), 0.34, 0.1, "#7A2B2B")
+    for k in range(5):
+        b.box("spine", (-0.2 + k * 0.1, 0.3, 0.5 + 0.05 * (k % 2)), (0.14, 0.04, 0.3), "#5C7A3A", rot=(0, 0, 0.5 * (k - 2) * 0.3))
+
+
+def spec_blinker(b):
+    """Phase assassin: thin, cloaked in torn strips, a glowing eye slit and a dagger in each hand."""
+    body_parts(b, "#D8E2FF", "#3A3F8C", slim=0.78, head_k=0.9, belt="#1E2255", glove="#10123A")
+    b.sphere("head", (0, 0.02, 1.07), 0.48, (1.05, 1.05, 1.0), "#232766")
+    b.box("head", (0, -0.43, 1.06), (0.34, 0.05, 0.06), "#5FF2FF")
+    for k, (x, z, h) in enumerate(((-0.2, 0.5, 0.7), (0.0, 0.46, 0.9), (0.2, 0.5, 0.75), (-0.1, 0.4, 0.55))):
+        b.box("spine", (x, 0.34, z), (0.14, 0.05, h), "#4A52B8", rot=(0.2, 0, 0))
+    b.cyl("spine", (0, -0.1, 0.78), 0.4, 0.1, "#5FF2FF", r2=0.34)
+    for sx in (-1, 1):
+        side = "L" if sx == 1 else "R"
+        b.cyl("hand." + side, (sx * 0.38, -0.1, 0.3), 0.04, 0.42, "#C8F4FF", rot=(2.4, 0, 0), r2=0.0)
+        b.box("hand." + side, (sx * 0.38, -0.02, 0.4), (0.07, 0.06, 0.16), "#10123A")
+
+
+def spec_magnetar(b):
+    """Magnet golem: a riveted steel body with a big horseshoe magnet for a crown, red and blue poles."""
+    body_parts(b, "#C8D0DC", "#7A8494", slim=1.2, head_k=0.78, belt="#363E4C", glove="#2B323E")
+    b.sphere("head", (0, 0, 1.07), 0.42, (1, 1, 0.9), "#9AA4B4")
+    b.box("head", (0, -0.4, 1.06), (0.46, 0.06, 0.1), "#FFE56A")
+    b.box("head", (0, 0, 1.78), (0.82, 0.22, 0.2), "#C9D0DA")
+    for sx, tip in ((-1, "#3B7BFF"), (1, "#FF3B3B")):
+        b.box("head", (sx * 0.33, 0, 1.52), (0.2, 0.22, 0.5), "#C9D0DA")
+        b.box("head", (sx * 0.33, 0, 1.24), (0.22, 0.24, 0.16), tip)
+    for sx in (-1, 1):
+        for z in (0.45, 0.62):
+            b.sphere("spine", (sx * 0.28, -0.22, z), 0.045, (1, 1, 1), "#363E4C")
+    b.sphere("spine", (0, -0.3, 0.52), 0.12, (1, 0.5, 1), "#FFE56A")
+
+
+def spec_flamer(b):
+    """Flame trooper: a gas mask, two fuel tanks on the back and a flamethrower with a lit pilot."""
+    body_parts(b, "#E8D0C0", "#4A3A36", slim=1.0, belt="#2A2220", glove="#1E1816")
+    b.sphere("head", (0, -0.36, 1.0), 0.16, (1, 0.7, 1), "#2E2A2A")
+    b.cyl("head", (0, -0.5, 0.96), 0.08, 0.22, "#1E1C1C", rot=(1.57, 0, 0))
+    for sx in (-1, 1):
+        b.sphere("head", (sx * 0.17, -0.36, 1.12), 0.1, (1, 0.5, 1), "#FFB347")
+        b.cyl("spine", (sx * 0.14, 0.33, 0.62), 0.11, 0.6, "#D8412A")
+        b.sphere("spine", (sx * 0.14, 0.33, 0.92), 0.11, (1, 1, 0.6), "#D8412A")
+    b.cyl("hand.R", (-0.28, -0.4, 0.5), 0.06, 0.8, "#363030", rot=(1.5, 0, 0))
+    b.cyl("hand.R", (-0.28, -0.85, 0.5), 0.08, 0.14, "#1E1818", rot=(1.5, 0, 0))
+    b.sphere("hand.R", (-0.28, -0.96, 0.5), 0.07, (1, 1, 1.3), "#FFB347")
+    b.box("spine", (0, -0.3, 0.55), (0.58, 0.08, 0.1), "#F2A22C")
+
+
 def crown(b, color="#FFC93C"):
     ring = b.cyl("head", (0, 0, 1.52), 0.34, 0.1, color)
     for k in range(6):
@@ -358,6 +504,37 @@ def spec_suru_lideri(b):
     body_parts(b, "#FFC48F", "#F28C38", slim=0.9, head_k=1.1)
     crown(b)
     b.cyl("spine", (0, 0.32, 0.8), 0.12, 0.5, "#5B2B2B", rot=(0.4, 0, 0), r2=0.0)
+
+
+def spec_meteor_lord(b):
+    """Meteor lord: scorched rock for shoulders and crown, a molten core glowing through the belly, a rock to throw."""
+    body_parts(b, "#3E3A44", "#6E2A1C", slim=1.45, head_k=0.9, belt="#2A1E1E", glove="#2A1E1E")
+    rnd = random.Random(21)
+    for sx in (-1, 1):
+        side = "L" if sx == 1 else "R"
+        b.sphere("arm." + side, (sx * 0.58, 0, 0.72), 0.3, (1, 1, 0.9), "#4A4650")
+        b.sphere("arm." + side, (sx * 0.6, 0.1, 0.98), 0.17, (1, 1, 1), "#FF7A1F")
+    for k in range(7):
+        a = 2 * math.pi * k / 7
+        b.cyl("head", (0.34 * math.cos(a), 0.34 * math.sin(a), 1.5), 0.08 + rnd.random() * 0.04, 0.34, "#4A4650", r2=0.0)
+    b.sphere("spine", (0, -0.3, 0.52), 0.22, (1, 0.55, 1), "#FFB347")
+    b.sphere("hand.R", (-0.5, -0.1, 0.6), 0.34, (1, 1, 1), "#4A4650")
+    b.sphere("hand.R", (-0.5, -0.38, 0.6), 0.13, (1, 0.5, 1), "#FF7A1F")
+
+
+def spec_purger(b):
+    """Purger: a tall white robe, a halo ring and one huge eye that decides who is judged."""
+    body_parts(b, "#F4F0FF", "#E9E4F7", slim=1.1, head_k=0.9, belt="#B7A8E8", glove="#FFFFFF")
+    b.cyl("spine", (0, 0, 0.3), 0.5, 0.65, "#F4F0FF", r2=0.27)
+    b.torus("head", (0, 0.02, 1.72), 0.42, 0.045, "#FFD84A", major=14, minor=4)
+    b.sphere("head", (0, -0.38, 1.08), 0.26, (1.1, 0.4, 1.1), "#FFFFFF")
+    b.sphere("head", (0, -0.5, 1.08), 0.13, (1, 0.5, 1), "#D01040")
+    b.sphere("head", (0, -0.55, 1.08), 0.06, (1, 0.5, 1), "#1A0A14")
+    for sx in (-1, 1):
+        b.sphere("spine", (sx * 0.62, 0.05, 0.9), 0.13, (0.6, 0.3, 1.8), "#FFFFFF")
+        b.sphere("spine", (sx * 0.78, 0.05, 1.12), 0.1, (0.5, 0.25, 1.6), "#FFFFFF")
+    b.cyl("hand.R", (-0.4, -0.08, 0.7), 0.05, 1.5, "#B7A8E8")
+    b.box("hand.R", (-0.4, -0.08, 1.45), (0.5, 0.06, 0.34), "#D8DDE8")
 
 
 # accessories live in character space; the client attaches them to the head bone
@@ -591,10 +768,22 @@ SPECS = [
     ("leaper", spec_leaper, 1.35, "tank", 1.5),
     ("bloater", spec_bloater, 1.9, "tank", 1.5),
     ("screamer", spec_screamer, 1.3, "tank", 1.5),
+    ("acider", spec_acider, 1.35, "special", 1.5),
+    ("rammer", spec_rammer, 1.9, "special", 1.5),
+    ("mortar", spec_mortar, 1.4, "special", 1.5),
+    ("sledge", spec_sledge, 2.2, "special", 1.5),
+    ("lamper", spec_lamper, 1.6, "special", 1.5),
+    ("reviver", spec_reviver, 1.5, "special", 1.5),
+    ("marksman", spec_marksman, 1.4, "special", 1.5),
+    ("blinker", spec_blinker, 1.15, "special", 1.5),
+    ("magnetar", spec_magnetar, 2.0, "special", 1.5),
+    ("flamer", spec_flamer, 1.4, "special", 1.5),
     ("boss_dev_grunt", spec_dev_grunt, 3.0, "boss", 1.7),
     ("boss_kral_tank", spec_kral_tank, 4.0, "boss", 1.7),
     ("boss_sayaci_ana", spec_sayaci_ana, 3.5, "boss", 1.7),
     ("boss_suru_lideri", spec_suru_lideri, 2.5, "boss", 1.7),
+    ("boss_meteor_lord", spec_meteor_lord, 3.6, "boss", 1.7),
+    ("boss_purger", spec_purger, 3.4, "boss", 1.7),
     ("acc_bandana", acc_bandana, 1.5, "acc", 1.5),
     ("acc_headphones", acc_headphones, 1.5, "acc", 1.5),
     ("acc_helmet", acc_helmet, 1.5, "acc", 1.5),
@@ -695,7 +884,7 @@ def _run():
     for cid, fn, S, budget, head_top in SPECS:
         if ONLY and cid not in ONLY:
             continue
-        b = Builder(cid, S, fixed, tint, LOW if budget in ("grunt", "runner", "tank", "exploder", "spitter", "shielder", "spawner") else HIGH)
+        b = Builder(cid, S, fixed, tint, LOW if budget in ("grunt", "runner", "tank", "exploder", "spitter", "shielder", "spawner", "special") else HIGH)
         fn(b)
         rig = build_armature(cid, S, head_top)
         mesh = finalize(cid, S, b.objs, rig)
@@ -788,10 +977,15 @@ def lineup(made):
     for i, cid in enumerate(["grunt", "runner", "tank", "exploder", "spitter", "shielder", "spawner"]):
         if cid in made:
             made[cid][1].location = (ex[i], 5.0, 0)
-    bx = [-7.0 + 4.6 * i for i in range(4)]
-    for i, cid in enumerate(["boss_dev_grunt", "boss_kral_tank", "boss_sayaci_ana", "boss_suru_lideri"]):
+    bx = [-9.0 + 3.6 * i for i in range(6)]
+    for i, cid in enumerate(["boss_dev_grunt", "boss_kral_tank", "boss_sayaci_ana", "boss_suru_lideri", "boss_meteor_lord", "boss_purger"]):
         if cid in made:
             made[cid][1].location = (bx[i], 11.5, 0)
+    # anything else that was made (the newer enemies) goes in rows of five
+    std = {"player_base", "grunt", "runner", "tank", "exploder", "spitter", "shielder", "spawner", "boss_dev_grunt", "boss_kral_tank", "boss_sayaci_ana", "boss_suru_lideri"} | set(accs)
+    extra = [c for c in made if c not in std and not c.startswith("acc_")]
+    for i, cid in enumerate(extra):
+        made[cid][1].location = (-6.4 + 3.2 * (i % 5) - (len(extra) <= 5) * 0, 5.0 + 5.0 * (i // 5) - (6.0 if pb else 4.0) * (len(extra) > 0 and not pb), 0)
     if os.environ.get("DEBUG_LINEUP"):
         for o in bpy.context.scene.objects:
             print("OBJ", o.name, o.type, tuple(round(c, 2) for c in o.location), tuple(round(c, 2) for c in o.dimensions), o.parent.name if o.parent else None)

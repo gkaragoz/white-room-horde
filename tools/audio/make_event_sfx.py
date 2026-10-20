@@ -154,6 +154,14 @@ def build():
     c["acid_splash"] = mix((splat, 1.0, 0.0), (fizz, 0.35, 0.05))
     whoosh = lowpass_env(fft_filter(noise(0.5), lo=150) * np.sin(np.linspace(0, np.pi, int(0.5 * SR))) ** 1.2, 6000, 700)
     c["launch"] = mix((whoosh, 0.9, 0.0), (tone(sweep(150, 60, 0.25), 0.25, release=0.22), 0.7, 0.0))
+    # the newer enemies: a charging whine, a magnetic hum, a phase blink
+    t = t_(0.9)
+    whine = tone(sweep(180, 900, 0.9, 1.7), 0.9, ((1, 1), (2, 0.3)), 0.05, 0.12, 1.3) * (0.6 + 0.4 * np.sin(t * 2 * np.pi * (6 + 18 * t)))
+    c["charge_up"] = whine
+    hum = tone(sweep(70, 120, 1.2, 0.6), 1.2, ((1, 1), (2, 0.5), (3, 0.25)), 0.08, 0.3, 1.2) * (0.75 + 0.25 * np.sin(t_(1.2) * 2 * np.pi * 14))
+    c["pull_hum"] = hum
+    zap = mix((fft_filter(noise(0.3), lo=1500) * env(int(0.3 * SR), 0.001, 0.3, 3), 0.6, 0.0), (tone(sweep(2400, 300, 0.25, 0.7), 0.25, release=0.2, curve=2), 0.7, 0.0))
+    c["blink_zap"] = zap
     return {k: normalise(v) for k, v in c.items()}
 
 

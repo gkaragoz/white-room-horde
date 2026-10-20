@@ -2,6 +2,7 @@ import { Buttons, ENEMY_TYPES, FloorPhase, MISC, TICK_DT, BALANCE, WEAPON_IDS } 
 import { addPlayer, createGame, createWorld, scriptedInput, setWave, spawnEnemy, step, type World } from '@wrh/sim';
 import { BOSS_TYPES, Crowd } from '../render/crowd';
 import { Fx } from '../render/fx';
+import { IceShards } from '../render/ice';
 import { RagdollPool } from '../render/ragdoll';
 import * as THREE from 'three';
 import { Audio, BANK_FILES, MUSIC_FILES } from '../audio';
@@ -105,6 +106,193 @@ export const crowdTests: QaTest[] = [
         }
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 14).join('\n') : `${CROWD_TYPES.length} types, ${clips} clips all animate` };
+    },
+  },
+  {
+    id: 'crowd.new-enemies',
+    title: 'The ten newer enemies each render with their own silhouette and colours, animate, and a windup glows and swells',
+    async run(ctx) {
+      const crowd = await getCrowd();
+      ctx.stage.scene.add(crowd.group);
+      const problems: string[] = [];
+      const names = ['acider', 'rammer', 'mortar', 'sledge', 'lamper', 'reviver', 'marksman', 'blinker', 'magnetar', 'flamer'];
+      const all: string[] = [...ENEMY_TYPES, ...BOSS_TYPES];
+      const sig = (px: Uint8Array): number[] => {
+        // 12 x 12 grid of average colour: a rough fingerprint of silhouette and palette
+        const size = Math.sqrt(px.length / 4);
+        const g = 12;
+        const out: number[] = [];
+        for (let gy = 0; gy < g; gy++) {
+          for (let gx = 0; gx < g; gx++) {
+            let r = 0;
+            let gg = 0;
+            let b = 0;
+            let n = 0;
+            for (let y = Math.floor((gy * size) / g); y < Math.floor(((gy + 1) * size) / g); y++) {
+              for (let x = Math.floor((gx * size) / g); x < Math.floor(((gx + 1) * size) / g); x++) {
+                const i = (y * size + x) * 4;
+                r += px[i]!;
+                gg += px[i + 1]!;
+                b += px[i + 2]!;
+                n++;
+              }
+            }
+            out.push(r / n, gg / n, b / n);
+          }
+        }
+        return out;
+      };
+      const sigs = new Map<string, number[]>();
+      try {
+        ctx.stage.setZoom(4); // fill the capture with the one enemy
+        ctx.stage.follow(0, 0);
+        crowd.debugPose(0, 'z_walk', 0, 99, 99);
+        ctx.stage.render();
+        const bg = grab(ctx);
+        for (const n of names) {
+          const idx = all.indexOf(n);
+          if (idx < 0) {
+            problems.push(`${n}: not in the type list`);
+            continue;
+          }
+          const walk = crowd.debugPose(idx, n === 'rammer' || n === 'blinker' ? 'z_run' : n === 'acider' || n === 'mortar' || n === 'reviver' || n === 'marksman' ? 'z_walk_creep' : 'z_walk', 0, 0, 0, 0);
+          if (!walk) {
+            problems.push(`${n}: baked clips missing`);
+            continue;
+          }
+          ctx.stage.render();
+          const a = grab(ctx);
+          const sil = silhouette(a, bg);
+          if (sil.count < 1500) problems.push(`${n}: hardly visible (${sil.count} px)`);
+          crowd.debugPose(idx, walk.clip.id, walk.clip.duration * 0.5, 0, 0, 0);
+          ctx.stage.render();
+          const b = grab(ctx);
+          if (diffCount(a, b) < 300) problems.push(`${n}: ${walk.clip.id} looks frozen`);
+          for (const clip of ['z_scream', 'z_death_back', 'z_death_fwd', 'z_attack_swipe']) {
+            const has = crowd.debugPose(idx, clip, 0, 0, 0, 0);
+            if (has && clip === 'z_scream') {
+              ctx.stage.render();
+              if (silhouette(grab(ctx), bg).count < 800) problems.push(`${n}: scream pose not visible`);
+            }
+          }
+          crowd.debugPose(idx, walk.clip.id, walk.clip.duration * 0.25, 0, 0, 0);
+          ctx.stage.render();
+          sigs.set(n, sig(grab(ctx)));
+        }
+        const bgSig = sig(bg);
+        const keys = [...sigs.keys()];
+        const pairs: string[] = [];
+        let closest = 1e9;
+        let closestPair = '';
+        for (let i = 0; i < keys.length; i++) {
+          for (let j = i + 1; j < keys.length; j++) {
+            const x = sigs.get(keys[i]!)!;
+            const y = sigs.get(keys[j]!)!;
+            // only the cells where either enemy is drawn count (the rest is the same empty floor)
+            let d = 0;
+            let used = 0;
+            for (let k = 0; k < x.length; k += 3) {
+              const live = Math.abs(x[k]! - bgSig[k]!) + Math.abs(x[k + 1]! - bgSig[k + 1]!) + Math.abs(x[k + 2]! - bgSig[k + 2]!) > 18 || Math.abs(y[k]! - bgSig[k]!) + Math.abs(y[k + 1]! - bgSig[k + 1]!) + Math.abs(y[k + 2]! - bgSig[k + 2]!) > 18;
+              if (!live) continue;
+              d += Math.abs(x[k]! - y[k]!) + Math.abs(x[k + 1]! - y[k + 1]!) + Math.abs(x[k + 2]! - y[k + 2]!);
+              used++;
+            }
+            d = used ? d / used / 3 : 0;
+            if (d < closest) {
+              closest = d;
+              closestPair = `${keys[i]}/${keys[j]}`;
+            }
+            pairs.push(`${keys[i]}/${keys[j]} ${f(d)}`);
+            if (d < 9) problems.push(`${keys[i]} and ${keys[j]} look almost identical (${f(d)}) ${pairs.join(', ')}`);
+          }
+        }
+        // the older types stay different from the new ones too
+        for (const old of ['grunt', 'tank']) {
+          const idx = all.indexOf(old);
+          crowd.debugPose(idx, 'z_walk', 0.2, 0, 0, 0);
+          ctx.stage.render();
+          const o = sig(grab(ctx));
+          for (const [n, x] of sigs) {
+            let d = 0;
+            let used = 0;
+            for (let k = 0; k < x.length; k += 3) {
+              if (Math.abs(x[k]! - bgSig[k]!) + Math.abs(x[k + 1]! - bgSig[k + 1]!) + Math.abs(x[k + 2]! - bgSig[k + 2]!) < 18 && Math.abs(o[k]! - bgSig[k]!) + Math.abs(o[k + 1]! - bgSig[k + 1]!) + Math.abs(o[k + 2]! - bgSig[k + 2]!) < 18) continue;
+              d += Math.abs(x[k]! - o[k]!) + Math.abs(x[k + 1]! - o[k + 1]!) + Math.abs(x[k + 2]! - o[k + 2]!);
+              used++;
+            }
+            if (used && d / used / 3 < 7) problems.push(`${n} is hard to tell from the ${old}`);
+          }
+        }
+        return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join('\n') + ' || ' + pairs.join(', ') : `10 distinct types, closest pair ${closestPair} (${f(closest)})` };
+      } finally {
+        ctx.stage.setZoom(1);
+        for (let i = 0; i < crowd.typeCount; i++) crowd.debugPose(i, 'z_walk', 0, 999, 999);
+        ctx.stage.render();
+        ctx.stage.scene.remove(crowd.group);
+      }
+    },
+  },
+  {
+    id: 'crowd.frost',
+    title: 'A frozen enemy turns icy blue from the feet up, shows ice shards, and a thaw is noticed once',
+    async run(ctx) {
+      const crowd = await getCrowd();
+      const shards = await IceShards.create();
+      ctx.stage.scene.add(crowd.group, shards.group);
+      const problems: string[] = [];
+      const w = createWorld(3);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, 6);
+      const e = spawnEnemy(w, ENEMY_TYPES.indexOf('tank'), 0, 0, false);
+      w.eCooldown[e] = 1e9;
+      const bluish = (px: Uint8Array): number => {
+        let n = 0;
+        for (let i = 0; i < px.length; i += 4) if (px[i + 2]! > px[i]! + 28 && px[i + 2]! > 150) n++;
+        return n;
+      };
+      const frame = (dtSec: number): Uint8Array => {
+        crowd.update(w, 1, performance.now() / 1000 + frameClock);
+        shards.update(w, crowd.frostLevel, 0, (i) => crowd.drawnPos(i), () => 1.5);
+        frameClock += dtSec;
+        ctx.stage.follow(0, 0);
+        ctx.stage.render();
+        return grab(ctx);
+      };
+      let frameClock = 0;
+      try {
+        ctx.stage.setZoom(3);
+        crowd.update(w, 1, 1000);
+        const warm = frame(0.05);
+        const base = bluish(warm);
+        w.eFrost[e] = 100000;
+        // let the coat grow for about 1.2 s of (fake) time
+        let last: Uint8Array = warm;
+        for (let k = 0; k < 24; k++) last = frame(0.05);
+        const frozen = bluish(last);
+        if (crowd.frostLevel[e]! < 0.95) problems.push(`frost level only ${f(crowd.frostLevel[e]!)} after a second`);
+        if (frozen < base + 800) problems.push(`the frozen enemy is not icy blue (${frozen} vs ${base} blue px)`);
+        if (shards.shown < 3) problems.push(`no ice shards (${shards.shown})`);
+        // thaw: the coat melts away and exactly one thaw is reported
+        w.eFrost[e] = 0;
+        let thaws = 0;
+        for (let k = 0; k < 30; k++) {
+          last = frame(0.05);
+          thaws += crowd.thawed.length;
+        }
+        if (thaws !== 1) problems.push(`${thaws} thaw events, expected 1`);
+        if (crowd.frostLevel[e]! > 0.02) problems.push('the coat never melted');
+        if (bluish(last) > base + 500) problems.push(`still blue after the thaw (${bluish(last)} vs ${base})`);
+        if (shards.shown !== 0) problems.push(`${shards.shown} shards left after the thaw`);
+      } finally {
+        ctx.stage.setZoom(1);
+        w.eActive[e] = 0;
+        crowd.update(w, 1, 5000);
+        shards.update(w, crowd.frostLevel, 0, () => null, () => 1);
+        ctx.stage.render();
+        ctx.stage.scene.remove(crowd.group, shards.group);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'ice coat, shards and thaw behave' };
     },
   },
   {

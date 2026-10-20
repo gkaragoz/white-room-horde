@@ -1,0 +1,36 @@
+{
+ "type": "flamer",
+ "scale": 1.4,
+ "vertexCount": 958,
+ "indexCount": 3048,
+ "frames": 89,
+ "clips": [
+  {
+   "id": "z_walk",
+   "start": 0,
+   "frames": 19,
+   "loop": true,
+   "duration": 1.5667
+  },
+  {
+   "id": "z_scream",
+   "start": 19,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  },
+  {
+   "id": "z_death_back",
+   "start": 53,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  }
+ ],
+ "extent": [
+  1.74,
+  2.064,
+  2.041
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

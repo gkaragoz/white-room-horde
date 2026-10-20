@@ -39,6 +39,10 @@ export type SimEvent =
   | { type: 'cardOffer'; slot: number; cards: number[] }
   | { type: 'cardPicked'; card: number; by: number }
   | { type: 'thaw' }
+  | { type: 'blink'; id: number; x0: number; y0: number; x: number; y: number }
+  /** A newer enemy starts winding up a big move / starts the move itself (etype indexes ENEMY_TYPES). */
+  | { type: 'windup'; id: number; etype: number; x: number; y: number }
+  | { type: 'enemyAct'; id: number; etype: number; x: number; y: number }
   /** The last enemy of a floor fell: `by` is the character who landed the blow (-1 none). The floor-clear countdown starts after the finisher. */
   | { type: 'finalKill'; by: number; x: number; y: number }
   /** A telegraphed attack starts charging (shape and effect: see TeleShape, TeleEffect) / lands. */
@@ -144,6 +148,12 @@ export interface World {
   eMod: Uint8Array;
   /** Ticks an enemy stays frozen (stands still, no attacks). */
   eFrost: Int32Array;
+  /** The newer enemies act in phases: 0 free, 1 winding up, 2 acting, 3 recovering (eActT ticks left); a thrown enemy flies for eAir ticks at (eVX, eVY). */
+  eAct: Uint8Array;
+  eActT: Int32Array;
+  eAir: Int32Array;
+  eVX: Float64Array;
+  eVY: Float64Array;
   /** Per player: stun ticks (no steering, no shooting), the push velocity from a blow and ticks spent in the air (the toss). */
   pStun: Int32Array;
   pKnockX: Float64Array;
@@ -297,6 +307,11 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     eCooldown: new Float64Array(MAX_ENEMIES),
     eMod: new Uint8Array(MAX_ENEMIES),
     eFrost: new Int32Array(MAX_ENEMIES),
+    eAct: new Uint8Array(MAX_ENEMIES),
+    eActT: new Int32Array(MAX_ENEMIES),
+    eAir: new Int32Array(MAX_ENEMIES),
+    eVX: new Float64Array(MAX_ENEMIES),
+    eVY: new Float64Array(MAX_ENEMIES),
     pStun: new Int32Array(MAX_PLAYERS),
     pKnockX: new Float64Array(MAX_PLAYERS),
     pKnockY: new Float64Array(MAX_PLAYERS),

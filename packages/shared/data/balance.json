@@ -292,6 +292,76 @@
       "radius": 0.5,
       "damage": 6,
       "interval": 1.0
+    },
+    "acider": {
+      "hp": 45,
+      "speed": 3.8,
+      "radius": 0.6,
+      "damage": 8,
+      "interval": 6.0
+    },
+    "rammer": {
+      "hp": 180,
+      "speed": 3.0,
+      "radius": 1.1,
+      "damage": 20,
+      "interval": 7.0
+    },
+    "flamer": {
+      "hp": 60,
+      "speed": 3.4,
+      "radius": 0.6,
+      "damage": 8,
+      "interval": 5.0
+    },
+    "mortar": {
+      "hp": 50,
+      "speed": 3.0,
+      "radius": 0.6,
+      "damage": 8,
+      "interval": 5.0
+    },
+    "sledge": {
+      "hp": 260,
+      "speed": 2.4,
+      "radius": 1.3,
+      "damage": 30,
+      "interval": 3.6
+    },
+    "lamper": {
+      "hp": 160,
+      "speed": 3.0,
+      "radius": 1.0,
+      "damage": 15,
+      "interval": 6.0
+    },
+    "blinker": {
+      "hp": 35,
+      "speed": 7.5,
+      "radius": 0.5,
+      "damage": 10,
+      "interval": 3.5
+    },
+    "marksman": {
+      "hp": 40,
+      "speed": 2.8,
+      "radius": 0.55,
+      "damage": 8,
+      "interval": 5.0
+    },
+    "reviver": {
+      "hp": 70,
+      "speed": 2.8,
+      "radius": 0.6,
+      "damage": 6,
+      "interval": 8.0
+    },
+    "magnetar": {
+      "hp": 140,
+      "speed": 2.6,
+      "radius": 1.0,
+      "damage": 12,
+      "interval": 9.0
     }
   },
   "floors": {
@@ -322,7 +392,17 @@
       "crawler": 4,
       "leaper": 6,
       "bloater": 9,
-      "screamer": 12
+      "screamer": 12,
+      "acider": 8,
+      "rammer": 10,
+      "flamer": 11,
+      "mortar": 13,
+      "sledge": 14,
+      "lamper": 16,
+      "blinker": 18,
+      "marksman": 20,
+      "reviver": 22,
+      "magnetar": 24
     },
     "weights": {
       "grunt": 100,
@@ -335,7 +415,17 @@
       "crawler": 30,
       "leaper": 15,
       "bloater": 6,
-      "screamer": 5
+      "screamer": 5,
+      "acider": 8,
+      "rammer": 5,
+      "flamer": 6,
+      "mortar": 6,
+      "sledge": 4,
+      "lamper": 4,
+      "blinker": 6,
+      "marksman": 5,
+      "reviver": 3,
+      "magnetar": 3
     },
     "waveSizeMul": 1.4,
     "spawnSeconds": 25,
@@ -356,7 +446,17 @@
       "crawler": 1,
       "leaper": 3,
       "bloater": 7,
-      "screamer": 5
+      "screamer": 5,
+      "acider": 5,
+      "rammer": 14,
+      "flamer": 7,
+      "mortar": 7,
+      "sledge": 18,
+      "lamper": 12,
+      "blinker": 7,
+      "marksman": 9,
+      "reviver": 10,
+      "magnetar": 12
     },
     "boss": {
       "everyWaves": 5,
@@ -658,8 +758,16 @@
     "max": 0.45
   },
   "hazards": {
-    "acid": { "dps": 14, "radius": 2.2, "seconds": 7 },
-    "fire": { "dps": 20, "radius": 2.0, "seconds": 5 }
+    "acid": {
+      "dps": 14,
+      "radius": 2.2,
+      "seconds": 7
+    },
+    "fire": {
+      "dps": 20,
+      "radius": 2.0,
+      "seconds": 5
+    }
   },
   "late": {
     "start": 15,
@@ -667,10 +775,131 @@
     "hpPerFloor": 0.025
   },
   "bossAttacks": {
-    "slam": { "every": 7, "radius": 7, "delay": 1.3, "damage": 38, "stun": 0.8, "push": 14 },
-    "meteors": { "every": 9, "count": 6, "radius": 3, "delay": 1.7, "stagger": 0.14, "damage": 46, "stun": 0.5, "push": 9 },
-    "sweep": { "every": 11, "width": 5, "delay": 1.5, "damage": 40, "stun": 0.6, "push": 12 },
-    "purge": { "every": 22, "delay": 6, "areaFraction": 0.6, "killFloor": 35 },
-    "pools": { "every": 10, "count": 4, "radius": 3, "delay": 1.4 }
+    "slam": {
+      "every": 7,
+      "radius": 7,
+      "delay": 1.3,
+      "damage": 38,
+      "stun": 0.8,
+      "push": 14
+    },
+    "meteors": {
+      "every": 9,
+      "count": 6,
+      "radius": 3,
+      "delay": 1.7,
+      "stagger": 0.14,
+      "damage": 46,
+      "stun": 0.5,
+      "push": 9
+    },
+    "sweep": {
+      "every": 11,
+      "width": 5,
+      "delay": 1.5,
+      "damage": 40,
+      "stun": 0.6,
+      "push": 12
+    },
+    "purge": {
+      "every": 22,
+      "delay": 6,
+      "areaFraction": 0.6,
+      "killFloor": 35
+    },
+    "pools": {
+      "every": 10,
+      "count": 4,
+      "radius": 3,
+      "delay": 1.4
+    }
+  },
+  "special": {
+    "acider": {
+      "trailEvery": 16,
+      "trailRadius": 1.5,
+      "trailSeconds": 4.5,
+      "spitRadius": 2.2,
+      "spitDelay": 1.3,
+      "range": 12
+    },
+    "rammer": {
+      "windup": 1.2,
+      "speed": 19,
+      "ticks": 34,
+      "recover": 0.7,
+      "minRange": 5,
+      "maxRange": 17,
+      "hit": 1.9,
+      "damage": 30,
+      "throw": 18,
+      "stun": 1.0,
+      "enemyDamage": 60,
+      "enemyThrow": 11
+    },
+    "mortar": {
+      "windup": 0.8,
+      "shells": 3,
+      "radius": 2.4,
+      "delay": 1.4,
+      "stagger": 0.22,
+      "damage": 28,
+      "keep": 11,
+      "range": 19
+    },
+    "sledge": {
+      "windup": 1.0,
+      "radius": 4.2,
+      "ahead": 2.0,
+      "damage": 40,
+      "reach": 3.4,
+      "recover": 0.8
+    },
+    "lamper": {
+      "windup": 1.4,
+      "radius": 5.6,
+      "damage": 42,
+      "reach": 6.5,
+      "recover": 0.7
+    },
+    "reviver": {
+      "windup": 1.0,
+      "count": 4,
+      "keep": 9,
+      "range": 22
+    },
+    "marksman": {
+      "windup": 1.2,
+      "width": 0.75,
+      "damage": 55,
+      "keep": 13,
+      "range": 22,
+      "recover": 0.4
+    },
+    "blinker": {
+      "windup": 0.4,
+      "behind": 2.3,
+      "minRange": 5,
+      "recover": 0.2
+    },
+    "magnetar": {
+      "windup": 1.2,
+      "radius": 14,
+      "pull": 9,
+      "ticks": 45,
+      "recover": 0.7,
+      "range": 14
+    },
+    "flamer": {
+      "windup": 0.6,
+      "ticks": 36,
+      "every": 3,
+      "near": 1.8,
+      "far": 7.0,
+      "radius": 1.5,
+      "seconds": 3,
+      "range": 7.5,
+      "recover": 0.5
+    }
   }
 }

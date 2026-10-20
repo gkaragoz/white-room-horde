@@ -13,7 +13,7 @@ export type Sfx =
   | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart'
   | 'floorCleared' | 'countTick' | 'countGo' | 'floorCharge' | 'floorLift' | 'floorArrive' | 'floorStart'
   | 'cardOffer' | 'iceFreeze' | 'iceThaw' | 'nuke' | 'secondWind' | 'weaponGet' | 'dead' | 'floorEnter' | 'slowIn' | 'slowOut' | 'impactWall' | 'barrelHit'
-  | 'warnCircle' | 'warnLine' | 'slamHit' | 'purge' | 'acidSplash' | 'launch';
+  | 'warnCircle' | 'warnLine' | 'slamHit' | 'purge' | 'acidSplash' | 'launch' | 'chargeUp' | 'pullHum' | 'blinkZap';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
 const GUN_GAP = 0.02;
@@ -25,7 +25,7 @@ const GAP: Record<Sfx, number> = {
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
   floorCleared: 0.5, countTick: 0.2, countGo: 0.2, floorCharge: 0.5, floorLift: 1, floorArrive: 0.5, floorStart: 0.5,
   cardOffer: 0.3, iceFreeze: 0.5, iceThaw: 0.3, nuke: 2, secondWind: 1, weaponGet: 0.2, dead: 0.5, floorEnter: 1, slowIn: 1, slowOut: 1, impactWall: 0.05, barrelHit: 0.1,
-  warnCircle: 0.25, warnLine: 0.4, slamHit: 0.1, purge: 1, acidSplash: 0.15, launch: 0.2,
+  warnCircle: 0.25, warnLine: 0.4, slamHit: 0.1, purge: 1, acidSplash: 0.15, launch: 0.2, chargeUp: 0.25, pullHum: 0.8, blinkZap: 0.1,
 };
 
 type Entry = { files: string[]; gain: number; rate: [number, number] };
@@ -119,10 +119,13 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   purge: { files: ['purge_hit'], gain: 1, rate: [1, 1] },
   acidSplash: { files: ['acid_splash'], gain: 0.7, rate: [0.9, 1.1] },
   launch: { files: ['launch'], gain: 0.7, rate: [0.95, 1.1] },
+  chargeUp: { files: ['charge_up'], gain: 0.5, rate: [0.9, 1.15] },
+  pullHum: { files: ['pull_hum'], gain: 0.7, rate: [1, 1] },
+  blinkZap: { files: ['blink_zap'], gain: 0.5, rate: [0.9, 1.2] },
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
-const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch']);
+const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
 
 const VOICE_SFX = new Set<Sfx>(['zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
 
@@ -610,6 +613,19 @@ export class Audio {
         break;
       case 'launch':
         this.play('launch', e);
+        break;
+      case 'windup':
+        this.play('chargeUp', e);
+        break;
+      case 'enemyAct': {
+        const n = ENEMY_TYPES[e.etype];
+        if (n === 'rammer') this.play('launch', e);
+        else if (n === 'magnetar') this.play('pullHum', e);
+        else if (n === 'flamer') this.play('gun_flamer', e);
+        break;
+      }
+      case 'blink':
+        this.play('blinkZap', e);
         break;
       case 'thaw':
         this.play('iceThaw');
