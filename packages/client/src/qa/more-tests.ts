@@ -846,4 +846,102 @@ export const moreTests: QaTest[] = [
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${hits} of ${total} auto-aimed shots hit their walking target` };
     },
   },
+  {
+    id: 'ui.toolbar',
+    title: 'Language, controls and settings buttons are always top right (menu, lobby, game), and the language switch works anywhere',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const picked: unknown[] = [];
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: (k, v) => picked.push([k, v]), onResetSettings: noop,
+      }, settings);
+      try {
+        const check = (where: string): void => {
+          for (const id of ['#tb-lang', '#tb-ctl', '#tb-set']) {
+            const b = host.querySelector<HTMLElement>(id);
+            if (!b) problems.push(`${where}: ${id} is missing`);
+            else if (getComputedStyle(b).display === 'none') problems.push(`${where}: ${id} is hidden`);
+          }
+        };
+        ui.showMenu();
+        check('menu');
+        ui.showLobby('ABCD', [{ slot: 0, name: 'a', host: true, connected: true, weapon: 'pistol', acc: 0, color: 0 }], true, { map: 0, difficulty: 1 }, false);
+        check('lobby');
+        const w = createWorld(1);
+        addPlayer(w, 0, 0, 0);
+        ui.clearScreen();
+        ui.update(w, 0, 0, 1000, ['p']);
+        check('game');
+        // the language list names every language and picking one reports it
+        host.querySelector<HTMLElement>('#tb-lang')!.click();
+        const items = [...host.querySelectorAll<HTMLElement>('#tb-pop [data-lang]')];
+        if (items.length !== LANGS.length) problems.push(`${items.length} languages listed, expected ${LANGS.length}`);
+        items.find((i) => i.getAttribute('data-lang') === 'tr')!.click();
+        if (!picked.some((p) => JSON.stringify(p) === '["lang","tr"]')) problems.push('picking Turkish did not report the language');
+        // settings and controls open from the toolbar
+        host.querySelector<HTMLElement>('#tb-set')!.click();
+        if (!host.querySelector('.wrh-set-tabs')) problems.push('the settings button does not open the settings');
+        host.querySelector<HTMLElement>('#tb-ctl')!.click();
+        if (!host.querySelector('.wrh-ctl-row')) problems.push('the controls button does not open the controls sheet');
+        host.querySelector<HTMLElement>('#tb-ctl')!.click();
+        // a language change redraws the menu in the new language and keeps what was typed
+        ui.showMenu();
+        const name = host.querySelector<HTMLInputElement>('#wrh-name');
+        if (name) name.value = 'Zed';
+        ui.applySettings({ ...settings, lang: 'tr' });
+        const solo = host.querySelector('#wrh-solo')?.textContent ?? '';
+        if (!/oyna/i.test(solo)) problems.push(`the menu was not redrawn in Turkish (${solo})`);
+        if (host.querySelector<HTMLInputElement>('#wrh-name')?.value !== 'Zed') problems.push('the typed name was lost on a language change');
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'three buttons everywhere, language list, settings, controls, redraw with typed text kept' };
+    },
+  },
+  {
+    id: 'ui.lobby-stable',
+    title: 'Other players changing things in the lobby updates it in place: no new screen, no scroll reset, the preview and the arena rows stay',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:500px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+      }, settings);
+      const p = (slot: number, name: string, weapon: (typeof WEAPON_IDS)[number] = 'pistol') => ({ slot, name, host: slot === 0, connected: true, weapon, acc: 0, color: slot });
+      try {
+        ui.showLobby('ABCD', [p(0, 'host')], false, { map: 0, difficulty: 1 }, false);
+        const panel = host.querySelector<HTMLElement>('#wrh-lobby');
+        const stage = host.querySelector('.wrh-prev');
+        if (!panel || !stage) throw new Error('the lobby did not draw');
+        panel.style.maxHeight = '200px';
+        panel.style.overflow = 'auto';
+        panel.scrollTop = 120;
+        const before = panel.scrollTop;
+        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'ar')], false, { map: 0, difficulty: 1 }, false);
+        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'smg'), p(2, 'third')], false, { map: 2, difficulty: 2 }, false);
+        if (host.querySelector('#wrh-lobby') !== panel) problems.push('the lobby panel was replaced by an update');
+        if (host.querySelector('.wrh-prev') !== stage) problems.push('the preview was rebuilt by an update');
+        if (panel.scrollTop !== before) problems.push(`the scroll position moved from ${before} to ${panel.scrollTop}`);
+        if (host.querySelectorAll('#wrh-plist li').length !== 3) problems.push('the player list did not grow to three');
+        if (!host.querySelector('#wrh-pcount')?.textContent?.includes('3/')) problems.push('the player count did not update');
+        if (!host.querySelector('#wrh-arena-wrap')?.textContent?.includes(UI_STRINGS.en.maps[2]!)) problems.push('the arena the host picked did not show up');
+      } catch (e) {
+        problems.push(String(e));
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'lobby updates in place' };
+    },
+  },
 ];

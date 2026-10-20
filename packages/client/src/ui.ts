@@ -117,6 +117,9 @@ const BASE_STRINGS = {
     statAcc: 'Accuracy',
     switched: 'Out of ammo, switched to',
     newWeapon: 'New weapon',
+    tbLang: 'Language',
+    tbControls: 'Controls',
+    tbSettings: 'Settings',
     backToMain: 'Ammo found, back to',
     sidearm: 'Sidearm',
     statReload: 'Reload',
@@ -299,6 +302,9 @@ const BASE_STRINGS = {
     statAcc: 'İsabet',
     switched: 'Mermi bitti, geçildi:',
     newWeapon: 'Yeni silah',
+    tbLang: 'Dil',
+    tbControls: 'Kontroller',
+    tbSettings: 'Ayarlar',
     backToMain: 'Mermi bulundu, dönüldü:',
     sidearm: 'Yedek silah',
     statReload: 'Doldurma',
@@ -663,6 +669,16 @@ const CSS = `
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
 .wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{text-shadow:none}
 .wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
+.wrh-tb{position:absolute;right:12px;top:10px;z-index:70;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+.wrh-tb>*{pointer-events:auto}
+.wrh-ui .wrh-tbtn{position:relative;display:block;width:36px;min-width:0;height:36px;border-radius:50%;padding:0;margin:0;cursor:pointer;background:rgba(250,244,232,.94);border:2px solid #cdbfa5;color:#3a352d;font-size:18px;line-height:32px;text-align:center;box-shadow:0 2px 8px rgba(20,28,44,.2);transition:transform .12s,background .12s}
+.wrh-ui .wrh-tbtn:hover{transform:scale(1.08);background:#fff}
+.wrh-ui .wrh-tbtn small{position:absolute;right:-3px;bottom:-4px;padding:0 4px;border-radius:6px;background:#2b3a52;color:#fff;font:800 9px/13px system-ui,sans-serif;letter-spacing:.03em}
+.wrh-langpop{position:absolute;right:88px;top:44px;min-width:150px;padding:6px;border-radius:12px;background:rgba(251,246,234,.98);border:2px solid #cdbfa5;box-shadow:0 8px 24px rgba(20,28,44,.3);display:none}
+.wrh-langpop.open{display:block}
+.wrh-ui .wrh-langpop button{display:block;width:100%;margin:2px 0;padding:7px 10px;border-radius:8px;border:0;background:transparent;color:#2b3a52;font-size:14px;font-weight:700;text-align:left;cursor:pointer;box-shadow:none}
+.wrh-ui .wrh-langpop button:hover{background:#efe7d6}
+.wrh-ui .wrh-langpop button.on{background:#1fa2ff;color:#fff}
 .wrh-inv{position:absolute;right:14px;bottom:182px;width:236px;display:flex;flex-direction:column;gap:3px;z-index:5;pointer-events:none}
 .wrh-inv .row{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px 0 4px;border-radius:9px;border:2px solid transparent;background:rgba(251,246,234,.82);box-shadow:0 1px 4px rgba(20,28,44,.14);font-size:12px;font-weight:700;color:#2b3a52}
 .wrh-inv kbd{min-width:19px;height:19px;line-height:19px;border-radius:5px;background:#2b3a52;color:#fff;text-align:center;font:800 11px/19px system-ui,sans-serif}
@@ -813,6 +829,8 @@ export class Ui {
   private readonly dev = document.createElement('div');
   private hudBuilt = false;
   private lastCards = '';
+  private readonly toolbar = document.createElement('div');
+  private langPop: HTMLElement | null = null;
   private settingsOpen = false;
   private readonly settingsEl = document.createElement('div');
   private lastHud = 0;
@@ -830,17 +848,78 @@ export class Ui {
     this.lang = settings.lang;
     this.hud.style.cssText = 'position:absolute;inset:0;pointer-events:none';
     this.dev.className = 'wrh-hud-dev';
-    this.root.append(this.hud, this.dev, this.screen, this.settingsEl);
+    this.root.append(this.hud, this.dev, this.screen, this.settingsEl, this.toolbar);
+    this.buildToolbar();
     // every button gets a click sound; the important ones a confirmation
     this.root.addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest('button, .wrh-card, .wrh-gear');
+      const b = (e.target as HTMLElement).closest('button, .wrh-card');
       if (!b) return;
-      if (b.classList.contains('wrh-gear')) this.h.onUiSound('open');
+      if (b.classList.contains('wrh-tbtn')) this.h.onUiSound('open');
       else if (['wrh-solo', 'wrh-host', 'wrh-join', 'wrh-start', 'wrh-again'].includes(b.id) || b.classList.contains('wrh-card')) this.h.onUiSound('confirm');
       else if (['wrh-leave', 's-close'].includes(b.id)) this.h.onUiSound('back');
       else this.h.onUiSound('click');
     });
     parent.appendChild(this.root);
+  }
+
+  /** The three round buttons that are always there, top right: language, controls and settings. */
+  private buildToolbar(): void {
+    this.toolbar.className = 'wrh-tb';
+    this.toolbar.innerHTML = `<button type="button" class="wrh-tbtn" id="tb-lang">&#127760;<small></small></button><button type="button" class="wrh-tbtn" id="tb-ctl">&#9000;</button><button type="button" class="wrh-tbtn" id="tb-set">&#9881;</button><div class="wrh-langpop" id="tb-pop"></div>`;
+    this.langPop = this.toolbar.querySelector<HTMLElement>('#tb-pop');
+    this.toolbar.querySelector<HTMLElement>('#tb-lang')!.onclick = (e) => {
+      e.stopPropagation();
+      this.langPop!.classList.toggle('open');
+    };
+    this.toolbar.querySelector<HTMLElement>('#tb-ctl')!.onclick = () => this.toggleControls();
+    this.toolbar.querySelector<HTMLElement>('#tb-set')!.onclick = () => this.toggleSettings();
+    document.addEventListener('click', () => this.langPop?.classList.remove('open'));
+    this.refreshToolbar();
+  }
+
+  /** Titles and the language list follow the chosen language. */
+  private refreshToolbar(): void {
+    const t = this.t;
+    const set = (id: string, text: string): void => {
+      const b = this.toolbar.querySelector<HTMLElement>(id);
+      if (b) {
+        b.title = text;
+        b.setAttribute('aria-label', text);
+      }
+    };
+    set('#tb-lang', t.tbLang);
+    set('#tb-ctl', t.tbControls);
+    set('#tb-set', t.tbSettings);
+    const code = this.toolbar.querySelector('#tb-lang small');
+    if (code) code.textContent = this.lang.toUpperCase();
+    if (this.langPop) {
+      this.langPop.innerHTML = LANGS.map((l) => `<button type="button" data-lang="${l.id}" class="${l.id === this.lang ? 'on' : ''}">${l.label}</button>`).join('');
+      this.langPop.querySelectorAll<HTMLElement>('[data-lang]').forEach((b) => {
+        b.onclick = () => {
+          this.langPop!.classList.remove('open');
+          this.h.onSetting('lang', b.getAttribute('data-lang')!);
+        };
+      });
+    }
+  }
+
+  /** Remember how to draw the screen that is up, so a language change can draw it again with the typed text kept. */
+  private redraw: (() => void) | null = null;
+
+  private redrawScreen(): void {
+    if (!this.redraw) return;
+    const typed = new Map<string, string>();
+    this.screen.querySelectorAll<HTMLInputElement>('input').forEach((i) => {
+      if (i.id) typed.set(i.id, i.value);
+    });
+    const scroll = this.screen.querySelector<HTMLElement>('.wrh-scroll')?.scrollTop ?? 0;
+    this.redraw();
+    typed.forEach((v, id) => {
+      const i = this.screen.querySelector<HTMLInputElement>('#' + id);
+      if (i && !i.value) i.value = v;
+    });
+    const sc = this.screen.querySelector<HTMLElement>('.wrh-scroll');
+    if (sc) sc.scrollTop = scroll;
   }
 
   /** Translate a UI string key (for messages the game shows outside the UI module). */
@@ -857,6 +936,8 @@ export class Ui {
   }
 
   clearScreen(): void {
+    this.redraw = null;
+    this.lobbyCode = '';
     this.disposePreview();
     this.screen.innerHTML = '';
   }
@@ -1055,10 +1136,6 @@ export class Ui {
   }
 
   /** Option rows shared by the menu and the lobby: arena and difficulty (host or solo) and the player's look. */
-  private optionRows(editable: boolean, map: number, difficulty: number): string {
-    return this.previewBlock() + this.arenaRows(editable, map, difficulty);
-  }
-
   /** Arena pictures and the skull difficulty row (read-only text for guests in a lobby). */
   private arenaRows(editable: boolean, map: number, difficulty: number): string {
     const t = this.t;
@@ -1082,6 +1159,8 @@ export class Ui {
   }
 
   showMenu(error = ''): void {
+    this.redraw = () => this.showMenu(error);
+    this.lobbyCode = '';
     const t = this.t;
     const profile = loadProfile();
     this.acc = profile.acc;
@@ -1168,6 +1247,8 @@ export class Ui {
 
   /** Pause screen (solo only; online games keep running). */
   showPause(): void {
+    this.redraw = () => this.showPause();
+    this.lobbyCode = '';
     const t = this.t;
     this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center"><h1>${t.paused}</h1>
       <button id="wrh-resume">${t.resume}</button><button id="wrh-pset" class="alt">${t.settings}</button><button id="wrh-leave" class="warn">${t.leave}</button></div>`;
@@ -1443,7 +1524,39 @@ export class Ui {
   }
 
   showConnecting(): void {
+    this.redraw = () => this.showConnecting();
+    this.lobbyCode = '';
     this.screen.innerHTML = `<div class="wrh-panel wrh-center"><h1>${this.t.connecting}</h1></div>`;
+  }
+
+  /** What the lobby on screen was built for: while it stays the same, updates only touch the list and the arena rows. */
+  private lobbyCode = '';
+  private lobbyHost = false;
+  private lobbyLocked = false;
+  private lobbyOpts = '';
+  private lobbyMap = 0;
+  private lobbyDifficulty = 1;
+
+  private lobbyList(players: { slot: number; name: string; host: boolean; weapon: WeaponId; acc: number; color: number }[]): string {
+    const t = this.t;
+    const accNames = t.accs as readonly string[];
+    return players
+      .map(
+        (p) =>
+          `<li><span class="wrh-dot" style="background:${p.color >= 0 ? PLAYER_COLORS[p.color % PLAYER_COLORS.length] : PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]} &middot; ${accNames[p.acc] ?? ''}</small></li>`,
+      )
+      .join('');
+  }
+
+  private bindArena(): void {
+    this.bindGroup('map', (id) => {
+      this.lobbyMap = Number(id);
+      this.h.onOptions(this.lobbyMap, this.lobbyDifficulty);
+    });
+    this.bindGroup('diff', (id) => {
+      this.lobbyDifficulty = Number(id);
+      this.h.onOptions(this.lobbyMap, this.lobbyDifficulty);
+    });
   }
 
   showLobby(
@@ -1453,34 +1566,43 @@ export class Ui {
     options: { map: number; difficulty: number } = { map: 0, difficulty: 1 },
     locked = false,
   ): void {
+    this.redraw = () => {
+      this.lobbyCode = '';
+      this.showLobby(code, players, iAmHost, options, locked);
+    };
     const t = this.t;
-    const accNames = t.accs as readonly string[];
-    const list = players
-      .map(
-        (p) =>
-          `<li><span class="wrh-dot" style="background:${p.color >= 0 ? PLAYER_COLORS[p.color % PLAYER_COLORS.length] : PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]} &middot; ${accNames[p.acc] ?? ''}</small></li>`,
-      )
-      .join('');
-    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
+    // somebody else changed something (joined, picked a weapon, the host chose an arena): update in place. Rebuilding the
+    // whole lobby would reset the scroll position, the 3D preview and whatever the player is clicking.
+    if (this.lobbyCode === code && this.lobbyHost === iAmHost && this.lobbyLocked === locked && this.screen.querySelector('#wrh-lobby')) {
+      this.screen.querySelector<HTMLElement>('#wrh-plist')!.innerHTML = this.lobbyList(players);
+      this.screen.querySelector<HTMLElement>('#wrh-pcount')!.textContent = `${t.players} (${players.length}/${MAX_PLAYERS})`;
+      const key = `${options.map}/${options.difficulty}`;
+      if (key !== this.lobbyOpts) {
+        this.lobbyOpts = key;
+        this.lobbyMap = options.map;
+        this.lobbyDifficulty = options.difficulty;
+        this.screen.querySelector<HTMLElement>('#wrh-arena-wrap')!.innerHTML = this.arenaRows(iAmHost, options.map, options.difficulty);
+        if (iAmHost) this.bindArena();
+      }
+      return;
+    }
+    this.lobbyCode = code;
+    this.lobbyHost = iAmHost;
+    this.lobbyLocked = locked;
+    this.lobbyOpts = `${options.map}/${options.difficulty}`;
+    this.lobbyMap = options.map;
+    this.lobbyDifficulty = options.difficulty;
+    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll" id="wrh-lobby">
       <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span>${locked ? ' &#128274;' : ''}</h1>
       <p class="sub">${iAmHost ? '' : t.waiting}</p>
-      <label>${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist">${list}</ul>
+      <label id="wrh-pcount">${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist" id="wrh-plist">${this.lobbyList(players)}</ul>
       <label>${t.weapon}</label><div class="wrh-weapons">${this.weaponButtons()}</div>
-      ${this.optionRows(iAmHost, options.map, options.difficulty)}
+      ${this.previewBlock()}<div id="wrh-arena-wrap">${this.arenaRows(iAmHost, options.map, options.difficulty)}</div>
       ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-invite" class="alt">&#128279; ${t.invite}</button><button id="wrh-leave" class="warn">${t.leave}</button>
     </div>`;
     this.bindWeapons();
     this.bindPreview();
-    let map = options.map;
-    let difficulty = options.difficulty;
-    this.bindGroup('map', (id) => {
-      map = Number(id);
-      this.h.onOptions(map, difficulty);
-    });
-    this.bindGroup('diff', (id) => {
-      difficulty = Number(id);
-      this.h.onOptions(map, difficulty);
-    });
+    this.bindArena();
     const s = this.screen.querySelector<HTMLElement>('#wrh-start');
     if (s) s.onclick = () => this.h.onStart();
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
@@ -1511,6 +1633,8 @@ export class Ui {
   }
 
   showGameOver(world: World, canReplay = false, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }): void {
+    this.redraw = () => this.showGameOver(world, canReplay, rec);
+    this.lobbyCode = '';
     const t = this.t;
     const names = t.weapons as Record<string, string>;
     const extra = rec
@@ -1540,9 +1664,7 @@ export class Ui {
       <div class="wrh-cards" id="h-cards" style="display:none"></div>
       <div class="wrh-warn" id="h-warn" style="display:none"></div>
       <div class="wrh-hint" id="h-hint"></div>
-      <div class="wrh-gear" id="h-gear" title="Settings">&#9881;</div><div class="wrh-gear" id="h-ctl" style="right:54px" title="Controls">&#9000;</div><div class="wrh-hostpause" id="h-hostpause"></div>`;
-    this.hud.querySelector<HTMLElement>('#h-gear')!.onclick = () => this.toggleSettings();
-    this.hud.querySelector<HTMLElement>('#h-ctl')!.onclick = () => this.toggleControls();
+      <div class="wrh-hostpause" id="h-hostpause"></div>`;
     this.hudBuilt = true;
   }
 
@@ -1675,9 +1797,15 @@ export class Ui {
     this.root.classList.toggle('no-minimap', !s.minimap);
     this.root.classList.toggle('no-tags', !s.nameTags);
     this.root.style.setProperty('--wrh-zoom', String([1, 1.18, 1.38][s.textSize] ?? 1));
+    const langChanged = this.lang !== s.lang;
     this.lang = s.lang;
+    this.refreshToolbar();
     if (this.settingsOpen || this.controlsOpen) this.renderSettings();
     this.lastCards = '';
+    if (langChanged) {
+      this.hudBuilt = false;
+      this.redrawScreen();
+    }
   }
 
   private mini: HTMLCanvasElement | null = null;
