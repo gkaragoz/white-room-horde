@@ -10,7 +10,8 @@ export type Sfx =
   | GunSfx | 'reloadPistol' | 'reloadRifle' | 'reloadShotgun'
   | 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'heavyShot' | 'throw' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive'
   | 'level' | 'pick' | 'wave' | 'boss' | 'over' | 'zGroan' | 'zAttack' | 'zHit' | 'zDeath' | 'zScream' | 'step' | 'pickup' | 'pickupDrop' | 'spit'
-  | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart';
+  | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart'
+  | 'floorCleared' | 'countTick' | 'countGo' | 'floorCharge' | 'floorLift' | 'floorArrive' | 'floorStart';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
 const GUN_GAP = 0.02;
@@ -20,6 +21,7 @@ const GAP: Record<Sfx, number> = {
   shot: 0.035, midShot: 0.04, bigShot: 0.05, cannonShot: 0.08, heavyShot: 0.05, throw: 0.1, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3,
   level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1, zGroan: 0.25, zAttack: 0.12, zHit: 0.05, zDeath: 0.06, zScream: 0.4, step: 0.12, pickup: 0.06, pickupDrop: 0.15, spit: 0.15,
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
+  floorCleared: 0.5, countTick: 0.2, countGo: 0.2, floorCharge: 0.5, floorLift: 1, floorArrive: 0.5, floorStart: 0.5,
 };
 
 type Entry = { files: string[]; gain: number; rate: [number, number] };
@@ -376,6 +378,33 @@ export class Audio {
       case 'uiConfirm':
         this.tone(523, 784, 0.15, 'triangle', 0.25);
         break;
+      case 'floorCleared':
+        // a short rising fanfare
+        [523, 659, 784, 1047].forEach((f, i) => this.tone(f, f, 0.32, 'triangle', 0.22, i * 0.11));
+        break;
+      case 'countTick':
+        this.tone(880, 880, 0.07, 'sine', 0.16);
+        break;
+      case 'countGo':
+        this.tone(1318, 1318, 0.14, 'triangle', 0.22);
+        break;
+      case 'floorCharge':
+        this.tone(110, 880, 0.9, 'sawtooth', 0.12);
+        this.tone(220, 1320, 0.9, 'sine', 0.1);
+        break;
+      case 'floorLift':
+        this.burst(2.7, 0.35, 900);
+        this.tone(90, 330, 2.7, 'sawtooth', 0.1);
+        break;
+      case 'floorArrive':
+        this.tone(130, 45, 0.5, 'sine', 0.5);
+        this.tone(523, 784, 0.5, 'triangle', 0.2, 0.08);
+        this.tone(784, 1047, 0.6, 'triangle', 0.16, 0.2);
+        break;
+      case 'floorStart':
+        this.tone(196, 196, 0.5, 'sawtooth', 0.2);
+        this.tone(247, 247, 0.5, 'sawtooth', 0.16, 0.05);
+        break;
       case 'wave':
         this.tone(196, 196, 0.35, 'sawtooth', 0.2);
         this.tone(147, 147, 0.5, 'sawtooth', 0.2, 0.2);
@@ -580,8 +609,18 @@ export class Audio {
       case 'cardPicked':
         this.play('pick');
         break;
+      case 'waveCleared':
+        this.play('floorCleared');
+        break;
+      case 'floorAscend':
+        this.play('floorCharge');
+        this.duckMusic(0.5, 4.5);
+        break;
+      case 'floorArrive':
+        this.play('floorArrive');
+        break;
       case 'waveStart':
-        this.play(e.boss ? 'boss' : 'wave');
+        this.play(e.boss ? 'boss' : 'floorStart');
         if (e.boss) {
           this.play('zScream');
           this.duckMusic(0.45, 4);

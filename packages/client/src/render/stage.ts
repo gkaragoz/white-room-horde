@@ -4,6 +4,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { patchReveal } from './reveal';
 
 import type { Backend } from './backend';
 
@@ -29,6 +31,14 @@ export class Stage {
   private readonly sunOffset: THREE.Vector3;
 
   private composer: EffectComposer | null = null;
+  /** The painted arena floor (the other floor of the climb gets a clone of it). */
+  readonly floor: THREE.Mesh;
+  /** Motion blur of the climb: only drawn while `blur` is above zero, through a 4x multisampled composer. */
+  private flightComposer: EffectComposer | null = null;
+  private blurPass: ShaderPass | null = null;
+  private blur = 0;
+  /** 0..1: the shaft between floors darkens the sky. */
+  private dark = 0;
   private readonly bounce: THREE.DirectionalLight;
   private readonly hemi: THREE.HemisphereLight;
   private readonly bg = new THREE.Color('#d5dde6');
@@ -120,11 +130,15 @@ export class Stage {
     this.flashlight = new THREE.SpotLight('#fff3d6', 0, 22, Math.PI / 5, 0.45, 1.3);
     this.scene.add(this.flashlight, this.flashlight.target);
 
-    this.scene.add(makeFloor(opts.texture ?? 1));
+    this.floor = makeFloor(opts.texture ?? 1);
+    this.scene.add(this.floor);
     if (opts.aa === 'smaa' && backend === 'webgl') {
       // the x-ray outline of hidden characters needs a stencil buffer in the post-processing target too
       this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, stencilBuffer: true }));
       this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.blurPass = new ShaderPass(MOTION_BLUR);
+      this.blurPass.enabled = false;
+      this.composer.addPass(this.blurPass);
       // tone map first so SMAA sees display-referred colours (edge detection is tuned for those)
       this.composer.addPass(new OutputPass());
       this.composer.addPass(new SMAAPass());
@@ -271,10 +285,18 @@ export class Stage {
     this.sun.intensity = D.sunI + (N.sunI - D.sunI) * t;
     this.bounce.intensity = D.bounce * (1 - t);
     this.renderer.toneMappingExposure = D.exposure + (N.exposure - D.exposure) * t;
-    if (t > 0.02) {
+    if (this.dark > 0) {
+      // in the shaft between floors the world falls away into a dark blue
+      // colours mix in linear light, so a plain lerp stays grey for a long time: push the weight up
+      this.bg.lerp(SHAFT, 1 - Math.pow(1 - this.dark, 3));
+      (this.scene.background as THREE.Color).copy(this.bg);
+      this.hemi.intensity *= 1 - 0.45 * this.dark;
+      this.renderer.toneMappingExposure *= 1 - 0.18 * this.dark;
+    }
+    if (t > 0.02 || this.dark > 0.02) {
       if (!this.scene.fog) this.scene.fog = new THREE.Fog(this.bg.clone(), 38, 95);
       (this.scene.fog as THREE.Fog).color.copy(this.bg);
-      (this.scene.fog as THREE.Fog).far = 95 - 30 * t;
+      (this.scene.fog as THREE.Fog).far = 95 - 30 * Math.max(t, this.dark * 0.9);
     } else {
       this.scene.fog = null;
     }
@@ -311,6 +333,8 @@ export class Stage {
     this.renderer.setSize(w, h);
     this.composer?.setPixelRatio(this.renderer.getPixelRatio());
     this.composer?.setSize(w, h);
+    this.flightComposer?.setPixelRatio(this.renderer.getPixelRatio());
+    this.flightComposer?.setSize(w, h);
     const halfW = CAMERA.orthoWidth / 2;
     const halfH = halfW * (h / w);
     this.camera.left = -halfW;
@@ -321,12 +345,12 @@ export class Stage {
   }
 
   /** Follow a point on the floor (three coordinates). */
-  follow(x: number, z: number, shake = 0): void {
-    const t = new THREE.Vector3(x + (Math.random() - 0.5) * shake * 0.5, 0.6, z + (Math.random() - 0.5) * shake * 0.5);
+  follow(x: number, z: number, shake = 0, height = 0): void {
+    const t = new THREE.Vector3(x + (Math.random() - 0.5) * shake * 0.5, 0.6 + height, z + (Math.random() - 0.5) * shake * 0.5);
     this.camera.position.copy(t).add(this.camOffset);
     this.camera.lookAt(t);
-    this.sun.position.set(x, 0, z).add(this.sunOffset);
-    this.sun.target.position.set(x, 0, z);
+    this.sun.position.set(x, height, z).add(this.sunOffset);
+    this.sun.target.position.set(x, height, z);
     this.sun.target.updateMatrixWorld();
   }
 
@@ -334,11 +358,72 @@ export class Stage {
     this.bounce.visible = on;
   }
 
+  /** Motion blur strength in screen heights (0 = off): the climb between floors. */
+  setFlightBlur(strength: number): void {
+    this.blur = strength;
+  }
+
+  /** The shaft between floors: 0 = normal sky, 1 = dark. */
+  setDark(k: number): void {
+    if (Math.abs(k - this.dark) < 0.002) return;
+    this.dark = k;
+    this.applyNight();
+  }
+
+  private ensureFlightComposer(): EffectComposer {
+    if (!this.flightComposer) {
+      const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, stencilBuffer: true, samples: 4 });
+      const c = new EffectComposer(this.renderer, rt);
+      c.addPass(new RenderPass(this.scene, this.camera));
+      this.blurPass = new ShaderPass(MOTION_BLUR);
+      c.addPass(this.blurPass);
+      c.addPass(new OutputPass());
+      c.setPixelRatio(this.renderer.getPixelRatio());
+      c.setSize(this.container.clientWidth || window.innerWidth, this.container.clientHeight || window.innerHeight);
+      this.flightComposer = c;
+    }
+    return this.flightComposer;
+  }
+
   render(): void {
+    const blurred = this.blur > 0.0004 && this.backend === 'webgl';
+    if (blurred) {
+      const w = this.container.clientWidth || window.innerWidth;
+      const h = this.container.clientHeight || window.innerHeight;
+      const comp = this.composer ?? this.ensureFlightComposer();
+      const pass = this.blurPass!;
+      pass.enabled = true;
+      pass.uniforms.uStrength!.value = this.blur;
+      pass.uniforms.uAspect!.value = w / h;
+      comp.render();
+      pass.enabled = false;
+      return;
+    }
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
   }
 }
+
+const SHAFT = new THREE.Color('#070b1a');
+
+const MOTION_BLUR = {
+  name: 'FlightBlur',
+  uniforms: { tDiffuse: { value: null as THREE.Texture | null }, uStrength: { value: 0 }, uAspect: { value: 1 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uStrength; uniform float uAspect; varying vec2 vUv;
+void main(){
+  vec2 c = vUv - 0.5;
+  vec2 dir = vec2(0.0, uStrength) + c * (uStrength * 0.7);
+  vec4 sum = vec4(0.0); float tot = 0.0;
+  for (int i = -8; i <= 8; i++) {
+    float t = float(i) / 8.0;
+    float w = 1.0 - abs(t) * 0.75;
+    sum += texture2D(tDiffuse, vUv + dir * t) * w;
+    tot += w;
+  }
+  gl_FragColor = sum / tot;
+}`,
+};
 
 /** Light concrete floor with soft painted patches and a faint grid, drawn once to a canvas. */
 function makeFloor(quality: 0 | 1): THREE.Mesh {
@@ -378,7 +463,9 @@ function makeFloor(quality: 0 | 1): THREE.Mesh {
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = quality === 1 ? 8 : 1;
   tex.repeat.set(2.5, 1.8);
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 }));
+  const floorMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
+  patchReveal(floorMat);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), floorMat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.receiveShadow = true;
   return mesh;

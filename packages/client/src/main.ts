@@ -14,6 +14,7 @@ import { Fx } from './render/fx';
 import { AmmoRing } from './render/ammoRing';
 import { TargetMarker } from './render/targetMarker';
 import { PropsView } from './render/props';
+import { FloorClimb } from './render/floorFx';
 import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
@@ -147,6 +148,9 @@ const arena = new ArenaView();
 const props = await PropsView.create();
 stage.scene.add(props.group);
 stage.scene.add(arena.group);
+const climb = new FloorClimb(stage, fx, arena, props);
+const vx: number[] = new Array<number>(MAX_PLAYERS).fill(0);
+const vy: number[] = new Array<number>(MAX_PLAYERS).fill(0);
 const animator = new PlayerAnimator();
 
 // grenades and spit
@@ -338,6 +342,8 @@ const moveAngle = new Float64Array(MAX_PLAYERS);
 const lastShot = new Float64Array(MAX_PLAYERS).fill(-10);
 let nowSec = 0;
 const lastDust: number[] = new Array<number>(MAX_PLAYERS).fill(0);
+let liftSounded = false;
+let lastCount = -1;
 let catchingUp = false;
 let catchupPeak = 0;
 let joinedLate = false;
@@ -432,12 +438,11 @@ function handleEvent(e: SimEvent): void {
     case 'waveStart': {
       const L = UI_STRINGS[ui.lang];
       const mod = e.mod ?? 0;
-      ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${ui.lang === 'tr' ? 'Dalga' : 'Wave'} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
+      ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${L.wave} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
       break;
     }
     case 'waveCleared':
-      ui.banner(UI_STRINGS[ui.lang].waveCleared, UI_STRINGS[ui.lang].breather, 1800);
-      break;
+      break; // the big countdown under the top bar says it
     case 'secondWind':
       ui.banner(UI_STRINGS[ui.lang].secondWind, names[e.slot] ?? '', 1600);
       break;
@@ -580,13 +585,13 @@ const COMBO_STEPS = [10, 25, 50, 100, 200, 350];
 // ---- starting a game ----
 function beginPlaying(w: World, slot: number): void {
   audio.startMusic();
-  arena.setMap(w.map);
-  props.setMap(w.map);
+  climb.arena.setMap(w.map);
+  climb.props.setMap(w.map);
   fx.setMap(w.map);
-  stage.setLamps(props.lamps);
+  stage.setLamps(climb.props.lamps);
   stage.setNightNow(nightFor(w));
   stage.update(0, 0, 0);
-  props.setNight(stage.night);
+  climb.props.setNight(stage.night);
   world = w;
   localSlot = slot;
   ui.clearScreen();
@@ -859,8 +864,19 @@ function frame(nowMs: number): void {
 
   if (world) {
     const w = world;
+    // the climb between floors: where everyone is drawn and how high the camera is
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      vx[s] = prevX[s]! + (curX[s]! - prevX[s]!) * alpha;
+      vy[s] = prevY[s]! + (curY[s]! - prevY[s]!) * alpha;
+    }
+    const lifted = climb.update(w, alpha, nowSec, dt, vx, vy);
+    // sounds that follow the climb: the thrusters when the lift begins, a tick for every countdown second
+    if (lifted.active && climb.lift01 > 0 && !liftSounded) {
+      liftSounded = true;
+      audio.play('floorLift');
+    } else if (!lifted.active) liftSounded = false;
     // characters
-    props.syncBarrels(w, nowSec);
+    climb.barrelProps.syncBarrels(w, nowSec);
     power.begin();
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const c = chars[s];
@@ -870,14 +886,14 @@ function frame(nowMs: number): void {
         c.detachWeapon();
         void c.attachWeapon('weapon_' + WEAPON_IDS[w.pWeapon[s]!]!);
       }
-      const x = prevX[s]! + (curX[s]! - prevX[s]!) * alpha;
-      const y = prevY[s]! + (curY[s]! - prevY[s]!) * alpha;
+      const x = vx[s]!;
+      const y = vy[s]!;
       const ang = lerpAngle(prevA[s]!, curA[s]!, alpha);
-      c.root.position.set(x, 0, -y);
+      c.root.position.set(x, lifted.lift, -y);
       c.root.rotation.y = ang + Math.PI / 2;
       const cls = w.pPerk[s * PERKS + PERK.Class]!;
       c.root.scale.setScalar(PowerView.bodyScale(w, s) * (cls === 2 ? 1.18 : cls === 3 ? 0.92 : 1));
-      power.slot(w, s, x, y, nowSec, dt, s === localSlot);
+      power.slot(w, s, x, y, nowSec, dt, s === localSlot, lifted.lift);
       if (w.pState[s] === PlayerState.Alive && nowSec - lastDust[s]! > 0.1) {
         const sp = Math.hypot(curX[s]! - prevX[s]!, curY[s]! - prevY[s]!) / TICK_DT;
         if (sp > 7) {
@@ -895,16 +911,16 @@ function frame(nowMs: number): void {
     if (w.pState[target] === PlayerState.Dead) {
       for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pState[s] === PlayerState.Alive) { target = s; break; }
     }
-    const fx0 = prevX[target]! + (curX[target]! - prevX[target]!) * alpha;
-    const fy0 = prevY[target]! + (curY[target]! - prevY[target]!) * alpha;
-    stage.follow(fx0, -fy0, fx.shake * settings.shake);
+    const fx0 = vx[target]!;
+    const fy0 = vy[target]!;
+    stage.follow(fx0, -fy0, fx.shake * settings.shake, lifted.lift);
     fx.faceCamera(stage.camera.quaternion);
     // time of day, real-time lights and the flashlight of the local player
     stage.nightTarget = nightFor(w);
     stage.setRain(settings.weather && stage.nightTarget > 0.5 && w.wave % 2 === 1);
     audio.nightBias = stage.night * 0.15;
     stage.update(dt, fx0, -fy0);
-    props.setNight(stage.night);
+    climb.props.setNight(stage.night);
     ui.setNightHud(stage.night > 0.5);
     ui.setCombo(settings.announcer && nowSec - comboAt < 2.2 ? comboCount : 0, '');
     {
@@ -925,9 +941,9 @@ function frame(nowMs: number): void {
         const gc = BALANCE.grenade;
         const dist = input.grenadeDistance(lx, ly, gc.range, gc.minRange, gc.maxRange);
         const bm = w.modBlast * w.pPerk[me * PERKS + PERK.Blast]!;
-        targetMarker.update(lx + Math.cos(a) * dist, -(ly + Math.sin(a) * dist), gc.radius * bm, nowSec, alive && !w.gameOver && w.pGren[me]! > 0 && !paused, (input.sample as unknown) !== undefined && w.pGrenCd[me]! > 0);
+        targetMarker.update(lx + Math.cos(a) * dist, -(ly + Math.sin(a) * dist), gc.radius * bm, nowSec, alive && !w.gameOver && w.pGren[me]! > 0 && !paused && !lifted.active, (input.sample as unknown) !== undefined && w.pGrenCd[me]! > 0);
       }
-      const show = alive && !w.gameOver && settings.ammoRing;
+      const show = alive && !w.gameOver && settings.ammoRing && !lifted.active;
       ammoRing.update(lx, -ly, frac, reloading, nowSec, show);
       ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, show, reloading);
     }
@@ -939,7 +955,7 @@ function frame(nowMs: number): void {
         ui.setTag(s, '', '#000', 0, 0, false);
         continue;
       }
-      _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 2.7, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
+      _p.set(vx[s]!, 2.7 + lifted.lift, -vy[s]!).project(stage.camera);
       ui.setTag(s, (settings.colorblind ? `${s + 1} ` : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
     }
     // revive rings over downed players (red: bleeding out, green: being revived)
@@ -949,7 +965,7 @@ function frame(nowMs: number): void {
         ui.setRing(s, 0, 0, 0, 0, false, false);
         continue;
       }
-      _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 1.6, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
+      _p.set(vx[s]!, 1.6 + lifted.lift, -vy[s]!).project(stage.camera);
       const need = BALANCE.player.reviveSeconds * w.modRevive;
       ui.setRing(s, Math.max(0, w.pTimer[s]! / BALANCE.player.downedSeconds), Math.min(1, w.pRevive[s]! / need), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true, w.pRevive[s]! > 0);
     }
@@ -1050,6 +1066,10 @@ function frame(nowMs: number): void {
     spitMesh.count = sn;
     spitMesh.instanceMatrix.needsUpdate = true;
     ui.update(w, localSlot, fx.hurt, nowMs, names);
+    if (ui.countShown !== lastCount) {
+      if (ui.countShown > 0) audio.play(ui.countShown <= 3 ? 'countGo' : 'countTick');
+      lastCount = ui.countShown;
+    }
     ui.drawMinimap(w, localSlot, nowMs);
   } else {
     fx.update(dt);

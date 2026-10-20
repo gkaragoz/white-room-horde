@@ -1,10 +1,10 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, WEAPON_IDS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, WEAPON_IDS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
-import { ELITE, absorb, addPerk, barrelsBlast, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
+import { ELITE, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
 import { dropLoot } from './pickups';
 import { cellIndex } from './flowfield';
-import { out, pushOut, segmentBlocked } from './obstacles';
+import { applyObstacles, out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { SH_H, SH_W } from './spatial';
 import type { World } from './state';
 
@@ -251,20 +251,86 @@ function farFromPlayers(w: World, x: number, y: number): boolean {
   return true;
 }
 
+/** The new floor: the world is rebuilt around the players (happens once, in the middle of the lift). */
+function enterFloor(w: World): void {
+  setWave(w, w.wave + 1);
+  w.map = (w.wave - 1) % MAP_COUNT;
+  useMap(w.map);
+  applyObstacles(w.field, w.map);
+  w.bActive.fill(0);
+  w.gActive.fill(0);
+  w.sActive.fill(0);
+  w.kActive.fill(0);
+  placeBarrels(w);
+  for (let s = 0; s < MAX_PLAYERS; s++) {
+    if (!w.pActive[s]) continue;
+    // everybody comes along: the fallen get up with part of their health
+    if (w.pState[s] !== PlayerState.Alive || w.pHp[s]! <= 0) {
+      w.pState[s] = PlayerState.Alive;
+      w.pHp[s] = w.pMaxHp[s]! * BALANCE.floors.reviveHp;
+      w.pTimer[s] = 0;
+      w.pRevive[s] = 0;
+    }
+    const a = (s * 6.283185307179586) / MAX_PLAYERS;
+    let x = cos(a) * 2;
+    let y = sin(a) * 2;
+    if (pushOut(x, y, 0.6)) {
+      x = out.x;
+      y = out.y;
+    }
+    w.pX[s] = x;
+    w.pY[s] = y;
+    w.pIFrames[s] = 1;
+    w.pDash[s] = 0;
+  }
+  w.events.push({ type: 'floorEnter', wave: w.wave, map: w.map });
+}
+
 function runWaves(w: World, playerCount: number): void {
   const cfg = BALANCE.waves;
-  // the first wave sizes itself on the first tick, when everybody is in
-  if (w.tick === 0 && w.misc[3] === 0) beginWave(w);
-  if (w.tick - w.waveTick >= cfg.periodSeconds * TICK_RATE) {
-    setWave(w, w.wave + 1);
-    const boss = w.wave % BALANCE.progression.boss.everyWaves === 0;
-    w.events.push({ type: 'waveStart', wave: w.wave, boss, mod: waveModOf(w.wave) });
-    if (boss) spawnBoss(w);
+  const fl = BALANCE.floors;
+  // the first floor sizes itself on the first tick, when everybody is in
+  if (w.tick === 0 && w.misc[MISC.Total] === 0) beginWave(w);
+  const phase = w.misc[MISC.Phase]!;
+  if (phase === FloorPhase.Cleared) {
+    // breather with a countdown; then the climb begins
+    if (w.tick >= w.misc[MISC.PhaseEnd]!) {
+      w.misc[MISC.Phase] = FloorPhase.Ascend;
+      w.misc[MISC.PhaseEnd] = w.tick + Math.round(fl.ascendSeconds * TICK_RATE);
+      w.misc[MISC.Entered] = 0;
+      w.events.push({ type: 'floorAscend', from: w.wave, to: w.wave + 1, map: w.wave % MAP_COUNT });
+    }
+    return;
+  }
+  if (phase === FloorPhase.Ascend) {
+    const end = w.misc[MISC.PhaseEnd]!;
+    const lift = Math.round((fl.ascendSeconds - fl.chargeSeconds) * TICK_RATE);
+    if (w.misc[MISC.Entered] === 0 && w.tick >= end - Math.round(lift / 2)) {
+      w.misc[MISC.Entered] = 1;
+      enterFloor(w);
+    }
+    if (w.tick >= end) {
+      w.misc[MISC.Phase] = FloorPhase.Arrive;
+      w.misc[MISC.PhaseEnd] = w.tick + Math.round(fl.arriveSeconds * TICK_RATE);
+      w.events.push({ type: 'floorArrive', wave: w.wave });
+    }
+    return;
+  }
+  if (phase === FloorPhase.Arrive) {
+    // a last countdown on the new floor, then its enemies come
+    if (w.tick >= w.misc[MISC.PhaseEnd]!) {
+      w.misc[MISC.Phase] = FloorPhase.Fight;
+      w.waveTick = w.tick;
+      const boss = w.wave % BALANCE.progression.boss.everyWaves === 0;
+      w.events.push({ type: 'waveStart', wave: w.wave, boss, mod: waveModOf(w.wave) });
+      if (boss) spawnBoss(w);
+    }
+    return;
   }
   if (playerCount === 0) return;
   const mod = waveModOf(w.wave);
-  const total = w.misc[3]!;
-  let remaining = w.misc[1]!;
+  const total = w.misc[MISC.Total]!;
+  let remaining = w.misc[MISC.Remaining]!;
   if (remaining > 0) {
     // the wave arrives in a rush and then as a stream, never more than the wave's own number
     const t = Math.min(1, (w.tick - w.waveTick) / (cfg.spawnSeconds * TICK_RATE));
@@ -285,12 +351,11 @@ function runWaves(w: World, playerCount: number): void {
       spawned++;
       remaining--;
     }
-    w.misc[1] = remaining;
-  } else if (total > 0 && w.enemyCount === 0 && w.misc[2] === 0) {
-    // the wave is cleared: a breather, then the next one comes early if the clock still has a long way to go
-    w.misc[2] = w.tick + 1;
-    const left = cfg.periodSeconds * TICK_RATE - (w.tick - w.waveTick);
-    if (left > cfg.breatherSeconds * TICK_RATE) w.waveTick = w.tick - (cfg.periodSeconds - cfg.breatherSeconds) * TICK_RATE;
+    w.misc[MISC.Remaining] = remaining;
+  } else if (total > 0 && w.enemyCount === 0) {
+    // everybody is dead: the floor is cleared
+    w.misc[MISC.Phase] = FloorPhase.Cleared;
+    w.misc[MISC.PhaseEnd] = w.tick + Math.round(fl.clearedSeconds * TICK_RATE);
     w.events.push({ type: 'waveCleared', wave: w.wave });
   }
 }

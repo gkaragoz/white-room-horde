@@ -39,9 +39,6 @@ export interface WaveConfig {
   waveSizeMul: number;
   spawnSeconds: number;
   spawnBurst: number;
-  /** Once a wave is cleared the next one starts after at most this many seconds. */
-  breatherSeconds: number;
-  periodSeconds: number;
   baseCount: number;
   perPlayer: number;
   countGrowth: number;
@@ -85,6 +82,8 @@ export const BALANCE = data as unknown as {
   progression: ProgressionConfig;
   enemies: Record<EnemyType, EnemyStats>;
   waves: WaveConfig;
+  /** The climb between floors: countdown after a clear, charge + lift, countdown on arrival, hp of those brought back. */
+  floors: { clearedSeconds: number; ascendSeconds: number; chargeSeconds: number; arriveSeconds: number; reviveHp: number };
   player: { reviveMoveMul: number; reviveDrain: number; hp: number; speed: number; iFrames: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };
   weapons: Record<WeaponId, WeaponStats>;
   classes: ClassStats[];

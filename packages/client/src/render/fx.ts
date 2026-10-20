@@ -75,6 +75,7 @@ export class Fx {
   private readonly decalCtx: CanvasRenderingContext2D;
   private readonly decalTex: THREE.CanvasTexture;
   private decalDirty = false;
+  private decalPlane: THREE.Mesh | null = null;
   private decalAge = 0;
   private readonly flashes: { mesh: THREE.Mesh; life: number; max: number; grow: number }[] = [];
   private readonly flashGeo = new THREE.SphereGeometry(1, 10, 8);
@@ -137,6 +138,7 @@ export class Fx {
       new THREE.PlaneGeometry(ARENA_HALF_W * 2, ARENA_HALF_H * 2),
       new THREE.MeshBasicMaterial({ map: this.decalTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
     );
+    this.decalPlane = plane;
     plane.rotation.x = -Math.PI / 2;
     plane.position.y = 0.012;
     plane.renderOrder = 1;
@@ -177,6 +179,22 @@ export class Fx {
   /** The camera the puffs face (set once by main; the iso camera never turns). */
   faceCamera(q: THREE.Quaternion): void {
     this.camQ.copy(q);
+  }
+
+  /** Wipe the blood and the bullet holes: a new floor starts clean. */
+  clearFloor(): void {
+    this.decalCtx.clearRect(0, 0, this.decalCanvas.width, this.decalCanvas.height);
+    this.decalTex.needsUpdate = true;
+    this.holeCount = 0;
+    this.holeNext = 0;
+    this.holes.count = 0;
+    this.setFloorFade(1);
+  }
+
+  /** Fade the floor's blood and holes (the old floor dissolves during the climb). */
+  setFloorFade(f: number): void {
+    if (this.decalPlane) (this.decalPlane.material as THREE.MeshBasicMaterial).opacity = f;
+    this.holes.visible = f > 0.35;
   }
 
   /** Remember the cover boxes of the arena in play (bullet holes stick to them). */

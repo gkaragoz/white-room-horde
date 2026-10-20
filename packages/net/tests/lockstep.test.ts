@@ -1,4 +1,4 @@
-import { type PlayerInput } from '@wrh/shared';
+import { BALANCE, FloorPhase, MISC, type PlayerInput } from '@wrh/shared';
 import { hashWorld, scriptedInput } from '@wrh/sim';
 import { describe, expect, it } from 'vitest';
 import { NetSession, RoomManager, type Conn, type ManagerOptions } from '../src';
@@ -184,6 +184,57 @@ describe('lockstep over a laggy network', () => {
     expect(compared).toBeGreaterThan(80);
     expect(net.clients.every((c) => c.session.desyncTicks.length === 0)).toBe(true);
   });
+
+  it('climbs from floor to floor with every client on the same hash, and a late joiner mid-flight lands in the same place', () => {
+    // tiny floors so the scripted players clear them quickly
+    const keep = [BALANCE.waves.baseCount, BALANCE.waves.perPlayer, BALANCE.waves.waveSizeMul, BALANCE.player.hp];
+    BALANCE.player.hp = 1e6; // nobody dies while the scripted players clear the floors
+    BALANCE.waves.baseCount = 2;
+    BALANCE.waves.perPlayer = 0;
+    BALANCE.waves.waveSizeMul = 1;
+    try {
+      const net = lobby([30, 80, 50], 20);
+      net.clients[0]!.session.start();
+      const seen = net.clients.map(() => new Map<number, number>());
+      let late: Client | null = null;
+      let sawFlight = false;
+      for (let t = 0; t < 120000; t++) {
+        net.advance(1);
+        net.clients.forEach((c, i) => {
+          const w = c.session.world;
+          if (!w) return;
+          const mine = seen[i];
+          if (mine && w.tick % 30 === 0 && !mine.has(w.tick)) mine.set(w.tick, hashWorld(w));
+        });
+        const w0 = net.clients[0]!.session.world;
+        if (w0 && w0.misc[MISC.Phase] === FloorPhase.Ascend) sawFlight = true;
+        if (!late && w0 && w0.misc[MISC.Phase] === FloorPhase.Ascend && w0.wave === 1) {
+          late = net.addClient(40, 10);
+          late.session.join(net.clients[0]!.session.code, 'late');
+        }
+        if (w0 && w0.wave >= 3 && late && late.session.world && late.session.world.wave >= 3) break;
+      }
+      expect(sawFlight).toBe(true);
+      expect(net.clients[0]!.session.world!.wave).toBeGreaterThanOrEqual(3);
+      expect(net.clients.every((c) => c.session.desyncTicks.length === 0)).toBe(true);
+      let compared = 0;
+      for (const [tick, h] of seen[0]!) {
+        for (let i = 1; i < net.clients.length; i++) {
+          const o = seen[i]?.get(tick);
+          if (o === undefined) continue;
+          expect(o).toBe(h);
+          compared++;
+        }
+      }
+      expect(compared).toBeGreaterThan(100);
+      expect(late).not.toBeNull();
+      expect(Math.abs(late!.session.world!.tick - net.clients[0]!.session.world!.tick)).toBeLessThan(20);
+      expect(late!.session.world!.wave).toBe(net.clients[0]!.session.world!.wave);
+      expect(late!.session.world!.map).toBe(net.clients[0]!.session.world!.map);
+    } finally {
+      [BALANCE.waves.baseCount, BALANCE.waves.perPlayer, BALANCE.waves.waveSizeMul, BALANCE.player.hp] = keep as [number, number, number, number];
+    }
+  }, 120000);
 
   it('a late joiner fast-forwards and converges; a perturbed client is reported as desynced', () => {
     const net = lobby([30, 30, 30], 10);

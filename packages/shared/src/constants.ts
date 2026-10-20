@@ -124,3 +124,9 @@ export const OBSTACLES: readonly Box[] = MAPS[0]!.boxes;
 
 
 export const MAX_PICKUPS = 64;
+
+/** Where the world is in the climb between floors (`world.misc[MISC.Phase]`). */
+export const FloorPhase = { Fight: 0, Cleared: 1, Ascend: 2, Arrive: 3 } as const;
+
+/** Slots of `world.misc`. */
+export const MISC = { Freeze: 0, Remaining: 1, Cleared: 2, Total: 3, Phase: 4, PhaseEnd: 5, Entered: 6 } as const;

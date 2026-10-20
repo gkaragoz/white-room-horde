@@ -30,6 +30,9 @@ export type SimEvent =
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
   | { type: 'waveCleared'; wave: number }
+  | { type: 'floorAscend'; from: number; to: number; map: number }
+  | { type: 'floorEnter'; wave: number; map: number }
+  | { type: 'floorArrive'; wave: number }
   | { type: 'waveStart'; wave: number; boss: boolean; mod: number }
   | { type: 'levelUp'; level: number }
   | { type: 'cardOffer'; cards: number[] }
@@ -260,7 +263,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     brY: new Float64Array(MAX_BARRELS),
     brHp: new Float64Array(MAX_BARRELS),
     brT: new Float64Array(MAX_BARRELS),
-    misc: new Float64Array(4),
+    misc: new Float64Array(8),
     gActive: new Uint8Array(MAX_GRENADES),
     gX: new Float64Array(MAX_GRENADES),
     gY: new Float64Array(MAX_GRENADES),

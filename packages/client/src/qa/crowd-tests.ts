@@ -1,4 +1,4 @@
-import { Buttons, ENEMY_TYPES, TICK_DT } from '@wrh/shared';
+import { Buttons, ENEMY_TYPES, FloorPhase, MISC, TICK_DT, BALANCE } from '@wrh/shared';
 import { addPlayer, createWorld, spawnEnemy, step, type World } from '@wrh/sim';
 import { BOSS_TYPES, Crowd } from '../render/crowd';
 import { Fx } from '../render/fx';
@@ -6,6 +6,9 @@ import { RagdollPool } from '../render/ragdoll';
 import * as THREE from 'three';
 import { Audio, BANK_FILES, MUSIC_FILES } from '../audio';
 import { PickupView } from '../render/pickups';
+import { ArenaView } from '../render/arena';
+import { PropsView } from '../render/props';
+import { FloorClimb, FLOOR_GAP } from '../render/floorFx';
 import { Stage, type AaMode } from '../render/stage';
 import { webgpuSupported } from '../render/backend';
 import type { Ctx, QaTest } from './tests';
@@ -531,6 +534,85 @@ export const crowdTests: QaTest[] = [
         ctx.stage.scene.remove(view.group);
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'all nine loot models and the spinning weapons are visible and removed cleanly' };
+    },
+  },
+  {
+    id: 'floors.transition',
+    title: 'The climb: charge circle, lift with two floors in view, blur only during the flight, clean hand-over at arrival',
+    async run(ctx) {
+      const w = createWorld(8);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, 0);
+      const fx = new Fx(undefined, 1);
+      const arena = new ArenaView();
+      const props = await PropsView.create();
+      arena.setMap(0);
+      props.setMap(0);
+      ctx.stage.scene.add(fx.group, arena.group, props.group);
+      const climb = new FloorClimb(ctx.stage, fx, arena, props);
+      const problems: string[] = [];
+      const px = [0];
+      const py = [0];
+      const hold = (remaining: number): ReturnType<FloorClimb['update']> => {
+        w.misc[MISC.Phase] = FloorPhase.Ascend;
+        w.misc[MISC.PhaseEnd] = w.tick + remaining;
+        px[0] = 0;
+        py[0] = 0;
+        return climb.update(w, 0, 1, 0.016, px, py);
+      };
+      try {
+        ctx.stage.follow(0, 0);
+        ctx.stage.render();
+        const calm = grab(ctx);
+        // charge: nothing has left the ground yet, the circle and the beam are drawn
+        const total = Math.round(BALANCE.floors.ascendSeconds * 30);
+        let info = hold(total - 15);
+        ctx.stage.follow(0, 0, 0, info.lift);
+        ctx.stage.render();
+        const charging = grab(ctx);
+        if (!info.active) problems.push('charge: climb not active');
+        if (info.lift > 0.01) problems.push(`charge: already lifted ${f(info.lift)}`);
+        if (diffCount(calm, charging) < 150) problems.push('charge: no circle or beam drawn under the party');
+        // half way: the party is about half a floor up and the new floor is part of the picture
+        info = hold(Math.round(total * 0.4));
+        if (Math.abs(info.lift - FLOOR_GAP * 0.5) > FLOOR_GAP * 0.3) problems.push(`mid flight lift ${f(info.lift)} is not near ${FLOOR_GAP / 2}`);
+        ctx.stage.follow(0, 0, 0, info.lift);
+        ctx.stage.setFlightBlur(0);
+        ctx.stage.render();
+        const sharp = grab(ctx);
+        ctx.stage.setFlightBlur(0.03);
+        ctx.stage.render();
+        const blurred = grab(ctx);
+        if (diffCount(sharp, blurred) < 500) problems.push('motion blur does not change the picture');
+        if (diffCount(calm, sharp) < 3000) problems.push('mid flight looks like the start (no second floor, dissolve or shaft)');
+        // the blur path alone must not shift brightness: a tiny strength through the composer matches the plain render
+        ctx.stage.setFlightBlur(0.0006);
+        ctx.stage.render();
+        const tiny = grab(ctx);
+        const mean = (a: Uint8Array): number => {
+          let t = 0;
+          for (let i = 0; i < a.length; i += 4) t += a[i]! + a[i + 1]! + a[i + 2]!;
+          return t / (a.length / 4) / 3;
+        };
+        if (Math.abs(mean(tiny) - mean(sharp)) > 6) problems.push(`switching to the flight composer shifts brightness by ${f(mean(tiny) - mean(sharp))}`);
+        ctx.stage.setFlightBlur(0);
+        // arrival: everything drops back to the floor in one go and the other floor is now the current one
+        const first = climb.props;
+        w.misc[MISC.Phase] = FloorPhase.Arrive;
+        info = climb.update(w, 0, 2, 0.016, px, py);
+        if (info.active || info.lift !== 0) problems.push('arrival: still lifted');
+        if (climb.props === first) problems.push('arrival: floors were not swapped');
+        ctx.stage.follow(0, 0, 0, 0);
+        ctx.stage.render();
+        const after = grab(ctx);
+        if (Math.abs(mean(after) - mean(calm)) > 40) problems.push(`arrival: brightness ${f(mean(after))} vs ${f(mean(calm))} at the start`);
+      } finally {
+        climb.dispose();
+        ctx.stage.scene.remove(fx.group, arena.group, props.group);
+        ctx.stage.follow(0, 0);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'charge, lift, blur and arrival behave' };
     },
   },
 ];

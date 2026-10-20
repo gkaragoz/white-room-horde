@@ -57,54 +57,13 @@ describe('waves', () => {
     }
     expect(w.misc[1]).toBe(0);
     expect(spawned).toBe(total());
-    // nothing more arrives until the next wave
+    // nothing more arrives; the floor is cleared and the countdown runs
     const wave = w.wave;
-    for (let t = 0; t < 30 * 8; t++) step(w, [NONE]);
+    for (let t = 0; t < 30 * 3; t++) step(w, [NONE]);
     expect(w.wave).toBe(wave);
     expect(w.enemyCount).toBe(0);
   });
 
-  it('a cleared wave gives a breather and then the next wave starts early', () => {
-    const w = createWorld(22);
-    addPlayer(w, 0, 0, 0);
-    let cleared = -1;
-    for (let t = 0; t < 30 * 40 && cleared < 0; t++) {
-      step(w, [NONE]);
-      wipe(w);
-      if (w.events.some((e) => e.type === 'waveCleared')) cleared = w.tick;
-    }
-    expect(cleared).toBeGreaterThan(0);
-    const startedAt = w.wave;
-    let nextStart = -1;
-    for (let t = 0; t < 30 * 30 && nextStart < 0; t++) {
-      step(w, [NONE]);
-      if (w.events.some((e) => e.type === 'waveStart')) nextStart = w.tick;
-    }
-    expect(w.wave).toBe(startedAt + 1);
-    const breather = (nextStart - cleared) / 30;
-    expect(breather).toBeGreaterThan(BALANCE.waves.breatherSeconds - 1);
-    expect(breather).toBeLessThan(BALANCE.waves.breatherSeconds + 2);
-    expect(breather).toBeLessThan(BALANCE.waves.periodSeconds);
-  });
-
-  it('a wave that is not cleared simply continues until the clock runs out, and every wave is bigger', () => {
-    const w = createWorld(23);
-    addPlayer(w, 0, 0, 0);
-    w.pHp[0] = 1e9;
-    w.pMaxHp[0] = 1e9;
-    const sizes: number[] = [w.misc[3]!];
-    let last = 1;
-    for (let t = 0; t < 30 * 130; t++) {
-      step(w, [NONE]);
-      if (t === 0) sizes[0] = w.misc[3]!;
-      if (w.wave !== last) {
-        last = w.wave;
-        sizes.push(w.misc[3]!);
-      }
-    }
-    expect(sizes.length).toBeGreaterThanOrEqual(3);
-    for (let i = 1; i < sizes.length; i++) expect(sizes[i]!).toBeGreaterThan(sizes[i - 1]!);
-  });
 });
 
 describe('enemies', () => {

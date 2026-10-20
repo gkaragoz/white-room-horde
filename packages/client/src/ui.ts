@@ -1,5 +1,5 @@
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, FloorPhase, MISC, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -43,11 +43,15 @@ const BASE_STRINGS = {
     waiting: 'Waiting for the host to start...',
     players: 'Players',
     host_tag: 'host',
-    wave: 'Wave',
-    nextWave: 'Next wave in',
+    wave: 'Floor',
+    nextWave: 'Next floor in',
     enemiesLeft: 'left',
-    waveCleared: 'Wave cleared!',
+    waveCleared: 'FLOOR CLEARED',
     breather: 'Catch your breath',
+    climbIn: 'Climbing in',
+    climbing: 'Climbing...',
+    getReady: 'Get ready',
+    arrivedTitle: 'Floor',
     kills: 'Kills',
     level: 'Level',
     boss: 'BOSS',
@@ -220,11 +224,15 @@ const BASE_STRINGS = {
     waiting: 'Host oyunu başlatana kadar bekleniyor...',
     players: 'Oyuncular',
     host_tag: 'host',
-    wave: 'Dalga',
-    nextWave: 'Sonraki dalga',
+    wave: 'Kat',
+    nextWave: 'Sonraki kat',
     enemiesLeft: 'kaldı',
-    waveCleared: 'Dalga temizlendi!',
+    waveCleared: 'KAT TEMİZLENDİ',
     breather: 'Nefes al',
+    climbIn: 'Yükselmeye',
+    climbing: 'Yükseliyor...',
+    getReady: 'Hazırlan',
+    arrivedTitle: 'Kat',
     kills: 'Öldürme',
     level: 'Seviye',
     boss: 'BOSS',
@@ -599,6 +607,12 @@ const CSS = `
 @media (max-width:560px){.wrh-set-row,.wrh-ctl-row{grid-template-columns:1fr}.wrh-set-row:has(.wrh-range){grid-template-columns:1fr 48px}.wrh-set-row:has(.wrh-range) label{grid-column:1/-1}}
 .wrh-gear{position:absolute;right:12px;top:10px;pointer-events:auto;cursor:pointer;width:34px;height:34px;border-radius:50%;background:rgba(250,244,232,.9);border:2px solid #cdbfa5;text-align:center;line-height:30px;font-size:18px}
 .wrh-hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;opacity:.7;text-shadow:0 1px 0 #fff}
+.wrh-count{position:absolute;left:50%;top:92px;transform:translateX(-50%);z-index:6;display:none;flex-direction:column;align-items:center;pointer-events:none;color:#fff;text-shadow:0 2px 0 rgba(20,28,44,.55),0 0 22px rgba(31,162,255,.7)}
+.wrh-count b{font-size:26px;letter-spacing:.12em;font-weight:900}
+.wrh-count i{font-style:normal;font-size:72px;line-height:1;font-weight:900;font-variant-numeric:tabular-nums}
+.wrh-count i.pop{animation:wrh-countpop .5s cubic-bezier(.2,1.6,.4,1)}
+.wrh-count small{font-size:14px;font-weight:700;opacity:.9;letter-spacing:.06em;text-transform:uppercase}
+@keyframes wrh-countpop{from{transform:scale(1.7);opacity:.2}to{transform:scale(1);opacity:1}}
 .wrh-loading{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(10,14,22,.55);backdrop-filter:blur(3px);pointer-events:none}
 .wrh-loading .box{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:240px;padding:22px 30px;border-radius:16px;background:rgba(251,246,234,.96);color:#2b3a52;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .wrh-loading i{width:38px;height:38px;border-radius:50%;border:4px solid rgba(43,58,82,.18);border-top-color:#1fa2ff;animation:wrh-spin .8s linear infinite}
@@ -1338,6 +1352,38 @@ export class Ui {
     });
   }
 
+  private countEl: HTMLElement | null = null;
+  /** Seconds currently shown by the floor countdown (for the pop animation and the tick sound). */
+  countShown = -1;
+
+  /** Big countdown at the top of the screen between floors: title, small line and the seconds; a null title hides it. */
+  setFloorCountdown(title: string | null, small: string, secs: number): void {
+    let el = this.countEl;
+    if (title === null) {
+      if (el && el.style.display !== 'none') el.style.display = 'none';
+      this.countShown = -1;
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wrh-count';
+      el.innerHTML = '<b></b><i></i><small></small>';
+      this.root.appendChild(el);
+      this.countEl = el;
+    }
+    el.style.display = 'flex';
+    const [b, num, sm] = [el.children[0] as HTMLElement, el.children[1] as HTMLElement, el.children[2] as HTMLElement];
+    if (b.textContent !== title) b.textContent = title;
+    if (sm.textContent !== small) sm.textContent = small;
+    if (secs !== this.countShown) {
+      this.countShown = secs;
+      num.textContent = String(secs);
+      num.classList.remove('pop');
+      void num.offsetWidth;
+      num.classList.add('pop');
+    }
+  }
+
   private loadingEl: HTMLElement | null = null;
 
   /** Full-screen "loading" overlay with a spinner (and a progress bar when `frac` is given); null hides it. */
@@ -1662,9 +1708,16 @@ export class Ui {
       const el = this.hud.querySelector<HTMLElement>('#' + id)!;
       if (el.innerHTML !== html) el.innerHTML = html;
     };
-    const nextIn = Math.max(0, Math.ceil(BALANCE.waves.periodSeconds - (world.tick - world.waveTick) / TICK_RATE));
-    const bossNext = (world.wave + 1) % BALANCE.progression.boss.everyWaves === 0;
-    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.level}<br><small style="font-weight:600;opacity:.75">${world.enemyCount + world.misc[1]! > 0 ? `${world.enemyCount + world.misc[1]!} ${t.enemiesLeft} &middot; ` : `${t.breather} &middot; `}${t.nextWave} ${nextIn}s${bossNext ? ` &middot; <span class="wrh-low">${t.boss}!</span>` : ''}</small>`);
+    const phase = world.misc[MISC.Phase]!;
+    const left = world.enemyCount + world.misc[MISC.Remaining]!;
+    const bossNext = world.wave % BALANCE.progression.boss.everyWaves === 0;
+    const sub = phase === FloorPhase.Fight ? `${left} ${t.enemiesLeft}${bossNext ? ` &middot; <span class="wrh-low">${t.boss}!</span>` : ''}` : phase === FloorPhase.Ascend ? t.climbing : phase === FloorPhase.Cleared ? t.breather : t.getReady;
+    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.level}<br><small style="font-weight:600;opacity:.75">${sub}</small>`);
+    // the big countdown under the top bar: after a clear (before the climb) and on the new floor (before the fight)
+    const secsLeft = Math.max(0, Math.ceil((world.misc[MISC.PhaseEnd]! - world.tick) / TICK_RATE));
+    if (phase === FloorPhase.Cleared) this.setFloorCountdown(t.waveCleared, `${t.climbIn}`, secsLeft);
+    else if (phase === FloorPhase.Arrive) this.setFloorCountdown(`${t.arrivedTitle} ${world.wave}`, t.getReady, secsLeft);
+    else this.setFloorCountdown(null, '', 0);
     (this.hud.querySelector('#h-xp') as HTMLElement).style.width = `${Math.min(100, (world.xp / xpForNext(world)) * 100)}%`;
 
     // boss bar

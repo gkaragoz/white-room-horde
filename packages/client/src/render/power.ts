@@ -90,7 +90,7 @@ export class PowerView {
   }
 
   /** Draw the upgrades of player `s` standing at sim position (x, y). */
-  slot(w: World, s: number, x: number, y: number, now: number, dt: number, isLocal: boolean): void {
+  slot(w: World, s: number, x: number, y: number, now: number, dt: number, isLocal: boolean, lift = 0): void {
     const shield = this.shields[s]!;
     if (!w.pActive[s] || w.pState[s] === PlayerState.Dead) {
       shield.visible = false;
@@ -108,7 +108,7 @@ export class PowerView {
       const a = now * 1.6 + (k / n) * Math.PI * 2;
       const r = 0.78 + Math.min(0.2, n * 0.012);
       const size = 0.06 + Math.min(0.06, active[k]!.level * 0.05);
-      this.tmp.position.set(x + Math.cos(a) * r, 1.05 + Math.sin(now * 2.2 + k) * 0.08, -y + Math.sin(a) * r);
+      this.tmp.position.set(x + Math.cos(a) * r, 1.05 + lift + Math.sin(now * 2.2 + k) * 0.08, -y + Math.sin(a) * r);
       this.tmp.rotation.set(now * 2 + k, now * 1.3, 0);
       this.tmp.scale.setScalar(size);
       this.tmp.updateMatrix();
@@ -120,7 +120,7 @@ export class PowerView {
     const armor = Math.max(0, POWERS[KIND.armor!]!.level(w, s));
     shield.visible = armor > 0.01 && !down;
     if (shield.visible) {
-      shield.position.set(x, 1.0, -y);
+      shield.position.set(x, 1.0 + lift, -y);
       shield.rotation.y = now * 0.8;
       (shield.material as THREE.MeshBasicMaterial).opacity = 0.06 + Math.min(0.3, armor * 0.9) + Math.sin(now * 3) * 0.02;
     }
@@ -132,7 +132,7 @@ export class PowerView {
         const soft = active.filter((a) => ['luck', 'scholar', 'medic', 'vampire', 'crit', 'magnet'].includes(a.p.id));
         if (soft.length) {
           const pick = soft[Math.floor(Math.random() * soft.length)]!;
-          this.sparkle(x + (Math.random() - 0.5) * 0.8, y + (Math.random() - 0.5) * 0.8, 0.4, pick.p.color, 1, 1.2);
+          this.sparkle(x + (Math.random() - 0.5) * 0.8, y + (Math.random() - 0.5) * 0.8, 0.4 + lift, pick.p.color, 1, 1.2);
         }
       }
       // speed: dust streaks while running fast
@@ -145,7 +145,7 @@ export class PowerView {
     }
     if (isLocal) {
       const mg = POWERS[KIND.magnet!]!.level(w, s);
-      this.magnet.visible = mg > 0.01 && !down;
+      this.magnet.visible = mg > 0.01 && !down && lift < 0.2;
       if (this.magnet.visible) {
         const r = BALANCE.pickups.magnetRadius * w.modMagnet;
         this.magnet.position.x = x;

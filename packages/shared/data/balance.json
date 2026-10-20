@@ -294,8 +294,14 @@
       "interval": 1.0
     }
   },
+  "floors": {
+    "clearedSeconds": 5,
+    "ascendSeconds": 3.6,
+    "chargeSeconds": 0.9,
+    "arriveSeconds": 5,
+    "reviveHp": 0.5
+  },
   "waves": {
-    "periodSeconds": 60,
     "baseCount": 30,
     "perPlayer": 10,
     "countGrowth": 1.12,
@@ -332,8 +338,7 @@
     },
     "waveSizeMul": 1.4,
     "spawnSeconds": 25,
-    "spawnBurst": 0.3,
-    "breatherSeconds": 15
+    "spawnBurst": 0.3
   },
   "progression": {
     "xpBase": 15,

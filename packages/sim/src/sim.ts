@@ -1,5 +1,7 @@
 import {
   PERK,
+  FloorPhase,
+  MISC,
   ARENA_HALF_H,
   ARENA_HALF_W,
   BALANCE,
@@ -286,7 +288,8 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
  * Advance the world by one tick. `inputs[slot]` is the confirmed input for that slot (undefined = no input).
  * The order of the systems is fixed (docs/DESIGN.md section 15): inputs, player movement, weapons, enemies, bullets.
  */
-export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): void {
+export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>): void {
+  let inputs = inputsIn;
   w.events.length = 0;
   useMap(w.map);
   if (w.gameOver) {
@@ -294,6 +297,8 @@ export function step(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): 
     return;
   }
   for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pIFrames[s]! > 0) w.pIFrames[s] = w.pIFrames[s]! - TICK_DT;
+  // while the party is lifted to the next floor nobody can move, shoot or throw: only the aim is kept
+  if (w.misc[MISC.Phase] === FloorPhase.Ascend) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: 0, ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}) } : i));
   updateCards(w, inputs);
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s] || w.pState[s] === PlayerState.Dead) continue;

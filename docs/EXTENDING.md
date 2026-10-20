@@ -46,3 +46,12 @@ the `ui.strings` QA test checks the array lengths and that most strings really d
 `Recorder` stores the confirmed inputs and a hash every 30 ticks. `verifyReplay(replay, finalHash?)` runs it again and
 reports the first checkpoint that does not match. A leaderboard server can call it on every submitted replay (the sim is
 plain TypeScript and runs in a Worker or in Node).
+
+## Floors (the climb between rooms)
+A floor ends only when every enemy of it is dead. `runWaves` in `packages/sim/src/enemies.ts` is a small state machine kept in
+`world.misc` (`MISC.Phase`, `MISC.PhaseEnd`; phases in `FloorPhase`): fight, a 5 s "cleared" countdown, the ascent (a short
+charge, then the lift; the world is rebuilt for the next map half way, `enterFloor`) and a 5 s arrival countdown before the
+next floor's enemies come. Timings and the health of revived players are in `balance.json` `floors`. During the ascent the sim
+ignores movement and fire inputs. The client draws it from the same state (`render/floorFx.ts`: two floors stacked
+`FLOOR_GAP` apart, rune circle and light beam, speed lines, dissolve shader in `render/reveal.ts`, vertical motion blur in
+`render/stage.ts`), so online clients and late joiners always agree with the sim.

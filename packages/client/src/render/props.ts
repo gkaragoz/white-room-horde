@@ -3,6 +3,7 @@ import { ARENA_HALF_H, ARENA_HALF_W, MAPS } from '@wrh/shared';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { asset } from '../assets';
 import { loadGLB } from './character';
+import { patchReveal, patchRevealTree } from './reveal';
 
 const NAMES = [
   'crate', 'crate_stack', 'barrel', 'barrel_blue', 'cone', 'lamp', 'pallet', 'tyres', 'sandbags', 'bench', 'plant', 'barrier', 'container', 'sign',
@@ -61,8 +62,20 @@ const THEMES: { outer: PropName[]; top: PropName[]; ground: string }[] = [
  */
 export class PropsView {
   readonly group = new THREE.Group();
-  private readonly models = new Map<PropName, THREE.Object3D>();
+  private models = new Map<PropName, THREE.Object3D>();
   private current = -1;
+
+  /** The layout shown right now (-1 before the first). */
+  get map(): number {
+    return this.current;
+  }
+
+  /** A second view that shares the loaded models (the other floor of the climb). */
+  fork(): PropsView {
+    const v = new PropsView();
+    v.models = this.models;
+    return v;
+  }
   private ground: THREE.Mesh | null = null;
   /** Light sources of the current arena (world coordinates), for the stage's real-time lamp lights. */
   lamps: { x: number; y: number; z: number; color?: string }[] = [];
@@ -79,6 +92,7 @@ export class PropsView {
             o.receiveShadow = true;
           }
         });
+        patchRevealTree(g.scene);
         v.models.set(n, g.scene);
       }),
     );
@@ -126,6 +140,7 @@ export class PropsView {
       this.ground.position.y = -0.02;
       this.ground.receiveShadow = true;
     }
+    patchReveal(this.ground.material as THREE.Material);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(theme.ground);
     this.group.add(this.ground);
 
@@ -190,6 +205,11 @@ export class PropsView {
       m.rotation.y = b * 1.3;
       m.scale.y = 1.1 + Math.sin(now * 5 + b) * 0.02;
     }
+  }
+
+  /** Hide every explosive barrel (they belong to another floor now). */
+  hideBarrels(): void {
+    for (const m of this.barrelMeshes) if (m) m.visible = false;
   }
 
   /** Glow sprites of lamps and fires fade in with the night. */
