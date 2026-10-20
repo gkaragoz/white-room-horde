@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, PERSONAL_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
+import { Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
 import { addPlayer, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
 import { AimSolver, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
@@ -374,7 +374,7 @@ export const moreTests: QaTest[] = [
       try {
         let clock = 1000;
         const bySet = (cards: string[]): void => {
-          cards.forEach((c, i) => (w.cardOffer[i] = CARD_IDS.indexOf(c as (typeof CARD_IDS)[number])));
+          cards.forEach((c, i) => (w.pOffer[i] = CARD_IDS.indexOf(c as (typeof CARD_IDS)[number])));
         };
         for (const lang of ['en', 'tr'] as const) {
           ui.applySettings({ ...settings, lang });
@@ -382,7 +382,7 @@ export const moreTests: QaTest[] = [
           for (let start = 0; start < CARD_IDS.length; start += 3) {
             const group = [0, 1, 2].map((k) => CARD_IDS[(start + k) % CARD_IDS.length]!);
             bySet(group);
-            w.cardTimer = 100;
+            w.pCardTimer[0] = 100;
             clock += 200; // the HUD throttles on time, so keep it moving forward
             ui.update(w, 0, 0, clock, ['p']);
             const cards = [...host.querySelectorAll<HTMLElement>('.wrh-card')];
@@ -399,7 +399,7 @@ export const moreTests: QaTest[] = [
               if (!title || !text) problems.push(`${lang}/${id}: empty title or text`);
               if (!img?.src.includes(`cards/${id}.png`)) problems.push(`${lang}/${id}: wrong image ${img?.src}`);
               if (!el.classList.contains(`r${CARD_RARITY[id]}`)) problems.push(`${lang}/${id}: wrong rarity class`);
-              if (PERSONAL_CARDS.includes(id) !== /sen|you/i.test(tag)) problems.push(`${lang}/${id}: personal tag mismatch ("${tag}")`);
+              if (TEAM_CARDS.includes(id) !== /takım|team/i.test(tag)) problems.push(`${lang}/${id}: team tag mismatch ("${tag}")`);
               if (img) {
                 try {
                   await img.decode();
@@ -653,19 +653,19 @@ export const moreTests: QaTest[] = [
       const problems: string[] = [];
       if (count() !== 0) problems.push('a gem shows with no upgrades');
       const steps: [string, () => void][] = [
-        ['damage', () => (w.modDamage = 1.3)],
-        ['rate', () => (w.modRate = 1.2)],
-        ['pierce', () => (w.modPierce = 2)],
-        ['crit', () => (w.modCrit = 0.1)],
-        ['blast', () => (w.modBlast = 1.3)],
+        ['damage', () => (w.modDamage[0] = 1.3)],
+        ['rate', () => (w.modRate[0] = 1.2)],
+        ['pierce', () => (w.modPierce[0] = 2)],
+        ['crit', () => (w.modCrit[0] = 0.1)],
+        ['blast', () => (w.modBlast[0] = 1.3)],
         ['speed', () => (w.pModSpeed[0] = 1.2)],
-        ['armor', () => (w.modArmor = 0.8)],
-        ['magnet', () => (w.modMagnet = 1.5)],
+        ['armor', () => (w.modArmor[0] = 0.8)],
+        ['magnet', () => (w.modMagnet[0] = 1.5)],
         ['luck', () => (w.modLoot = 1.4)],
-        ['scholar', () => (w.modXp = 1.3)],
-        ['medic', () => (w.modRevive = 0.7)],
-        ['quick', () => (w.modReload = 0.8)],
-        ['roll', () => (w.modDash = 0.8)],
+        ['scholar', () => (w.modXp[0] = 1.3)],
+        ['medic', () => (w.modRevive[0] = 0.7)],
+        ['quick', () => (w.modReload[0] = 0.8)],
+        ['roll', () => (w.modDash[0] = 0.8)],
         ['vampire', () => (w.pLifesteal[0] = 2)],
       ];
       let n = 0;
@@ -807,43 +807,78 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'aim.hits',
-    title: 'Auto-aimed shots hit: from the muzzle, leading a walking enemy, in every direction and with every kind of gun',
+    title: 'Auto-aimed shots hit: from the muzzle, leading a walking enemy, through the delay of the input, around cover',
     async run() {
       const problems: string[] = [];
       const solver = new AimSolver();
       const weapons = ['pistol', 'smg', 'ar', 'shotgun', 'sniper', 'revolver'] as const;
+      const encode = (angle: number): number => Math.round((((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * 65536) & 0xffff;
       let hits = 0;
       let total = 0;
       const missed: string[] = [];
-      for (const weapon of weapons) {
-        for (let k = 0; k < 8; k++) {
-          for (const dist of [6, 13]) {
-            const w = createWorld(100 + k);
-            w.waveTick = 1e9;
-            w.countMul = 0;
-            addPlayer(w, 0, 0, 0, weapon);
-            w.pHp[0] = w.pMaxHp[0] = 1e9;
-            const th = (k / 8) * Math.PI * 2 + 0.2;
-            const e = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), Math.cos(th) * dist, Math.sin(th) * dist, false);
-            w.eHp[e] = 14; // two pistol hits would be fine too, but one lucky pellet should not decide
-            let target: ReturnType<typeof pickTarget> = null;
-            let killed = false;
-            for (let t = 0; t < 120 && !killed; t++) {
-              solver.track(w);
-              target = pickTarget(w, 0, target);
-              const angle = target ? solver.angle(w, 0, target, 1) : 0;
-              step(w, [{ moveX: 0, moveY: 0, aim: Math.round((((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * 65536) & 0xffff, buttons: Buttons.Fire }]);
-              killed = !w.eActive[e] || w.kills > 0;
+      // inputs reach the simulation `delay` ticks after they were worked out, as they do online
+      for (const delay of [1, 6]) {
+        for (const weapon of weapons) {
+          for (let k = 0; k < 8; k++) {
+            for (const dist of [6, 13]) {
+              const w = createWorld(100 + k);
+              w.waveTick = 1e9;
+              w.countMul = 0;
+              addPlayer(w, 0, 0, 0, weapon);
+              w.pHp[0] = w.pMaxHp[0] = 1e9;
+              const th = (k / 8) * Math.PI * 2 + 0.2;
+              const e = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), Math.cos(th) * dist, Math.sin(th) * dist, false);
+              w.eHp[e] = 14;
+              let target: ReturnType<typeof pickTarget> = null;
+              let killed = false;
+              const queue: number[] = [];
+              for (let t = 0; t < 140 && !killed; t++) {
+                solver.track(w);
+                target = pickTarget(w, 0, target, (x) => solver.shotClear(w, 0, x, delay));
+                queue.push(target ? solver.angle(w, 0, target, delay) : 0);
+                const aim = encode(queue.length > delay ? queue.shift()! : queue[0]!);
+                step(w, [{ moveX: 0, moveY: 0, aim, buttons: Buttons.Fire }]);
+                killed = !w.eActive[e] || w.kills > 0;
+              }
+              total++;
+              if (killed) hits++;
+              else missed.push(`${weapon} d${delay} ${f((th * 180) / Math.PI, 0)}deg ${dist}u`);
             }
-            total++;
-            if (killed) hits++;
-            else missed.push(`${weapon} ${f((th * 180) / Math.PI, 0)}deg ${dist}u`);
           }
         }
       }
-      // a few pellets of a shotgun or the odd wide spread may miss at long range; the aim itself must be right
-      if (hits / total < 0.94) problems.push(`only ${hits} of ${total} auto-aimed shots killed their target (${missed.slice(0, 6).join(', ')})`);
-      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${hits} of ${total} auto-aimed shots hit their walking target` };
+      if (hits / total < 0.97) problems.push(`only ${hits} of ${total} auto-aimed shots killed their target (${missed.slice(0, 6).join(', ')})`);
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${hits} of ${total} auto-aimed shots hit their walking target (inputs delayed by 1 and 6 ticks)` };
+    },
+  },
+  {
+    id: 'aim.cover',
+    title: 'Auto-aim never picks a target behind cover, not even one that is visible from the middle of the player but not from the muzzle',
+    async run() {
+      const problems: string[] = [];
+      const solver = new AimSolver();
+      // map 0 has a box at x 8..10, y -7.5..-2.5; the pistol's muzzle sits 1.56 ahead and 0.29 to the right
+      const w = createWorld(7);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 6.8, -2.3, 'pistol');
+      const e = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 16, -2.3, false);
+      w.eCooldown[e] = 1e9;
+      w.misc[0] = 1000; // frozen: it stays where it is
+      const plain = pickTarget(w, 0, null);
+      if (!plain) problems.push('the setup is wrong: the target is not visible from the middle of the player');
+      const aimed = pickTarget(w, 0, null, (x) => solver.shotClear(w, 0, x, 1));
+      if (aimed) problems.push('the target whose muzzle is behind the box corner was chosen');
+      // and the simulation agrees: shooting straight at it never reaches it
+      const hp = w.eHp[e]!;
+      for (let t = 0; t < 40; t++) step(w, [{ moveX: 0, moveY: 0, aim: 0, buttons: Buttons.Fire }]);
+      if (w.eHp[e] !== hp) problems.push('a bullet got through the corner, the check is too strict');
+      // a second target in the open is chosen instead of the hidden one
+      const open = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 6.8, 9, false);
+      w.eCooldown[open] = 1e9;
+      const next = pickTarget(w, 0, null, (x) => solver.shotClear(w, 0, x, 1));
+      if (!next || next.id !== open) problems.push('the visible enemy was not chosen over the hidden one');
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'hidden targets are skipped, visible ones chosen' };
     },
   },
   {
@@ -942,6 +977,40 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'lobby updates in place' };
+    },
+  },
+  {
+    id: 'ui.infobar',
+    title: 'The info bar for team upgrades: slides in with the card name and who took it, one at a time, the next one queued behind it',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+      }, settings);
+      const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+      try {
+        ui.pushInfo('First aid', 'Everyone healed to full', 'Alice', '#1FA2FF');
+        ui.pushInfo('Full magazines', 'Every weapon refilled', 'Bob', '#FF4F9A');
+        await sleep(120);
+        let items = [...host.querySelectorAll<HTMLElement>('.wrh-info .it')];
+        if (items.length !== 1) problems.push(`${items.length} bars at once, expected 1 (the second waits)`);
+        if (!items[0]?.classList.contains('in')) problems.push('the bar does not slide in');
+        if (!items[0]?.textContent?.includes('Alice') || !items[0]?.textContent?.includes('First aid')) problems.push('the bar does not name the card and who took it');
+        await sleep(4100);
+        items = [...host.querySelectorAll<HTMLElement>('.wrh-info .it')];
+        if (items.length !== 1 || !items[0]!.textContent?.includes('Bob')) problems.push('the queued bar did not follow the first one');
+        await sleep(4100);
+        if (host.querySelectorAll('.wrh-info .it').length !== 0) problems.push('the bar did not go away after its animation');
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'one at a time, queued, names the card and the player' };
     },
   },
 ];

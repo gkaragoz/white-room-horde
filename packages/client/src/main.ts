@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
@@ -445,7 +445,15 @@ function handleEvent(e: SimEvent): void {
   switch (e.type) {
     case 'enemyHit':
       crowd.hit(e.id);
-      if (Math.random() < 0.6) damageNumber(e.x, e.y, e.damage);
+      // every hit of the local player counts: hits on the same enemy inside one frame (shotgun pellets) are one number
+      if (e.by === localSlot) {
+        const a = hitAcc.get(e.id);
+        if (a) {
+          a.dmg += e.damage;
+          a.x = e.x;
+          a.y = e.y;
+        } else hitAcc.set(e.id, { x: e.x, y: e.y, dmg: e.damage });
+      }
       break;
     case 'waveStart': {
       const L = UI_STRINGS[ui.lang];
@@ -484,8 +492,19 @@ function handleEvent(e: SimEvent): void {
       break;
     }
     case 'levelUp':
-      ui.banner(ui.lang === 'tr' ? 'Seviye atlandı!' : 'Level up!', `${e.level}`, 1500);
+      if (e.slot === localSlot) ui.banner(ui.lang === 'tr' ? 'Seviye atlandı!' : 'Level up!', `${e.level}`, 1500);
       break;
+    case 'cardPicked': {
+      // a card for the whole squad: the info bar says what it is and who took it
+      const id = CARD_IDS[e.card]!;
+      if (TEAM_CARDS.includes(id)) {
+        const L = UI_STRINGS[ui.lang];
+        const cards = L.cards as Record<string, readonly [string, string]>;
+        const info = L.teamInfo as Record<string, string>;
+        ui.pushInfo(cards[id]![0], info[id] ?? cards[id]![1], names[e.by] ?? `P${e.by + 1}`, colorFor(e.by));
+      }
+      break;
+    }
     case 'playerRevive':
       ui.banner(ui.lang === 'tr' ? 'Kaldırıldı!' : 'Revived!', names[e.slot] ?? '', 1500);
       animator.trigger(e.slot, 'get_up', 1.3, nowSec);
@@ -533,6 +552,13 @@ window.addEventListener('blur', () => {
 });
 
 const _p = new THREE.Vector3();
+/** Damage of the local player's hits since the last frame, per enemy; shown (and cleared) once per frame. */
+const hitAcc = new Map<number, { x: number; y: number; dmg: number }>();
+
+function flushHits(): void {
+  for (const h of hitAcc.values()) damageNumber(h.x, h.y, h.dmg);
+  hitAcc.clear();
+}
 /** Floating damage numbers for hits (thinned out when the screen is full of them). */
 function damageNumber(x: number, y: number, damage: number): void {
   if (damage < 1 || !settings.damageNumbers) return;
@@ -789,8 +815,9 @@ function lockOn(): number | null {
     return null;
   }
   aimSolver.track(w);
-  aimTarget = pickTarget(w, localSlot, aimTarget);
-  return aimTarget ? aimSolver.angle(w, localSlot, aimTarget, inputDelayTicks()) : null;
+  const delay = inputDelayTicks();
+  aimTarget = pickTarget(w, localSlot, aimTarget, (t) => aimSolver.shotClear(w, localSlot, t, delay));
+  return aimTarget ? aimSolver.angle(w, localSlot, aimTarget, delay) : null;
 }
 
 function sampleLocal(): PlayerInput {
@@ -1034,7 +1061,7 @@ function frame(nowMs: number): void {
       const reloading = w.pReload[me]! > 0;
       _p.set(lx, 0.02, -ly).project(stage.camera);
       const ppu = app.clientWidth / CAMERA.orthoWidth;
-      const frac = reloading ? 1 - w.pReload[me]! / (st.reload * w.modReload) : w.pMag[me]! / st.mag;
+      const frac = reloading ? 1 - w.pReload[me]! / (st.reload * w.modReload[me]!) : w.pMag[me]! / st.mag;
       // where the next grenade lands
       {
         const gc = BALANCE.grenade;
@@ -1082,7 +1109,10 @@ function frame(nowMs: number): void {
         continue;
       }
       _p.set(vx[s]!, 1.6 + lifted.lift, -vy[s]!).project(stage.camera);
-      const need = BALANCE.player.reviveSeconds * w.modRevive;
+      // the fastest medic card in the squad sets the pace of the ring
+      let medic = 1;
+      for (let h = 0; h < MAX_PLAYERS; h++) if (w.pActive[h] && h !== s && w.modRevive[h]! < medic) medic = w.modRevive[h]!;
+      const need = BALANCE.player.reviveSeconds * medic;
       ui.setRing(s, Math.max(0, w.pTimer[s]! / BALANCE.player.downedSeconds), Math.min(1, w.pRevive[s]! / need), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true, w.pRevive[s]! > 0);
     }
     // arrows at the screen edge for teammates who are out of view
@@ -1181,6 +1211,7 @@ function frame(nowMs: number): void {
     }
     spitMesh.count = sn;
     spitMesh.instanceMatrix.needsUpdate = true;
+    flushHits();
     ui.update(w, localSlot, fx.hurt, nowMs, names);
     if (ui.countShown !== lastCount) {
       if (ui.countShown > 0) audio.play(ui.countShown <= 3 ? 'countGo' : 'countTick');

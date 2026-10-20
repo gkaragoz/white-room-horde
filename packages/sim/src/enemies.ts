@@ -364,7 +364,7 @@ function runWaves(w: World, playerCount: number): void {
 
 export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number, attacker = -1): boolean {
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
-  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * w.modArmor * w.pModArmor[slot]!);
+  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * w.modArmor[slot]! * w.pModArmor[slot]!);
   const thorns = perk(w, slot, PERK.Thorns);
   if (thorns > 0 && attacker >= 0 && w.eActive[attacker]) {
     const prev = killer;
@@ -406,7 +406,14 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   w.kills++;
   w.events.push({ type: 'enemyDeath', id: i, etype: type, x: w.eX[i]!, y: w.eY[i]!, dx, dy, power });
   dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0);
-  awardXp(w, w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]);
+  // experience belongs to the character that made the kill; a kill nobody owns is shared by the living
+  const xp = w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]!;
+  if (killer >= 0 && w.pActive[killer]) awardXp(w, killer, xp);
+  else {
+    let alive = 0;
+    for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pState[s] === PlayerState.Alive) alive++;
+    for (let s = 0; s < MAX_PLAYERS && alive > 0; s++) if (w.pActive[s] && w.pState[s] === PlayerState.Alive) awardXp(w, s, xp / alive);
+  }
   if (type === T_EXPLODER) explode(w, i);
   if (type === T_BLOATER) {
     // the belly bursts: acid burns whoever is close and a litter of crawlers crawls out
@@ -467,7 +474,7 @@ export function damageEnemy(w: World, i: number, rawDamage: number, dx: number, 
     killEnemy(w, i, dx, dy, damage);
     return true;
   }
-  w.events.push({ type: 'enemyHit', id: i, etype: w.eType[i]!, x: w.eX[i]!, y: w.eY[i]!, damage });
+  w.events.push({ type: 'enemyHit', id: i, etype: w.eType[i]!, x: w.eX[i]!, y: w.eY[i]!, damage, by: killer });
   // a hit shoves the enemy along the shot (bosses barely move)
   const kb = Math.min(BALANCE.knock.max, damage * BALANCE.knock.perDamage) * (w.eBoss[i] ? 0.15 : 1);
   if (kb > 0.01) shove(w, i, dx * kb, dy * kb);
@@ -837,7 +844,7 @@ export function updateProjectiles(w: World): void {
     }
     if (w.gFuse[i]! <= 0) {
       w.gActive[i] = 0;
-      const bm = w.modBlast * perk(w, w.gOwner[i]!, PERK.Blast);
+      const bm = w.modBlast[w.gOwner[i]!]! * perk(w, w.gOwner[i]!, PERK.Blast);
       w.events.push({ type: 'explosion', x: w.gX[i]!, y: w.gY[i]!, radius: cfg.radius * bm });
       killer = w.gOwner[i]!;
       blastEnemies(w, w.gX[i]!, w.gY[i]!, cfg.radius * bm, cfg.damage * bm);

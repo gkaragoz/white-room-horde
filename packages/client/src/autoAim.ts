@@ -25,9 +25,10 @@ function position(w: World, kind: 0 | 1, id: number): { x: number; y: number } {
 /**
  * The nearest enemy or barrel the player can actually shoot: within reach of the weapon in the hands and not hidden
  * behind cover (a wall in the way would just eat the bullets). Barrels inside their blast of the shooter are skipped:
- * shooting one at your feet would hurt you. Null when there is nothing (then the character keeps looking where it was).
+ * shooting one at your feet would hurt you. `shotClear` (from AimSolver.shotClear) tests the real bullet path; without
+ * it only the line from the player's middle is checked. Null when there is nothing (then the character keeps looking where it was).
  */
-export function pickTarget(w: World, slot: number, prev: AimTarget | null): AimTarget | null {
+export function pickTarget(w: World, slot: number, prev: AimTarget | null, shotClear?: (t: AimTarget) => boolean): AimTarget | null {
   if (!w.pActive[slot]) return null;
   const px = w.pX[slot]!;
   const py = w.pY[slot]!;
@@ -61,7 +62,7 @@ export function pickTarget(w: World, slot: number, prev: AimTarget | null): AimT
       }
     }
     if (!cand) break;
-    if (lineClear(w, px, py, cand.x, cand.y)) {
+    if (shotClear ? shotClear(cand) : lineClear(w, px, py, cand.x, cand.y)) {
       best = cand;
       break;
     }
@@ -76,7 +77,8 @@ export function pickTarget(w: World, slot: number, prev: AimTarget | null): AimT
   const dpy = p.y - py;
   const dp = dpx * dpx + dpy * dpy;
   const db = (best.x - px) ** 2 + (best.y - py) ** 2;
-  if (dp <= limit && lineClear(w, px, py, p.x, p.y) && db > dp * STICKY * STICKY) return { kind: prev.kind, id: prev.id, x: p.x, y: p.y };
+  const prevTarget: AimTarget = { kind: prev.kind, id: prev.id, x: p.x, y: p.y };
+  if (dp <= limit && (shotClear ? shotClear(prevTarget) : lineClear(w, px, py, p.x, p.y)) && db > dp * STICKY * STICKY) return { kind: prev.kind, id: prev.id, x: p.x, y: p.y };
   return best;
 }
 
@@ -115,8 +117,9 @@ export class AimSolver {
         const dy = w.eY[i]! - this.ey[i]!;
         // a slot that was refilled, or a blast that threw the body, is not a speed
         const far = dx * dx + dy * dy > 9;
-        this.evx[i] = far ? 0 : dx / dt;
-        this.evy[i] = far ? 0 : dy / dt;
+        // smoothed over about three ticks: separation between neighbours makes single-tick speeds jumpy
+        this.evx[i] = far ? 0 : this.evx[i]! * 0.4 + (dx / dt) * 0.6;
+        this.evy[i] = far ? 0 : this.evy[i]! * 0.4 + (dy / dt) * 0.6;
       } else {
         this.evx[i] = 0;
         this.evy[i] = 0;
@@ -132,12 +135,30 @@ export class AimSolver {
         const dx = w.pX[s]! - this.px[s]!;
         const dy = w.pY[s]! - this.py[s]!;
         const far = dx * dx + dy * dy > 9;
-        this.pvx[s] = far ? 0 : dx / dt;
-        this.pvy[s] = far ? 0 : dy / dt;
+        this.pvx[s] = far ? 0 : this.pvx[s]! * 0.4 + (dx / dt) * 0.6;
+        this.pvy[s] = far ? 0 : this.pvy[s]! * 0.4 + (dy / dt) * 0.6;
       }
       this.px[s] = w.pX[s]!;
       this.py[s] = w.pY[s]!;
     }
+  }
+
+  /**
+   * Would a shot at this target really get through? Mirrors what the simulation does with a bullet: the stretch from the
+   * player to the muzzle (which sits ahead and to the side) and then the flight from the muzzle to the target must both be
+   * free of cover. A target that is visible from the player's middle but whose muzzle is behind a corner fails.
+   */
+  shotClear(w: World, slot: number, t: AimTarget, delayTicks: number): boolean {
+    const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[slot]!]!]!;
+    const a = this.angle(w, slot, t, delayTicks);
+    const px = w.pX[slot]!;
+    const py = w.pY[slot]!;
+    const mx = px + Math.cos(a) * st.muzzleFwd + Math.sin(a) * st.muzzleSide;
+    const my = py + Math.sin(a) * st.muzzleFwd - Math.cos(a) * st.muzzleSide;
+    const near = Math.hypot(t.x - px, t.y - py) <= st.muzzleFwd + 0.3;
+    if (near) return lineClear(w, px, py, t.x, t.y);
+    const dist = Math.hypot(t.x - mx, t.y - my);
+    return lineClear(w, px, py, mx, my) && lineClear(w, mx, my, mx + Math.cos(a) * dist, my + Math.sin(a) * dist);
   }
 
   /** The shot angle for `target`; `delayTicks` is how long the input takes to reach the simulation. */
@@ -146,8 +167,10 @@ export class AimSolver {
     const delay = Math.max(0, delayTicks) * TICK_DT;
     const pvx = this.pvx[slot]!;
     const pvy = this.pvy[slot]!;
-    const tvx = t.kind === 0 ? this.evx[t.id]! : 0;
-    const tvy = t.kind === 0 ? this.evy[t.id]! : 0;
+    // a leaper in its jump or a charging brute changes speed any moment: trust its velocity less
+    const trust = t.kind === 0 && w.eAux[t.id]! > 0 ? 0.5 : 1;
+    const tvx = t.kind === 0 ? this.evx[t.id]! * trust : 0;
+    const tvy = t.kind === 0 ? this.evy[t.id]! * trust : 0;
     const Px = w.pX[slot]! + pvx * delay;
     const Py = w.pY[slot]! + pvy * delay;
     const tx = t.x + tvx * delay;

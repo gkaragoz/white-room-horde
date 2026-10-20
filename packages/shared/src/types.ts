@@ -55,8 +55,8 @@ export const EnemyState = { Move: 0, Attack: 1, Spawn: 2 } as const;
 export const PlayerState = { Alive: 0, Downed: 1, Dead: 2 } as const;
 
 /**
- * The card pool (docs/DESIGN.md section 9). Index = card id in the sim and in the offer. Team cards help everybody,
- * personal cards only the player who picked them. Art for each card lives in packages/client/public/cards/<id>.png.
+ * The card pool (docs/DESIGN.md section 9). Index = card id in the sim and in the offer. TEAM_CARDS help everybody,
+ * every other card only the character that picked it. Art for each card lives in packages/client/public/cards/<id>.png.
  */
 export const CARD_IDS = [
   // team
@@ -66,8 +66,10 @@ export const CARD_IDS = [
   'regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage',
 ] as const;
 export type CardId = (typeof CARD_IDS)[number];
-/** Cards that only help the player who picked them. */
-export const PERSONAL_CARDS: readonly string[] = ['sharp', 'sprint', 'bulk', 'vampire', 'tempo', 'marksman', 'ironskin', 'regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage'];
+/** The few cards that help the whole squad; they show up on the info bar with the name of whoever took them. */
+export const TEAM_CARDS: readonly string[] = ['heal', 'ammo', 'grenades', 'luck'];
+/** Cards that only help the character that picked them: all the others. */
+export const PERSONAL_CARDS: readonly string[] = CARD_IDS.filter((id) => !TEAM_CARDS.includes(id));
 /** 0 common, 1 rare, 2 epic: how often a card is offered and how its frame looks. */
 export const CARD_RARITY: Record<CardId, 0 | 1 | 2> = {
   damage: 0, rate: 0, speed: 0, hp: 0, heal: 0, ammo: 0, magnet: 0, sharp: 0, sprint: 0, bulk: 0,

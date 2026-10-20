@@ -1,16 +1,20 @@
 import * as THREE from 'three';
-import { BALANCE, FloorPhase, MAP_COUNT, MAX_PLAYERS, MISC, PlayerState, TICK_RATE } from '@wrh/shared';
+import { BALANCE, CAMERA, FloorPhase, MAP_COUNT, MAX_PLAYERS, MISC, PlayerState, TICK_RATE } from '@wrh/shared';
 import type { World } from '@wrh/sim';
 import { ArenaView } from './arena';
 import type { Fx } from './fx';
 import { PropsView } from './props';
-import { REVEAL, revealOff } from './reveal';
 import type { Stage } from './stage';
 
-/** Height between two floors of the climb (world units). */
-export const FLOOR_GAP = 18;
-/** The dissolve has to reach the edge of the big ground plane. */
-const REVEAL_RADIUS = 115;
+/**
+ * Height between two floors of the climb (world units). With the camera at 28 degrees a vertical offset shows up on
+ * screen as 0.88 times itself, a floor with its ground plane covers about 90 screen units and the view about 26, so
+ * at this distance (with a ground plane of 140 x 110) the view can only ever hold one floor: the old one leaves the bottom of the frame whole before the new
+ * one shows up at the top.
+ */
+export const FLOOR_GAP = 150;
+/** World size of everything a floor draws (the ground plane is the widest): half width, half depth, height. */
+export const FLOOR_HALF = { x: 70, z: 55, y: 10 };
 
 interface FloorSet {
   arena: ArenaView;
@@ -160,7 +164,7 @@ export class FloorClimb {
     this.beam.renderOrder = 3;
     this.group.add(this.beam);
     this.streakMat = new THREE.MeshBasicMaterial({ color: '#cfeeff', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false });
-    this.streaks = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.07, 7), this.streakMat, 170);
+    this.streaks = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.07, 7), this.streakMat, 420);
     this.streaks.frustumCulled = false;
     this.streaks.visible = false;
     this.streaks.renderOrder = 3;
@@ -175,7 +179,6 @@ export class FloorClimb {
     }
     this.stage.scene.remove(this.group);
     this.stage.floor.visible = true;
-    revealOff();
     this.stage.setDark(0);
     this.stage.setFlightBlur(0);
     this.fx.setFloorFade(1);
@@ -214,8 +217,9 @@ export class FloorClimb {
     const nx = this.other;
     if (this.building !== map) {
       this.building = map;
+      this.gap = this.requiredGap();
       nx.arena.setMap(map);
-      nx.arena.group.position.y = nx.props.group.position.y = nx.floor.position.y = FLOOR_GAP;
+      nx.arena.group.position.y = nx.props.group.position.y = nx.floor.position.y = this.gap;
       return; // the scenery follows on the next frame
     }
     nx.props.setMap(map);
@@ -234,6 +238,17 @@ export class FloorClimb {
 
   private building = -1;
   private warmed = false;
+  /** Distance between the floors for the view in use (a tall portrait window needs more than a wide one). */
+  gap = FLOOR_GAP;
+
+  /** The least distance at which the view never holds both floors, for the camera as it is now, with some margin. */
+  requiredGap(): number {
+    const cam = this.stage.camera;
+    const el = (CAMERA.elevationDeg * Math.PI) / 180;
+    const yaw = (CAMERA.yawDeg * Math.PI) / 180;
+    const span = 2 * (FLOOR_HALF.x * Math.sin(el) * Math.sin(yaw) + FLOOR_HALF.z * Math.sin(el) * Math.cos(yaw)) + FLOOR_HALF.y * Math.cos(el);
+    return Math.max(FLOOR_GAP, (span + (cam.top - cam.bottom) + 4) / Math.cos(el));
+  }
 
   private rebase(w: World): void {
     const old = this.sets[this.cur]!;
@@ -243,7 +258,6 @@ export class FloorClimb {
     old.arena.group.visible = old.props.group.visible = old.floor.visible = false;
     old.props.hideBarrels();
     now.arena.group.visible = now.props.group.visible = now.floor.visible = true;
-    revealOff();
     this.flying = false;
     this.entered = false;
     this.lampsSwitched = false;
@@ -258,6 +272,28 @@ export class FloorClimb {
     this.stage.setDark(0);
     this.stage.setFlightBlur(0);
     this.lift01 = this.charge01 = this.flightTime = 0;
+  }
+
+  private readonly frustum = new THREE.Frustum();
+  private readonly viewMatrix = new THREE.Matrix4();
+  private readonly box = new THREE.Box3();
+
+  /** Show a floor only while its bounds touch the camera's view (hidden floors cost nothing to draw). */
+  private showByView(set: FloorSet, y: number): void {
+    const cam = this.stage.camera;
+    cam.updateMatrixWorld();
+    this.viewMatrix.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.viewMatrix);
+    this.box.min.set(-FLOOR_HALF.x, y - 1, -FLOOR_HALF.z);
+    this.box.max.set(FLOOR_HALF.x, y + FLOOR_HALF.y, FLOOR_HALF.z);
+    const on = this.frustum.intersectsBox(this.box);
+    set.arena.group.visible = set.props.group.visible = set.floor.visible = on;
+  }
+
+  /** True when this floor's bounds touch the camera view right now (for the tests). */
+  floorInView(index: number): boolean {
+    const set = this.sets[index]!;
+    return set.floor.visible;
   }
 
   private hideEffects(): void {
@@ -319,7 +355,7 @@ export class FloorClimb {
       // random speed lines spread over the arena and the whole height of the shaft
       const yaw = new THREE.Euler().setFromQuaternion(this.stage.camera.quaternion, 'YXZ').y;
       for (let i = 0; i < this.streaks.count; i++) {
-        this.dummy.position.set((Math.random() - 0.5) * 56, -4 + Math.random() * (FLOOR_GAP + 16), (Math.random() - 0.5) * 36);
+        this.dummy.position.set((Math.random() - 0.5) * 56, -4 + Math.random() * (this.gap + 16), (Math.random() - 0.5) * 36);
         this.dummy.rotation.set(0, yaw, 0);
         this.dummy.scale.set(0.6 + Math.random() * 1.6, 0.5 + Math.random() * 1.4, 1);
         this.dummy.updateMatrix();
@@ -328,9 +364,6 @@ export class FloorClimb {
       this.streaks.instanceMatrix.needsUpdate = true;
       this.other.arena.group.visible = this.other.props.group.visible = this.other.floor.visible = false;
     }
-    // the new floor is shown once the party starts to rise
-    const showNext = p > 0.02;
-    nx.arena.group.visible = nx.props.group.visible = nx.floor.visible = showNext;
     // the sim rebuilt the world half way: the barrels now belong to the new floor, the party glides to its new places
     const entered = w.misc[MISC.Entered] === 1;
     if (entered && !this.entered) {
@@ -355,18 +388,16 @@ export class FloorClimb {
       cx /= n;
       cy /= n;
     }
-    const lift = FLOOR_GAP * easeInOut(p);
+    const lift = this.gap * easeInOut(p);
     this.centre.set(cx, 0, -cy);
 
-    // dissolve of the old floor and materialisation of the new one, both spreading from the party
-    REVEAL.split.value = FLOOR_GAP * 0.8;
-    REVEAL.old.value.set(cx, 0, -cy, REVEAL_RADIUS * smooth((p - 0.08) / 0.62));
-    if (p <= 0.001) REVEAL.old.value.w = -1;
-    REVEAL.next.value.set(cx, 0, -cy, REVEAL_RADIUS * smooth((p - 0.3) / 0.7));
-    if (p >= 0.995) REVEAL.next.value.w = -1;
+    // each floor is drawn only while some of it is in the view: the old one stays whole and scrolls out below, the new one
+    // comes in whole from far above; they are never on screen together
+    this.showByView(this.sets[this.cur]!, 0);
+    this.showByView(nx, this.gap);
     if (p > 0.5 && !this.lampsSwitched) {
       this.lampsSwitched = true;
-      this.stage.setLamps(nx.props.lamps.map((l) => ({ ...l, y: l.y + FLOOR_GAP })));
+      this.stage.setLamps(nx.props.lamps.map((l) => ({ ...l, y: l.y + this.gap })));
     }
 
     // ---- effects ----
@@ -407,9 +438,8 @@ export class FloorClimb {
     }
     this.stage.glow(cx, 1.4 + lift, -cy, '#7fdcff', 5 + 9 * c * (1 - p * 0.5), 0.12, 13);
     this.fx.shake = Math.max(this.fx.shake, 0.06 + 0.16 * c * (1 - p) + 0.22 * bell);
-    this.fx.setFloorFade(1 - smooth((p - 0.04) / 0.5));
     this.stage.setDark(0.82 * Math.pow(bell, 0.7));
-    this.stage.setFlightBlur(0.026 * Math.pow(bell, 1.2));
+    this.stage.setFlightBlur(0.04 * Math.pow(bell, 1.2));
     void dt;
     return { active: true, lift };
   }

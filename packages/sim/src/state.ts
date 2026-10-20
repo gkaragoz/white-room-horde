@@ -9,7 +9,7 @@ export type SimEvent =
   | { type: 'shot'; slot: number; weapon: number; x: number; y: number; angle: number }
   /** reason: 0 range ended, 1 hit cover, 2 hit an enemy */
   | { type: 'bulletGone'; x: number; y: number; angle: number; reason: number }
-  | { type: 'enemyHit'; id: number; etype: number; x: number; y: number; damage: number }
+  | { type: 'enemyHit'; id: number; etype: number; x: number; y: number; damage: number; by: number }
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
   | { type: 'weaponSwitch'; slot: number; weapon: number; auto: boolean }
@@ -35,8 +35,8 @@ export type SimEvent =
   | { type: 'floorEnter'; wave: number; map: number }
   | { type: 'floorArrive'; wave: number }
   | { type: 'waveStart'; wave: number; boss: boolean; mod: number }
-  | { type: 'levelUp'; level: number }
-  | { type: 'cardOffer'; cards: number[] }
+  | { type: 'levelUp'; slot: number; level: number }
+  | { type: 'cardOffer'; slot: number; cards: number[] }
   | { type: 'cardPicked'; card: number; by: number }
   | { type: 'gameOver'; wave: number; kills: number };
 
@@ -55,28 +55,27 @@ export interface World {
   /** 0 easy, 1 normal, 2 hard (scales enemy hp, count and damage) and the arena layout index. */
   difficulty: number;
   map: number;
-  xp: number;
-  level: number;
-  pendingLevels: number;
-  /** Open card offer (card ids) or all -1; cardTimer counts ticks left to choose. */
-  cardOffer: Int32Array;
-  cardTimer: number;
-  /** Team modifiers from cards. */
-  modDamage: number;
-  modRate: number;
-  modSpeed: number;
-  modPierce: number;
-  modHp: number;
-  /** More team modifiers from cards (multipliers start at 1, crit chance at 0). */
-  modRevive: number;
-  modMagnet: number;
+  /** Team modifier from a card that helps everybody: loot luck. All the other upgrades are per player (arrays below). */
   modLoot: number;
-  modXp: number;
-  modBlast: number;
-  modReload: number;
-  modDash: number;
-  modArmor: number;
-  modCrit: number;
+  /** Per player: experience, level, levels waiting for a card offer, the open offer (3 card ids per slot, all -1 = none) and its ticks left. */
+  pXp: Float64Array;
+  pLevel: Int32Array;
+  pPending: Int32Array;
+  pOffer: Int32Array;
+  pCardTimer: Int32Array;
+  /** Per player upgrades from cards (multipliers start at 1, pierce and crit chance at 0). */
+  modDamage: Float64Array;
+  modRate: Float64Array;
+  modSpeed: Float64Array;
+  modPierce: Float64Array;
+  modRevive: Float64Array;
+  modMagnet: Float64Array;
+  modXp: Float64Array;
+  modBlast: Float64Array;
+  modReload: Float64Array;
+  modDash: Float64Array;
+  modArmor: Float64Array;
+  modCrit: Float64Array;
   // players
   pActive: Uint8Array;
   pX: Float64Array;
@@ -193,25 +192,24 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     gameOver: 0,
     difficulty,
     map,
-    xp: 0,
-    level: 1,
-    pendingLevels: 0,
-    cardOffer: new Int32Array(3).fill(-1),
-    cardTimer: 0,
-    modDamage: 1,
-    modRate: 1,
-    modSpeed: 1,
-    modPierce: 0,
-    modHp: 0,
-    modRevive: 1,
-    modMagnet: 1,
     modLoot: 1,
-    modXp: 1,
-    modBlast: 1,
-    modReload: 1,
-    modDash: 1,
-    modArmor: 1,
-    modCrit: 0,
+    pXp: new Float64Array(MAX_PLAYERS),
+    pLevel: new Int32Array(MAX_PLAYERS).fill(1),
+    pPending: new Int32Array(MAX_PLAYERS),
+    pOffer: new Int32Array(MAX_PLAYERS * 3).fill(-1),
+    pCardTimer: new Int32Array(MAX_PLAYERS),
+    modDamage: new Float64Array(MAX_PLAYERS).fill(1),
+    modRate: new Float64Array(MAX_PLAYERS).fill(1),
+    modSpeed: new Float64Array(MAX_PLAYERS).fill(1),
+    modPierce: new Float64Array(MAX_PLAYERS),
+    modRevive: new Float64Array(MAX_PLAYERS).fill(1),
+    modMagnet: new Float64Array(MAX_PLAYERS).fill(1),
+    modXp: new Float64Array(MAX_PLAYERS).fill(1),
+    modBlast: new Float64Array(MAX_PLAYERS).fill(1),
+    modReload: new Float64Array(MAX_PLAYERS).fill(1),
+    modDash: new Float64Array(MAX_PLAYERS).fill(1),
+    modArmor: new Float64Array(MAX_PLAYERS).fill(1),
+    modCrit: new Float64Array(MAX_PLAYERS),
     pActive: new Uint8Array(MAX_PLAYERS),
     pX: new Float64Array(MAX_PLAYERS),
     pY: new Float64Array(MAX_PLAYERS),

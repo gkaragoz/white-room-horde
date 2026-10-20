@@ -349,7 +349,7 @@ describe('explosive rounds', () => {
   it('a rocket bursts on the first enemy even with piercing upgrades', () => {
     const w = quiet(32);
     addPlayer(w, 0, -10, 0, 'gl');
-    w.modPierce = 3;
+    w.modPierce[0] = 3;
     const a = spawnEnemy(w, T('grunt'), -4, 0, false);
     const b = spawnEnemy(w, T('grunt'), 3, 0, false);
     for (const e of [a, b]) w.eCooldown[e] = 1e9;

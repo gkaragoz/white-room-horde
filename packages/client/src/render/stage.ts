@@ -5,7 +5,6 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { patchReveal } from './reveal';
 
 import type { Backend } from './backend';
 
@@ -92,7 +91,8 @@ export class Stage {
     const el = THREE.MathUtils.degToRad(CAMERA.elevationDeg);
     const yaw = THREE.MathUtils.degToRad(CAMERA.yawDeg);
     this.camOffset = new THREE.Vector3(Math.sin(yaw) * Math.cos(el), Math.sin(el), Math.cos(yaw) * Math.cos(el)).multiplyScalar(40);
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+    // the near plane is far behind the camera: during a climb a floor 130 units above sits "behind" an orthographic camera that looks down
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1500, 1500);
 
     // Neutral daylight: a near-white sun, cool sky fill and a pale blue-grey ground, so the colourful characters pop.
     this.sunOffset = new THREE.Vector3(0.505, 0.788, 0.353).multiplyScalar(30);
@@ -493,7 +493,6 @@ function makeFloor(quality: 0 | 1): THREE.Mesh {
   tex.anisotropy = quality === 1 ? 8 : 1;
   tex.repeat.set(2.5, 1.8);
   const floorMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
-  patchReveal(floorMat);
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), floorMat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.receiveShadow = true;

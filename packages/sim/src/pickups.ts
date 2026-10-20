@@ -87,8 +87,6 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
 export function updatePickups(w: World): void {
   const cfg = BALANCE.pickups;
   const r2 = cfg.radius * cfg.radius;
-  const magnet = cfg.magnetRadius * w.modMagnet;
-  const m2 = magnet * magnet;
   for (let i = 0; i < MAX_PICKUPS; i++) {
     if (!w.kActive[i]) continue;
     w.kLife[i] = w.kLife[i]! - TICK_DT;
@@ -109,6 +107,9 @@ export function updatePickups(w: World): void {
       }
     }
     if (best < 0) continue;
+    // the pull radius is the collector's own (magnet card)
+    const magnet = cfg.magnetRadius * w.modMagnet[best]!;
+    const m2 = magnet * magnet;
     if (bd2 <= r2) {
       collect(w, best, i);
       continue;

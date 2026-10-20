@@ -96,17 +96,16 @@ describe('personal cards, weapon drops and difficulty', () => {
     const w = quiet(6);
     addPlayer(w, 0, 0, 0);
     addPlayer(w, 1, 3, 0);
-    awardXp(w, xpForNext(w));
-    // force an offer made of the three personal cards
     const ids = ['sharp', 'sprint', 'bulk'].map((c) => CARD_IDS.indexOf(c as (typeof CARD_IDS)[number]));
-    ids.forEach((c, i) => (w.cardOffer[i] = c));
+    // player 1 levels up and takes the first of three personal cards
+    awardXp(w, 1, xpForNext(w, 1));
+    ids.forEach((c, i) => (w.pOffer[3 + i] = c));
     step(w, [NONE, { ...NONE, buttons: Buttons.Card1 }]);
     expect(w.pModDmg[1]).toBeCloseTo(1 + BALANCE.progression.cards.sharp);
     expect(w.pModDmg[0]).toBe(1);
-    w.cardOffer.fill(-1);
-    w.pendingLevels = 1;
-    awardXp(w, 0);
-    ids.forEach((c, i) => (w.cardOffer[i] = c));
+    // player 0 levels up and takes the third
+    awardXp(w, 0, xpForNext(w, 0));
+    ids.forEach((c, i) => (w.pOffer[i] = c));
     step(w, [{ ...NONE, buttons: Buttons.Card3 }, NONE]);
     expect(w.pMaxHp[0]).toBe(BALANCE.player.hp + BALANCE.progression.cards.bulk);
     expect(w.pMaxHp[1]).toBe(BALANCE.player.hp);

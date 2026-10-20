@@ -8,7 +8,7 @@ import { Audio, BANK_FILES, MUSIC_FILES } from '../audio';
 import { PickupView } from '../render/pickups';
 import { ArenaView } from '../render/arena';
 import { PropsView } from '../render/props';
-import { FloorClimb, FLOOR_GAP } from '../render/floorFx';
+import { FloorClimb, FLOOR_HALF } from '../render/floorFx';
 import { Stage, type AaMode } from '../render/stage';
 import { webgpuSupported } from '../render/backend';
 import type { Ctx, QaTest } from './tests';
@@ -576,7 +576,7 @@ export const crowdTests: QaTest[] = [
         if (diffCount(calm, charging) < 150) problems.push('charge: no circle or beam drawn under the party');
         // half way: the party is about half a floor up and the new floor is part of the picture
         info = hold(Math.round(total * 0.4));
-        if (Math.abs(info.lift - FLOOR_GAP * 0.5) > FLOOR_GAP * 0.3) problems.push(`mid flight lift ${f(info.lift)} is not near ${FLOOR_GAP / 2}`);
+        if (Math.abs(info.lift - climb.gap * 0.5) > climb.gap * 0.3) problems.push(`mid flight lift ${f(info.lift)} is not near ${f(climb.gap / 2)}`);
         ctx.stage.follow(0, 0, 0, info.lift);
         ctx.stage.setFlightBlur(0);
         ctx.stage.render();
@@ -666,6 +666,61 @@ export const crowdTests: QaTest[] = [
       if (worstEnemy > 6) problems.push(`an enemy jumped ${f(worstEnemy)} units in one tick (${worstWhy})`);
       if (worstPlayer > 2.2) problems.push(`a player jumped ${f(worstPlayer)} units in one tick`);
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 6).join(' | ') : `largest step: enemy ${f(worstEnemy)}, player ${f(worstPlayer)} units per tick` };
+    },
+  },
+  {
+    id: 'floors.never-together',
+    title: 'During the climb the view never holds the old and the new floor at the same time, in wide, square and tall windows',
+    async run(ctx) {
+      const problems: string[] = [];
+      const w = createWorld(9);
+      const fx = new Fx(undefined, 1);
+      const arena = new ArenaView();
+      const props = await PropsView.create();
+      arena.setMap(0);
+      props.setMap(0);
+      const climb = new FloorClimb(ctx.stage, fx, arena, props);
+      const cam = ctx.stage.camera;
+      const frustum = new THREE.Frustum();
+      const m = new THREE.Matrix4();
+      const box = new THREE.Box3();
+      const inView = (y: number): boolean => {
+        cam.updateMatrixWorld();
+        m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+        frustum.setFromProjectionMatrix(m);
+        box.min.set(-FLOOR_HALF.x, y - 1, -FLOOR_HALF.z);
+        box.max.set(FLOOR_HALF.x, y + FLOOR_HALF.y, FLOOR_HALF.z);
+        return frustum.intersectsBox(box);
+      };
+      try {
+        for (const [name, aspect] of [['16:9', 16 / 9], ['16:10', 1.6], ['4:3', 4 / 3], ['21:9', 21 / 9], ['3:4', 3 / 4], ['9:16', 9 / 16]] as const) {
+          const halfW = 21;
+          cam.left = -halfW;
+          cam.right = halfW;
+          cam.top = halfW / aspect;
+          cam.bottom = -halfW / aspect;
+          cam.updateProjectionMatrix();
+          const gap = climb.requiredGap();
+          let both = 0;
+          ctx.stage.follow(0, 0, 0, 0);
+          if (!inView(0)) problems.push(`${name}: the floor is not in view at the start`);
+          if (inView(gap)) problems.push(`${name}: the next floor is already in view at the start`);
+          for (let lift = 0; lift <= gap; lift += 0.5) {
+            ctx.stage.follow(0, 0, 0, lift);
+            if (inView(0) && inView(gap)) both++;
+          }
+          ctx.stage.follow(0, 0, 0, gap);
+          if (!inView(gap)) problems.push(`${name}: the new floor is not in view at the end`);
+          if (inView(0)) problems.push(`${name}: the old floor is still in view at the end`);
+          if (both) problems.push(`${name}: both floors are in view at ${both} of ${Math.round(gap * 2)} camera heights (gap ${f(gap, 0)})`);
+        }
+      } finally {
+        climb.dispose();
+        ctx.stage.resize();
+        ctx.stage.follow(0, 0);
+        void w;
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 5).join(' | ') : 'one floor in view at every camera height, in six window shapes' };
     },
   },
 ];

@@ -1,4 +1,4 @@
-import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, PERSONAL_CARDS, PickupType, RARITY_WEIGHT, WEAPON_IDS, type CardId, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, PERSONAL_CARDS, PickupType, PlayerState, RARITY_WEIGHT, TEAM_CARDS, WEAPON_IDS, type CardId, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createWorld, spawnEnemy, step, type World } from '../src';
 import { dropLoot, spawnPickup } from '../src/pickups';
@@ -14,24 +14,30 @@ function quiet(seed: number): World {
   return w;
 }
 
-/** Offer exactly this card (first slot) and have the given player take it. */
+/** Put exactly this card first in a character's own offer and have that character take it. */
 function pick(w: World, id: CardId, by = 0): void {
-  w.cardOffer.fill(-1);
-  w.cardOffer[0] = CARD_IDS.indexOf(id);
-  w.cardOffer[1] = CARD_IDS.indexOf('damage');
-  w.cardOffer[2] = CARD_IDS.indexOf('rate');
-  w.cardTimer = 100;
+  for (let i = 0; i < 3; i++) w.pOffer[by * 3 + i] = -1;
+  w.pOffer[by * 3] = CARD_IDS.indexOf(id);
+  w.pOffer[by * 3 + 1] = CARD_IDS.indexOf('damage');
+  w.pOffer[by * 3 + 2] = CARD_IDS.indexOf('rate');
+  w.pCardTimer[by] = 100;
   const inputs: PlayerInput[] = [];
   for (let s = 0; s < 4; s++) inputs[s] = s === by ? { ...NONE, buttons: CARD_BUTTON[0]! } : NONE;
   step(w, inputs);
 }
 
+const offerOf = (w: World, s: number): number[] => [0, 1, 2].map((i) => w.pOffer[s * 3 + i]!);
+
 describe('card pool', () => {
-  it('has 35 cards, every one with a rarity, unique ids and consistent personal list', () => {
+  it('has 35 cards, every one with a rarity, unique ids and a consistent team / personal split', () => {
     expect(CARD_IDS.length).toBe(35);
     expect(new Set(CARD_IDS).size).toBe(35);
     for (const id of CARD_IDS) expect([0, 1, 2]).toContain(CARD_RARITY[id]);
     for (const p of PERSONAL_CARDS) expect(CARD_IDS).toContain(p);
+    for (const t of TEAM_CARDS) expect(CARD_IDS).toContain(t);
+    // every card is exactly one of the two: nothing is chosen for the team except the four gifts to everybody
+    expect([...TEAM_CARDS].sort()).toEqual(['ammo', 'grenades', 'heal', 'luck']);
+    expect(PERSONAL_CARDS.length + TEAM_CARDS.length).toBe(CARD_IDS.length);
     for (const id of Object.keys(CARD_RARITY)) expect(CARD_IDS).toContain(id);
     const perkCards = ['regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage'];
     for (const id of CARD_IDS) expect(BALANCE.progression.cards).toHaveProperty(id === 'arsenal' || id === 'heal' || id === 'ammo' || perkCards.includes(id) ? 'damage' : id);
@@ -42,12 +48,12 @@ describe('card pool', () => {
     const w = quiet(5);
     addPlayer(w, 0, 0, 0);
     for (let n = 0; n < 4000; n++) {
-      w.cardOffer.fill(-1);
-      w.pendingLevels = 0;
-      w.level = 1;
-      w.xp = 0;
-      awardXp(w, xpForNext(w));
-      const offer = Array.from(w.cardOffer);
+      for (let i = 0; i < 3; i++) w.pOffer[i] = -1;
+      w.pPending[0] = 0;
+      w.pLevel[0] = 1;
+      w.pXp[0] = 0;
+      awardXp(w, 0, xpForNext(w, 0));
+      const offer = offerOf(w, 0);
       expect(new Set(offer).size).toBe(3);
       for (const c of offer) count[c]!++;
     }
@@ -65,27 +71,24 @@ describe('card pool', () => {
   });
 });
 
-describe('every card does what it says', () => {
+describe('every card does what it says, for the character that picked it', () => {
   const c = BALANCE.progression.cards;
+  /** Personal cards: [picker, other]. */
   const cases: [CardId, (w: World, before: Record<string, number>) => void][] = [
-    ['damage', (w) => expect(w.modDamage).toBeCloseTo(1 + c.damage)],
-    ['rate', (w) => expect(w.modRate).toBeCloseTo(1 + c.rate)],
-    ['speed', (w) => expect(w.modSpeed).toBeCloseTo(1 + c.speed)],
-    ['hp', (w) => expect(w.pMaxHp[0]).toBe(BALANCE.player.hp + c.hp)],
-    ['pierce', (w) => expect(w.modPierce).toBe(c.pierce)],
-    ['arsenal', (w) => expect(WEAPON_IDS[w.pWeapon[0]!]).toBe('mp')], // the next missing weapon above the pistol, taken into the hands
-    ['heal', (w) => expect(w.pHp[0]).toBe(w.pMaxHp[0])],
-    ['ammo', (w) => expect(w.pAmmo[0]).toBe(BALANCE.weapons.smg.ammo)],
-    ['grenades', (w, b) => expect(w.pGren[0]).toBe(b.gren! + c.grenades)],
-    ['medic', (w) => expect(w.modRevive).toBeCloseTo(c.medic)],
-    ['magnet', (w) => expect(w.modMagnet).toBeCloseTo(c.magnet)],
-    ['luck', (w) => expect(w.modLoot).toBeCloseTo(c.luck)],
-    ['scholar', (w) => expect(w.modXp).toBeCloseTo(c.scholar)],
-    ['blast', (w) => expect(w.modBlast).toBeCloseTo(c.blast)],
-    ['quickhands', (w) => expect(w.modReload).toBeCloseTo(c.quickhands)],
-    ['roll', (w) => expect(w.modDash).toBeCloseTo(c.roll)],
-    ['armor', (w) => expect(w.modArmor).toBeCloseTo(c.armor)],
-    ['crit', (w) => expect(w.modCrit).toBeCloseTo(c.crit)],
+    ['damage', (w) => expect([w.modDamage[0], w.modDamage[1]]).toEqual([1 + c.damage, 1])],
+    ['rate', (w) => expect([w.modRate[0], w.modRate[1]]).toEqual([1 + c.rate, 1])],
+    ['speed', (w) => expect([w.modSpeed[0], w.modSpeed[1]]).toEqual([1 + c.speed, 1])],
+    ['hp', (w) => expect([w.pMaxHp[0], w.pMaxHp[1]]).toEqual([BALANCE.player.hp + c.hp, BALANCE.player.hp])],
+    ['pierce', (w) => expect([w.modPierce[0], w.modPierce[1]]).toEqual([c.pierce, 0])],
+    ['arsenal', (w) => expect([WEAPON_IDS[w.pWeapon[0]!], WEAPON_IDS[w.pWeapon[1]!]]).toEqual(['mp', 'pistol'])],
+    ['medic', (w) => expect([w.modRevive[0]!, w.modRevive[1]!]).toEqual([c.medic, 1])],
+    ['magnet', (w) => expect([w.modMagnet[0]!, w.modMagnet[1]!]).toEqual([c.magnet, 1])],
+    ['scholar', (w) => expect([w.modXp[0]!, w.modXp[1]!]).toEqual([c.scholar, 1])],
+    ['blast', (w) => expect([w.modBlast[0]!, w.modBlast[1]!]).toEqual([c.blast, 1])],
+    ['quickhands', (w) => expect([w.modReload[0]!, w.modReload[1]!]).toEqual([c.quickhands, 1])],
+    ['roll', (w) => expect([w.modDash[0]!, w.modDash[1]!]).toEqual([c.roll, 1])],
+    ['armor', (w) => expect([w.modArmor[0]!, w.modArmor[1]!]).toEqual([c.armor, 1])],
+    ['crit', (w) => expect([w.modCrit[0]!, w.modCrit[1]!]).toEqual([c.crit, 0])],
     ['sharp', (w) => expect([w.pModDmg[0], w.pModDmg[1]]).toEqual([1 + c.sharp, 1])],
     ['sprint', (w) => expect([w.pModSpeed[0], w.pModSpeed[1]]).toEqual([1 + c.sprint, 1])],
     ['bulk', (w) => expect([w.pMaxHp[0], w.pMaxHp[1]]).toEqual([BALANCE.player.hp + c.bulk, BALANCE.player.hp])],
@@ -99,19 +102,34 @@ describe('every card does what it says', () => {
       const w = quiet(10);
       addPlayer(w, 0, 0, 0, 'pistol');
       addPlayer(w, 1, 5, 0, 'pistol');
-      if (id === 'heal') w.pHp[0] = 10;
-      if (id === 'ammo') {
-        addPlayer(w, 0, 0, 0, 'smg');
-        w.pAmmo[0] = 0;
-        w.pMag[0] = 0;
-      }
       const before = { gren: w.pGren[0]! };
-      w.pendingLevels = 0;
       pick(w, id);
-      expect(w.events.some((e) => e.type === 'cardPicked'), 'card was taken').toBe(true);
+      expect(w.events.some((e) => e.type === 'cardPicked' && e.by === 0), 'card was taken').toBe(true);
       check(w, before);
     });
   }
+
+  it('the team cards help everybody: heal, ammo and grenades reach both players, luck is the squad\'s', () => {
+    const w = quiet(12);
+    addPlayer(w, 0, 0, 0, 'smg');
+    addPlayer(w, 1, 5, 0, 'smg');
+    w.pHp[0] = 10;
+    w.pHp[1] = 20;
+    pick(w, 'heal');
+    expect([w.pHp[0], w.pHp[1]]).toEqual([w.pMaxHp[0], w.pMaxHp[1]]);
+    w.pAmmo[0] = 0;
+    w.pAmmo[1] = 0;
+    pick(w, 'ammo', 1);
+    expect([w.pAmmo[0], w.pAmmo[1]]).toEqual([BALANCE.weapons.smg.ammo, BALANCE.weapons.smg.ammo]);
+    const g = [w.pGren[0]!, w.pGren[1]!];
+    pick(w, 'grenades');
+    expect([w.pGren[0], w.pGren[1]]).toEqual([g[0]! + c.grenades, g[1]! + c.grenades]);
+    pick(w, 'luck');
+    expect(w.modLoot).toBeCloseTo(c.luck);
+    // and the event names who took it
+    pick(w, 'heal', 1);
+    expect(w.events.find((e) => e.type === 'cardPicked')).toMatchObject({ card: CARD_IDS.indexOf('heal'), by: 1 });
+  });
 
   it('multiplier cards stop at their limits', () => {
     const w = quiet(11);
@@ -119,15 +137,92 @@ describe('every card does what it says', () => {
     for (let i = 0; i < 20; i++) {
       for (const id of ['medic', 'magnet', 'luck', 'blast', 'quickhands', 'roll', 'armor', 'crit', 'ironskin'] as CardId[]) pick(w, id);
     }
-    expect(w.modRevive).toBeCloseTo(c.medicMin);
-    expect(w.modMagnet).toBeCloseTo(c.magnetMax);
+    expect(w.modRevive[0]).toBeCloseTo(c.medicMin);
+    expect(w.modMagnet[0]).toBeCloseTo(c.magnetMax);
     expect(w.modLoot).toBeCloseTo(c.luckMax);
-    expect(w.modBlast).toBeCloseTo(c.blastMax);
-    expect(w.modReload).toBeCloseTo(c.quickMin);
-    expect(w.modDash).toBeCloseTo(c.rollMin);
-    expect(w.modArmor).toBeCloseTo(c.armorMin);
-    expect(w.modCrit).toBeCloseTo(c.critMax);
+    expect(w.modBlast[0]).toBeCloseTo(c.blastMax);
+    expect(w.modReload[0]).toBeCloseTo(c.quickMin);
+    expect(w.modDash[0]).toBeCloseTo(c.rollMin);
+    expect(w.modArmor[0]).toBeCloseTo(c.armorMin);
+    expect(w.modCrit[0]).toBeCloseTo(c.critMax);
     expect(w.pModArmor[0]).toBeCloseTo(c.ironMin);
+  });
+});
+
+describe('every character levels on its own', () => {
+  it('a kill gives xp to the killer only, and only the killer can level up from it', () => {
+    const w = quiet(30);
+    addPlayer(w, 0, -10, 0, 'pistol');
+    addPlayer(w, 1, 10, 0, 'pistol');
+    const k = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 14, 0, false);
+    w.eHp[k] = 1;
+    w.eCooldown[k] = 1e9;
+    for (let t = 0; t < 40 && w.kills === 0; t++) step(w, [NONE, { ...NONE, buttons: Buttons.Fire }]);
+    expect(w.kills).toBe(1);
+    expect(w.pXp[1]).toBeGreaterThan(0);
+    expect(w.pXp[0]).toBe(0);
+    // enough xp for a level goes to player 1 only
+    awardXp(w, 1, xpForNext(w, 1));
+    expect([w.pLevel[0], w.pLevel[1]]).toEqual([1, 2]);
+    expect(offerOf(w, 0)).toEqual([-1, -1, -1]);
+    expect(offerOf(w, 1).every((c) => c >= 0)).toBe(true);
+    expect(w.events.some((e) => e.type === 'levelUp' && e.slot === 1 && e.level === 2)).toBe(true);
+  });
+
+  it('two characters can have their own offers open at once; one pick never touches the other\'s', () => {
+    const w = quiet(31);
+    addPlayer(w, 0, 0, 0);
+    addPlayer(w, 1, 5, 0);
+    awardXp(w, 0, xpForNext(w, 0));
+    awardXp(w, 1, xpForNext(w, 1));
+    const second = offerOf(w, 1);
+    expect(offerOf(w, 0).every((c) => c >= 0)).toBe(true);
+    expect(second.every((c) => c >= 0)).toBe(true);
+    // player 0 takes the second card of THEIR offer; player 1's offer is still open and unchanged
+    step(w, [{ ...NONE, buttons: Buttons.Card2 }, NONE]);
+    expect(offerOf(w, 0)).toEqual([-1, -1, -1]);
+    expect(offerOf(w, 1)).toEqual(second);
+    // player 1 pressing Card3 takes the third card of theirs, not of player 0's
+    step(w, [NONE, { ...NONE, buttons: Buttons.Card3 }]);
+    expect(offerOf(w, 1)).toEqual([-1, -1, -1]);
+    const picked = w.events.filter((e) => e.type === 'cardPicked');
+    expect(picked).toHaveLength(1);
+    expect(picked[0]).toMatchObject({ card: second[2], by: 1 });
+  });
+
+  it('a character who does not choose gets a random card of their own when their time runs out; a downed one keeps waiting', () => {
+    const w = quiet(32);
+    addPlayer(w, 0, 0, 0);
+    addPlayer(w, 1, 5, 0);
+    awardXp(w, 0, xpForNext(w, 0));
+    awardXp(w, 1, xpForNext(w, 1));
+    w.pState[1] = PlayerState.Downed;
+    w.pHp[1] = 0;
+    const waiting = offerOf(w, 1);
+    for (let t = 0; t < BALANCE.progression.cardSeconds * 30 + 5; t++) step(w, [NONE, NONE]);
+    expect(offerOf(w, 0)).toEqual([-1, -1, -1]);
+    expect(offerOf(w, 1)).toEqual(waiting);
+  });
+
+  it('levels queue up per character and open one offer after the other', () => {
+    const w = quiet(33);
+    addPlayer(w, 0, 0, 0);
+    awardXp(w, 0, xpForNext(w, 0) * 3);
+    expect(w.pLevel[0]!).toBeGreaterThanOrEqual(3);
+    expect(w.pPending[0]!).toBeGreaterThanOrEqual(1);
+    const levels = w.pLevel[0]!;
+    step(w, [{ ...NONE, buttons: Buttons.Card1 }]);
+    expect(offerOf(w, 0).every((x) => x >= 0)).toBe(true); // the next one opened
+    expect(w.pLevel[0]).toBe(levels);
+  });
+
+  it('digits choose cards while the character has an offer, and pick weapons otherwise', () => {
+    const w = quiet(34);
+    addPlayer(w, 0, 0, 0, 'ar');
+    awardXp(w, 0, xpForNext(w, 0));
+    const before = w.pWeapon[0];
+    step(w, [{ ...NONE, wsel: 1 }]); // would be the pistol, but the offer is open
+    expect(w.pWeapon[0]).toBe(before);
   });
 });
 
@@ -143,7 +238,7 @@ describe('card effects in play', () => {
       return BALANCE.player.hp - w.pHp[0]!;
     };
     const base = hit(() => undefined);
-    expect(hit((w) => (w.modArmor = 0.5))).toBeCloseTo(base * 0.5, 5);
+    expect(hit((w) => (w.modArmor[0] = 0.5))).toBeCloseTo(base * 0.5, 5);
     expect(hit((w) => (w.pModArmor[0] = 0.5))).toBeCloseTo(base * 0.5, 5);
   });
 
@@ -151,7 +246,7 @@ describe('card effects in play', () => {
     const damages = (crit: number): number[] => {
       const w = quiet(21);
       addPlayer(w, 0, 0, 0, 'ar');
-      w.modCrit = crit;
+      w.modCrit[0] = crit;
       const seen: number[] = [];
       for (let t = 0; t < 60; t++) {
         step(w, [{ ...NONE, buttons: Buttons.Fire }]);
@@ -177,9 +272,10 @@ describe('card effects in play', () => {
     expect(w.pHp[0]).toBeGreaterThan(50);
 
     const a = quiet(23);
-    a.modXp = 2;
-    awardXp(a, 10);
-    expect(a.xp).toBe(20);
+    addPlayer(a, 0, 0, 0);
+    a.modXp[0] = 2;
+    awardXp(a, 0, 10);
+    expect(a.pXp[0]).toBe(20);
   });
 
   it('magnet pulls loot from further away; luck makes drops more common; medic revives faster; blast grows explosions', () => {
@@ -189,7 +285,7 @@ describe('card effects in play', () => {
     spawnPickup(w, PickupType.Ammo, BALANCE.pickups.magnetRadius + 1, 0);
     step(w, [NONE]);
     expect(w.kX[0]).toBe(BALANCE.pickups.magnetRadius + 1); // out of the normal pull
-    w.modMagnet = 2;
+    w.modMagnet[0] = 2;
     step(w, [NONE]);
     expect(w.kX[0]!).toBeLessThan(BALANCE.pickups.magnetRadius + 1);
 
@@ -211,7 +307,7 @@ describe('card effects in play', () => {
       const x = quiet(26);
       addPlayer(x, 0, 0, 0);
       addPlayer(x, 1, 0.5, 0);
-      x.modRevive = mul;
+      x.modRevive[1] = mul; // the helper's own medic card
       x.pHp[0] = 0;
       step(x, [NONE, NONE]);
       let t = 0;
@@ -226,7 +322,7 @@ describe('card effects in play', () => {
     const blast = (mul: number): number => {
       const x = quiet(27);
       addPlayer(x, 0, 0, 0);
-      x.modBlast = mul;
+      x.modBlast[0] = mul;
       step(x, [{ ...NONE, buttons: Buttons.Grenade }]);
       let radius = 0;
       for (let t = 0; t < 60 && !radius; t++) {

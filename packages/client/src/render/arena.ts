@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { MAPS } from '@wrh/shared';
-import { patchReveal } from './reveal';
 
 /** Cover colours per layout so the four arenas read differently at a glance. */
 export const THEMES: { side: string; top: string; rim: string }[] = [
@@ -37,7 +36,6 @@ export class ArenaView {
     const top = new THREE.MeshStandardMaterial({ color: t.top, roughness: 0.9, flatShading: true });
     const rimMat = new THREE.MeshStandardMaterial({ color: t.rim, roughness: 1, flatShading: true });
     this.disposables.push(side, top, rimMat);
-    for (const m of [side, top, rimMat]) patchReveal(m);
     for (const o of MAPS[index]?.boxes ?? MAPS[0]!.boxes) {
       const h = 1.1;
       const box = new THREE.Mesh(new THREE.BoxGeometry(o.w, h, o.h), [side, side, top, side, side, side]);

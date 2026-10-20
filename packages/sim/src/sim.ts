@@ -50,8 +50,8 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pX[slot] = x;
   w.pY[slot] = y;
   w.pAngle[slot] = 0;
-  w.pHp[slot] = BALANCE.player.hp + w.modHp;
-  w.pMaxHp[slot] = BALANCE.player.hp + w.modHp;
+  w.pHp[slot] = BALANCE.player.hp;
+  w.pMaxHp[slot] = BALANCE.player.hp;
   w.pState[slot] = PlayerState.Alive;
   w.pTimer[slot] = 0;
   w.pRevive[slot] = 0;
@@ -69,6 +69,15 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pModPierce[slot] = 0;
   w.pModArmor[slot] = 1;
   w.pLifesteal[slot] = 0;
+  // a fresh character: level 1, no xp, nothing on offer, no card upgrades
+  w.pXp[slot] = 0;
+  w.pLevel[slot] = 1;
+  w.pPending[slot] = 0;
+  w.pCardTimer[slot] = 0;
+  for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = -1;
+  w.modDamage[slot] = w.modRate[slot] = w.modSpeed[slot] = w.modRevive[slot] = w.modMagnet[slot] = w.modXp[slot] = 1;
+  w.modBlast[slot] = w.modReload[slot] = w.modDash[slot] = w.modArmor[slot] = 1;
+  w.modPierce[slot] = w.modCrit[slot] = 0;
   resetPerks(w, slot);
   applyClass(w, slot, cls);
 }
@@ -101,8 +110,8 @@ function endBullet(w: World, i: number, x: number, y: number, reason: number): v
   const out = x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H;
   if (st.blast !== undefined && !out) {
     // explosive round: bursts where it ends (wall, enemy or end of its range)
-    w.events.push({ type: 'explosion', x, y, radius: st.blast * w.modBlast });
-    blastFrom(w, owner, x, y, st.blast * w.modBlast, (st.blastDamage ?? 0) * w.modBlast * w.modDamage * w.pModDmg[owner]!);
+    w.events.push({ type: 'explosion', x, y, radius: st.blast * w.modBlast[owner]! });
+    blastFrom(w, owner, x, y, st.blast * w.modBlast[owner]!, (st.blastDamage ?? 0) * w.modBlast[owner]! * w.modDamage[owner]! * w.pModDmg[owner]!);
   } else {
     w.events.push({ type: 'bulletGone', x, y, angle: atan2(w.bVy[i]!, w.bVx[i]!), reason });
   }
@@ -154,7 +163,7 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
       w.pDashX[s] = len > 0.2 ? mx / l : cos(angle);
       w.pDashY[s] = len > 0.2 ? my / l : sin(angle);
       w.pDash[s] = Math.ceil(dc.seconds * 30);
-      w.pDashCd[s] = (dc.cooldown * w.modDash) / perk(w, s, PERK.DashRate);
+      w.pDashCd[s] = (dc.cooldown * w.modDash[s]!) / perk(w, s, PERK.DashRate);
       if (perk(w, s, PERK.Shock) > 0) {
         // shock card: the dash sends out a shockwave that hurts and shoves what is around
         w.events.push({ type: 'explosion', x: w.pX[s]!, y: w.pY[s]!, radius: BALANCE.perks.shockRadius * 0.6 });
@@ -185,7 +194,7 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
 }
 
 function startReload(w: World, s: number, stats: { reload: number }): void {
-  w.pReload[s] = stats.reload * w.modReload;
+  w.pReload[s] = stats.reload * w.modReload[s]!;
   w.events.push({ type: 'reloadStart', slot: s });
 }
 
@@ -222,12 +231,12 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       const ox = cos(angle) * stats.muzzleFwd + sin(angle) * stats.muzzleSide;
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
       // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
-      const crit = w.modCrit > 0 && w.rng.float() < w.modCrit ? 2 : 1;
-      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce + w.pModPierce[s]!);
+      const crit = w.modCrit[s]! > 0 && w.rng.float() < w.modCrit[s]! ? 2 : 1;
+      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage[s]! * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce[s]! + w.pModPierce[s]!);
     }
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
     w.pMag[s] = w.pMag[s]! - 1;
-    w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate * w.pModRate[s]!);
+    w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate[s]! * w.pModRate[s]!);
     shots++;
   }
   if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
@@ -257,6 +266,7 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
   for (let d = 0; d < MAX_PLAYERS; d++) {
     if (!w.pActive[d] || w.pState[d] !== PlayerState.Downed) continue;
     let helped = false;
+    let reviveMul = 1;
     let rate = 1;
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (s === d || !w.pActive[s] || w.pState[s] !== PlayerState.Alive) continue;
@@ -265,12 +275,13 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
       const dy = w.pY[s]! - w.pY[d]!;
       if (dx * dx + dy * dy <= range2) {
         if (!helped || perk(w, s, PERK.ReviveRate) > rate) rate = perk(w, s, PERK.ReviveRate);
+        if (!helped || w.modRevive[s]! < reviveMul) reviveMul = w.modRevive[s]!;
         helped = true;
       }
     }
     if (helped) {
       w.pRevive[d] = w.pRevive[d]! + TICK_DT * rate;
-      if (w.pRevive[d]! >= BALANCE.player.reviveSeconds * w.modRevive) {
+      if (w.pRevive[d]! >= BALANCE.player.reviveSeconds * reviveMul) {
         w.pState[d] = PlayerState.Alive;
         w.pHp[d] = w.pMaxHp[d]! * BALANCE.progression.revive.hpFraction;
         w.pRevive[d] = 0;
@@ -318,7 +329,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
       continue;
     }
     // the number keys (rank 1-9) and Q (next) pick a weapon while no card offer is open (the digits choose cards then)
-    if (w.cardOffer[0]! < 0 && inp.wsel) {
+    if (w.pOffer[s * 3]! < 0 && inp.wsel) {
       if (inp.wsel === 14) selectNext(w, s);
       else selectByRank(w, s, inp.wsel);
     }
@@ -326,7 +337,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
     ensureUsable(w, s);
     // a helper holding Revive next to a downed teammate is busy: slower, no shooting (moving off interrupts the revive)
     const busy = (inp.buttons & Buttons.Revive) !== 0 && downedNear(w, s);
-    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
+    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
     if (!busy) fireWeapon(w, s, inp, angle);
   }
   updatePlayerPerks(w);
@@ -388,9 +399,10 @@ export function hashWorld(w: World): number {
   const c = new Crc32();
   c.u32(w.tick);
   for (const v of w.rng.getState()) c.u32(v);
-  c.u32(w.difficulty).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver).u32(w.xp).u32(w.level).u32(w.pendingLevels).u32(w.cardTimer);
-  c.typed(w.cardOffer);
-  c.typed(new Float64Array([w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modHp, w.modRevive, w.modMagnet, w.modLoot, w.modXp, w.modBlast, w.modReload, w.modDash, w.modArmor, w.modCrit]));
+  c.u32(w.difficulty).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver);
+  c.typed(new Float64Array([w.modLoot]));
+  c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer);
+  c.typed(w.modDamage).typed(w.modRate).typed(w.modSpeed).typed(w.modPierce).typed(w.modRevive).typed(w.modMagnet).typed(w.modXp).typed(w.modBlast).typed(w.modReload).typed(w.modDash).typed(w.modArmor).typed(w.modCrit);
   c.typed(w.pModRate).typed(w.pModPierce).typed(w.pModArmor).typed(w.pLifesteal);
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);
   c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);

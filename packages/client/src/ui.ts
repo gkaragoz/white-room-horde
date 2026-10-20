@@ -1,5 +1,5 @@
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, FloorPhase, MISC, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -68,6 +68,11 @@ const BASE_STRINGS = {
     pick: 'Level up! Pick a card',
     rarity: ['Common', 'Rare', 'Epic'],
     onlyYou: 'Only you',
+    teamTag: 'Team',
+    infoBy: 'taken by',
+    teamInfo: { heal: 'Everyone healed to full', ammo: 'Every weapon refilled for everyone', grenades: '+2 grenades for everyone', luck: '+50% loot drops for the squad' },
+    lvShort: 'Lv',
+    choosing: 'choosing a card',
     settings: 'Settings',
     volume: 'Volume',
     music: 'Music',
@@ -157,26 +162,26 @@ const BASE_STRINGS = {
     dashReady: 'Dash',
     grenades: 'Grenades',
     cards: {
-      damage: ['Heavy rounds', '+15% damage for everyone'],
-      rate: ['Quick fingers', '+12% fire rate for everyone'],
-      speed: ['Running shoes', '+8% move speed for everyone'],
-      hp: ['Thick vests', '+20 max HP for everyone'],
+      damage: ['Heavy rounds', '+15% damage for you'],
+      rate: ['Quick fingers', '+12% fire rate for you'],
+      speed: ['Running shoes', '+8% move speed for you'],
+      hp: ['Thick vests', '+20 max HP for you'],
       pierce: ['Piercing tips', 'Bullets pass through +1 enemy'],
-      arsenal: ['New toys', 'Everyone upgrades to the next weapon'],
+      arsenal: ['New toys', 'You get the next weapon'],
       heal: ['First aid', 'Heal everyone to full'],
-      sharp: ['Sharpshooter', '+30% damage for you only'],
-      sprint: ['Sprinter', '+20% move speed for you only'],
-      bulk: ['Bulk up', '+40 max HP for you only'],
+      sharp: ['Sharpshooter', '+30% damage'],
+      sprint: ['Sprinter', '+20% move speed'],
+      bulk: ['Bulk up', '+40 max HP'],
       ammo: ['Full magazines', 'Everyone refills magazine and reserve'],
       grenades: ['Grenade crate', '+2 grenades for everyone'],
       medic: ['Field medics', 'Revive 30% faster'],
       magnet: ['Loot magnet', 'Pickups fly to you from further away'],
       luck: ['Lucky clover', '+50% loot drops'],
-      scholar: ['Quick study', '+25% XP for the team'],
+      scholar: ['Quick study', '+25% XP for you'],
       blast: ['Big bang', 'Grenades +25% radius and damage'],
       quickhands: ['Quick hands', 'Reload 25% faster'],
       roll: ['Roll with it', 'Dash recharges 30% faster'],
-      armor: ['Padded vests', 'Everyone takes 12% less damage'],
+      armor: ['Padded vests', 'You take 12% less damage'],
       crit: ['Critical hits', '10% chance of double damage'],
       vampire: ['Vampire', 'You heal 3 HP per kill'],
       tempo: ['Tempo', '+25% fire rate for you only'],
@@ -253,6 +258,11 @@ const BASE_STRINGS = {
     pick: 'Seviye atladın! Bir kart seç',
     rarity: ['Yaygın', 'Nadir', 'Efsanevi'],
     onlyYou: 'Sadece sen',
+    teamTag: 'Takım',
+    infoBy: 'seçen',
+    teamInfo: { heal: 'Herkesin canı tam doldu', ammo: 'Herkesin tüm silahları doldu', grenades: 'Herkese +2 el bombası', luck: 'Takım için %50 daha çok ganimet' },
+    lvShort: 'Sv',
+    choosing: 'kart seçiyor',
     settings: 'Ayarlar',
     volume: 'Ses',
     music: 'Müzik',
@@ -342,26 +352,26 @@ const BASE_STRINGS = {
     dashReady: 'Atılma',
     grenades: 'Bomba',
     cards: {
-      damage: ['Ağır mermiler', 'Herkese +%15 hasar'],
-      rate: ['Çevik parmaklar', 'Herkese +%12 ateş hızı'],
-      speed: ['Koşu ayakkabısı', 'Herkese +%8 hız'],
-      hp: ['Kalın yelekler', 'Herkese +20 azami can'],
+      damage: ['Ağır mermiler', 'Sana +%15 hasar'],
+      rate: ['Çevik parmaklar', 'Sana +%12 ateş hızı'],
+      speed: ['Koşu ayakkabısı', 'Sana +%8 hız'],
+      hp: ['Kalın yelekler', 'Sana +20 azami can'],
       pierce: ['Delici uçlar', 'Mermiler +1 düşmanı deler'],
-      arsenal: ['Yeni oyuncaklar', 'Herkes bir sonraki silaha geçer'],
+      arsenal: ['Yeni oyuncaklar', 'Sana bir sonraki silah gelir'],
       heal: ['İlk yardım', 'Herkesin canı tam dolar'],
-      sharp: ['Keskin nişancı', 'Sadece sana +%30 hasar'],
-      sprint: ['Koşucu', 'Sadece sana +%20 hız'],
-      bulk: ['Kalın deri', 'Sadece sana +40 azami can'],
+      sharp: ['Keskin nişancı', '+%30 hasar'],
+      sprint: ['Koşucu', '+%20 hız'],
+      bulk: ['Kalın deri', '+40 azami can'],
       ammo: ['Dolu şarjörler', 'Herkesin şarjörü ve yedeği dolar'],
       grenades: ['Bomba sandığı', 'Herkese +2 el bombası'],
       medic: ['Saha sağlıkçıları', 'Kaldırma %30 daha hızlı'],
       magnet: ['Ganimet mıknatısı', 'Kutular daha uzaktan sana uçar'],
       luck: ['Şans yoncası', '%50 daha çok ganimet'],
-      scholar: ['Çabuk öğrenen', 'Takıma +%25 XP'],
+      scholar: ['Çabuk öğrenen', 'Sana +%25 XP'],
       blast: ['Büyük patlama', 'El bombaları +%25 alan ve hasar'],
       quickhands: ['Çevik eller', '%25 daha hızlı doldurma'],
       roll: ['Yuvarlan', 'Atılma %30 daha hızlı dolar'],
-      armor: ['Dolgulu yelekler', 'Herkes %12 daha az hasar alır'],
+      armor: ['Dolgulu yelekler', '%12 daha az hasar alırsın'],
       crit: ['Kritik vuruşlar', '%10 ihtimalle çift hasar'],
       vampire: ['Vampir', 'Her öldürmede 3 can kazanırsın'],
       tempo: ['Tempo', 'Sadece sana +%25 ateş hızı'],
@@ -528,6 +538,8 @@ const CSS = `
 .wrh-pc.me{width:230px;padding:8px 11px 9px;font-size:13px}
 .wrh-pc .top{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 .wrh-pc .top b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+.wrh-pc .top .lv{font-size:.82em;font-weight:800;padding:0 5px;border-radius:7px;background:rgba(43,58,82,.12)}
+.wrh-pc .top .pick{font-style:normal;color:#ffb000;animation:wrh-lowhp .5s ease-in-out infinite alternate}
 .wrh-pc .top em{font-style:normal;font-variant-numeric:tabular-nums;font-weight:800;font-size:1.12em}
 .wrh-pc .top em small{font-size:.78em;font-weight:600;opacity:.6}
 .wrh-pc .bar{position:relative;height:11px;border-radius:6px;background:rgba(30,40,58,.3);box-shadow:inset 0 1px 2px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.35);overflow:hidden}
@@ -669,6 +681,16 @@ const CSS = `
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
 .wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{text-shadow:none}
 .wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
+.wrh-info{position:absolute;left:12px;top:30px;z-index:8;max-width:300px;pointer-events:none;display:flex;flex-direction:column;gap:6px}
+.wrh-info .it{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 10px;border-radius:12px;border-left:5px solid var(--c,#1fa2ff);background:rgba(251,246,234,.96);box-shadow:0 4px 14px rgba(20,28,44,.28);color:#2b3a52;transform:translateX(-120%);opacity:0}
+.wrh-info .it.in{animation:wrh-info-in .42s cubic-bezier(.2,1.5,.4,1) forwards}
+.wrh-info .it.out{animation:wrh-info-out .32s ease-in forwards}
+.wrh-info .ic{width:34px;height:34px;border-radius:9px;background:var(--c,#1fa2ff);color:#fff;font:800 17px/34px system-ui,sans-serif;text-align:center;flex:none}
+.wrh-info b{display:block;font-size:14px;font-weight:800}
+.wrh-info span{display:block;font-size:12px;font-weight:600;opacity:.85}
+.wrh-info small{display:block;margin-top:2px;font-size:11px;font-weight:700;opacity:.75}
+@keyframes wrh-info-in{from{transform:translateX(-120%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes wrh-info-out{from{transform:translateX(0);opacity:1}to{transform:translateX(-120%);opacity:0}}
 .wrh-tb{position:absolute;right:12px;top:10px;z-index:70;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
 .wrh-tb>*{pointer-events:auto}
 .wrh-ui .wrh-tbtn{position:relative;display:block;width:36px;min-width:0;height:36px;border-radius:50%;padding:0;margin:0;cursor:pointer;background:rgba(250,244,232,.94);border:2px solid #cdbfa5;color:#3a352d;font-size:18px;line-height:32px;text-align:center;box-shadow:0 2px 8px rgba(20,28,44,.2);transition:transform .12s,background .12s}
@@ -848,7 +870,8 @@ export class Ui {
     this.lang = settings.lang;
     this.hud.style.cssText = 'position:absolute;inset:0;pointer-events:none';
     this.dev.className = 'wrh-hud-dev';
-    this.root.append(this.hud, this.dev, this.screen, this.settingsEl, this.toolbar);
+    this.infoEl.className = 'wrh-info';
+    this.root.append(this.hud, this.dev, this.screen, this.settingsEl, this.toolbar, this.infoEl);
     this.buildToolbar();
     // every button gets a click sound; the important ones a confirmation
     this.root.addEventListener('click', (e) => {
@@ -860,6 +883,43 @@ export class Ui {
       else this.h.onUiSound('click');
     });
     parent.appendChild(this.root);
+  }
+
+  private readonly infoEl = document.createElement('div');
+  private infoQueue: { title: string; detail: string; who: string; color: string }[] = [];
+  private infoBusy = false;
+
+  /**
+   * The info bar top left for upgrades that touch the whole squad: slides in, stays a few seconds, slides out. Anything
+   * that arrives while one is showing waits in a queue and plays after the previous one has left.
+   */
+  pushInfo(title: string, detail: string, who: string, color: string): void {
+    this.infoQueue.push({ title, detail, who, color });
+    if (!this.infoBusy) this.nextInfo();
+  }
+
+  private nextInfo(): void {
+    const item = this.infoQueue.shift();
+    if (!item) {
+      this.infoBusy = false;
+      return;
+    }
+    this.infoBusy = true;
+    const el = document.createElement('div');
+    el.className = 'it';
+    el.style.setProperty('--c', item.color);
+    el.innerHTML = `<div class="ic">&#9733;</div><div><b>${esc(item.title)}</b><span>${esc(item.detail)}</span><small>${this.t.infoBy}: ${esc(item.who)}</small></div>`;
+    this.infoEl.appendChild(el);
+    void el.offsetWidth;
+    el.classList.add('in');
+    setTimeout(() => {
+      el.classList.remove('in');
+      el.classList.add('out');
+      setTimeout(() => {
+        el.remove();
+        this.nextInfo();
+      }, 340);
+    }, 3600);
   }
 
   /** The three round buttons that are always there, top right: language, controls and settings. */
@@ -1411,7 +1471,7 @@ export class Ui {
 
   /** A damage number that rises from a screen position and fades out. */
   popNumber(px: number, py: number, text: string, big: boolean): void {
-    if (this.floaters >= 18) return;
+    if (this.floaters >= 60) return;
     this.floaters++;
     const el = document.createElement('div');
     el.className = 'wrh-dmg';
@@ -1642,7 +1702,7 @@ export class Ui {
       : '';
     this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center">
       <h1>${t.over}</h1>
-      <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${world.level}</b></p>${extra}
+      <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${Math.max(1, ...Array.from(world.pLevel).filter((_, i) => world.pActive[i]))}</b></p>${extra}
       ${this.squadStats(world)}
       <button id="wrh-again">${t.again}</button>${canReplay ? `<button id="wrh-replay" class="alt">${t.replay}</button>` : ''}
     </div>`;
@@ -1876,13 +1936,13 @@ export class Ui {
     const left = world.enemyCount + world.misc[MISC.Remaining]!;
     const bossNext = world.wave % BALANCE.progression.boss.everyWaves === 0;
     const sub = phase === FloorPhase.Fight ? `${left} ${t.enemiesLeft}${bossNext ? ` &middot; <span class="wrh-low">${t.boss}!</span>` : ''}` : phase === FloorPhase.Ascend ? t.climbing : phase === FloorPhase.Cleared ? t.breather : t.getReady;
-    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.level}<br><small style="font-weight:600;opacity:.75">${sub}</small>`);
+    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.pLevel[slot]}<br><small style="font-weight:600;opacity:.75">${sub}</small>`);
     // the big countdown under the top bar: after a clear (before the climb) and on the new floor (before the fight)
     const secsLeft = Math.max(0, Math.ceil((world.misc[MISC.PhaseEnd]! - world.tick) / TICK_RATE));
     if (phase === FloorPhase.Cleared) this.setFloorCountdown(t.waveCleared, `${t.climbIn}`, secsLeft);
     else if (phase === FloorPhase.Arrive) this.setFloorCountdown(`${t.arrivedTitle} ${world.wave}`, t.getReady, secsLeft);
     else this.setFloorCountdown(null, '', 0);
-    (this.hud.querySelector('#h-xp') as HTMLElement).style.width = `${Math.min(100, (world.xp / xpForNext(world)) * 100)}%`;
+    (this.hud.querySelector('#h-xp') as HTMLElement).style.width = `${Math.min(100, (world.pXp[slot]! / xpForNext(world, slot)) * 100)}%`;
 
     // boss bar
     let boss = -1;
@@ -1926,7 +1986,7 @@ export class Ui {
       if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>&#9889;</i>${Math.ceil(haste)}s</span>`;
       if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>&#10006;4</i>${Math.ceil(quad)}s</span>`;
       squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${frac < 0.3 && st === PlayerState.Alive ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
-        `<div class="top"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' &#9760;' : ''}<em>${num}</em></div>` +
+        `<div class="top"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' &#9760;' : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
         `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
         (chips ? `<div class="chips">${chips}</div>` : '') +
         '</div>';
@@ -1980,19 +2040,20 @@ export class Ui {
     }
     // cards
     const cardsEl = this.hud.querySelector<HTMLElement>('#h-cards')!;
-    if (world.cardOffer[0]! >= 0 && !world.gameOver) {
-      const key = world.cardOffer.join(',') + this.lang;
+    if (world.pOffer[slot * 3]! >= 0 && !world.gameOver && world.pState[slot] === PlayerState.Alive) {
+      const offer = [world.pOffer[slot * 3]!, world.pOffer[slot * 3 + 1]!, world.pOffer[slot * 3 + 2]!];
+      const key = offer.join(',') + this.lang;
       if (key !== this.lastCards) {
         this.lastCards = key;
         const cards = t.cards as Record<string, readonly [string, string]>;
         cardsEl.innerHTML =
           `<h3>${t.pick}</h3>` +
-          Array.from(world.cardOffer)
+          offer
             .map((c, i) => {
               const id = CARD_IDS[c]!;
               const rarity = CARD_RARITY[id];
-              const personal = PERSONAL_CARDS.includes(id);
-              return `<div class="wrh-card r${rarity}" data-i="${i}"><kbd>${i + 1}</kbd><div class="art"><img src="${asset(`cards/${id}.png`)}" alt="" draggable="false"></div><b>${cards[id]![0]}</b><span>${cards[id]![1]}</span><em>${(t.rarity as readonly string[])[rarity]}${personal ? ` &middot; ${t.onlyYou}` : ''}</em></div>`;
+              const team = TEAM_CARDS.includes(id);
+              return `<div class="wrh-card r${rarity}" data-i="${i}"><kbd>${i + 1}</kbd><div class="art"><img src="${asset(`cards/${id}.png`)}" alt="" draggable="false"></div><b>${cards[id]![0]}</b><span>${cards[id]![1]}</span><em>${(t.rarity as readonly string[])[rarity]}${team ? ` &middot; ${t.teamTag}` : ''}</em></div>`;
             })
             .join('') +
           `<div class="wrh-cardtime"><i id="h-ct"></i></div>`;
@@ -2002,7 +2063,7 @@ export class Ui {
       }
       cardsEl.style.display = 'block';
       const ct = cardsEl.querySelector<HTMLElement>('#h-ct');
-      if (ct) ct.style.width = `${Math.max(0, (world.cardTimer / (BALANCE.progression.cardSeconds * TICK_RATE)) * 100)}%`;
+      if (ct) ct.style.width = `${Math.max(0, (world.pCardTimer[slot]! / (BALANCE.progression.cardSeconds * TICK_RATE)) * 100)}%`;
     } else {
       cardsEl.style.display = 'none';
       this.lastCards = '';

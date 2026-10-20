@@ -30,7 +30,7 @@ function assetManifest(): Plugin {
           else if (!name.endsWith('.meta.json') && !name.endsWith('.md')) files.push({ p: r, s: statSync(full).size });
         }
       };
-      for (const d of ['models', 'cards', 'sfx', 'music']) {
+      for (const d of ['models', 'cards', 'sfx', 'music', 'ui']) {
         try {
           walk(resolve(out, d), d);
         } catch {
@@ -42,8 +42,16 @@ function assetManifest(): Plugin {
   };
 }
 
+/** Puts the version into the static loading screen, so it shows before any script has run. */
+function htmlVersion(): Plugin {
+  return {
+    name: 'wrh-html-version',
+    transformIndexHtml: (html) => html.split('__VERSION__').join(pkg.version),
+  };
+}
+
 export default defineConfig({
-  plugins: [assetManifest()],
+  plugins: [assetManifest(), htmlVersion()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commit()),

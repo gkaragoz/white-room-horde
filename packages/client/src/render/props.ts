@@ -3,7 +3,6 @@ import { ARENA_HALF_H, ARENA_HALF_W, MAPS } from '@wrh/shared';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { asset } from '../assets';
 import { loadGLB } from './character';
-import { patchReveal, patchRevealTree } from './reveal';
 
 const NAMES = [
   'crate', 'crate_stack', 'barrel', 'barrel_blue', 'cone', 'lamp', 'pallet', 'tyres', 'sandbags', 'bench', 'plant', 'barrier', 'container', 'sign',
@@ -92,7 +91,6 @@ export class PropsView {
             o.receiveShadow = true;
           }
         });
-        patchRevealTree(g.scene);
         v.models.set(n, g.scene);
       }),
     );
@@ -135,12 +133,11 @@ export class PropsView {
 
     // ground beyond the floor so the arena does not float in the sky colour
     if (!this.ground) {
-      this.ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 160), new THREE.MeshStandardMaterial({ color: theme.ground, roughness: 1 }));
+      this.ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 110), new THREE.MeshStandardMaterial({ color: theme.ground, roughness: 1 }));
       this.ground.rotation.x = -Math.PI / 2;
       this.ground.position.y = -0.02;
       this.ground.receiveShadow = true;
     }
-    patchReveal(this.ground.material as THREE.Material);
     (this.ground.material as THREE.MeshStandardMaterial).color.set(theme.ground);
     this.group.add(this.ground);
 

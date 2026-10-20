@@ -46,17 +46,17 @@ describe('cards', () => {
     const w = createWorld(4);
     w.waveTick = 1e9;
     addPlayer(w, 0, 0, 0);
-    awardXp(w, xpForNext(w));
-    expect(w.level).toBe(2);
-    expect(w.cardOffer[0]).toBeGreaterThanOrEqual(0);
-    const offered = w.cardOffer[0]!;
+    awardXp(w, 0, xpForNext(w, 0));
+    expect(w.pLevel[0]).toBe(2);
+    expect(w.pOffer[0]).toBeGreaterThanOrEqual(0);
+    const offered = w.pOffer[0]!;
     step(w, [{ ...NONE, buttons: Buttons.Card1 }]);
-    expect(w.cardOffer[0]).toBe(-1);
+    expect(w.pOffer[0]).toBe(-1);
     const id = CARD_IDS[offered]!;
-    if (id === 'damage') expect(w.modDamage).toBeGreaterThan(1);
-    awardXp(w, xpForNext(w));
+    if (id === 'damage') expect(w.modDamage[0]).toBeGreaterThan(1);
+    awardXp(w, 0, xpForNext(w, 0));
     for (let t = 0; t < BALANCE.progression.cardSeconds * 30 + 2; t++) step(w, [NONE]);
-    expect(w.cardOffer[0]).toBe(-1);
+    expect(w.pOffer[0]).toBe(-1);
   });
 });
 

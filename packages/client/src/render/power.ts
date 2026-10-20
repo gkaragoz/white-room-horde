@@ -11,20 +11,20 @@ export interface PowerKind {
 
 /** The visible upgrade categories. The levels are read from the simulation's modifiers, so nothing here touches the sim. */
 export const POWERS: readonly PowerKind[] = [
-  { id: 'damage', color: '#ff4d4d', level: (w, s) => w.modDamage * w.pModDmg[s]! - 1 },
-  { id: 'rate', color: '#ff9f2e', level: (w, s) => w.modRate * w.pModRate[s]! - 1 },
-  { id: 'pierce', color: '#35d6ff', level: (w, s) => (w.modPierce + w.pModPierce[s]!) * 0.5 },
-  { id: 'crit', color: '#ffd21f', level: (w) => w.modCrit * 3 },
-  { id: 'blast', color: '#ff6a1a', level: (w) => w.modBlast - 1 },
-  { id: 'speed', color: '#b6ff3d', level: (w, s) => w.modSpeed * w.pModSpeed[s]! - 1 },
+  { id: 'damage', color: '#ff4d4d', level: (w, s) => w.modDamage[s]! * w.pModDmg[s]! - 1 },
+  { id: 'rate', color: '#ff9f2e', level: (w, s) => w.modRate[s]! * w.pModRate[s]! - 1 },
+  { id: 'pierce', color: '#35d6ff', level: (w, s) => (w.modPierce[s]! + w.pModPierce[s]!) * 0.5 },
+  { id: 'crit', color: '#ffd21f', level: (w, s) => w.modCrit[s]! * 3 },
+  { id: 'blast', color: '#ff6a1a', level: (w, s) => w.modBlast[s]! - 1 },
+  { id: 'speed', color: '#b6ff3d', level: (w, s) => w.modSpeed[s]! * w.pModSpeed[s]! - 1 },
   { id: 'hp', color: '#ff6fa5', level: (w, s) => (w.pMaxHp[s]! - BALANCE.player.hp) / BALANCE.player.hp },
-  { id: 'armor', color: '#7aa7ff', level: (w, s) => 1 - w.modArmor * w.pModArmor[s]! },
-  { id: 'magnet', color: '#b36bff', level: (w) => w.modMagnet - 1 },
+  { id: 'armor', color: '#7aa7ff', level: (w, s) => 1 - w.modArmor[s]! * w.pModArmor[s]! },
+  { id: 'magnet', color: '#b36bff', level: (w, s) => w.modMagnet[s]! - 1 },
   { id: 'luck', color: '#5df08a', level: (w) => w.modLoot - 1 },
-  { id: 'scholar', color: '#5aa0ff', level: (w) => w.modXp - 1 },
-  { id: 'medic', color: '#3df2c8', level: (w) => 1 - w.modRevive },
-  { id: 'quick', color: '#ffffff', level: (w) => 1 - w.modReload },
-  { id: 'roll', color: '#2fd0b0', level: (w) => 1 - w.modDash },
+  { id: 'scholar', color: '#5aa0ff', level: (w, s) => w.modXp[s]! - 1 },
+  { id: 'medic', color: '#3df2c8', level: (w, s) => 1 - w.modRevive[s]! },
+  { id: 'quick', color: '#ffffff', level: (w, s) => 1 - w.modReload[s]! },
+  { id: 'roll', color: '#2fd0b0', level: (w, s) => 1 - w.modDash[s]! },
   { id: 'vampire', color: '#c8102e', level: (w, s) => w.pLifesteal[s]! * 0.5 },
 ];
 
@@ -147,7 +147,7 @@ export class PowerView {
       const mg = POWERS[KIND.magnet!]!.level(w, s);
       this.magnet.visible = mg > 0.01 && !down && lift < 0.2;
       if (this.magnet.visible) {
-        const r = BALANCE.pickups.magnetRadius * w.modMagnet;
+        const r = BALANCE.pickups.magnetRadius * w.modMagnet[s]!;
         this.magnet.position.x = x;
         this.magnet.position.z = -y;
         this.magnet.scale.setScalar(r);

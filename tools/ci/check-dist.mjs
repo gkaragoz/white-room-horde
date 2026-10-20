@@ -15,6 +15,7 @@ const need = (f) => {
 const html = existsSync(join(dist, 'index.html')) ? readFileSync(join(dist, 'index.html'), 'utf8') : '';
 if (!/rel="manifest"/.test(html)) problems.push('index.html does not link the manifest');
 if (!/wrh-loading/.test(html)) problems.push('index.html has no loading screen');
+if (/__VERSION__/.test(html) || !/wrh-load-sub[^<]*v\d+\.\d+\.\d+/.test(html)) problems.push('the loading screen does not show the version');
 
 const manifest = JSON.parse(readFileSync(join(dist, 'asset-manifest.json'), 'utf8'));
 const total = manifest.files.reduce((a, f) => a + f.s, 0);

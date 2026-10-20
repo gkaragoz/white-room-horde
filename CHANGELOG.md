@@ -7,6 +7,21 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Characters (rules change: update the server and reload the page)**
+- Levels are per character now. A kill gives its experience to the character that made it (kills nobody owns are shared by the living); there is no team xp. Every character levels on its own and picks its own three cards when it does; one character's offer never blocks or decides for another, a downed character's offer waits until it is back up. The xp bar and the "Level" in the top panel are yours, each squad card shows its character's level and a dot while it is choosing.
+- Upgrades are personal: damage, fire rate, speed, health, piercing, armour, crit, blast, reload, dash, magnet, medic, scholar and the new weapon of the arsenal card all belong to whoever picked them. Only four cards still help everybody (First aid, Full magazines, Grenade crate, Lucky clover): they are marked "Team" and show up on the new info bar.
+- Info bar top left: it slides in with the card name, what it did and who took it, stays a few seconds and slides out; more of them wait in a queue.
+
+**Hits and aim**
+- Every hit you land prints its damage (pellets of one shot on the same enemy are added into one number).
+- Auto aim checks the real bullet path (player to muzzle to target), so a target whose muzzle is behind a wall corner is never picked; the input delay and speeds are smoothed, a leaping enemy is trusted less. 192 test shots with the input arriving 1 and 6 ticks late all land.
+
+**Floors**
+- The two floors are never on screen together: the next floor sits far above (a distance worked out from the window shape), the old floor leaves the bottom of the frame whole, the new one comes in whole from the top. The dissolve is gone, the shaft, speed lines and blur stay. The ground around the arena is smaller to make that possible.
+
+**Loading screen**
+- Shows the version number.
+
 ## v0.8.4 (2026-10-20)
 
 **Menus**
