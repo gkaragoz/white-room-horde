@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.9.0 (2026-10-20)
+
 **Characters (rules change: update the server and reload the page)**
 - Levels are per character now. A kill gives its experience to the character that made it (kills nobody owns are shared by the living); there is no team xp. Every character levels on its own and picks its own three cards when it does; one character's offer never blocks or decides for another, a downed character's offer waits until it is back up. The xp bar and the "Level" in the top panel are yours, each squad card shows its character's level and a dot while it is choosing.
 - Upgrades are personal: damage, fire rate, speed, health, piercing, armour, crit, blast, reload, dash, magnet, medic, scholar and the new weapon of the arsenal card all belong to whoever picked them. Only four cards still help everybody (First aid, Full magazines, Grenade crate, Lucky clover): they are marked "Team" and show up on the new info bar.
