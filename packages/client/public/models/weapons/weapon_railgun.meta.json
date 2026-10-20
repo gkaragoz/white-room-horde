@@ -1,0 +1,23 @@
+{
+ "id": "railgun",
+ "tris": 370,
+ "muzzle": [
+  0.0,
+  -2.26,
+  0.14
+ ],
+ "grip_l": [
+  0,
+  -1.0,
+  -0.06
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

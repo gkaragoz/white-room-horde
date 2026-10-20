@@ -1,0 +1,23 @@
+{
+ "id": "crossbow",
+ "tris": 124,
+ "muzzle": [
+  0.0,
+  -1.74,
+  0.21
+ ],
+ "grip_l": [
+  0,
+  -0.9,
+  -0.1
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

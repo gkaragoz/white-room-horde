@@ -44,7 +44,9 @@ export function keyLabel(code: string): string {
   return code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Arrow/, '').replace(/^(Shift|Control|Alt)(Left|Right)$/, '$2 $1').replace('Space', 'Space');
 }
 
-const DEADZONE = 0.22;
+const DEADZONE = 0.28;
+/** Seconds auto aim stays active after the fire button is let go. */
+const FIRE_GRACE = 0.35;
 
 /** Pads report y down; the game wants screen-up positive. Returns the deadzone-scaled stick or null when idle. */
 function stick(x: number, y: number): { x: number; y: number } | null {
@@ -235,7 +237,15 @@ export class Input {
     return null;
   }
 
-  sample(playerX: number, playerY: number, autoAim: number | null = null, autoMode = false): { input: PlayerInput; moveAngle: number; aimAngle: number } {
+  /** Is the player shooting (Fire held, or let go less than a third of a second ago)? Auto aim only turns the character then. */
+  shooting = false;
+  private fireUntil = 0;
+
+  /**
+   * One input sample. `lock` finds the auto-aim angle and is only asked while shooting: a character standing still does not
+   * turn to whoever happens to be nearest. `cursorAngle` turns a cursor point into the shot angle from the muzzle.
+   */
+  sample(playerX: number, playerY: number, lock: (() => number | null) | null = null, autoMode = false, cursorAngle: ((x: number, y: number) => number) | null = null): { input: PlayerInput; moveAngle: number; aimAngle: number } {
     const dx = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
     const dy = (this.held('up') ? 1 : 0) - (this.held('down') ? 1 : 0);
     let m = keysToMove(dx, dy);
@@ -306,12 +316,18 @@ export class Input {
     }
     buttons |= this.touchButtons;
 
+    const nowS = performance.now() / 1000;
+    if (buttons & Buttons.Fire) this.fireUntil = nowS + FIRE_GRACE;
+    this.shooting = nowS < this.fireUntil;
+
     let aimAngle: number;
     let aimDist = 0;
+    let cursor: { x: number; y: number } | null = null;
     if (touchAim) aimAngle = Math.atan2(touchAim.y, touchAim.x);
     else if (padAim) aimAngle = Math.atan2(padAim.y, padAim.x);
     else if (this.aimDevice === 'mouse') {
       const aim = this.aimPoint();
+      cursor = aim;
       aimAngle = Math.atan2(aim.y - playerY, aim.x - playerX);
       aimDist = Math.min(255, Math.round(Math.hypot(aim.x - playerX, aim.y - playerY) * 4));
     } else aimAngle = this.lastAim;
@@ -322,7 +338,9 @@ export class Input {
     // grenades (gAim, aimDist). A stick on a pad or a phone is an explicit aim and wins.
     this.stickAiming = !!(touchAim || padAim);
     let shotAngle = aimAngle;
+    if (!autoMode && cursor && cursorAngle) shotAngle = cursorAngle(cursor.x, cursor.y); // the bullet leaves the muzzle, not the middle of the player
     if (autoMode && !this.stickAiming) {
+      const autoAim = this.shooting && lock ? lock() : null;
       if (autoAim !== null) shotAngle = autoAim;
       else if (Math.hypot(m.x, m.y) > 0.2) shotAngle = Math.atan2(m.y, m.x);
       else shotAngle = this.lastShot;

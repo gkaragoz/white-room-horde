@@ -7,6 +7,22 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**More of everything: 10 enemies, 5 elites, 5 bosses, 10 guns, harder floors (rules and wire format change: update the server and reload the page)**
+
+- Ten new enemies: the **pouncer** marks one player and leaps onto the spot, the **hurler** picks up its own soldiers and throws them at you, the **grabber** catches you and throws you across the room, the **spiker** shoots a fan of spikes, the **shocker** pulses a ring of lightning, the **brood** mother bursts into crawlers, the **trapper** lays mines, the **warcaller** blows a horn and calls reinforcements (and speeds its horde up), the **chopper** throws an axe that comes back, the **quaker** stomps and rains rocks.
+- Five new elite kinds: berserk (frenzy every few seconds), vampiric (heals when it hits), toxic (leaves acid), phantom (dodges some hits), warded (a shield before its health). Elites are more common.
+- Five new bosses (eleven in all, old and new mixed so a new one comes early): the iron colossus (earthquakes), the storm caller (lightning), the plague doctor (poison ground, broods), the stalker (leaps, cuts lines) and the warlord (throws its soldiers, war cries).
+- Ten new guns: railgun, crossbow, plasma rifle, rocket launcher, nail gun, auto shotgun, akimbo pistols, frost gun (freezes what it hits), saw launcher and arc thrower. Models, icons, sounds, unlocks and names in six languages. The starting weapon list and the weapon crates know them all.
+- Harder and busier floors: three times the enemies (cap 510), they arrive faster, enemies grow tougher sooner and hit harder after floor 10.
+- A boss that smashes the ground no longer says "Reinforcements!": every boss attack has its own banner. The last-kill statistics also know the ten new guns; texts reviewed ("Reached floor", the controls line mentions the ability key, elite names in all languages).
+- The wire format of a joining player and of a replay got room for more than 16 weapons.
+
+**Aim fixes**
+
+- Auto aim only turns the character while you shoot (and for a third of a second after): standing still, the character no longer swings round to whichever enemy happens to be nearest. It only locks on enemies in reach of the weapon, holds a lock against near equals (a nearer one must be a third closer, or the old one dead or blocked for six ticks) and leads moving targets with a calmer estimate.
+- The body turns to the angle that is actually being shot, and manual aim now sends the bullet through the cursor from the muzzle instead of alongside it.
+- A wall beside the barrel no longer eats a shot: only a wall in front of the muzzle stops it. Close targets are aimed at from the middle of the character so they cannot be missed by the barrel's offset.
+
 ## v0.18.0 (2026-10-20)
 
 **Bigger arenas, a built and demolished floor, a game-over page full of numbers (rules change: update the server and reload the page)**

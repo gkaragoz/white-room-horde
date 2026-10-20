@@ -1,0 +1,23 @@
+{
+ "id": "nailgun",
+ "tris": 136,
+ "muzzle": [
+  0.0,
+  -1.1,
+  0.12
+ ],
+ "grip_l": [
+  0,
+  -0.5,
+  -0.18
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

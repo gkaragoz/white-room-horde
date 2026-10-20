@@ -215,15 +215,15 @@ describe('the new bosses', () => {
     return { w, id };
   };
 
-  it('the boss cycle has six variants', () => {
+  it('the boss cycle has eleven variants', () => {
     const seen = new Set<number>();
-    for (let k = 1; k <= 6; k++) {
+    for (let k = 1; k <= 11; k++) {
       const w = createWorld(1);
       addPlayer(w, 0, 0, 0);
       w.wave = k * BALANCE.progression.boss.everyWaves;
       seen.add(w.eBoss[spawnBoss(w)]!);
     }
-    expect([...seen].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+    expect([...seen].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
 
   it('meteors rain on the player: telegraphs first, hits after', () => {

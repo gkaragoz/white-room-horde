@@ -163,7 +163,7 @@ export function waveModOf(wave: number): number {
   return wave < 3 ? 0 : (wave * 7 + (wave >> 2)) % 6;
 }
 
-export const ELITE = { Giant: 1, Swift: 2, Splitter: 3, Volatile: 4, Regen: 5, Armored: 6 } as const;
+export const ELITE = { Giant: 1, Swift: 2, Splitter: 3, Volatile: 4, Regen: 5, Armored: 6, Berserk: 7, Vampiric: 8, Toxic: 9, Phantom: 10, Warded: 11 } as const;
 
 export function eliteChance(w: World): number {
   const c = BALANCE.elites;
@@ -177,8 +177,9 @@ export function eliteChance(w: World): number {
 export function rollElite(w: World, i: number): void {
   const chance = eliteChance(w);
   if (chance <= 0 || w.rng.float() >= chance) return;
-  const mod = 1 + w.rng.int(6);
+  const mod = 1 + w.rng.int(11);
   w.eMod[i] = mod;
+  if (mod === ELITE.Warded) w.eShield[i] = w.eHp[i]! * BALANCE.elites.wardedShield;
   if (mod === ELITE.Giant) w.eHp[i] = w.eHp[i]! * BALANCE.elites.giantHp;
   else if (mod === ELITE.Swift) w.eHp[i] = w.eHp[i]! * BALANCE.elites.swiftHp;
   else if (mod === ELITE.Armored) w.eHp[i] = w.eHp[i]! * 1.3;

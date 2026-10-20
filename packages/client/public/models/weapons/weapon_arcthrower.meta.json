@@ -1,0 +1,23 @@
+{
+ "id": "arcthrower",
+ "tris": 260,
+ "muzzle": [
+  0.0,
+  -1.6,
+  0.14
+ ],
+ "grip_l": [
+  0,
+  -0.55,
+  -0.12
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

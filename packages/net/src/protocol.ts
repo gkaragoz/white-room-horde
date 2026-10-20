@@ -91,14 +91,15 @@ export function decodeInputMsg(buf: Uint8Array): { tick: number; input: PlayerIn
 
 export function encodeBundle(b: Bundle): Uint8Array {
   const body = encodeTick(b.inputs);
-  const out = new Uint8Array(1 + 4 + 1 + b.joins.length * 2 + body.length);
+  const out = new Uint8Array(1 + 4 + 1 + b.joins.length * 3 + body.length);
   out[0] = Bin.Bundle;
   new DataView(out.buffer).setUint32(1, b.tick, true);
   out[5] = b.joins.length;
   let o = 6;
   for (const j of b.joins) {
     out[o++] = j.slot;
-    out[o++] = (j.weaponIndex & 15) | ((j.cls & 15) << 4); // weapons use the low four bits (up to 16), the class the top four
+    out[o++] = j.weaponIndex & 255;
+    out[o++] = j.cls & 255;
   }
   out.set(body, o);
   return out;
@@ -111,8 +112,8 @@ export function decodeBundle(buf: Uint8Array, slots: number): Bundle {
   const joins: Bundle['joins'] = [];
   let o = 6;
   for (let i = 0; i < n; i++) {
-    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]! & 15, cls: buf[o + 1]! >> 4 });
-    o += 2;
+    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]!, cls: buf[o + 2]! });
+    o += 3;
   }
   return { tick, joins, inputs: decodeTick(buf.subarray(o), slots).inputs };
 }

@@ -33,8 +33,10 @@ export const Buttons = {
 
 export const NO_INPUT: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 
-export type WeaponId = 'pistol' | 'smg' | 'ar' | 'shotgun' | 'hmg' | 'minigun' | 'sniper' | 'revolver' | 'mp' | 'dbl' | 'dmr' | 'flamer' | 'gl' | 'sword' | 'hammer';
-export const WEAPON_IDS: readonly WeaponId[] = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper', 'revolver', 'mp', 'dbl', 'dmr', 'flamer', 'gl', 'sword', 'hammer'];
+export type WeaponId = 'pistol' | 'smg' | 'ar' | 'shotgun' | 'hmg' | 'minigun' | 'sniper' | 'revolver' | 'mp' | 'dbl' | 'dmr' | 'flamer' | 'gl' | 'sword' | 'hammer' | 'railgun' | 'crossbow' | 'plasma' | 'rocket' | 'nailgun' | 'autoshotgun' | 'akimbo' | 'frostgun' | 'sawlauncher' | 'arcthrower';
+export const WEAPON_IDS: readonly WeaponId[] = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper', 'revolver', 'mp', 'dbl', 'dmr', 'flamer', 'gl', 'sword', 'hammer', 'railgun', 'crossbow', 'plasma', 'rocket', 'nailgun', 'autoshotgun', 'akimbo', 'frostgun', 'sawlauncher', 'arcthrower'];
+/** Room in the per-player weapon tables (time spent with each weapon): more than there are weapons, so a few more can be added. */
+export const WEAPON_SLOTS = 32;
 /** Classes that fight with a blade or a hammer and use no guns (class id index). */
 export const MELEE_CLASSES: readonly number[] = [7, 8];
 
@@ -42,15 +44,15 @@ export const MELEE_CLASSES: readonly number[] = [7, 8];
  * Fixed order of the weapons from the weakest to the strongest (sustained damage and area, see balance.json). The number
  * keys 1-9 pick the first nine of them, Q walks up the list; the order never changes, so a key always means the same gun.
  */
-export const WEAPON_RANK: readonly WeaponId[] = ['pistol', 'mp', 'shotgun', 'revolver', 'dbl', 'smg', 'ar', 'flamer', 'sniper', 'dmr', 'hmg', 'gl', 'minigun', 'sword', 'hammer'];
+export const WEAPON_RANK: readonly WeaponId[] = ['pistol', 'mp', 'shotgun', 'akimbo', 'nailgun', 'revolver', 'crossbow', 'dbl', 'smg', 'arcthrower', 'autoshotgun', 'ar', 'plasma', 'frostgun', 'flamer', 'sniper', 'dmr', 'sawlauncher', 'hmg', 'gl', 'rocket', 'minigun', 'railgun', 'sword', 'hammer'];
 /** WEAPON_RANK as indices into WEAPON_IDS. */
 export const RANK_INDEX: readonly number[] = WEAPON_RANK.map((id) => WEAPON_IDS.indexOf(id));
 /** Position of a weapon (index into WEAPON_IDS) in the ranking, 0 = weakest. */
 export const RANK_OF: readonly number[] = WEAPON_IDS.map((id) => WEAPON_RANK.indexOf(id));
 
-export type EnemyType = 'grunt' | 'runner' | 'tank' | 'exploder' | 'spitter' | 'shielder' | 'spawner' | 'crawler' | 'leaper' | 'bloater' | 'screamer' | 'acider' | 'rammer' | 'flamer' | 'mortar' | 'sledge' | 'lamper' | 'blinker' | 'marksman' | 'reviver' | 'magnetar';
+export type EnemyType = 'grunt' | 'runner' | 'tank' | 'exploder' | 'spitter' | 'shielder' | 'spawner' | 'crawler' | 'leaper' | 'bloater' | 'screamer' | 'acider' | 'rammer' | 'flamer' | 'mortar' | 'sledge' | 'lamper' | 'blinker' | 'marksman' | 'reviver' | 'magnetar' | 'pouncer' | 'hurler' | 'grabber' | 'spiker' | 'shocker' | 'brood' | 'trapper' | 'warcaller' | 'chopper' | 'quaker';
 /** Index in this array is the numeric type stored in the sim and used by the renderer. */
-export const ENEMY_TYPES: readonly EnemyType[] = ['grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'crawler', 'leaper', 'bloater', 'screamer', 'acider', 'rammer', 'flamer', 'mortar', 'sledge', 'lamper', 'blinker', 'marksman', 'reviver', 'magnetar'];
+export const ENEMY_TYPES: readonly EnemyType[] = ['grunt', 'runner', 'tank', 'exploder', 'spitter', 'shielder', 'spawner', 'crawler', 'leaper', 'bloater', 'screamer', 'acider', 'rammer', 'flamer', 'mortar', 'sledge', 'lamper', 'blinker', 'marksman', 'reviver', 'magnetar', 'pouncer', 'hurler', 'grabber', 'spiker', 'shocker', 'brood', 'trapper', 'warcaller', 'chopper', 'quaker'];
 
 /** Enemy animation state (eState). */
 export const EnemyState = { Move: 0, Attack: 1, Spawn: 2 } as const;

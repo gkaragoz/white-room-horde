@@ -537,6 +537,185 @@ def spec_purger(b):
     b.box("hand.R", (-0.4, -0.08, 1.45), (0.5, 0.06, 0.34), "#D8DDE8")
 
 
+# ---------------------------------------------------------------- v0.19: ten more enemies and five more bosses
+def spec_pouncer(b):
+    """Pouncer: a lean feral hunter with huge hind legs and claws, eyes fixed on one victim."""
+    body_parts(b, "#F2C4F0", "#C25BC0", slim=0.8, head_k=0.95, belt="#5E1F5C", glove="#2A0F2A")
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.sphere("thigh." + side, (sx * 0.24, 0, 0.3), 0.21, (1, 1, 1.5), "#9E3C9C")
+        b.cyl("hand." + side, (sx * 0.4, -0.12, 0.3), 0.045, 0.3, "#FFF2FF", rot=(1.2, 0, 0), r2=0.0)
+        b.sphere("head", (sx * 0.17, -0.38, 1.1), 0.075, (1, 0.5, 1), "#FFF04A")
+    for k in range(3):
+        b.cyl("spine", (0, 0.32, 0.5 + 0.16 * k), 0.06, 0.2, "#5E1F5C", rot=(-0.8, 0, 0), r2=0.0)
+
+
+def spec_hurler(b):
+    """Hurler: a hulking thrower with a harness, a sack of rocks on the back and hands made for picking things up."""
+    body_parts(b, "#F2D4B0", "#C98B4A", slim=1.6, head_k=0.7, belt="#5A3A1C", glove="#3A2410")
+    b.box("spine", (0, -0.4, 0.55), (0.9, 0.12, 0.2), "#3A2410", rot=(0, 0, 0.5))
+    b.sphere("spine", (0, 0.4, 0.62), 0.34, (1, 0.9, 1), "#8A6A3A")
+    for k, (x, z) in enumerate(((-0.12, 0.8), (0.14, 0.72), (0.02, 0.92))):
+        b.sphere("spine", (x, 0.48, z), 0.13, (1, 1, 1), "#8C8C98")
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.sphere("hand." + side, (sx * 0.46, -0.1, 0.34), 0.2, (1, 1, 1), "#B87A3A")
+
+
+def spec_grabber(b):
+    """Grabber: a chained ogre with clamps for hands, a cage on the back and a locked jaw."""
+    body_parts(b, "#C9D4E0", "#6E86A6", slim=1.7, head_k=0.75, belt="#2F3B4E", glove="#2A2A32")
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.box("hand." + side, (sx * 0.5, -0.1, 0.32), (0.34, 0.34, 0.42), "#4A4A56")
+        b.box("hand." + side, (sx * 0.5, -0.3, 0.32), (0.3, 0.1, 0.12), "#8A8A98")
+        b.cyl("arm." + side, (sx * 0.4, 0, 0.55), 0.07, 0.5, "#B8B8C4", rot=(0, sx * 0.4, 0))
+    b.box("spine", (0, 0.36, 0.6), (0.6, 0.1, 0.7), "#3A3A44")
+    for k in range(3):
+        b.box("spine", (-0.2 + 0.2 * k, 0.4, 0.6), (0.04, 0.06, 0.74), "#8A8A98")
+    b.box("head", (0, -0.4, 0.92), (0.4, 0.1, 0.14), "#8A8A98")
+
+
+def spec_spiker(b):
+    """Spiker: a bristling back of quills, aimed forward when it is about to shoot."""
+    body_parts(b, "#BFF2E6", "#3FBFA8", slim=1.0, head_k=0.9, belt="#1D5C50", glove="#10382F")
+    rnd = random.Random(31)
+    for k in range(9):
+        a = math.pi * (0.15 + 0.7 * k / 8)
+        b.cyl("spine", (0.42 * math.cos(a), 0.18 + 0.2 * math.sin(a), 0.55 + 0.12 * (k % 3)), 0.06, 0.5 + rnd.random() * 0.2, "#F2FFFB", rot=(0.9 * math.sin(a), -0.9 * math.cos(a), 0), r2=0.0)
+    b.sphere("head", (0, -0.35, 1.0), 0.16, (1.2, 0.6, 0.8), "#10382F")
+
+
+def spec_shocker(b):
+    """Shocker: tesla coils on the shoulders that crackle, a glowing chest cell."""
+    body_parts(b, "#D6F4FF", "#5CC8F2", slim=0.95, head_k=0.9, belt="#24506B", glove="#10303F")
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.cyl("arm." + side, (sx * 0.38, 0.02, 0.8), 0.07, 0.5, "#9CB4C2")
+        b.torus("arm." + side, (sx * 0.38, 0.02, 0.92), 0.11, 0.025, "#E8FFFF", major=8, minor=4)
+        b.sphere("arm." + side, (sx * 0.38, 0.02, 1.08), 0.11, (1, 1, 1), "#FFFFA8")
+    b.sphere("spine", (0, -0.3, 0.55), 0.15, (1, 0.5, 1), "#FFFFA8")
+    b.sphere("head", (0, -0.4, 1.08), 0.08, (1, 0.5, 1), "#FFFFA8")
+
+
+def spec_brood(b):
+    """Brood: a swollen mother with egg sacs on the back and belly, larvae squirming under the skin."""
+    body_parts(b, "#F8D8DC", "#E39AA6", slim=1.5, head_k=0.75, belt="#8C4F58", glove="#C9788A")
+    rnd = random.Random(44)
+    for (x, y, z) in ((0.0, 0.34, 0.55), (0.28, 0.28, 0.42), (-0.28, 0.3, 0.7), (0.1, -0.38, 0.45), (-0.3, -0.25, 0.4), (0.3, -0.2, 0.7)):
+        b.sphere("spine", (x, y, z), 0.19 + rnd.random() * 0.05, (1, 1, 1), "#FFF0E0")
+        b.sphere("spine", (x * 1.05, y * 1.12, z + 0.02), 0.07, (1, 1, 1), "#8C2A3A")
+    b.sphere("head", (0, -0.36, 0.95), 0.14, (1.2, 0.5, 0.8), "#5A1A26")
+
+
+def spec_trapper(b):
+    """Trapper: a hard hat, a bandolier of round mines and a bag of them on the hip."""
+    body_parts(b, "#FFEFA8", "#E8C03C", slim=1.0, head_k=0.95, belt="#2B2D33", glove="#2B2D33")
+    b.cyl("head", (0, 0, 1.5), 0.4, 0.14, "#FFC93C")
+    b.cyl("head", (0, 0, 1.45), 0.5, 0.05, "#FFC93C")
+    for k in range(4):
+        b.cyl("spine", (-0.22 + 0.15 * k, -0.34, 0.45 + 0.07 * k), 0.09, 0.06, "#4A4A52", rot=(1.5, 0, 0))
+        b.sphere("spine", (-0.22 + 0.15 * k, -0.38, 0.45 + 0.07 * k), 0.035, (1, 1, 1), "#FF4A3C")
+    b.sphere("hips", (0.34, 0, 0.3), 0.2, (1, 1, 1), "#6B4A2A")
+
+
+def spec_warcaller(b):
+    """Warcaller: a war banner on the back, a horn at the belt and a red sash, shouting orders."""
+    body_parts(b, "#FFD4C4", "#D8402E", slim=1.1, head_k=0.9, belt="#6E1810", glove="#FFD84A")
+    b.cyl("spine", (0, 0.34, 1.0), 0.04, 1.7, "#6B4A2A")
+    b.box("spine", (0.3, 0.34, 1.62), (0.6, 0.04, 0.5), "#D8402E")
+    b.box("spine", (0.3, 0.34, 1.62), (0.2, 0.05, 0.2), "#FFD84A")
+    b.cyl("hips", (-0.36, -0.1, 0.34), 0.07, 0.3, "#F2EEDC", rot=(0, 0.6, 0.3), r2=0.15)
+    b.box("spine", (0, -0.36, 0.55), (0.12, 0.05, 0.7), "#FFD84A", rot=(0, 0, 0.55))
+
+
+def spec_chopper(b):
+    """Chopper: a masked executioner with a huge two-handed axe."""
+    body_parts(b, "#E6D0D0", "#8C2A2A", slim=1.25, head_k=0.9, belt="#2B1010", glove="#1A0A0A")
+    b.sphere("head", (0, -0.3, 1.1), 0.4, (1.05, 0.5, 1.0), "#1A0A0A")
+    for sx in (-1, 1):
+        b.sphere("head", (sx * 0.12, -0.5, 1.1), 0.045, (1, 0.5, 1), "#FF3A3A")
+    b.cyl("hand.R", (-0.42, -0.1, 0.8), 0.05, 1.5, "#6B4A2A")
+    b.box("hand.R", (-0.42, -0.1, 1.45), (0.7, 0.05, 0.5), "#B8C0CC")
+    b.box("hand.R", (-0.42, -0.1, 1.45), (0.2, 0.07, 0.45), "#7C8896")
+
+
+def spec_quaker(b):
+    """Quaker: a rock giant with two boulder fists, plates of cracked stone and a glowing seam."""
+    body_parts(b, "#D8CBB0", "#9C8A6A", slim=1.7, head_k=0.65, belt="#4A3E2C", glove="#6E6048")
+    rnd = random.Random(52)
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.sphere("hand." + side, (sx * 0.58, -0.05, 0.3), 0.36, (1, 1, 0.95), "#7A6C52")
+        b.sphere("arm." + side, (sx * 0.6, 0, 0.78), 0.25, (1, 1, 0.9), "#8A7A5E")
+    for k in range(6):
+        a = 2 * math.pi * k / 6
+        b.cyl("head", (0.3 * math.cos(a), 0.3 * math.sin(a), 1.4), 0.07 + rnd.random() * 0.04, 0.3, "#6E6048", r2=0.0)
+    b.box("spine", (0, -0.4, 0.55), (0.06, 0.05, 0.7), "#FF9A3C", rot=(0, 0, 0.3))
+    b.box("spine", (0.1, -0.41, 0.4), (0.3, 0.05, 0.06), "#FF9A3C")
+
+
+def spec_iron_colossus(b):
+    """Iron colossus: riveted steel plate, a furnace in the chest, hammer fists."""
+    body_parts(b, "#B8C0CC", "#6C7A8C", slim=1.7, head_k=0.7, belt="#2E3846", glove="#3A4454")
+    b.box("head", (0, -0.2, 1.1), (0.7, 0.6, 0.36), "#5A6678")
+    b.box("head", (0, -0.5, 1.12), (0.5, 0.06, 0.08), "#FF7A1F")
+    b.sphere("spine", (0, -0.34, 0.56), 0.24, (1, 0.5, 1), "#FF7A1F")
+    b.torus("spine", (0, -0.36, 0.56), 0.28, 0.04, "#3A4454", major=10, minor=4, rot=(1.57, 0, 0))
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.box("arm." + side, (sx * 0.6, 0, 0.7), (0.4, 0.5, 0.5), "#4A5668")
+        b.box("hand." + side, (sx * 0.6, -0.05, 0.3), (0.5, 0.5, 0.5), "#3A4454")
+        b.cyl("head", (sx * 0.3, 0.3, 1.5), 0.07, 0.5, "#4A5668", r2=0.04)
+
+
+def spec_storm_caller(b):
+    """Storm caller: a tall robe crackling with a ring of lightning orbs and a staff topped with a storm."""
+    body_parts(b, "#E8F2FF", "#4A7AC8", slim=1.2, head_k=0.9, belt="#243B63", glove="#F4FAFF")
+    b.cyl("spine", (0, 0, 0.3), 0.55, 0.68, "#3A64B0", r2=0.28)
+    b.torus("head", (0, 0, 1.75), 0.4, 0.04, "#8FE8FF", major=14, minor=4)
+    for k in range(5):
+        a = 2 * math.pi * k / 5
+        b.sphere("spine", (0.62 * math.cos(a), 0.62 * math.sin(a), 0.95 + 0.1 * (k % 2)), 0.11, (1, 1, 1), "#FFFFA8")
+    b.cyl("hand.R", (-0.42, -0.08, 0.8), 0.05, 1.7, "#B8C8E0")
+    b.sphere("hand.R", (-0.42, -0.08, 1.7), 0.2, (1, 1, 1), "#8FE8FF")
+    b.sphere("head", (0, -0.4, 1.05), 0.06, (1, 0.5, 1), "#FFFFA8")
+
+
+def spec_plague_doctor(b):
+    """Plague doctor: a long beak mask, a wide hat, a green coat and a smoking censer."""
+    body_parts(b, "#E4F0C8", "#3E6B2A", slim=1.15, head_k=0.9, belt="#1C2E12", glove="#10200A")
+    b.cyl("spine", (0, 0, 0.3), 0.5, 0.62, "#2E5220", r2=0.26)
+    b.cyl("head", (0, -0.52, 1.0), 0.16, 0.7, "#E8E0C8", rot=(1.35, 0, 0), r2=0.02)
+    b.cyl("head", (0, 0, 1.52), 0.6, 0.05, "#1C2E12")
+    b.cyl("head", (0, 0, 1.64), 0.34, 0.26, "#1C2E12")
+    for sx in (-1, 1):
+        b.sphere("head", (sx * 0.17, -0.36, 1.14), 0.1, (1, 0.5, 1), "#C8FF5A")
+    b.cyl("hand.R", (-0.4, -0.2, 0.9), 0.015, 0.5, "#8A8A96", rot=(0.3, 0, 0))
+    b.sphere("hand.R", (-0.4, -0.3, 0.6), 0.14, (1, 1, 1), "#B8C85A")
+
+
+def spec_stalker(b):
+    """Stalker: a gaunt hunter in a torn cloak of blades, long arms with hooked claws, one red eye."""
+    body_parts(b, "#D4C8D8", "#3A2E48", slim=0.9, head_k=0.8, belt="#140E1C", glove="#140E1C")
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.cyl("hand." + side, (sx * 0.42, -0.1, 0.22), 0.05, 0.6, "#C8C8D4", rot=(0.25, 0, 0), r2=0.0)
+        b.cyl("arm." + side, (sx * 0.4, 0, 0.55), 0.06, 0.7, "#2A2038", rot=(0, sx * 0.25, 0))
+    for k in range(7):
+        a = math.pi * (0.1 + 0.8 * k / 6)
+        b.cyl("spine", (0.4 * math.cos(a), 0.3 + 0.1 * math.sin(a), 0.5 + 0.1 * (k % 3)), 0.07, 0.8, "#C8C8D4", rot=(0.7, -0.4 * math.cos(a), 0), r2=0.0)
+    b.sphere("head", (0, -0.4, 1.06), 0.12, (1, 0.5, 1), "#FF2A2A")
+
+
+def spec_warlord(b):
+    """Warlord: a horned helm, heavy pauldrons, a cape and a war banner as tall as two men."""
+    body_parts(b, "#F2D4B8", "#8C2A1C", slim=1.5, head_k=0.85, belt="#2B1410", glove="#2B1410")
+    for sx in (-1, 1):
+        b.cyl("head", (sx * 0.4, 0, 1.4), 0.1, 0.5, "#F2EEDC", rot=(0, sx * 0.9, 0), r2=0.0)
+        b.sphere("arm." + ("L" if sx == 1 else "R"), (sx * 0.58, 0, 0.78), 0.28, (1, 1, 0.8), "#4A4A56")
+    b.box("spine", (0, 0.38, 0.55), (0.8, 0.06, 0.9), "#6E1810")
+    b.cyl("spine", (0.45, 0.42, 1.1), 0.05, 2.4, "#6B4A2A")
+    b.box("spine", (0.8, 0.42, 1.9), (0.7, 0.05, 0.6), "#D8402E")
+    b.box("spine", (0.8, 0.43, 1.9), (0.26, 0.06, 0.26), "#FFD84A")
+    b.cyl("hand.R", (-0.5, -0.1, 0.8), 0.06, 1.7, "#6B4A2A")
+    b.box("hand.R", (-0.5, -0.1, 1.6), (0.8, 0.06, 0.6), "#B8C0CC")
+
+
+
 # accessories live in character space; the client attaches them to the head bone
 def acc_bandana(b):  # accessories use HIGH detail
     b.torus("head", (0, 0, 1.19), 0.44, 0.06, "#FFFFFF", tint=True, scale=(1, 1, 1))
@@ -784,6 +963,21 @@ SPECS = [
     ("boss_suru_lideri", spec_suru_lideri, 2.5, "boss", 1.7),
     ("boss_meteor_lord", spec_meteor_lord, 3.6, "boss", 1.7),
     ("boss_purger", spec_purger, 3.4, "boss", 1.7),
+    ("pouncer", spec_pouncer, 1.3, "special", 1.5),
+    ("hurler", spec_hurler, 2.1, "special", 1.5),
+    ("grabber", spec_grabber, 2.3, "special", 1.5),
+    ("spiker", spec_spiker, 1.4, "special", 1.5),
+    ("shocker", spec_shocker, 1.4, "special", 1.5),
+    ("brood", spec_brood, 1.8, "special", 1.5),
+    ("trapper", spec_trapper, 1.35, "special", 1.5),
+    ("warcaller", spec_warcaller, 1.5, "special", 1.5),
+    ("chopper", spec_chopper, 1.7, "special", 1.5),
+    ("quaker", spec_quaker, 2.4, "special", 1.5),
+    ("boss_iron_colossus", spec_iron_colossus, 4.2, "boss", 1.7),
+    ("boss_storm_caller", spec_storm_caller, 3.4, "boss", 1.7),
+    ("boss_plague_doctor", spec_plague_doctor, 3.2, "boss", 1.7),
+    ("boss_stalker", spec_stalker, 3.0, "boss", 1.7),
+    ("boss_warlord", spec_warlord, 3.8, "boss", 1.7),
     ("acc_bandana", acc_bandana, 1.5, "acc", 1.5),
     ("acc_headphones", acc_headphones, 1.5, "acc", 1.5),
     ("acc_helmet", acc_helmet, 1.5, "acc", 1.5),

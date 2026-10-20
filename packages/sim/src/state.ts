@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_TELE, MAX_ZONES, PERKS, STATS, WEAPON_IDS } from '@wrh/shared';
+import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_TELE, MAX_ZONES, PERKS, STATS, WEAPON_IDS, WEAPON_SLOTS } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -26,7 +26,7 @@ export type SimEvent =
   | { type: 'reloadStart'; slot: number }
   | { type: 'reloadDone'; slot: number }
   | { type: 'dash'; slot: number; x: number; y: number }
-  | { type: 'bossAbility'; kind: 'charge' | 'summon' | 'aura' | 'slam' | 'meteor' | 'acid' | 'sweep' | 'purge'; x: number; y: number }
+  | { type: 'bossAbility'; kind: 'charge' | 'summon' | 'aura' | 'slam' | 'meteor' | 'acid' | 'sweep' | 'purge' | 'quake' | 'storm' | 'plague' | 'pounce' | 'hurl'; x: number; y: number }
   | { type: 'playerDown'; slot: number; x: number; y: number }
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
@@ -150,6 +150,8 @@ export interface World {
   eCooldown: Float64Array;
   /** Elite modifier of an enemy (0 none; see ELITE in features.ts). */
   eMod: Uint8Array;
+  /** Hit points of the protective shield of a warded elite (taken off before the health). */
+  eShield: Float64Array;
   /** Ticks an enemy stays frozen (stands still, no attacks). */
   eFrost: Int32Array;
   eLayer: Uint8Array;
@@ -330,6 +332,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     eAux: new Float64Array(MAX_ENEMIES),
     eCooldown: new Float64Array(MAX_ENEMIES),
     eMod: new Uint8Array(MAX_ENEMIES),
+    eShield: new Float64Array(MAX_ENEMIES),
     eFrost: new Int32Array(MAX_ENEMIES),
     eLayer: new Uint8Array(MAX_ENEMIES),
     bLayer: new Uint8Array(MAX_BULLETS),
@@ -349,7 +352,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pRally: new Float64Array(MAX_PLAYERS),
     pCharge: new Float64Array(MAX_PLAYERS),
     pStat: new Float64Array(MAX_PLAYERS * STATS),
-    pWpnTime: new Float64Array(MAX_PLAYERS * 16),
+    pWpnTime: new Float64Array(MAX_PLAYERS * WEAPON_SLOTS),
     pOver: new Int32Array(MAX_PLAYERS),
     zActive: new Uint8Array(MAX_ZONES),
     zKind: new Uint8Array(MAX_ZONES),

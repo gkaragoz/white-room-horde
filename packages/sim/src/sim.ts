@@ -12,6 +12,7 @@ import {
   PlayerState,
   STAT,
   STATS,
+  WEAPON_SLOTS,
   TICK_DT,
   TICK_RATE,
   WEAPON_IDS,
@@ -96,7 +97,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pRally[slot] = 0;
   w.pCharge[slot] = 0;
   for (let k = 0; k < STATS; k++) w.pStat[slot * STATS + k] = 0;
-  for (let k = 0; k < 16; k++) w.pWpnTime[slot * 16 + k] = 0;
+  for (let k = 0; k < WEAPON_SLOTS; k++) w.pWpnTime[slot * WEAPON_SLOTS + k] = 0;
   w.pOver[slot] = 0;
   for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = -1;
   w.pCards.fill(0, slot * CARD_IDS.length, (slot + 1) * CARD_IDS.length);
@@ -143,10 +144,10 @@ function endBullet(w: World, i: number, x: number, y: number, reason: number): v
 }
 
 /**
- * Launch a round from the muzzle. The stretch between the shooter and the muzzle is swept first, so a wall right in
- * front of the player stops the shot and enemies standing closer than the muzzle can still be hit.
+ * Launch a round from the muzzle. The stretch from the shooter to the muzzle's distance ahead (along the aim) is swept first,
+ * so a wall right in front of the player stops the shot and enemies standing closer than the muzzle can still be hit.
  */
-function spawnBullet(w: World, owner: number, ox: number, oy: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number): void {
+function spawnBullet(w: World, owner: number, ox: number, oy: number, sx: number, sy: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number): void {
   for (let i = 0; i < MAX_BULLETS; i++) {
     if (w.bActive[i]) continue;
     w.bActive[i] = 1;
@@ -160,11 +161,13 @@ function spawnBullet(w: World, owner: number, ox: number, oy: number, x: number,
     w.bPierce[i] = pierce;
     w.bHit.fill(-1, i * 4, i * 4 + 4);
     w.bLayer[i] = owner >= 0 ? w.pLayer[owner]! : 0;
-    if (segmentBlocked(ox, oy, x, y, w.bLayer[i]!)) {
+    // the stretch swept first runs along the aim from the shooter to the muzzle's distance ahead (not to the muzzle itself, which
+    // sits to the side): a wall in front stops the shot, a wall beside the barrel does not eat it
+    if (segmentBlocked(ox, oy, sx, sy, w.bLayer[i]!)) {
       endBullet(w, i, ox, oy, 1);
-    } else if (bulletVsBarrels(w, i, ox, oy, x, y)) {
+    } else if (bulletVsBarrels(w, i, ox, oy, sx, sy)) {
       endBullet(w, i, w.bX[i]!, w.bY[i]!, 2);
-    } else if (w.enemyCount > 0 && bulletVsEnemies(w, i, ox, oy, x, y)) {
+    } else if (w.enemyCount > 0 && bulletVsEnemies(w, i, ox, oy, sx, sy)) {
       endBullet(w, i, w.bX[i]!, w.bY[i]!, 2);
     }
     return;
@@ -419,7 +422,7 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
       const crit = w.modCrit[s]! > 0 && w.rng.float() < w.modCrit[s]! ? 2 : 1;
       if (crit === 2) addStat(w, s, STAT.Crits, 1);
-      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage[s]! * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce[s]! + w.pModPierce[s]! + (w.pOver[s]! > 0 ? BALANCE.abilities.ranger!.pierce! : 0));
+      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + cos(angle) * stats.muzzleFwd, w.pY[s]! + sin(angle) * stats.muzzleFwd, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage[s]! * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce[s]! + w.pModPierce[s]! + (w.pOver[s]! > 0 ? BALANCE.abilities.ranger!.pierce! : 0));
     }
     addStat(w, s, STAT.Shots, 1);
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
@@ -606,7 +609,7 @@ export function hashWorld(w: World): number {
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
   c.typed(w.kActive).typed(w.kData).typed(w.kLayer).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
-  c.typed(w.pPerk).typed(w.pStat).typed(w.pWpnTime).typed(w.eMod).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pLayer).typed(w.eLayer).typed(w.bLayer).typed(w.sLayer).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
+  c.typed(w.pPerk).typed(w.pStat).typed(w.pWpnTime).typed(w.eMod).typed(w.eShield).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pLayer).typed(w.eLayer).typed(w.bLayer).typed(w.sLayer).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);

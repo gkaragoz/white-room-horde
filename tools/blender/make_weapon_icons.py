@@ -17,7 +17,7 @@ MODELS = os.path.join(REPO, "packages", "client", "public", "models", "weapons")
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(REPO, "packages", "client", "public", "ui")
 ONLY = [x for x in os.environ.get("ONLY", "").split(",") if x] or None
 W, H = 192, 96
-IDS = ["pistol", "smg", "ar", "shotgun", "hmg", "minigun", "sniper", "revolver", "mp", "dbl", "dmr", "flamer", "gl", "sword", "hammer"]
+IDS = ["pistol", "smg", "ar", "shotgun", "hmg", "minigun", "sniper", "revolver", "mp", "dbl", "dmr", "flamer", "gl", "sword", "hammer", "railgun", "crossbow", "plasma", "rocket", "nailgun", "autoshotgun", "akimbo", "frostgun", "sawlauncher", "arcthrower"]
 
 
 def lin(h):

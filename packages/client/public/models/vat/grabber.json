@@ -1,0 +1,43 @@
+{
+ "type": "grabber",
+ "scale": 2.3,
+ "vertexCount": 710,
+ "indexCount": 2220,
+ "frames": 102,
+ "clips": [
+  {
+   "id": "z_walk",
+   "start": 0,
+   "frames": 19,
+   "loop": true,
+   "duration": 1.5667
+  },
+  {
+   "id": "z_punch",
+   "start": 19,
+   "frames": 13,
+   "loop": false,
+   "duration": 1.0667
+  },
+  {
+   "id": "z_death_back",
+   "start": 32,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  },
+  {
+   "id": "z_scream",
+   "start": 68,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  2.582,
+  3.062,
+  2.614
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

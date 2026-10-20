@@ -1,0 +1,23 @@
+{
+ "id": "akimbo",
+ "tris": 152,
+ "muzzle": [
+  0.0,
+  -0.86,
+  0.12
+ ],
+ "grip_l": [
+  0.36,
+  -0.2,
+  -0.22
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

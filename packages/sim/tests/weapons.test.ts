@@ -107,7 +107,7 @@ describe('weapon inventory', () => {
   it('the ranking is a permutation of the weapons, weakest first', () => {
     expect([...WEAPON_RANK].sort()).toEqual([...WEAPON_IDS].sort());
     expect(WEAPON_RANK[0]).toBe('pistol');
-    expect(WEAPON_RANK[WEAPON_RANK.length - 3]).toBe('minigun'); // the two melee weapons come last
+    expect(WEAPON_RANK[WEAPON_RANK.length - 3]).toBe('railgun'); // the strongest gun is the last gun, the two melee weapons come last
     expect(WEAPON_RANK.slice(-2)).toEqual(['sword', 'hammer']);
   });
 

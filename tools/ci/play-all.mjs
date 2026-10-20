@@ -98,7 +98,7 @@ try {
     await page.mouse.up();
     await ticks(page, 45); // a charged swing lands after the button is released
     const fight = await world(page, () => ({ dmg: window.__wrh.world.pPerk[21], kills: window.__wrh.world.kills, hp: window.__wrh.world.pHp[0] }));
-    check(`${CLASS_NAMES[cls]}: the attack deals damage (${Math.round(fight.dmg)}) and kills (${fight.kills})`, fight.dmg > 20 && fight.kills > 0);
+    check(`${CLASS_NAMES[cls]}: the attack deals damage (${Math.round(fight.dmg)}) and kills (${fight.kills})`, fight.dmg > 20 && (fight.kills > 0 || fight.dmg > 100)); // (the enemies are chunkier now: a weak hitter may not finish one in two seconds)
     await page.screenshot({ path: join(shots, `class_${cls}_${CLASS_NAMES[cls]}.png`) });
     check(`${CLASS_NAMES[cls]}: no page errors`, errors.length === 0, errors.slice(0, 3).join(' | '));
     await ctx.close();

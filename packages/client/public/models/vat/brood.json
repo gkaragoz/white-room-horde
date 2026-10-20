@@ -1,0 +1,36 @@
+{
+ "type": "brood",
+ "scale": 1.8,
+ "vertexCount": 1075,
+ "indexCount": 3600,
+ "frames": 110,
+ "clips": [
+  {
+   "id": "z_walk_creep",
+   "start": 0,
+   "frames": 40,
+   "loop": true,
+   "duration": 4.0667
+  },
+  {
+   "id": "z_scream",
+   "start": 40,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  },
+  {
+   "id": "z_death_back",
+   "start": 74,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  }
+ ],
+ "extent": [
+  1.604,
+  2.397,
+  1.841
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

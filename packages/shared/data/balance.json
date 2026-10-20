@@ -253,6 +253,161 @@
         "knock": 7,
         "charge": 1.1
       }
+    },
+    "railgun": {
+      "damage": 120,
+      "rate": 0.8,
+      "pellets": 1,
+      "ammo": 24,
+      "spread": 0.0,
+      "bulletSpeed": 160,
+      "range": 66,
+      "muzzleFwd": 3.9,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.72,
+      "pierce": 99,
+      "mag": 4,
+      "reload": 2.2
+    },
+    "crossbow": {
+      "damage": 58,
+      "rate": 1.6,
+      "pellets": 1,
+      "ammo": 40,
+      "spread": 0.01,
+      "bulletSpeed": 120,
+      "range": 46,
+      "muzzleFwd": 2.88,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.7,
+      "pierce": 3,
+      "mag": 5,
+      "reload": 1.6
+    },
+    "plasma": {
+      "damage": 12,
+      "rate": 5,
+      "pellets": 1,
+      "ammo": 168,
+      "spread": 0.03,
+      "bulletSpeed": 70,
+      "range": 30,
+      "muzzleFwd": 3.27,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.69,
+      "pierce": 0,
+      "mag": 24,
+      "reload": 1.8,
+      "blast": 1.4,
+      "blastDamage": 8
+    },
+    "rocket": {
+      "damage": 45,
+      "rate": 1.0,
+      "pellets": 1,
+      "ammo": 14,
+      "spread": 0.015,
+      "bulletSpeed": 46,
+      "range": 34,
+      "muzzleFwd": 3.12,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.66,
+      "pierce": 0,
+      "mag": 2,
+      "reload": 2.4,
+      "blast": 4.6,
+      "blastDamage": 110
+    },
+    "nailgun": {
+      "damage": 9,
+      "rate": 13,
+      "pellets": 1,
+      "ammo": 400,
+      "spread": 0.05,
+      "bulletSpeed": 90,
+      "range": 18,
+      "muzzleFwd": 1.92,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.69,
+      "pierce": 1,
+      "mag": 40,
+      "reload": 1.6
+    },
+    "autoshotgun": {
+      "damage": 7,
+      "rate": 2.6,
+      "pellets": 7,
+      "ammo": 90,
+      "spread": 0.2,
+      "bulletSpeed": 62,
+      "range": 14,
+      "muzzleFwd": 3.15,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.75,
+      "pierce": 0,
+      "mag": 10,
+      "reload": 2.0
+    },
+    "akimbo": {
+      "damage": 13,
+      "rate": 7.5,
+      "pellets": 1,
+      "ammo": 240,
+      "spread": 0.06,
+      "bulletSpeed": 70,
+      "range": 22,
+      "muzzleFwd": 1.56,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.69,
+      "pierce": 0,
+      "mag": 24,
+      "reload": 1.5
+    },
+    "frostgun": {
+      "damage": 15,
+      "rate": 6,
+      "pellets": 1,
+      "ammo": 210,
+      "spread": 0.05,
+      "bulletSpeed": 55,
+      "range": 20,
+      "muzzleFwd": 2.7,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.72,
+      "pierce": 0,
+      "mag": 30,
+      "reload": 1.6,
+      "freeze": 18
+    },
+    "sawlauncher": {
+      "damage": 38,
+      "rate": 2.2,
+      "pellets": 1,
+      "ammo": 56,
+      "spread": 0.02,
+      "bulletSpeed": 36,
+      "range": 28,
+      "muzzleFwd": 2.67,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.72,
+      "pierce": 6,
+      "mag": 8,
+      "reload": 2.0
+    },
+    "arcthrower": {
+      "damage": 3.2,
+      "rate": 11,
+      "pellets": 4,
+      "ammo": 480,
+      "spread": 0.14,
+      "bulletSpeed": 80,
+      "range": 11,
+      "muzzleFwd": 2.67,
+      "muzzleSide": 0.29,
+      "muzzleH": 0.72,
+      "pierce": 2,
+      "mag": 55,
+      "reload": 2.2
     }
   },
   "enemies": {
@@ -404,6 +559,76 @@
       "radius": 1.0,
       "damage": 12,
       "interval": 9.0
+    },
+    "pouncer": {
+      "hp": 40,
+      "speed": 5.2,
+      "radius": 0.5,
+      "damage": 14,
+      "interval": 1.2
+    },
+    "hurler": {
+      "hp": 220,
+      "speed": 2.2,
+      "radius": 1.1,
+      "damage": 24,
+      "interval": 3.0
+    },
+    "grabber": {
+      "hp": 330,
+      "speed": 2.0,
+      "radius": 1.3,
+      "damage": 26,
+      "interval": 3.2
+    },
+    "spiker": {
+      "hp": 70,
+      "speed": 3.0,
+      "radius": 0.6,
+      "damage": 8,
+      "interval": 3.0
+    },
+    "shocker": {
+      "hp": 90,
+      "speed": 3.2,
+      "radius": 0.6,
+      "damage": 10,
+      "interval": 3.4
+    },
+    "brood": {
+      "hp": 160,
+      "speed": 2.0,
+      "radius": 1.0,
+      "damage": 16,
+      "interval": 2.0
+    },
+    "trapper": {
+      "hp": 55,
+      "speed": 3.4,
+      "radius": 0.55,
+      "damage": 8,
+      "interval": 3.2
+    },
+    "warcaller": {
+      "hp": 120,
+      "speed": 3.0,
+      "radius": 0.7,
+      "damage": 8,
+      "interval": 9.0
+    },
+    "chopper": {
+      "hp": 150,
+      "speed": 3.0,
+      "radius": 0.8,
+      "damage": 22,
+      "interval": 3.0
+    },
+    "quaker": {
+      "hp": 480,
+      "speed": 1.8,
+      "radius": 1.5,
+      "damage": 34,
+      "interval": 5.0
     }
   },
   "floors": {
@@ -415,12 +640,12 @@
     "finisherSeconds": 2.6
   },
   "waves": {
-    "baseCount": 14,
-    "perPlayer": 6,
-    "countGrowth": 1.08,
-    "hpGrowth": 0.08,
+    "baseCount": 42,
+    "perPlayer": 18,
+    "countGrowth": 1.09,
+    "hpGrowth": 0.1,
     "playerHpGrowth": 0.1,
-    "cap": 170,
+    "cap": 510,
     "spawnPerTick": 8,
     "spawnMinDistance": 16,
     "unlock": {
@@ -444,7 +669,17 @@
       "blinker": 18,
       "marksman": 20,
       "reviver": 22,
-      "magnetar": 24
+      "magnetar": 24,
+      "pouncer": 5,
+      "hurler": 18,
+      "grabber": 20,
+      "spiker": 8,
+      "shocker": 10,
+      "brood": 12,
+      "trapper": 11,
+      "warcaller": 14,
+      "chopper": 16,
+      "quaker": 23
     },
     "weights": {
       "grunt": 100,
@@ -467,11 +702,21 @@
       "blinker": 6,
       "marksman": 5,
       "reviver": 3,
-      "magnetar": 3
+      "magnetar": 3,
+      "pouncer": 14,
+      "hurler": 4,
+      "grabber": 3,
+      "spiker": 8,
+      "shocker": 7,
+      "brood": 6,
+      "trapper": 7,
+      "warcaller": 3,
+      "chopper": 6,
+      "quaker": 2
     },
     "waveSizeMul": 1.2,
-    "spawnSeconds": 25,
-    "spawnBurst": 0.3
+    "spawnSeconds": 20,
+    "spawnBurst": 0.4
   },
   "progression": {
     "xpBase": 15,
@@ -498,7 +743,17 @@
       "blinker": 7,
       "marksman": 9,
       "reviver": 10,
-      "magnetar": 12
+      "magnetar": 12,
+      "pouncer": 4,
+      "hurler": 14,
+      "grabber": 16,
+      "spiker": 6,
+      "shocker": 6,
+      "brood": 9,
+      "trapper": 6,
+      "warcaller": 12,
+      "chopper": 9,
+      "quaker": 22
     },
     "boss": {
       "everyWaves": 5,
@@ -806,9 +1061,9 @@
     "barrierCd": 8
   },
   "elites": {
-    "start": 3,
-    "perWave": 0.03,
-    "max": 0.35,
+    "start": 2,
+    "perWave": 0.045,
+    "max": 0.5,
     "giantHp": 3,
     "giantSpeed": 0.8,
     "giantRadius": 1.5,
@@ -818,7 +1073,12 @@
     "regenPerSec": 3,
     "splitCount": 2,
     "volatileRadius": 2.4,
-    "volatileDamage": 35
+    "volatileDamage": 35,
+    "berserkSpeed": 1.7,
+    "vampHeal": 6,
+    "toxicEvery": 14,
+    "phantomDodge": 0.3,
+    "wardedShield": 0.6
   },
   "barrels": {
     "hp": 30,
@@ -846,9 +1106,9 @@
     }
   },
   "late": {
-    "start": 15,
-    "damagePerFloor": 0.06,
-    "hpPerFloor": 0.025
+    "start": 10,
+    "damagePerFloor": 0.075,
+    "hpPerFloor": 0.03
   },
   "bossAttacks": {
     "slam": {
@@ -888,6 +1148,54 @@
       "count": 4,
       "radius": 3,
       "delay": 1.4
+    },
+    "quake": {
+      "every": 6,
+      "radius": 7.5,
+      "delay": 1.3,
+      "damage": 44,
+      "stun": 1.0,
+      "push": 16,
+      "rocks": 6,
+      "rockRadius": 2.4,
+      "rockDelay": 1.5
+    },
+    "storm": {
+      "every": 3.5,
+      "count": 4,
+      "radius": 2.4,
+      "delay": 1.0,
+      "damage": 40,
+      "ringEvery": 9,
+      "ringRadius": 7,
+      "ringDamage": 34,
+      "ringStun": 0.8
+    },
+    "plague": {
+      "every": 9,
+      "zones": 5,
+      "radius": 3.4,
+      "seconds": 14,
+      "summonEvery": 14,
+      "summonCount": 4
+    },
+    "pounce": {
+      "every": 5.5,
+      "minRange": 5,
+      "windup": 0.6,
+      "radius": 2.6,
+      "damage": 48,
+      "stun": 1.0
+    },
+    "hurl": {
+      "every": 4.5,
+      "count": 3,
+      "pickRadius": 9,
+      "radius": 2.8,
+      "delay": 1.0,
+      "damage": 40,
+      "hornEvery": 15,
+      "hornCount": 4
     }
   },
   "special": {
@@ -976,6 +1284,94 @@
       "seconds": 3,
       "range": 7.5,
       "recover": 0.5
+    },
+    "pouncer": {
+      "minRange": 5,
+      "maxRange": 14,
+      "windup": 0.5,
+      "radius": 1.9,
+      "damage": 20,
+      "stun": 0.7,
+      "recover": 0.5
+    },
+    "hurler": {
+      "range": 16,
+      "minRange": 6,
+      "windup": 0.9,
+      "radius": 2.3,
+      "damage": 34,
+      "pickRadius": 7,
+      "recover": 0.7,
+      "victimHit": 0.25
+    },
+    "grabber": {
+      "reach": 3.3,
+      "windup": 0.8,
+      "grabRadius": 2.9,
+      "damage": 28,
+      "throw": 22,
+      "stun": 1.1,
+      "recover": 1.0
+    },
+    "spiker": {
+      "range": 15,
+      "windup": 0.7,
+      "count": 5,
+      "spread": 0.3,
+      "length": 17,
+      "width": 0.9,
+      "damage": 26,
+      "recover": 0.8
+    },
+    "shocker": {
+      "range": 8,
+      "windup": 0.9,
+      "radius": 5.0,
+      "damage": 22,
+      "stun": 0.9,
+      "recover": 0.7
+    },
+    "brood": {
+      "count": 3
+    },
+    "trapper": {
+      "keep": 7,
+      "range": 14,
+      "windup": 0.5,
+      "count": 2,
+      "radius": 2.2,
+      "delay": 1.8,
+      "scatter": 3.2,
+      "damage": 36,
+      "recover": 0.6
+    },
+    "warcaller": {
+      "keep": 9,
+      "range": 13,
+      "windup": 1.0,
+      "count": 4,
+      "recover": 1.0
+    },
+    "chopper": {
+      "range": 10,
+      "windup": 0.75,
+      "length": 13,
+      "width": 1.6,
+      "damage": 34,
+      "back": 0.7,
+      "recover": 0.7
+    },
+    "quaker": {
+      "range": 14,
+      "windup": 1.1,
+      "radius": 5.8,
+      "damage": 40,
+      "stun": 1.0,
+      "rocks": 4,
+      "rockRadius": 2.0,
+      "rockDamage": 30,
+      "rockDelay": 1.0,
+      "recover": 1.0
     }
   },
   "abilities": {

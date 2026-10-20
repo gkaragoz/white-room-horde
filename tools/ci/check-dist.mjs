@@ -29,7 +29,7 @@ const jsBytes = readdirSync(join(dist, 'assets'))
   .reduce((a, f) => a + statSync(join(dist, 'assets', f)).size, 0);
 
 const MB = 1024 * 1024;
-const BUDGET = { download: 38 * MB, scripts: 3 * MB }; // (the ten newer enemies and two bosses added about 11 MB of baked animation)
+const BUDGET = { download: 52 * MB, scripts: 3 * MB }; // (the ten newer enemies and two bosses added about 11 MB of baked animation, ten more enemies and five bosses another 12)
 if (oneFormat > BUDGET.download) problems.push(`first download is ${(oneFormat / MB).toFixed(1)} MB, budget ${BUDGET.download / MB} MB`);
 if (jsBytes > BUDGET.scripts) problems.push(`scripts are ${(jsBytes / MB).toFixed(1)} MB, budget ${BUDGET.scripts / MB} MB`);
 

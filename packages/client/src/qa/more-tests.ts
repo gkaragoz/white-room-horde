@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Buttons, TeleEffect, TeleShape, ZoneKind, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
 import { addPlayer, addTelegraph, addZone, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
-import { AimSolver, pickTarget } from '../autoAim';
+import { AimSolver, TargetLock, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
@@ -176,7 +176,9 @@ export const moreTests: QaTest[] = [
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyQ' }));
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Digit3' }));
       // auto-aim moves the shot direction but the cursor keeps steering grenades
-      const aimed = input.sample(0, 0, 1.5, true).input;
+      input.debugKeys(['Space']); // shooting: auto aim only turns the character while the fire button is down
+      const aimed = input.sample(0, 0, () => 1.5, true).input;
+      input.debugKeys([]);
       if (Math.abs(aimed.aim - Math.round((1.5 / (Math.PI * 2)) * 65536)) > 2) problems.push('auto aim angle is not sent as the shot direction');
       if (aimed.gAim === aimed.aim) problems.push('the grenade direction followed the auto aim');
       input.resetBindings();
@@ -269,7 +271,7 @@ export const moreTests: QaTest[] = [
         const translated = Object.keys(enFlat).filter((k) => f[k] !== enFlat[k]).length;
         if (translated < Object.keys(enFlat).length * 0.6) problems.push(`${lang}: only ${translated} of ${Object.keys(enFlat).length} strings differ from English`);
         const t2 = UI_STRINGS[lang] as unknown as Record<string, unknown[]>;
-        for (const [k, n] of [['classNames', 9], ['classTips', 9], ['waveMods', 6], ['waveModTips', 6], ['elites', 7], ['powerups', 9], ['combos', 6]] as const) if (t2[k]!.length !== n) problems.push(`${lang}: ${k} needs ${n} entries`);
+        for (const [k, n] of [['classNames', 9], ['classTips', 9], ['waveMods', 6], ['waveModTips', 6], ['elites', 12], ['powerups', 9], ['combos', 6]] as const) if (t2[k]!.length !== n) problems.push(`${lang}: ${k} needs ${n} entries`);
       }
       for (const lang of ['en', 'tr', 'de', 'es', 'fr', 'ru'] as const) {
         const t = UI_STRINGS[lang] as unknown as Record<string, Record<string, unknown>>;
@@ -971,6 +973,71 @@ export const moreTests: QaTest[] = [
       if (!next || next.id !== open) problems.push('the visible enemy was not chosen over the hidden one');
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'visible targets preferred, nearest hidden one as the fallback' };
 
+    },
+  },
+  {
+    id: 'aim.idle-stable',
+    title: 'Auto aim only turns the character while shooting: standing still it never asks for a target and the shot angle stays put; a lock holds against a near equal and lets go of a target that is out of reach',
+    async run() {
+      const problems: string[] = [];
+      const camera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 100);
+      camera.position.set(0, 10, 0);
+      camera.lookAt(0, 0, 0);
+      camera.updateMatrixWorld(true);
+      const input = new Input(document.createElement('div'), camera);
+      input.resetBindings();
+      input.debugKeys([]);
+      let asked = 0;
+      const lock = (): number => {
+        asked++;
+        return 2.2;
+      };
+      // not shooting: the lock is never asked, whatever the enemies do
+      for (let i = 0; i < 20; i++) input.sample(0, 0, lock, true);
+      if (asked) problems.push(`the lock was asked ${asked} times while standing still`);
+      const idle = input.sample(0, 0, lock, true).aimAngle;
+      // shooting: asked at once, and the angle follows it
+      input.debugKeys(['Space']);
+      const fired = input.sample(0, 0, lock, true);
+      if (!asked) problems.push('the lock was not asked while shooting');
+      if (Math.abs(fired.aimAngle - 2.2) > 1e-9) problems.push('the shot did not follow the lock');
+      // let go: a short grace, then nothing more is asked and the angle stays where the last shot was
+      input.debugKeys([]);
+      await new Promise((r) => setTimeout(r, 450));
+      asked = 0;
+      const after = input.sample(0, 0, lock, true).aimAngle;
+      if (asked) problems.push('the lock was still asked after the fire button had been let go');
+      if (Math.abs(after - 2.2) > 1e-9) problems.push(`the character turned to ${after.toFixed(2)} on its own after shooting (idle was ${idle.toFixed(2)})`);
+      // the target lock: nearest in reach, holds against an equal, drops an out-of-reach one
+      const w = createWorld(3);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, -12, 'pistol');
+      const a = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 8, -12, false);
+      const b = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 6, -12, false);
+      for (const e of [a, b]) {
+        w.eCooldown[e] = 1e9;
+        w.eFrost[e] = 1e6;
+      }
+      const tl = new TargetLock();
+      const all = (): boolean => true;
+      let t = tl.update(w, 0, all, 26);
+      if (!t || t.id !== b) problems.push('did not take the nearest');
+      w.eX[a] = 5.7;
+      w.eY[a] = -12;
+      for (let k = 0; k < 3; k++) {
+        w.tick++;
+        t = tl.update(w, 0, all, 26);
+      }
+      if (!t || t.id !== b) problems.push('a near equal took the lock at once');
+      const far = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 40, -12, false);
+      w.eFrost[far] = 1e6;
+      w.eActive[a] = 0;
+      w.eActive[b] = 0;
+      w.enemyCount -= 2;
+      t = tl.update(w, 0, all, 26);
+      if (t) problems.push('locked on a target that is out of reach (' + t.id + ')');
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'no lock without shooting, held against equals, out of reach is not a target' };
     },
   },
   {

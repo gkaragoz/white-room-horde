@@ -93,7 +93,7 @@ export interface BotRun {
 }
 
 /** Play a squad of bots until everybody is dead (or `maxTicks`). Returns the floor reached. */
-export function playBots(seed: number, players = 3, maxTicks = 30 * 60 * 40): BotRun {
+export function playBots(seed: number, players = 3, maxTicks = 30 * 60 * 18): BotRun {
   const w = createGame({ seed, players: Array.from({ length: players }, (_, i) => ({ slot: i, weapon: 'pistol' as const, cls: (seed + i * 4) % 9 })) });
   while (!w.gameOver && w.tick < maxTicks) {
     const inputs: PlayerInput[] = [];

@@ -1,4 +1,4 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, CLASS_IDS, STAT, MAX_BARRELS, MAX_ENEMIES, MAX_PLAYERS, PERK, PlayerState, TICK_DT, TeleEffect, TeleShape, WEAPON_IDS, ENEMY_TYPES, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, WEAPON_SLOTS, BALANCE, Buttons, CLASS_IDS, STAT, MAX_BARRELS, MAX_ENEMIES, MAX_PLAYERS, PERK, PlayerState, TICK_DT, TeleEffect, TeleShape, WEAPON_IDS, ENEMY_TYPES, type PlayerInput } from '@wrh/shared';
 import type { WeaponStats } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { damageEnemyBy, shove } from './enemies';
@@ -200,7 +200,7 @@ export function updateAbilities(w: World, inputs: ReadonlyArray<PlayerInput | un
     const inp = inputs[s];
     // time alive, and which weapon the time was spent with
     addStat(w, s, STAT.AliveTicks, 1);
-    w.pWpnTime[s * 16 + w.pWeapon[s]!] = w.pWpnTime[s * 16 + w.pWeapon[s]!]! + 1;
+    w.pWpnTime[s * WEAPON_SLOTS + w.pWeapon[s]!] = w.pWpnTime[s * WEAPON_SLOTS + w.pWeapon[s]!]! + 1;
     if (inp && (inp.buttons & Buttons.Special) !== 0 && w.pSpecCd[s]! <= 0 && w.pStun[s] === 0) {
       addStat(w, s, STAT.Abilities, 1);
       activate(w, s, inp, cls);

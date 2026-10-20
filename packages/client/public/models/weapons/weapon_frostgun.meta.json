@@ -1,0 +1,23 @@
+{
+ "id": "frostgun",
+ "tris": 190,
+ "muzzle": [
+  0.0,
+  -1.62,
+  0.14
+ ],
+ "grip_l": [
+  0,
+  -0.9,
+  -0.08
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

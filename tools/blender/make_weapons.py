@@ -177,7 +177,7 @@ def sniper(b):
 # support (left) hand target for runtime two-bone IK; grip (right hand) is the origin
 GRIP_L = {"pistol": (0, -0.18, -0.22), "smg": (0, -0.85, -0.22), "ar": (0, -1.1, -0.04), "shotgun": (0, -0.78, -0.22), "hmg": (0, -1.0, -0.14),
           "minigun": (0, -0.55, -0.42), "sniper": (0, -0.95, -0.08),
-          "revolver": (0, -0.55, -0.18), "mp": (0, -0.55, -0.2), "dbl": (0, -0.6, -0.12), "dmr": (0, -1.0, -0.06), "flamer": (0, -0.75, -0.18), "gl": (0, -0.75, -0.2), "sword": (0, 0.02, 0.0), "hammer": (0, -0.55, 0.0)}
+          "revolver": (0, -0.55, -0.18), "mp": (0, -0.55, -0.2), "dbl": (0, -0.6, -0.12), "dmr": (0, -1.0, -0.06), "flamer": (0, -0.75, -0.18), "gl": (0, -0.75, -0.2), "railgun": (0, -1.0, -0.06), "crossbow": (0, -0.9, -0.1), "plasma": (0, -0.9, -0.14), "rocket": (0, -0.45, -0.22), "nailgun": (0, -0.5, -0.18), "autoshotgun": (0, -1.0, -0.12), "akimbo": (0.36, -0.2, -0.22), "frostgun": (0, -0.9, -0.08), "sawlauncher": (0, -0.6, -0.2), "arcthrower": (0, -0.55, -0.12), "sword": (0, 0.02, 0.0), "hammer": (0, -0.55, 0.0)}
 
 
 def revolver(b):
@@ -309,7 +309,139 @@ def hammer(b):
     return (0, -1.9, 0.0)
 
 
-WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade), ("revolver", revolver), ("mp", mp), ("dbl", dbl), ("dmr", dmr), ("flamer", flamer), ("gl", gl), ("sword", sword), ("hammer", hammer)]
+# ---------------------------------------------------------------- v0.19: ten more guns
+CYAN, CYAN2, ICE, FIRE, GLOW = "#6FE8FF", "#2FA8D8", "#C8F4FF", "#FF7A2A", "#B8FF6A"
+
+
+def railgun(b):
+    b.box("root", (0, -0.6, 0.1), (0.3, 1.5, 0.3), DARK)                      # spine
+    for sx in (-1, 1):
+        b.box("root", (sx * 0.15, -1.45, 0.14), (0.07, 1.5, 0.12), METAL)       # twin rails
+        b.box("root", (sx * 0.18, -0.9, 0.05), (0.05, 0.9, 0.2), DARK2)         # rail braces
+    for k in range(4):
+        b.torus("root", (0, -0.5 - 0.36 * k, 0.12), 0.2, 0.04, CYAN, rot=(math.pi / 2, 0, 0), major=8, minor=4)   # coil rings
+    b.box("root", (0, -0.2, 0.34), (0.16, 0.5, 0.1), ACC)                      # top rib
+    b.box("root", (0, 0.12, -0.22), (0.2, 0.22, 0.5), ACC2, rot=(-0.2, 0, 0))   # grip
+    b.box("root", (0, 0.55, 0.02), (0.24, 0.8, 0.34), DARK2)                   # stock
+    b.sphere("root", (0, -2.18, 0.14), 0.07, (1, 1, 1), CYAN, seg=6, rings=4)   # glowing tip
+    return (0, -2.26, 0.14)
+
+
+def crossbow(b):
+    b.box("root", (0, -0.5, 0.06), (0.16, 1.4, 0.18), "#8B5A2B")              # stock
+    b.box("root", (0, 0.35, 0.0), (0.2, 0.5, 0.3), "#6B4220")                  # butt
+    b.box("root", (0, -1.12, 0.1), (1.6, 0.1, 0.12), DARK)                     # bow limbs
+    for sx in (-1, 1):
+        b.box("root", (sx * 0.86, -1.02, 0.1), (0.4, 0.1, 0.1), DARK2, rot=(0, 0, sx * 0.4))
+    b.box("root", (0, -0.78, 0.18), (1.5, 0.025, 0.025), "#E8E0C8")            # bowstring
+    b.box("root", (0, -0.98, 0.21), (0.05, 1.2, 0.05), METAL)                 # bolt
+    b.cyl("root", (0, -1.62, 0.21), 0.06, 0.18, ACC, rot=(math.pi / 2, 0, 0), r2=0.0)   # bolt head
+    b.box("root", (0, 0.1, -0.22), (0.18, 0.22, 0.46), "#6B4220", rot=(-0.2, 0, 0))
+    b.box("root", (0, -0.2, 0.18), (0.1, 0.4, 0.05), ACC)                      # sight rail
+    return (0, -1.74, 0.21)
+
+
+def plasma(b):
+    b.box("root", (0, -0.4, 0.1), (0.36, 1.2, 0.34), DARK)                    # body
+    b.cyl("root", (0, -0.7, 0.34), 0.17, 0.9, GLOW, rot=(math.pi / 2, 0, 0))   # glowing cell
+    b.cyl("root", (0, -1.4, 0.12), 0.13, 0.7, METAL, rot=(math.pi / 2, 0, 0))  # barrel
+    b.torus("root", (0, -1.72, 0.12), 0.2, 0.05, CYAN, rot=(math.pi / 2, 0, 0), major=8, minor=4)   # emitter
+    b.torus("root", (0, -1.5, 0.12), 0.18, 0.04, CYAN2, rot=(math.pi / 2, 0, 0), major=8, minor=4)
+    b.box("root", (0, 0.1, -0.2), (0.2, 0.22, 0.46), ACC2, rot=(-0.2, 0, 0))   # grip
+    b.box("root", (0, 0.5, 0.0), (0.26, 0.7, 0.3), DARK2)                      # stock
+    b.box("root", (0, -0.9, -0.16), (0.14, 0.4, 0.3), DARK2)                   # foregrip block
+    return (0, -2.0, 0.12)
+
+
+def rocket(b):
+    b.cyl("root", (0, -0.7, 0.1), 0.24, 1.9, DARK, rot=(math.pi / 2, 0, 0))    # tube
+    b.cyl("root", (0, -1.75, 0.1), 0.28, 0.2, METAL, rot=(math.pi / 2, 0, 0))  # front lip
+    b.cyl("root", (0, 0.35, 0.1), 0.3, 0.3, DARK2, rot=(math.pi / 2, 0, 0), r2=0.22)   # rear flare
+    b.cyl("root", (0, -1.7, 0.1), 0.15, 0.3, FIRE, rot=(math.pi / 2, 0, 0), r2=0.0)    # rocket nose
+    b.box("root", (0, -0.5, 0.38), (0.1, 0.8, 0.08), ACC)                      # sight rail
+    b.box("root", (0, -0.3, -0.2), (0.16, 0.2, 0.4), ACC2)                     # fore grip
+    b.box("root", (0, 0.1, -0.28), (0.2, 0.22, 0.46), ACC2, rot=(-0.2, 0, 0))  # grip
+    b.box("root", (0, -0.7, 0.1), (0.6, 0.05, 0.05), DARK2)                    # band
+    return (0, -1.9, 0.1)
+
+
+def nailgun(b):
+    b.box("root", (0, -0.25, 0.1), (0.3, 0.9, 0.34), "#FFB84A")                # housing
+    b.box("root", (0, -0.25, 0.3), (0.2, 0.7, 0.08), DARK2)
+    b.cyl("root", (0, -0.85, 0.12), 0.1, 0.5, METAL, rot=(math.pi / 2, 0, 0))  # nozzle
+    b.box("root", (0, -0.55, -0.25), (0.14, 0.9, 0.18), DARK, rot=(0.0, 0, 0)) # nail strip magazine
+    for k in range(5):
+        b.box("root", (0, -0.2 - 0.17 * k, -0.34), (0.05, 0.05, 0.12), METAL)
+    b.box("root", (0, 0.08, -0.2), (0.2, 0.22, 0.46), DARK2, rot=(-0.2, 0, 0))
+    b.box("root", (0, 0.3, 0.1), (0.1, 0.4, 0.3), DARK)
+    return (0, -1.1, 0.12)
+
+
+def autoshotgun(b):
+    b.box("root", (0, -0.45, 0.1), (0.3, 1.4, 0.3), DARK)                     # receiver
+    b.cyl("root", (0, -1.4, 0.16), 0.11, 1.0, METAL, rot=(math.pi / 2, 0, 0))  # barrel
+    b.cyl("root", (0, -1.4, 0.0), 0.08, 1.0, DARK2, rot=(math.pi / 2, 0, 0))   # tube magazine
+    b.cyl("root", (0, -0.5, -0.32), 0.3, 0.26, ACC, rot=(0, 0, 0))            # drum magazine
+    b.cyl("root", (0, -0.5, -0.32), 0.12, 0.3, DARK2, rot=(0, 0, 0))
+    b.box("root", (0, 0.1, -0.2), (0.2, 0.22, 0.46), ACC2, rot=(-0.2, 0, 0))   # grip
+    b.box("root", (0, 0.5, 0.0), (0.24, 0.8, 0.32), DARK2)                     # stock
+    b.box("root", (0, -0.3, 0.3), (0.12, 0.8, 0.07), ACC)                      # rail
+    return (0, -1.92, 0.16)
+
+
+def akimbo(b):
+    for sx in (-1, 1):
+        x = sx * 0.36
+        b.box("root", (x, -0.32, 0.13), (0.2, 0.8, 0.22), DARK)               # slide
+        b.box("root", (x, -0.27, -0.02), (0.2, 0.66, 0.1), DARK2)             # frame
+        b.cyl("root", (x, -0.78, 0.12), 0.075, 0.14, METAL, rot=(math.pi / 2, 0, 0))
+        b.box("root", (x, 0.08, -0.24), (0.18, 0.2, 0.46), ACC, rot=(-0.2, 0, 0))   # grip
+        b.box("root", (x, -0.7, 0.28), (0.04, 0.05, 0.07), ACC2)
+    b.box("root", (0, -0.1, 0.0), (0.7, 0.1, 0.1), DARK2)                      # the bridge that joins them
+    return (0, -0.86, 0.12)
+
+
+def frostgun(b):
+    b.box("root", (0, -0.4, 0.1), (0.3, 1.2, 0.32), "#8FBFD8")                # body
+    b.cyl("root", (0, -0.1, 0.3), 0.14, 0.7, CYAN2, rot=(math.pi / 2, 0, 0))   # coolant tank
+    b.cyl("root", (0, -1.15, 0.14), 0.12, 0.7, METAL, rot=(math.pi / 2, 0, 0))
+    for k in range(4):                                                         # ice crystals round the muzzle
+        a = k * math.pi / 2 + 0.4
+        b.cyl("root", (0.13 * math.cos(a), -1.5, 0.14 + 0.13 * math.sin(a)), 0.045, 0.34, ICE, rot=(math.pi / 2 + 0.2 * math.cos(a), 0.2 * math.sin(a), 0), r2=0.0)
+    b.box("root", (0, 0.1, -0.2), (0.2, 0.22, 0.46), ACC2, rot=(-0.2, 0, 0))
+    b.box("root", (0, 0.5, 0.0), (0.24, 0.7, 0.3), DARK2)
+    b.sphere("root", (0, -0.45, 0.28), 0.09, (1, 1.6, 0.6), ICE, seg=6, rings=4)
+    return (0, -1.62, 0.14)
+
+
+def sawlauncher(b):
+    b.box("root", (0, -0.35, 0.1), (0.4, 1.1, 0.4), DARK)                     # chunky body
+    b.cyl("root", (0, -1.0, 0.14), 0.5, 0.1, METAL, rot=(0, 0, 0))            # saw disc (flat ring seen from above)
+    b.torus("root", (0, -1.0, 0.14), 0.52, 0.06, ACC, major=10, minor=4)
+    for k in range(8):                                                         # teeth
+        a = k * math.pi / 4
+        b.box("root", (0.55 * math.cos(a), -1.0 + 0.55 * math.sin(a), 0.14), (0.12, 0.12, 0.08), DARK2, rot=(0, 0, a))
+    b.cyl("root", (0, -1.0, 0.14), 0.14, 0.2, DARK2)
+    b.box("root", (0, 0.1, -0.2), (0.2, 0.22, 0.46), ACC2, rot=(-0.2, 0, 0))
+    b.box("root", (0, 0.5, 0.0), (0.26, 0.7, 0.32), DARK2)
+    b.box("root", (0, -0.6, -0.2), (0.14, 0.3, 0.3), ACC)
+    return (0, -1.6, 0.14)
+
+
+def arcthrower(b):
+    b.box("root", (0, -0.3, 0.1), (0.3, 0.9, 0.32), DARK)                     # body
+    b.cyl("root", (0, -0.1, 0.34), 0.16, 0.5, CYAN2, rot=(math.pi / 2, 0, 0))  # capacitor
+    for sx in (-1, 1):
+        b.cyl("root", (sx * 0.2, -1.0, 0.14), 0.04, 0.9, METAL, rot=(math.pi / 2, 0, 0))   # twin electrodes
+        b.sphere("root", (sx * 0.2, -1.5, 0.14), 0.08, (1, 1, 1), "#FFFFA8", seg=6, rings=4)
+    b.torus("root", (0, -0.85, 0.14), 0.26, 0.03, CYAN, rot=(math.pi / 2, 0, 0), major=8, minor=4)
+    b.box("root", (0, 0.08, -0.2), (0.2, 0.22, 0.46), ACC2, rot=(-0.2, 0, 0))
+    b.box("root", (0, 0.4, 0.04), (0.2, 0.6, 0.28), DARK2)
+    return (0, -1.6, 0.14)
+
+
+
+WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade), ("revolver", revolver), ("mp", mp), ("dbl", dbl), ("dmr", dmr), ("flamer", flamer), ("gl", gl), ("sword", sword), ("hammer", hammer), ("railgun", railgun), ("crossbow", crossbow), ("plasma", plasma), ("rocket", rocket), ("nailgun", nailgun), ("autoshotgun", autoshotgun), ("akimbo", akimbo), ("frostgun", frostgun), ("sawlauncher", sawlauncher), ("arcthrower", arcthrower)]
 
 
 exec(compile(open(os.path.join(HERE, "meshclean.py"), encoding="utf-8").read(), "meshclean", "exec"), globals())
@@ -458,7 +590,7 @@ def lineup(items):
     fl.data.materials.append(fm)
     order = ["pistol", "smg", "ar", "shotgun", "hmg", "minigun", "sniper", "grenade", "revolver", "mp", "dbl", "dmr", "flamer", "gl"]
     pos = {"pistol": (-8.4, 3.0), "smg": (-3.2, 3.0), "ar": (3.2, 3.0), "shotgun": (9.6, 3.0), "hmg": (-7.4, -3.2), "minigun": (-0.6, -3.2), "sniper": (6.8, -3.2), "grenade": (10.6, -3.2),
-           "revolver": (-8.4, -9.4), "mp": (-3.2, -9.4), "dbl": (3.2, -9.4), "dmr": (9.6, -9.4), "flamer": (-4.0, -15.0), "gl": (4.0, -15.0), "sword": (-2.0, -21.0), "hammer": (8.0, -21.0)}
+           "revolver": (-8.4, -9.4), "mp": (-3.2, -9.4), "dbl": (3.2, -9.4), "dmr": (9.6, -9.4), "flamer": (-4.0, -15.0), "gl": (4.0, -15.0), "railgun": (-8.4, -27.0), "crossbow": (-1.0, -27.0), "plasma": (6.4, -27.0), "rocket": (-8.4, -33.0), "nailgun": (-2.0, -33.0), "autoshotgun": (5.0, -33.0), "akimbo": (-8.4, -39.0), "frostgun": (-2.0, -39.0), "sawlauncher": (5.0, -39.0), "arcthrower": (-8.4, -45.0), "sword": (-2.0, -21.0), "hammer": (8.0, -21.0)}
     for (wid, mesh, emp) in items:
         x, y = pos[wid]
         mesh.location = (x + 1.2, y, 0)
@@ -472,9 +604,9 @@ def lineup(items):
     bpy.ops.object.camera_add()
     cam = bpy.context.active_object
     cam.data.type = "ORTHO"
-    cam.data.ortho_scale = 36
+    cam.data.ortho_scale = 70
     cam.rotation_euler = (math.radians(55), 0, math.radians(0))
-    cam.location = Vector((1.2, -6.0, 0.2)) + cam.rotation_euler.to_matrix() @ Vector((0, 0, 30))
+    cam.location = Vector((1.2, -22.0, 0.2)) + cam.rotation_euler.to_matrix() @ Vector((0, 0, 30))
     sc.camera = cam
     os.makedirs(os.path.dirname(PREVIEW_PATH), exist_ok=True)
     sc.render.filepath = PREVIEW_PATH

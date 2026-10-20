@@ -1,0 +1,23 @@
+{
+ "id": "autoshotgun",
+ "tris": 182,
+ "muzzle": [
+  0.0,
+  -1.92,
+  0.16
+ ],
+ "grip_l": [
+  0,
+  -1.0,
+  -0.12
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

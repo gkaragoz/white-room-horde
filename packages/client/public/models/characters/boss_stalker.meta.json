@@ -1,0 +1,23 @@
+{
+ "id": "boss_stalker",
+ "tris": 1534,
+ "bones": [
+  "root",
+  "hips",
+  "spine",
+  "head",
+  "arm.L",
+  "arm.R",
+  "hand.L",
+  "hand.R",
+  "thigh.L",
+  "thigh.R",
+  "foot.L",
+  "foot.R"
+ ],
+ "materials": [
+  "wrh_fixed"
+ ],
+ "height": 4.448,
+ "attach": null
+}

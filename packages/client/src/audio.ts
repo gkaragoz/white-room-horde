@@ -13,7 +13,7 @@ export type Sfx =
   | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart'
   | 'floorCleared' | 'countTick' | 'countGo' | 'floorCharge' | 'floorLift' | 'floorArrive' | 'floorStart'
   | 'cardOffer' | 'iceFreeze' | 'iceThaw' | 'nuke' | 'secondWind' | 'weaponGet' | 'dead' | 'floorEnter' | 'slowIn' | 'slowOut' | 'impactWall' | 'barrelHit'
-  | 'buildThud' | 'buildThudBig' | 'crumble' | 'crumbleBig' | 'boneCrack' | 'fleshHit' | 'goreDecap' | 'goreTear' | 'gibBurst'
+  | 'pounce' | 'grab' | 'warhorn' | 'thunder' | 'quake' | 'mineBeep' | 'spikeVolley' | 'shockPulse' | 'buildThud' | 'buildThudBig' | 'crumble' | 'crumbleBig' | 'boneCrack' | 'fleshHit' | 'goreDecap' | 'goreTear' | 'gibBurst'
   | 'warnCircle' | 'warnLine' | 'slamHit' | 'purge' | 'acidSplash' | 'launch' | 'chargeUp' | 'pullHum' | 'blinkZap' | 'abilityBuff' | 'abilityPower' | 'abilityWhoosh' | 'airstrikeCall'
   | 'vo_firstblood' | 'vo_doublekill' | 'vo_triplekill' | 'vo_megakill' | 'vo_killingspree' | 'vo_rampage' | 'vo_dominating' | 'vo_massacre' | 'vo_godlike' | 'vo_mayhem' | 'vo_ownage' | 'vo_carnage';
 
@@ -27,7 +27,7 @@ const GAP: Record<Sfx, number> = {
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
   floorCleared: 0.5, countTick: 0.2, countGo: 0.2, floorCharge: 0.5, floorLift: 1, floorArrive: 0.5, floorStart: 0.5,
   cardOffer: 0.3, iceFreeze: 0.5, iceThaw: 0.3, nuke: 2, secondWind: 1, weaponGet: 0.2, dead: 0.5, floorEnter: 1, slowIn: 1, slowOut: 1, impactWall: 0.05, barrelHit: 0.1,
-  buildThud: 0.07, buildThudBig: 0.12, crumble: 0.07, crumbleBig: 0.12, boneCrack: 0.06, fleshHit: 0.05, goreDecap: 0.2, goreTear: 0.2, gibBurst: 0.15,
+  pounce: 0.15, grab: 0.2, warhorn: 0.6, thunder: 0.3, quake: 0.4, mineBeep: 0.2, spikeVolley: 0.2, shockPulse: 0.2, buildThud: 0.07, buildThudBig: 0.12, crumble: 0.07, crumbleBig: 0.12, boneCrack: 0.06, fleshHit: 0.05, goreDecap: 0.2, goreTear: 0.2, gibBurst: 0.15,
   warnCircle: 0.25, warnLine: 0.4, slamHit: 0.1, purge: 1, acidSplash: 0.15, launch: 0.2, chargeUp: 0.25, pullHum: 0.8, blinkZap: 0.1, abilityBuff: 0.2, abilityPower: 0.2, abilityWhoosh: 0.2, airstrikeCall: 0.5,
   vo_firstblood: 0, vo_doublekill: 0, vo_triplekill: 0, vo_megakill: 0, vo_killingspree: 0, vo_rampage: 0, vo_dominating: 0, vo_massacre: 0, vo_godlike: 0, vo_mayhem: 0, vo_ownage: 0, vo_carnage: 0,
 };
@@ -53,6 +53,16 @@ const GUNS: Record<WeaponId, { takes: number; gain: number; rate: [number, numbe
   gl: { takes: 3, gain: 1.0, rate: [0.95, 1.0] },
   sword: { takes: 3, gain: 0.9, rate: [0.95, 1.08] },
   hammer: { takes: 2, gain: 1.0, rate: [0.92, 1.0] },
+  railgun: { takes: 2, gain: 1.0, rate: [0.95, 1.0] },
+  crossbow: { takes: 2, gain: 0.8, rate: [0.95, 1.08] },
+  plasma: { takes: 2, gain: 0.85, rate: [0.95, 1.08] },
+  rocket: { takes: 2, gain: 1.0, rate: [0.92, 1.0] },
+  nailgun: { takes: 2, gain: 0.7, rate: [0.95, 1.1] },
+  autoshotgun: { takes: 2, gain: 0.95, rate: [0.95, 1.05] },
+  akimbo: { takes: 2, gain: 0.8, rate: [0.97, 1.06] },
+  frostgun: { takes: 2, gain: 0.8, rate: [0.95, 1.08] },
+  sawlauncher: { takes: 2, gain: 0.9, rate: [0.95, 1.05] },
+  arcthrower: { takes: 2, gain: 0.8, rate: [0.95, 1.1] },
 };
 
 /** Recorded effects (CC0, see public/sfx/CREDITS.md). Each name picks a random file and varies the pitch a little. */
@@ -117,6 +127,14 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   floorEnter: { files: ['floor_enter'], gain: 0.4, rate: [1, 1] },
   slowIn: { files: ['slowmo_in'], gain: 0.8, rate: [1, 1] },
   slowOut: { files: ['slowmo_out'], gain: 0.7, rate: [1, 1] },
+  pounce: { files: ['pounce'], gain: 0.7, rate: [0.95, 1.1] },
+  grab: { files: ['grab'], gain: 0.85, rate: [0.9, 1.05] },
+  warhorn: { files: ['warhorn'], gain: 0.9, rate: [0.95, 1.05] },
+  thunder: { files: ['thunder'], gain: 0.9, rate: [0.9, 1.1] },
+  quake: { files: ['quake'], gain: 1.0, rate: [0.9, 1.05] },
+  mineBeep: { files: ['mine_beep'], gain: 0.5, rate: [0.95, 1.1] },
+  spikeVolley: { files: ['spike_volley'], gain: 0.7, rate: [0.95, 1.1] },
+  shockPulse: { files: ['shock_pulse'], gain: 0.8, rate: [0.95, 1.1] },
   buildThud: { files: ['build_thud_1', 'build_thud_2', 'build_thud_3'], gain: 0.5, rate: [1.1, 1.4] },
   buildThudBig: { files: ['build_thud_1', 'build_thud_2', 'build_thud_3'], gain: 0.85, rate: [0.8, 1.0] },
   crumble: { files: ['crumble_1', 'crumble_2', 'crumble_3'], gain: 0.5, rate: [1.05, 1.3] },
@@ -156,7 +174,7 @@ const BANK: Partial<Record<Sfx, Entry>> = {
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
-const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'buildThud', 'buildThudBig', 'crumble', 'crumbleBig', 'boneCrack', 'fleshHit', 'goreDecap', 'goreTear', 'gibBurst', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
+const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'pounce', 'grab', 'warhorn', 'thunder', 'quake', 'mineBeep', 'spikeVolley', 'shockPulse', 'buildThud', 'buildThudBig', 'crumble', 'crumbleBig', 'boneCrack', 'fleshHit', 'goreDecap', 'goreTear', 'gibBurst', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
 
 const VOICE_SFX = new Set<Sfx>(['vo_firstblood', 'vo_doublekill', 'vo_triplekill', 'vo_megakill', 'vo_killingspree', 'vo_rampage', 'vo_dominating', 'vo_massacre', 'vo_godlike', 'vo_mayhem', 'vo_ownage', 'vo_carnage', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
 
@@ -663,6 +681,12 @@ export class Audio {
         break;
       case 'bossAbility':
         this.play('bossRoar');
+        if (e.kind === 'quake') this.play('quake', e);
+        else if (e.kind === 'storm') this.play('thunder', e);
+        else if (e.kind === 'plague') this.play('acidSplash', e);
+        else if (e.kind === 'pounce') this.play('pounce', e);
+        else if (e.kind === 'hurl') this.play('launch', e);
+        else if (e.kind === 'summon') this.play('warhorn', e);
         break;
       case 'telegraph':
         this.play(e.shape === 1 ? 'warnLine' : 'warnCircle', e);
@@ -681,6 +705,15 @@ export class Audio {
         if (n === 'rammer') this.play('launch', e);
         else if (n === 'magnetar') this.play('pullHum', e);
         else if (n === 'flamer') this.play('gun_flamer', e);
+        else if (n === 'pouncer') this.play('pounce', e);
+        else if (n === 'hurler') this.play('launch', e);
+        else if (n === 'grabber') this.play('grab', e);
+        else if (n === 'spiker') this.play('spikeVolley', e);
+        else if (n === 'shocker') this.play('shockPulse', e);
+        else if (n === 'warcaller') this.play('warhorn', e);
+        else if (n === 'chopper') this.play('abilityWhoosh', e);
+        else if (n === 'quaker') this.play('quake', e);
+        else if (n === 'trapper') this.play('mineBeep', e);
         break;
       }
       case 'blink':

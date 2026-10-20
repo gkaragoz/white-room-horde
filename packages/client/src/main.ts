@@ -21,7 +21,7 @@ import { IceShards } from './render/ice';
 import { TargetMarker } from './render/targetMarker';
 import { PropsView } from './render/props';
 import { FloorClimb } from './render/floorFx';
-import { AimSolver, pickTarget, type AimTarget } from './autoAim';
+import { AimSolver, TargetLock, type AimTarget } from './autoAim';
 import { AimMarker } from './render/aimMarker';
 import { NetDiag } from './netDiag';
 import { InputTimer } from './inputTimer';
@@ -145,6 +145,16 @@ const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
   gl: { color: new THREE.Color('#9fe870'), w: 2.4, l: 0.9 },
   sword: { color: new THREE.Color('#ffffff'), w: 1, l: 1 },
   hammer: { color: new THREE.Color('#ffffff'), w: 1, l: 1 },
+  railgun: { color: new THREE.Color('#6fe8ff'), w: 1.3, l: 3.4 },
+  crossbow: { color: new THREE.Color('#d8b878'), w: 0.9, l: 1.6 },
+  plasma: { color: new THREE.Color('#b8ff6a'), w: 2.0, l: 0.9 },
+  rocket: { color: new THREE.Color('#ff9a3a'), w: 2.4, l: 1.5 },
+  nailgun: { color: new THREE.Color('#dfe3ea'), w: 0.6, l: 0.7 },
+  autoshotgun: { color: new THREE.Color('#ffb85a'), w: 0.9, l: 0.45 },
+  akimbo: { color: new THREE.Color('#fff0a8'), w: 0.85, l: 0.9 },
+  frostgun: { color: new THREE.Color('#bff4ff'), w: 1.6, l: 0.8 },
+  sawlauncher: { color: new THREE.Color('#e8eef6'), w: 3.0, l: 0.5 },
+  arcthrower: { color: new THREE.Color('#ffffa8'), w: 0.7, l: 0.9 },
 };
 const tracerScale = new THREE.Vector3();
 const GLOW_SCALE = new THREE.Vector3(1.9, 1.9, 1.25);
@@ -464,6 +474,23 @@ function tearOff(e: Extract<SimEvent, { type: 'enemyDeath' }>, type: string, boo
   }
 }
 
+/** The banner of every boss ability: [English, Turkish]. */
+const BOSS_BANNERS: Record<string, readonly [string, string]> = {
+  charge: ['CHARGE!', 'HÜCUM!'],
+  summon: ['Reinforcements!', 'Takviye çağırdı!'],
+  aura: ['The swarm speeds up!', 'Sürü hızlandı!'],
+  slam: ['SLAM!', 'YER DARBESİ!'],
+  meteor: ['Meteors!', 'Meteor yağmuru!'],
+  acid: ['Acid rain!', 'Asit yağmuru!'],
+  sweep: ['Sweeping beam!', 'Süpüren ışın!'],
+  purge: ['PURGE! Leave the red!', 'TEMİZLİK! Kırmızıdan çık!'],
+  quake: ['EARTHQUAKE!', 'DEPREM!'],
+  storm: ['Lightning storm!', 'Yıldırım fırtınası!'],
+  plague: ['Poison ground!', 'Zehirli zemin!'],
+  pounce: ['It leaps!', 'Üstünüze atlıyor!'],
+  hurl: ['Incoming soldiers!', 'Asker fırlatıyor!'],
+};
+
 function handleEvent(e: SimEvent): void {
   if (e.type === 'swing') {
     const heavy = WEAPON_IDS[e.weapon] === 'hammer';
@@ -483,7 +510,7 @@ function handleEvent(e: SimEvent): void {
     if (e.slot === localSlot) cursorPulse();
     // recoil: the weapon kicks back by an amount that grows with the round's punch
     const st = BALANCE.weapons[WEAPON_IDS[e.weapon]!];
-    chars[e.slot]?.kick(Math.min(0.32, 0.05 + st.damage * st.pellets * 0.0016));
+    chars[e.slot]?.kick(Math.min(0.15, 0.04 + st.damage * st.pellets * 0.0009)); // a small kick: the barrel never seems detached from where the bullet starts
   }
   if (e.type === 'playerHit' && e.slot === localSlot && world) {
     // which way did it come from: the nearest enemy
@@ -634,7 +661,11 @@ function handleEvent(e: SimEvent): void {
       animator.trigger(e.slot, 'hit_down', 1.2, nowSec);
       break;
     case 'bossAbility':
-      ui.banner(e.kind === 'charge' ? (ui.lang === 'tr' ? 'HÜCUM!' : 'CHARGE!') : e.kind === 'aura' ? (ui.lang === 'tr' ? 'Sürü hızlandı!' : 'The swarm speeds up!') : (ui.lang === 'tr' ? 'Takviye çağırdı!' : 'Reinforcements!'), '', 1400);
+      {
+        // what the boss just did, in words that match (only a summon is "reinforcements")
+        const b = BOSS_BANNERS[e.kind];
+        if (b) ui.banner(ui.lang === 'tr' ? b[1] : b[0], '', 1400);
+      }
       break;
     case 'gameOver':
       cine.cancel();
@@ -925,7 +956,9 @@ async function downloadReport(): Promise<void> {
   ui.warn(ui.lang === 'tr' ? 'Rapor indirildi' : 'Report downloaded');
 }
 
+let easedFacing: number | null = null;
 const aimSolver = new AimSolver();
+const targetLock = new TargetLock();
 let aimTarget: AimTarget | null = null;
 
 /** Simulation ticks between the world as drawn now and the moment an input sent now takes effect (online: the lead). */
@@ -934,24 +967,41 @@ function inputDelayTicks(): number {
 }
 
 /**
- * Auto aim: finds the nearest enemy or barrel the player can shoot (in reach, not behind cover) and returns the angle that
- * hits it from where the muzzle will be, leading a moving target. Null when there is nothing to shoot at or auto aim is off.
+ * Auto aim: finds the nearest enemy or barrel in reach the player can shoot (not behind cover) and returns the angle that
+ * hits it from where the muzzle will be, leading a moving target. Asked only while shooting (see Input.shooting). Null when
+ * there is nothing in reach or auto aim is off.
  */
 function lockOn(): number | null {
   const w = world;
   if (!w || !settings.autoAim || !w.pActive[localSlot] || w.pState[localSlot] !== PlayerState.Alive) {
+    targetLock.reset();
     aimTarget = null;
     return null;
   }
   aimSolver.track(w);
   const delay = inputDelayTicks();
-  aimTarget = pickTarget(w, localSlot, aimTarget, (t) => aimSolver.shotClear(w, localSlot, t, delay));
+  const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[localSlot]!]!]!;
+  // a blade only reaches a few units but turns for what is coming; a gun for as far as its bullets fly
+  const reach = st.melee ? 9 : st.range;
+  aimTarget = targetLock.update(w, localSlot, (t) => aimSolver.shotClear(w, localSlot, t, delay), reach);
   return aimTarget ? aimSolver.angle(w, localSlot, aimTarget, delay) : null;
+}
+
+/** The shot angle through a cursor point, from the muzzle (manual aim). */
+function cursorFix(x: number, y: number): number {
+  const w = world;
+  if (!w || !w.pActive[localSlot]) return Math.atan2(y - curY[localSlot]!, x - curX[localSlot]!);
+  return aimSolver.cursorAngle(w, localSlot, x, y);
 }
 
 function sampleLocal(): PlayerInput {
   if (dev.auto && mode === 'solo') return scriptedInput(world!.tick, 0);
-  const s = input.sample(curX[localSlot]!, curY[localSlot]!, lockOn(), settings.autoAim);
+  const s = input.sample(curX[localSlot]!, curY[localSlot]!, lockOn, settings.autoAim, cursorFix);
+  if (!input.shooting) {
+    // standing without shooting: no lock, no target mark, the character stays as it is
+    targetLock.reset();
+    aimTarget = null;
+  }
   return s.input;
 }
 
@@ -1172,9 +1222,13 @@ function frame(nowMs: number): void {
     // the local character turns the instant the aim does (no wait for the simulation or the network)
     let localFacing: number | null = null;
     if (settings.autoAim && w.pActive[localSlot] && w.pState[localSlot] === PlayerState.Alive) {
-      const locked = lockOn();
-      localFacing = input.stickAiming ? input.lastShot : locked ?? input.lastShot;
-    } else if (predictedAngle !== null && w.pState[localSlot] === PlayerState.Alive) localFacing = predictedAngle;
+      // the character turns to the angle that was just sent (the one the bullets use), eased between samples
+      easedFacing = easedFacing === null ? input.lastShot : lerpAngle(easedFacing, input.lastShot, 1 - Math.exp(-dt * 40));
+      localFacing = easedFacing;
+    } else {
+      easedFacing = null;
+      if (predictedAngle !== null && w.pState[localSlot] === PlayerState.Alive) localFacing = predictedAngle;
+    }
     // sounds that follow the climb: the thrusters when the lift begins, a tick for every countdown second
     if (lifted.active && climb.lift01 > 0 && !liftSounded) {
       liftSounded = true;

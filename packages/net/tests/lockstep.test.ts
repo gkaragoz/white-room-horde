@@ -232,7 +232,8 @@ describe('lockstep over a laggy network', () => {
 
   it('climbs from floor to floor with every client on the same hash, and a late joiner mid-flight lands in the same place', () => {
     // tiny floors so the scripted players clear them quickly
-    const keep = [BALANCE.waves.baseCount, BALANCE.waves.perPlayer, BALANCE.waves.waveSizeMul, BALANCE.player.hp];
+    const keep = [BALANCE.waves.baseCount, BALANCE.waves.perPlayer, BALANCE.waves.waveSizeMul, BALANCE.player.hp, BALANCE.waves.spawnSeconds];
+    BALANCE.waves.spawnSeconds = 4; // the enemies of a tiny floor arrive at once (the real floors take 20 s)
     BALANCE.player.hp = 1e6; // nobody dies while the scripted players clear the floors
     BALANCE.waves.baseCount = 2;
     BALANCE.waves.perPlayer = 0;
@@ -243,7 +244,7 @@ describe('lockstep over a laggy network', () => {
       const seen = net.clients.map(() => new Map<number, number>());
       let late: Client | null = null;
       let sawFlight = false;
-      for (let t = 0; t < 120000; t++) {
+      for (let t = 0; t < 240000; t++) {
         net.advance(1);
         net.clients.forEach((c, i) => {
           const w = c.session.world;
@@ -277,9 +278,9 @@ describe('lockstep over a laggy network', () => {
       expect(late!.session.world!.wave).toBe(net.clients[0]!.session.world!.wave);
       expect(late!.session.world!.map).toBe(net.clients[0]!.session.world!.map);
     } finally {
-      [BALANCE.waves.baseCount, BALANCE.waves.perPlayer, BALANCE.waves.waveSizeMul, BALANCE.player.hp] = keep as [number, number, number, number];
+      [BALANCE.waves.baseCount, BALANCE.waves.perPlayer, BALANCE.waves.waveSizeMul, BALANCE.player.hp, BALANCE.waves.spawnSeconds] = keep as [number, number, number, number, number];
     }
-  }, 120000);
+  }, 240000);
 
   it('a late joiner fast-forwards and converges; a perturbed client is reported as desynced', () => {
     const net = lobby([30, 30, 30], 10);

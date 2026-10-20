@@ -25,6 +25,10 @@ const T_CRAWLER = ENEMY_TYPES.indexOf('crawler');
 const T_LEAPER = ENEMY_TYPES.indexOf('leaper');
 const T_BLOATER = ENEMY_TYPES.indexOf('bloater');
 const T_SCREAMER = ENEMY_TYPES.indexOf('screamer');
+const T_BROOD = ENEMY_TYPES.indexOf('brood');
+const T_WARCALLER = ENEMY_TYPES.indexOf('warcaller');
+const T_SHOCKER = ENEMY_TYPES.indexOf('shocker');
+const T_CHOPPER = ENEMY_TYPES.indexOf('chopper');
 
 // per-type stats flattened for the hot loops
 const HP = new Float64Array(N_TYPES);
@@ -126,6 +130,9 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     w.eBoss[i] = 0;
     w.eMod[i] = 0;
     w.eFrost[i] = 0;
+    w.eShield[i] = 0;
+    w.eVX[i] = 0;
+    w.eVY[i] = 0;
     w.eLayer[i] = 0;
     w.eAct[i] = 0;
     w.eActT[i] = 0;
@@ -153,7 +160,7 @@ let auraN = 0;
 function collectAuras(w: World): void {
   auraN = 0;
   for (let i = 0; i < MAX_ENEMIES && auraN < 24; i++) {
-    if (w.eActive[i] && (w.eBoss[i] === 4 || w.eType[i] === T_SCREAMER)) {
+    if (w.eActive[i] && (w.eBoss[i] === 4 || w.eType[i] === T_SCREAMER || w.eType[i] === T_WARCALLER)) {
       auraX[auraN] = w.eX[i]!;
       auraY[auraN] = w.eY[i]!;
       auraN++;
@@ -179,12 +186,67 @@ function summonRing(w: World, x: number, y: number, type: number, n: number): vo
   }
 }
 
+
+/** Distance covered by a body in the air (18 ticks, its speed falling by 6 % every tick), in units per unit of launch speed per second. */
+const AIR_TICKS = 18;
+const AIR_REACH = ((): number => {
+  let f = 1;
+  let sum = 0;
+  for (let k = 0; k < AIR_TICKS; k++) {
+    sum += f;
+    f *= 0.94;
+  }
+  return sum * TICK_DT;
+})();
+
+/** Send an enemy flying to a spot: it lands there after the 18 ticks of the air (the client draws the arc). */
+function leapTo(w: World, i: number, tx: number, ty: number): void {
+  const dx = tx - w.eX[i]!;
+  const dy = ty - w.eY[i]!;
+  w.eVX[i] = dx / AIR_REACH;
+  w.eVY[i] = dy / AIR_REACH;
+  w.eAir[i] = AIR_TICKS;
+}
+
+/** The nearest ordinary small enemy within `radius` of a point that can be picked up and thrown (never a boss, nothing already airborne). */
+function pickSmall(w: World, x: number, y: number, radius: number, not: number): number {
+  let best = -1;
+  let bd = radius * radius;
+  for (let j = 0; j < MAX_ENEMIES; j++) {
+    if (j === not || !w.eActive[j] || w.eBoss[j] || w.eAir[j]! > 0 || w.eFrost[j]! > 0 || w.eType[j]! >= FIRST_SPECIAL || RADIUS[w.eType[j]!]! > 0.8) continue;
+    const dx = w.eX[j]! - x;
+    const dy = w.eY[j]! - y;
+    const d = dx * dx + dy * dy;
+    if (d < bd) {
+      bd = d;
+      best = j;
+    }
+  }
+  return best;
+}
+
+/** Throw an enemy at a spot on the ground: it flies, a marked circle shows where it lands, and whoever stands there is hit. */
+function hurlAt(w: World, victim: number, tx: number, ty: number, radius: number, damage: number, victimHit: number): void {
+  const dx = tx - w.eX[victim]!;
+  const dy = ty - w.eY[victim]!;
+  const prev = killer;
+  killer = -1;
+  const dead = damageEnemy(w, victim, w.eHp[victim]! * victimHit, dx * 0.01, dy * 0.01);
+  killer = prev;
+  if (dead) return;
+  w.eAct[victim] = 0;
+  w.eCooldown[victim] = INTERVAL[w.eType[victim]!]! * 0.5;
+  leapTo(w, victim, tx, ty);
+  addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, tx, ty, 0, radius, 0, AIR_TICKS * TICK_DT, damage);
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // The newer enemy types (index >= FIRST_SPECIAL) act in phases kept in eAct / eActT: 0 free, 1 winding up (stands still, the
 // ground shows what is coming), 2 acting (a charge, a pull, a stream of fire), 3 recovering. eAux holds the length of the
 // windup so the client can draw a charge bar. They return true while busy, so the ordinary chase does not run.
 // ---------------------------------------------------------------------------------------------------------------------
 const FIRST_SPECIAL = ENEMY_TYPES.indexOf('acider');
+const FIRST_NEW = ENEMY_TYPES.indexOf('pouncer');
 const SP = BALANCE.special;
 let spMX = 0;
 let spMY = 0;
@@ -228,6 +290,43 @@ function keepAway(w: World, i: number, type: number, dist: number, keep: number,
   return dist <= range ? 'hold' : 'chase';
 }
 
+
+/** The windup of one of the ten newest enemies is over: do what it was winding up for. */
+function finishNew(w: World, i: number, type: number, name: string, cfg: Record<string, number>, x: number, y: number, px: number, py: number, face: number): void {
+  w.events.push({ type: 'enemyAct', id: i, etype: type, x, y });
+  if (name === 'pouncer') {
+    // it jumps at the spot it marked when it crouched, not at where the player has gone since
+    leapTo(w, i, w.eVX[i]!, w.eVY[i]!);
+    w.eAngle[i] = atan2(w.eVY[i]! - y, w.eVX[i]! - x);
+  } else if (name === 'hurler') {
+    const v = w.eVX[i]! | 0;
+    if (v > 0 && w.eActive[v - 1] && w.eAir[v - 1]! <= 0 && !w.eBoss[v - 1]) hurlAt(w, v - 1, px, py, cfg.radius!, cfg.damage!, cfg.victimHit!);
+    w.eVX[i] = 0;
+  } else if (name === 'grabber') {
+    const gx = x + cos(face) * 2.0;
+    const gy = y + sin(face) * 2.0;
+    const r2 = cfg.grabRadius! * cfg.grabRadius!;
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive || w.pHp[s]! <= 0) continue;
+      const dx = w.pX[s]! - gx;
+      const dy = w.pY[s]! - gy;
+      if (dx * dx + dy * dy > r2) continue;
+      if (!hurtPlayer(w, s, cfg.damage!, w.pX[s]!, w.pY[s]!, i)) continue;
+      // picked up and thrown across the room, in a direction that is not quite away
+      const a = face + (w.rng.float() * 2 - 1) * 0.7;
+      launchPlayer(w, s, cos(a) * cfg.throw!, sin(a) * cfg.throw!, cfg.stun!, 22);
+    }
+  } else if (name === 'warcaller') {
+    for (let k = 0; k < cfg.count! && w.enemyCount < BALANCE.waves.cap; k++) {
+      const a = (k / cfg.count!) * 6.283185307179586 + 0.4;
+      const pick = w.rng.int(3);
+      spawnEnemy(w, pick === 0 ? T_GRUNT : pick === 1 ? T_RUNNER : T_CRAWLER, clamp(x + cos(a) * 1.8, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(y + sin(a) * 1.8, -ARENA_HALF_H + 1, ARENA_HALF_H - 1));
+    }
+  }
+  endAct(w, i, cfg.recover ?? 0.6);
+  if (name === 'pouncer') w.eAct[i] = 3;
+}
+
 function special(w: World, i: number, type: number, x: number, y: number, best: number, dist: number, tx: number, ty: number): boolean {
   spMX = 0;
   spMY = 0;
@@ -245,6 +344,10 @@ function special(w: World, i: number, type: number, x: number, y: number, best: 
     // the windup is over: do it
     w.eState[i] = EnemyState.Attack;
     w.eStateTick[i] = w.tick;
+    if (type >= FIRST_NEW) {
+      finishNew(w, i, type, name, cfg, x, y, px, py, face);
+      return true;
+    }
     if (name === 'rammer' || name === 'magnetar' || name === 'flamer') w.events.push({ type: 'enemyAct', id: i, etype: type, x, y });
     if (name === 'rammer') {
       w.eAngle[i] = face;
@@ -408,6 +511,108 @@ function special(w: World, i: number, type: number, x: number, y: number, best: 
         return true;
       }
       return false;
+    case 'pouncer':
+      if (ready && dist >= cfg.minRange! && dist <= cfg.maxRange! && !segmentBlocked(x, y, px, py)) {
+        w.eAngle[i] = face;
+        w.eVX[i] = px;
+        w.eVY[i] = py;
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, px, py, 0, cfg.radius!, 0, cfg.windup! + AIR_TICKS * TICK_DT, cfg.damage!);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'hurler': {
+      if (ready && dist >= cfg.minRange! && dist <= cfg.range!) {
+        const v = pickSmall(w, x, y, cfg.pickRadius!, i);
+        if (v >= 0) {
+          w.eVX[i] = v + 1;
+          beginWindup(w, i, cfg.windup!);
+          w.eCooldown[i] = INTERVAL[type]!;
+          return true;
+        }
+      }
+      return false;
+    }
+    case 'grabber':
+      if (ready && dist <= cfg.reach!) {
+        w.eAngle[i] = face;
+        addTelegraph(w, TeleShape.Circle, TeleEffect.None, x + tx * 2.0, y + ty * 2.0, 0, cfg.grabRadius!, 0, cfg.windup!, 0);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'spiker':
+      if (ready && dist <= cfg.range! && !segmentBlocked(x, y, px, py)) {
+        w.eAngle[i] = face;
+        const n = cfg.count!;
+        for (let k = 0; k < n; k++) {
+          const a = face + (k - (n - 1) / 2) * cfg.spread!;
+          const half = cfg.length! / 2;
+          addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + cos(a) * half, y + sin(a) * half, a, cfg.width!, half, cfg.windup!, cfg.damage!);
+        }
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'shocker':
+      if (ready && dist <= cfg.range!) {
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, cfg.radius!, 0, cfg.windup!, cfg.damage!);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'chopper':
+      if (ready && dist <= cfg.range! && !segmentBlocked(x, y, px, py)) {
+        w.eAngle[i] = face;
+        const half = cfg.length! / 2;
+        addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + tx * half, y + ty * half, face, cfg.width!, half, cfg.windup!, cfg.damage!);
+        // the axe comes back the same way
+        addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + tx * half, y + ty * half, face, cfg.width!, half, cfg.windup! + cfg.back!, cfg.damage! * 0.7);
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'quaker':
+      if (ready && dist <= cfg.range!) {
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, cfg.radius!, 0, cfg.windup!, cfg.damage!);
+        for (let k = 0; k < cfg.rocks!; k++) {
+          const s = pickPlayer(w);
+          if (s < 0) break;
+          const ox = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 3.5, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
+          const oy = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 3.5, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
+          addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, cfg.rockRadius!, 0, cfg.windup! + cfg.rockDelay! + k * 0.18, cfg.rockDamage!);
+        }
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+        return true;
+      }
+      return false;
+    case 'trapper':
+    case 'warcaller': {
+      const mode = keepAway(w, i, type, dist, cfg.keep!, cfg.range!, tx, ty);
+      if (mode === 'chase') return false;
+      if (mode === 'back') return true;
+      if (ready) {
+        if (name === 'trapper') {
+          // mines in the ground round the player: they show up at once and go off after a moment
+          for (let k = 0; k < cfg.count!; k++) {
+            const a = w.rng.float() * 6.283185307179586;
+            const d = 1 + w.rng.float() * cfg.scatter!;
+            addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, clamp(px + cos(a) * d, -ARENA_HALF_W + 2, ARENA_HALF_W - 2), clamp(py + sin(a) * d, -ARENA_HALF_H + 2, ARENA_HALF_H - 2), 0, cfg.radius!, 0, cfg.delay!, cfg.damage!);
+          }
+        }
+        beginWindup(w, i, cfg.windup!);
+        w.eCooldown[i] = INTERVAL[type]!;
+      }
+      return true;
+    }
+    case 'brood':
+      return false;
     case 'mortar':
     case 'reviver':
     case 'marksman': {
@@ -461,7 +666,7 @@ function sweepAt(w: World, x: number, y: number): void {
   const s = pickPlayer(w);
   if (s < 0) return;
   const a = aimAt(x, y, w.pX[s]!, w.pY[s]!);
-  const half = 32;
+  const half = 64;
   addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + cos(a) * half, y + sin(a) * half, a, sw.width, half, sw.delay, sw.damage);
 }
 
@@ -488,7 +693,7 @@ function purge(w: World, x: number, y: number): void {
 }
 
 /**
- * The six bosses fight differently: the brute charges and slams, the king summons grunts and calls meteors, the queen
+ * The eleven bosses fight differently (the first six below, then the iron colossus, the storm caller, the plague doctor, the stalker and the warlord): the brute charges and slams, the king summons grunts and calls meteors, the queen
  * spits out spitters and leaves acid, the swarm leader speeds up its horde and sweeps a line, the meteor lord rains
  * fire, the purger paints most of the arena red.
  */
@@ -558,6 +763,120 @@ function bossAbilities(w: World, i: number, x: number, y: number, dist: number):
   } else if (variant === 5) {
     if (every(ba.meteors.every - 2, 90)) meteors(ba.meteors.count + 3);
     if (every(ba.slam.every + 6, 200) && dist < 11) slam();
+  } else if (variant === 7) {
+    // iron colossus: shakes the floor, charges, slams
+    if (every(ba.quake.every, 90) && dist < 14) {
+      const q = ba.quake;
+      addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, q.radius, 0, q.delay, q.damage);
+      for (let k = 0; k < q.rocks; k++) {
+        const s = pickPlayer(w);
+        if (s < 0) break;
+        const ox = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 4, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
+        const oy = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 4, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, q.rockRadius, 0, q.rockDelay + k * 0.18, q.damage * 0.7);
+      }
+      w.events.push({ type: 'bossAbility', kind: 'quake', x, y });
+      callState();
+    }
+    if (every(cfg.chargeSeconds + 2, 150) && dist > 5 && w.eAux[i]! <= 0) {
+      w.eAux[i] = cfg.chargeTicks;
+      w.events.push({ type: 'bossAbility', kind: 'charge', x, y });
+      callState();
+    }
+    if (every(ba.slam.every + 3, 210) && dist < 11) slam();
+  } else if (variant === 8) {
+    // storm caller: lightning on the players, a ring of lightning round itself, shockers to keep the squad busy
+    const st = ba.storm;
+    if (every(st.every, 30)) {
+      for (let k = 0; k < st.count; k++) {
+        const s = pickPlayer(w);
+        if (s < 0) break;
+        const ox = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 3, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
+        const oy = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 3, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, st.radius, 0, st.delay + k * 0.15, st.damage);
+      }
+      w.events.push({ type: 'bossAbility', kind: 'storm', x, y });
+      callState();
+    }
+    if (every(st.ringEvery, 120)) {
+      addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, st.ringRadius, 0, 1.2, st.ringDamage);
+      w.events.push({ type: 'bossAbility', kind: 'storm', x, y });
+      callState();
+    }
+    if (every(cfg.summonSeconds * 1.5, 70)) {
+      summonRing(w, x, y, T_SHOCKER, 2);
+      w.events.push({ type: 'bossAbility', kind: 'summon', x, y });
+      callState();
+    }
+  } else if (variant === 9) {
+    // plague doctor: poisoned ground all over, broods that burst into crawlers
+    const pl = ba.plague;
+    if (every(pl.every, 0)) {
+      for (let k = 0; k < pl.zones; k++) {
+        const s = pickPlayer(w);
+        if (s < 0) break;
+        const ox = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 7, -ARENA_HALF_W + 3, ARENA_HALF_W - 3);
+        const oy = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 7, -ARENA_HALF_H + 3, ARENA_HALF_H - 3);
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Acid, ox, oy, 0, pl.radius, 0, 1.2, pl.radius);
+      }
+      w.events.push({ type: 'bossAbility', kind: 'plague', x, y });
+      callState();
+    }
+    if (every(pl.summonEvery, 100)) {
+      summonRing(w, x, y, T_BROOD, 2);
+      summonRing(w, x, y, T_SPITTER, pl.summonCount);
+      w.events.push({ type: 'bossAbility', kind: 'summon', x, y });
+      callState();
+    }
+  } else if (variant === 10) {
+    // stalker: leaps at one player after the other, cuts lines across the arena
+    const po = ba.pounce;
+    if (every(po.every, 60) && dist >= po.minRange && w.eAir[i]! <= 0) {
+      const s = pickPlayer(w);
+      if (s >= 0) {
+        const px = w.pX[s]!;
+        const py = w.pY[s]!;
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, px, py, 0, po.radius, 0, AIR_TICKS * TICK_DT, po.damage);
+        leapTo(w, i, px, py);
+        w.events.push({ type: 'bossAbility', kind: 'pounce', x, y });
+        callState();
+      }
+    }
+    if (every(ba.sweep.every + 4, 170)) {
+      sweepAt(w, x, y);
+      w.events.push({ type: 'bossAbility', kind: 'sweep', x, y });
+      callState();
+    }
+    if (every(cfg.summonSeconds * 2, 90)) summonRing(w, x, y, T_RUNNER, 4);
+  } else if (variant === 11) {
+    // warlord: throws its own soldiers at the players, calls war cries and charges
+    const hu = ba.hurl;
+    if (every(hu.every, 45)) {
+      let thrown = 0;
+      for (let k = 0; k < hu.count; k++) {
+        const v = pickSmall(w, x, y, hu.pickRadius, i);
+        const s = pickPlayer(w);
+        if (v < 0 || s < 0) break;
+        hurlAt(w, v, w.pX[s]! + (w.rng.float() * 2 - 1) * 1.5, w.pY[s]! + (w.rng.float() * 2 - 1) * 1.5, hu.radius, hu.damage, 0.1);
+        thrown++;
+      }
+      if (thrown > 0) {
+        w.events.push({ type: 'bossAbility', kind: 'hurl', x, y });
+        callState();
+      }
+    }
+    if (every(hu.hornEvery, 100)) {
+      summonRing(w, x, y, T_WARCALLER, 1);
+      summonRing(w, x, y, T_CHOPPER, 2);
+      summonRing(w, x, y, T_GRUNT, hu.hornCount);
+      w.events.push({ type: 'bossAbility', kind: 'summon', x, y });
+      callState();
+    }
+    if (every(cfg.chargeSeconds + 3, 200) && dist > 5 && w.eAux[i]! <= 0) {
+      w.eAux[i] = cfg.chargeTicks;
+      w.events.push({ type: 'bossAbility', kind: 'charge', x, y });
+      callState();
+    }
   } else if (variant === 6) {
     // the first purge ten seconds in, then on its own cycle
     const period = Math.round(ba.purge.every * TICK_RATE);
@@ -575,11 +894,14 @@ function bossAbilities(w: World, i: number, x: number, y: number, dist: number):
   }
 }
 
+/** The boss variants in the order the boss floors bring them: the older and the newer mixed, so a long run meets both early. */
+const BOSS_ORDER: readonly number[] = [1, 2, 7, 3, 8, 4, 9, 5, 10, 6, 11];
+
 export function spawnBoss(w: World): number {
   edgePoint(w);
   const i = spawnEnemy(w, T_TANK, spawnX, spawnY);
   if (i >= 0) {
-    w.eBoss[i] = 1 + ((((w.wave / BALANCE.progression.boss.everyWaves) | 0) - 1 + 6) % 6);
+    w.eBoss[i] = BOSS_ORDER[((((w.wave / BALANCE.progression.boss.everyWaves) | 0) - 1) % BOSS_ORDER.length + BOSS_ORDER.length) % BOSS_ORDER.length]!;
     w.eHp[i] = w.eHp[i]! * BALANCE.progression.boss.hpMul;
   }
   return i;
@@ -764,6 +1086,7 @@ export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number,
   const hp = w.pHp[slot]! - damage;
   w.pHp[slot] = hp > 0 ? hp : 0;
   w.pIFrames[slot] = BALANCE.player.iFrames;
+  if (attacker >= 0 && w.eActive[attacker] && w.eMod[attacker] === ELITE.Vampiric) w.eHp[attacker] = w.eHp[attacker]! + BALANCE.elites.vampHeal * w.hpMul;
   w.events.push({ type: 'playerHit', slot, x, y, damage });
   return true;
 }
@@ -821,6 +1144,14 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
       spawnEnemy(w, T_CRAWLER, clamp(bx + cos(a) * 1.0, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(by + sin(a) * 1.0, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), false);
     }
   }
+  if (type === T_BROOD) {
+    const bx = w.eX[i]!;
+    const by = w.eY[i]!;
+    for (let k = 0; k < SP.brood!.count!; k++) {
+      const a = (k / SP.brood!.count!) * 6.283185307179586 + 0.9;
+      spawnEnemy(w, T_CRAWLER, clamp(bx + cos(a) * 1.1, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(by + sin(a) * 1.1, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), false);
+    }
+  }
   const mod = w.eMod[i]!;
   const ex = w.eX[i]!;
   const ey = w.eY[i]!;
@@ -872,7 +1203,29 @@ export function damageEnemyBy(w: World, i: number, owner: number, damage: number
 
 /** Apply bullet damage; returns true when the enemy died. */
 export function damageEnemy(w: World, i: number, rawDamage: number, dx: number, dy: number): boolean {
-  const damage = w.eMod[i] ? rawDamage * enemyDamageMul(w, i) : rawDamage;
+  let damage = w.eMod[i] ? rawDamage * enemyDamageMul(w, i) : rawDamage;
+  if (w.eMod[i] === ELITE.Phantom && (Math.imul(w.tick + i * 977, 2654435761) >>> 0) % 100 < BALANCE.elites.phantomDodge * 100) {
+    // a phantom slips out of the way of some of what hits it: a short sidestep and the damage is gone
+    const sx = -dy;
+    const sy = dx;
+    const l = sqrt(sx * sx + sy * sy);
+    const x0 = w.eX[i]!;
+    const y0 = w.eY[i]!;
+    if (l > 1e-6) shove(w, i, (sx / l) * 1.4, (sy / l) * 1.4);
+    w.events.push({ type: 'blink', id: i, x0, y0, x: w.eX[i]!, y: w.eY[i]! });
+    return false;
+  }
+  if (w.eShield[i]! > 0) {
+    // a warded enemy loses its shield first
+    const take = damage < w.eShield[i]! ? damage : w.eShield[i]!;
+    w.eShield[i] = w.eShield[i]! - take;
+    damage -= take;
+    if (killer >= 0) addStat(w, killer, STAT.Hits, 1);
+    if (damage <= 0) {
+      w.events.push({ type: 'enemyHit', id: i, etype: w.eType[i]!, x: w.eX[i]!, y: w.eY[i]!, damage: take, by: killer });
+      return false;
+    }
+  }
   // the damage meter counts what was really taken off (no credit for overkill)
   if (killer >= 0) {
     addPerk(w, killer, PERK.Damage, Math.min(damage, Math.max(0, w.eHp[i]!)));
@@ -983,6 +1336,7 @@ export function updateEnemies(w: World): void {
     let y = w.eY[i]!;
     w.eCooldown[i] = w.eCooldown[i]! - TICK_DT;
     if (w.eMod[i] === ELITE.Regen) w.eHp[i] = w.eHp[i]! + BALANCE.elites.regenPerSec * w.hpMul * TICK_DT;
+    else if (w.eMod[i] === ELITE.Toxic && (w.tick + i) % BALANCE.elites.toxicEvery === 0) addZone(w, w.eX[i]!, w.eY[i]!, 1.0, 3, ZoneKind.Acid);
     const age = w.tick - w.eStateTick[i]!;
     let state = w.eState[i]!;
     if (state === EnemyState.Spawn && age >= SPAWN_TICKS) state = EnemyState.Move;
@@ -1096,6 +1450,7 @@ export function updateEnemies(w: World): void {
           w.eAux[i] = w.eAux[i]! - 1;
         }
         if (auraN > 0 && !boss && inAura(x, y)) sp *= BALANCE.progression.boss.auraSpeedMul;
+        if (w.eMod[i] === ELITE.Berserk && (w.tick + i * 13) % 180 < 60) sp *= BALANCE.elites.berserkSpeed; // a few seconds of frenzy every six
         if (w.eMod[i] || w.wave >= 3) sp *= enemySpeedMul(w, i);
         if (perk(w, best, PERK.Frost) > 0 && dist < BALANCE.perks.frostRadius) sp *= BALANCE.perks.frostSlow;
         mx = dx * sp * TICK_DT;
@@ -1210,6 +1565,10 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
     killer = w.bOwner[b]!;
     damageEnemy(w, bestSlot, dmg, bdx, bdy);
     killer = -1;
+    // a frost round leaves the enemy frozen for a moment (bosses shrug it off)
+    const owner = w.bOwner[b]!;
+    const freeze = owner >= 0 ? BALANCE.weapons[WEAPON_IDS[w.pWeapon[owner]!]!]!.freeze : undefined;
+    if (freeze && w.eActive[bestSlot] && !w.eBoss[bestSlot] && w.eFrost[bestSlot]! < freeze) w.eFrost[bestSlot] = freeze;
     if (w.bPierce[b]! <= 0) {
       w.bX[b] = x0 + sx * bestT;
       w.bY[b] = y0 + sy * bestT;

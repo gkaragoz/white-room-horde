@@ -171,7 +171,7 @@ describe('benchmark', () => {
     const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
     const p99 = samples[Math.floor(samples.length * 0.99)]!;
     console.log(`sim benchmark: enemies=${w.enemyCount} avg=${avg.toFixed(2)}ms p99=${p99.toFixed(2)}ms max=${samples[samples.length - 1]!.toFixed(2)}ms hash=${hashWorld(w)}`);
-    expect(w.enemyCount).toBeGreaterThan(120);
+    expect(w.enemyCount).toBeGreaterThan(300);
     expect(avg).toBeLessThan(12);
   }, 60000);
 });

@@ -61,12 +61,12 @@ export function verifyReplay(r: Replay, expectedFinalHash?: number): Verdict {
 }
 
 /** Marks the second version of the binary form (map, difficulty and classes are stored too). */
-const MAGIC = [0x57, 0x53];
+const MAGIC = [0x57, 0x54];
 
 /** Compact binary form: header (seed, map, difficulty, players), then per tick the wire encoding, then the hashes. */
 export function encodeReplay(r: Replay): Uint8Array {
   const parts: Uint8Array[] = [];
-  const head = new Uint8Array(2 + 4 + 2 + 1 + r.setup.players.length * 2 + 4 + 4);
+  const head = new Uint8Array(2 + 4 + 2 + 1 + r.setup.players.length * 3 + 4 + 4);
   const dv = new DataView(head.buffer);
   head[0] = MAGIC[0]!;
   head[1] = MAGIC[1]!;
@@ -77,7 +77,8 @@ export function encodeReplay(r: Replay): Uint8Array {
   let o = 9;
   for (const p of r.setup.players) {
     head[o++] = p.slot;
-    head[o++] = (WEAPON_IDS.indexOf(p.weapon) & 15) | (((p.cls ?? 0) & 15) << 4);
+    head[o++] = WEAPON_IDS.indexOf(p.weapon) & 255;
+    head[o++] = (p.cls ?? 0) & 255;
   }
   dv.setUint32(o, r.ticks.length, true);
   dv.setUint32(o + 4, r.hashes.length, true);
@@ -117,8 +118,8 @@ export function decodeReplay(buf: Uint8Array): Replay {
   let maxSlot = 0;
   for (let i = 0; i < n; i++) {
     const slot = buf[o++]!;
-    const packed = buf[o++]!;
-    players.push({ slot, weapon: WEAPON_IDS[packed & 15]!, cls: packed >> 4 });
+    const weapon = WEAPON_IDS[buf[o++]!]!;
+    players.push({ slot, weapon, cls: buf[o++]! });
     if (slot > maxSlot) maxSlot = slot;
   }
   const ticks = dv.getUint32(o, true);

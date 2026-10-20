@@ -21,6 +21,8 @@ export interface WeaponStats {
   /** Explosive rounds: radius and damage of the blast where the round ends. */
   blast?: number;
   blastDamage?: number;
+  /** Ticks of frost a hit puts on an enemy (frozen enemies stand still). */
+  freeze?: number;
   spinUp?: number;
   spinDown?: number;
   /** Melee weapons: swing arc (radians), reach, knockback, and the seconds of charge of a held swing (hammer; 0 = none). */
@@ -106,11 +108,16 @@ export const BALANCE = data as unknown as {
     sweep: { every: number; width: number; delay: number; damage: number; stun: number; push: number };
     purge: { every: number; delay: number; areaFraction: number; killFloor: number };
     pools: { every: number; count: number; radius: number; delay: number };
+    quake: { every: number; radius: number; delay: number; damage: number; stun: number; push: number; rocks: number; rockRadius: number; rockDelay: number };
+    storm: { every: number; count: number; radius: number; delay: number; damage: number; ringEvery: number; ringRadius: number; ringDamage: number; ringStun: number };
+    plague: { every: number; zones: number; radius: number; seconds: number; summonEvery: number; summonCount: number };
+    pounce: { every: number; minRange: number; windup: number; radius: number; damage: number; stun: number };
+    hurl: { every: number; count: number; pickRadius: number; radius: number; delay: number; damage: number; hornEvery: number; hornCount: number };
   };
 };
 
 type PerkKey = 'outOfCombatSeconds' | 'baseRegen' | 'cardRegen' | 'auraRadius' | 'thorns' | 'shockRadius' | 'shockDamage' | 'shockPush' | 'volatileChance' | 'volatileRadius' | 'volatileDamage' | 'frostRadius' | 'frostSlow' | 'scavChance' | 'rageMax' | 'secondHp' | 'adrenSeconds' | 'adrenSpeed' | 'barrierAmount' | 'barrierCd';
-type EliteKey = 'start' | 'perWave' | 'max' | 'giantHp' | 'giantSpeed' | 'giantRadius' | 'swiftSpeed' | 'swiftHp' | 'armoredMul' | 'regenPerSec' | 'splitCount' | 'volatileRadius' | 'volatileDamage';
+type EliteKey = 'start' | 'perWave' | 'max' | 'giantHp' | 'giantSpeed' | 'giantRadius' | 'swiftSpeed' | 'swiftHp' | 'armoredMul' | 'regenPerSec' | 'splitCount' | 'volatileRadius' | 'volatileDamage' | 'berserkSpeed' | 'vampHeal' | 'toxicEvery' | 'phantomDodge' | 'wardedShield';
 type BarrelKey = 'hp' | 'radius' | 'damage' | 'playerDamage' | 'respawn' | 'hitRadius' | 'push';
 
 export interface ClassStats {

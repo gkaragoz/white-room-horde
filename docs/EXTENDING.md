@@ -19,7 +19,7 @@ same world from the same inputs. Anything stored in the world must be in `snapsh
 2. `packages/shared/data/balance.json` `weapons.<id>`: damage, rate, pellets, spread, range, pierce, magazine, reload, ammo
    (`-1` infinite). Keep sustained DPS inside the band checked by `packages/sim/tests/weapons.test.ts` (40 to 100).
    `blast` and `blastDamage` make the round explode where it ends.
-3. Model: add a function to `tools/blender/make_weapons.py` (grip at the origin, barrel along -Y) and run it with Blender.
+3. Model: add a function to `tools/blender/make_weapons.py` (and its id to `tools/blender/make_weapon_icons.py` `IDS`; `WEAPON_SLOTS` in `types.ts` is the room in the per-player weapon tables) (grip at the origin, barrel along -Y) and run it with Blender.
 4. Run the QA page (`weapon.alignment`) and copy the measured muzzle numbers into `balance.json`
    (`muzzleFwd`, `muzzleSide`, `muzzleH`); `weapon.head-clearance` must pass.
 5. Client: name in `ui.ts` (`weapons`, both languages and `i18n.ts`), `WEAPON_UNLOCK` in `profile.ts`, tracer in `TRACER`
@@ -32,6 +32,14 @@ same world from the same inputs. Anything stored in the world must be in `snapsh
 3. Model: `spec_<name>` in `tools/blender/make_chibi.py` and the entry in `SPECS`; animations: add it to `TYPES` in
    `tools/blender/bake_vat.py` and run the bake (needs the local Mixamo files in `./mixamo`).
 4. Client: the clip table `CLIPS` in `render/crowd.ts`, gib colour in `render/fx.ts`.
+
+## The latest ten enemies, five elites and five bosses
+`finishNew` (end of the windup) and the free-state `switch` in `special()` hold the ten newest types; `hurlAt`, `leapTo`
+and `pickSmall` are the shared helpers for "throw a small enemy" and "leap onto a spot". Elites are numbers in `ELITE`
+(`features.ts`) with their effects where they act (`damageEnemy`, `hurtPlayer`, the movement loop); a warded elite has
+its shield in `eShield`. Bosses are variants of `eBoss`: add the ability block in `bossAbilities`, its numbers in
+`bossAttacks`, its place in `BOSS_ORDER`, its model to `BOSS_TYPES` (`render/crowd.ts`) and `bake_vat.py`, and its banner
+to `BOSS_BANNERS` (`main.ts`).
 
 ## A special enemy behaviour
 The newer enemy types (index from `acider` on) act in phases (`eAct`: free, winding up, acting, recovering; `eActT` ticks

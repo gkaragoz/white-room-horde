@@ -15,7 +15,7 @@ interface VatMeta {
 }
 
 /** Boss looks, picked by the sim's eBoss value (1-based) and baked as their own VAT types. */
-export const BOSS_TYPES = ['boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri', 'boss_meteor_lord', 'boss_purger'] as const;
+export const BOSS_TYPES = ['boss_dev_grunt', 'boss_kral_tank', 'boss_sayaci_ana', 'boss_suru_lideri', 'boss_meteor_lord', 'boss_purger', 'boss_iron_colossus', 'boss_storm_caller', 'boss_plague_doctor', 'boss_stalker', 'boss_warlord'] as const;
 const BOSS_CLIPS = { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' };
 
 interface ClipRef {
@@ -49,6 +49,16 @@ const CLIPS: Record<EnemyType, { move: string; attack: string; spawn: string; de
   blinker: { move: 'z_run', attack: 'z_kick', spawn: 'z_scream', death: 'z_death_fwd', deathFwd: 'z_death_fwd' },
   magnetar: { move: 'z_walk', attack: 'z_punch', spawn: 'z_scream', death: 'z_death_back' },
   flamer: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  pouncer: { move: 'z_run', attack: 'z_kick', spawn: 'z_scream', death: 'z_death_fwd', deathFwd: 'z_death_fwd' },
+  hurler: { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' },
+  grabber: { move: 'z_walk', attack: 'z_punch', spawn: 'z_scream', death: 'z_death_back' },
+  spiker: { move: 'z_walk_creep', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  shocker: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  brood: { move: 'z_walk_creep', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  trapper: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  warcaller: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  chopper: { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' },
+  quaker: { move: 'z_walk', attack: 'z_attack_overhead', spawn: 'z_scream', death: 'z_death_back' },
 };
 
 const LEAP_TICKS = 9;
@@ -446,15 +456,15 @@ export class Crowd {
       const s = this.sample(clip, time);
       // elites stand out: giants are big, swift ones bright, armoured ones dark, volatile ones glow hot
       const mod = w.eMod[i]!;
-      const eliteShade = mod === 6 ? 0.55 : mod === 4 ? 1.9 : mod === 2 ? 1.35 : mod === 3 ? 1.25 : mod === 5 ? 1.15 : 1;
+      const eliteShade = mod === 6 ? 0.55 : mod === 4 ? 1.9 : mod === 2 ? 1.35 : mod === 3 ? 1.25 : mod === 5 ? 1.15 : mod === 7 ? 1.6 : mod === 8 ? 0.65 : mod === 9 ? 1.45 : mod === 10 ? 0.8 : mod === 11 ? 1.3 : 1;
       // hops: a leaper's leap is a real arc, fast runners bounce with every stride, a hit pops the body up a little
       let hop = this.flash[i]! * 0.14;
       const etype = w.eType[i]!;
       if (etype === LEAPER && w.eAux[i]! > 0) hop += 1.5 * Math.sin(Math.PI * Math.min(1, (LEAP_TICKS - w.eAux[i]! + alpha) / LEAP_TICKS));
       else if (clip.loop && state !== EnemyState.Attack && (etype === RUNNER || etype === CRAWLER || etype === EXPLODER || etype === LEAPER)) hop += Math.abs(Math.sin(this.phase[i]! * Math.PI * 2)) * 0.13;
       // the newer enemies wind up for their big moves: they stand still, tremble, swell and glow until it is time
-      let scale = mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : 1;
-      let glow = 0;
+      let scale = mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : mod === 7 ? 1.18 : mod === 10 ? 0.92 : mod === 11 ? 1.1 : 1;
+      let glow = mod === 7 && (w.tick + i * 13) % 180 < 60 ? 0.6 + 0.4 * Math.sin(now * 30) : mod === 9 ? 0.25 + 0.15 * Math.sin(now * 6 + i) : mod === 11 ? 0.2 : 0; // berserk flares, toxic seethes, warded glints
       let yawOut = this.yaw[i]!;
       let px = x;
       let pz = -y;

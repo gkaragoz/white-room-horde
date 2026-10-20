@@ -21,7 +21,7 @@ export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headph
   'acc_pirate', 'acc_wizard', 'acc_viking', 'acc_santa', 'acc_chef', 'acc_astronaut', 'acc_cat', 'acc_halo', 'acc_alien', 'acc_gasmask', 'acc_beanie', 'acc_samurai', 'acc_shades', 'acc_flowers'] as const;
 
 /** Best wave a player has to reach before a starting weapon unlocks (the first three are free). */
-export const WEAPON_UNLOCK: Record<WeaponId, number> = { pistol: 0, smg: 0, ar: 0, shotgun: 3, hmg: 5, sniper: 7, minigun: 9, revolver: 2, mp: 4, dbl: 6, dmr: 8, flamer: 10, gl: 12, sword: 0, hammer: 0 };
+export const WEAPON_UNLOCK: Record<WeaponId, number> = { pistol: 0, smg: 0, ar: 0, shotgun: 3, hmg: 5, sniper: 7, minigun: 9, revolver: 2, mp: 4, dbl: 6, dmr: 8, flamer: 10, gl: 12, sword: 0, hammer: 0, akimbo: 6, nailgun: 9, crossbow: 12, arcthrower: 15, autoshotgun: 18, plasma: 21, frostgun: 24, sawlauncher: 28, rocket: 32, railgun: 38 };
 
 const KEY = 'wrh.profile';
 const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 };

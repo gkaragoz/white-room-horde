@@ -39,7 +39,7 @@ describe('the ten newer enemy types exist and are tuned', () => {
       expect(BALANCE.special[n], n).toBeTruthy();
     }
     expect(new Set(ENEMY_TYPES).size).toBe(ENEMY_TYPES.length);
-    expect(ENEMY_TYPES.length).toBe(21);
+    expect(ENEMY_TYPES.length).toBe(31);
   });
 
   it('they join the waves in order as the floors go up', () => {

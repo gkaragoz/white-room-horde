@@ -1,4 +1,4 @@
-import { PERK, PERKS, STAT, STATS, WEAPON_IDS, MAX_PLAYERS } from '@wrh/shared';
+import { PERK, PERKS, STAT, STATS, WEAPON_IDS, WEAPON_SLOTS, MAX_PLAYERS } from '@wrh/shared';
 import type { World } from '@wrh/sim';
 
 /** What the client alone knows about a run (the simulation never sees a mouse). */
@@ -139,7 +139,7 @@ function rowsFor(world: World, s: number, lang: string, ex: RunExtras & { slot: 
   let fav = -1;
   let favT = 0;
   for (let k = 0; k < WEAPON_IDS.length; k++) {
-    const v = world.pWpnTime[s * 16 + k]!;
+    const v = world.pWpnTime[s * WEAPON_SLOTS + k]!;
     if (v > favT) {
       favT = v;
       fav = k;
