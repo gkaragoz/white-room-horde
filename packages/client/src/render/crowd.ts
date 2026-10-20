@@ -35,6 +35,10 @@ const CLIPS: Record<EnemyType, { move: string; attack: string; spawn: string; de
   spitter: { move: 'z_walk_creep', attack: 'z_attack_swipe', spawn: 'z_scream', death: 'z_death_back' },
   shielder: { move: 'z_walk_creep', attack: 'z_punch', spawn: 'z_walk_creep', death: 'z_death_back' },
   spawner: { move: 'z_walk_creep', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
+  crawler: { move: 'z_crawl', attack: 'z_headbutt', spawn: 'z_scream', death: 'z_death_back' },
+  leaper: { move: 'z_run', attack: 'z_kick', spawn: 'z_scream', death: 'z_death_fwd', deathFwd: 'z_death_fwd' },
+  bloater: { move: 'z_walk_creep', attack: 'z_punch', spawn: 'z_scream', death: 'z_death_back' },
+  screamer: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
 };
 
 const VERTEX_DECL = /* glsl */ `

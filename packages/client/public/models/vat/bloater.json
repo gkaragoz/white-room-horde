@@ -1,0 +1,43 @@
+{
+ "type": "bloater",
+ "scale": 1.9,
+ "vertexCount": 774,
+ "indexCount": 2592,
+ "frames": 123,
+ "clips": [
+  {
+   "id": "z_walk_creep",
+   "start": 0,
+   "frames": 40,
+   "loop": true,
+   "duration": 4.0667
+  },
+  {
+   "id": "z_punch",
+   "start": 40,
+   "frames": 13,
+   "loop": false,
+   "duration": 1.0667
+  },
+  {
+   "id": "z_death_back",
+   "start": 53,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  },
+  {
+   "id": "z_scream",
+   "start": 89,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  1.78,
+  2.488,
+  1.902
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

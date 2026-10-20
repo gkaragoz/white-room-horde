@@ -290,6 +290,33 @@ def spec_spawner(b):
         b.sphere("spine", (x, 0.3, z), 0.14 + rnd.random() * 0.05, (1, 1, 1), "#F3E3C3")
 
 
+def spec_crawler(b):
+    body_parts(b, "#D9E8C0", "#A3B58A", slim=0.85, head_k=0.9, belt="#6F7F58")
+    for k, (x, z) in enumerate(((0.0, 0.78), (0.14, 0.62), (-0.14, 0.62))):
+        b.cyl("spine", (x, 0.3, z), 0.07, 0.22, "#6F7F58", rot=(-0.9, 0, 0), r2=0.0)
+
+
+def spec_leaper(b):
+    body_parts(b, "#C4D6F2", "#7FA0D8", slim=0.95, head_k=0.85, belt="#4C6AA3")
+    for sx, side in ((1, "L"), (-1, "R")):
+        b.sphere("thigh." + side, (sx * 0.22, 0, 0.27), 0.2, (1, 1, 1.45), "#5C7DBA")
+        b.cyl("arm." + side, (sx * 0.4, 0, 0.74), 0.07, 0.3, "#E8F0FF", rot=(0, sx * 0.5, 0), r2=0.0)
+
+
+def spec_bloater(b):
+    body_parts(b, "#CFE4A0", "#9FBF6A", slim=1.85, head_k=0.7, belt="#6E8C3A")
+    rnd = random.Random(11)
+    for (x, y, z) in ((0.3, -0.3, 0.45), (-0.35, -0.25, 0.55), (0.1, -0.42, 0.62), (0.4, 0.1, 0.4), (-0.2, -0.4, 0.38), (0.0, 0.35, 0.55)):
+        b.sphere("spine", (x, y, z), 0.14 + rnd.random() * 0.06, (1, 1, 1), "#E8F06A")
+
+
+def spec_screamer(b):
+    body_parts(b, "#F3C9E6", "#D78BC1", slim=0.75, head_k=1.3, belt="#8C4F7A")
+    b.sphere("head", (0, -0.4, 0.95), 0.27, (1.1, 0.5, 1.25), "#4A1030")
+    for sx in (-1, 1):
+        b.sphere("head", (sx * 0.34, -0.3, 1.2), 0.07, (1, 1, 1), "#FFF2A8")
+
+
 def crown(b, color="#FFC93C"):
     ring = b.cyl("head", (0, 0, 1.52), 0.34, 0.1, color)
     for k in range(6):
@@ -555,6 +582,10 @@ SPECS = [
     ("spitter", spec_spitter, 1.35, "spitter", 1.5),
     ("shielder", spec_shielder, 1.5, "shielder", 1.5),
     ("spawner", spec_spawner, 1.5, "spawner", 1.5),
+    ("crawler", spec_crawler, 1.1, "grunt", 1.5),
+    ("leaper", spec_leaper, 1.35, "tank", 1.5),
+    ("bloater", spec_bloater, 1.9, "tank", 1.5),
+    ("screamer", spec_screamer, 1.3, "tank", 1.5),
     ("boss_dev_grunt", spec_dev_grunt, 3.0, "boss", 1.7),
     ("boss_kral_tank", spec_kral_tank, 4.0, "boss", 1.7),
     ("boss_sayaci_ana", spec_sayaci_ana, 3.5, "boss", 1.7),

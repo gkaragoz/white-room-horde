@@ -16,6 +16,10 @@ const T_GRUNT = ENEMY_TYPES.indexOf('grunt');
 const T_TANK = ENEMY_TYPES.indexOf('tank');
 const T_RUNNER = ENEMY_TYPES.indexOf('runner');
 const T_SHIELDER = ENEMY_TYPES.indexOf('shielder');
+const T_CRAWLER = ENEMY_TYPES.indexOf('crawler');
+const T_LEAPER = ENEMY_TYPES.indexOf('leaper');
+const T_BLOATER = ENEMY_TYPES.indexOf('bloater');
+const T_SCREAMER = ENEMY_TYPES.indexOf('screamer');
 
 // per-type stats flattened for the hot loops
 const HP = new Float64Array(N_TYPES);
@@ -95,15 +99,15 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
   return -1;
 }
 
-const auraX = new Float64Array(8);
-const auraY = new Float64Array(8);
+const auraX = new Float64Array(24);
+const auraY = new Float64Array(24);
 let auraN = 0;
 
-/** Swarm-leader bosses (variant 4) speed up every enemy standing near them. */
+/** Swarm-leader bosses (variant 4) and screamers speed up every enemy standing near them. */
 function collectAuras(w: World): void {
   auraN = 0;
-  for (let i = 0; i < MAX_ENEMIES && auraN < 8; i++) {
-    if (w.eActive[i] && w.eBoss[i] === 4) {
+  for (let i = 0; i < MAX_ENEMIES && auraN < 24; i++) {
+    if (w.eActive[i] && (w.eBoss[i] === 4 || w.eType[i] === T_SCREAMER)) {
       auraX[auraN] = w.eX[i]!;
       auraY[auraN] = w.eY[i]!;
       auraN++;
@@ -301,6 +305,23 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0);
   awardXp(w, w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]);
   if (type === T_EXPLODER) explode(w, i);
+  if (type === T_BLOATER) {
+    // the belly bursts: acid burns whoever is close and a litter of crawlers crawls out
+    const bx = w.eX[i]!;
+    const by = w.eY[i]!;
+    const r = BLAST[T_BLOATER]!;
+    w.events.push({ type: 'explosion', x: bx, y: by, radius: r * 0.8 });
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
+      const dx = w.pX[s]! - bx;
+      const dy = w.pY[s]! - by;
+      if (dx * dx + dy * dy <= r * r) hurtPlayer(w, s, DAMAGE[T_BLOATER]!, w.pX[s]!, w.pY[s]!);
+    }
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * 6.283185307179586 + 0.4;
+      spawnEnemy(w, T_CRAWLER, clamp(bx + cos(a) * 1.0, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(by + sin(a) * 1.0, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), false);
+    }
+  }
   const mod = w.eMod[i]!;
   const ex = w.eX[i]!;
   const ey = w.eY[i]!;
@@ -474,6 +495,8 @@ export function updateEnemies(w: World): void {
             dy = field.dirY[c]!;
           }
         }
+        // a leaper crouches and then jumps at its target every three seconds or so
+        if (type === T_LEAPER && w.eAux[i]! <= 0 && dist > 4 && dist < 11 && (w.tick + i * 7) % 90 === 0) w.eAux[i] = 9;
         let sp = SPEED[type]! * (0.9 + ((i * 37) % 16) * 0.0125);
         if (w.eAux[i]! > 0) {
           sp *= BALANCE.progression.boss.chargeSpeedMul; // the brute is charging

@@ -1,0 +1,43 @@
+{
+ "type": "leaper",
+ "scale": 1.35,
+ "vertexCount": 636,
+ "indexCount": 2100,
+ "frames": 124,
+ "clips": [
+  {
+   "id": "z_run",
+   "start": 0,
+   "frames": 10,
+   "loop": true,
+   "duration": 0.8333
+  },
+  {
+   "id": "z_kick",
+   "start": 10,
+   "frames": 40,
+   "loop": false,
+   "duration": 3.4
+  },
+  {
+   "id": "z_death_fwd",
+   "start": 50,
+   "frames": 40,
+   "loop": false,
+   "duration": 3.3667
+  },
+  {
+   "id": "z_scream",
+   "start": 90,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  0.924,
+  1.87,
+  1.45
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

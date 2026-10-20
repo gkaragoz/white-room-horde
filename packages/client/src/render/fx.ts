@@ -14,6 +14,10 @@ const GIB_COLORS: Record<string, string> = {
   spitter: '#7fa88e',
   shielder: '#8a98b8',
   spawner: '#a88ab0',
+  crawler: '#a3b58a',
+  leaper: '#7fa0d8',
+  bloater: '#9fbf6a',
+  screamer: '#d78bc1',
 };
 
 const enum Kind {
@@ -51,6 +55,13 @@ export class Fx {
   private readonly col = new Float32Array(MAX_PARTICLES * 3);
   private live = 0;
 
+  /** Smoke and fire are soft round puffs (camera-facing quads with a radial texture and a per-puff alpha), not cubes. */
+  private readonly smoke: THREE.InstancedMesh;
+  private readonly fire: THREE.InstancedMesh;
+  private readonly smokeAlpha = new Float32Array(MAX_PARTICLES);
+  private readonly fireAlpha = new Float32Array(MAX_PARTICLES);
+  private readonly camQ = new THREE.Quaternion();
+
   /** Bullet holes on the cover boxes: a ring buffer of little dark discs standing on the faces. */
   private readonly holes: THREE.InstancedMesh;
   private holeNext = 0;
@@ -85,6 +96,35 @@ export class Fx {
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
     this.group.add(this.mesh);
+
+    const pc = document.createElement('canvas');
+    pc.width = pc.height = 64;
+    const pg = pc.getContext('2d')!;
+    const rg2 = pg.createRadialGradient(32, 32, 2, 32, 32, 31);
+    rg2.addColorStop(0, 'rgba(255,255,255,.95)');
+    rg2.addColorStop(0.45, 'rgba(255,255,255,.55)');
+    rg2.addColorStop(1, 'rgba(255,255,255,0)');
+    pg.fillStyle = rg2;
+    pg.fillRect(0, 0, 64, 64);
+    const puffTex = new THREE.CanvasTexture(pc);
+    const makeSoft = (blending: THREE.Blending, alpha: Float32Array): THREE.InstancedMesh => {
+      const geo = new THREE.PlaneGeometry(1, 1);
+      geo.setAttribute('iAlpha', new THREE.InstancedBufferAttribute(alpha, 1));
+      const mat = new THREE.MeshBasicMaterial({ map: puffTex, transparent: true, depthWrite: false, blending, toneMapped: false });
+      mat.onBeforeCompile = (sh) => {
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float iAlpha;\nvarying float vAlpha;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvAlpha = iAlpha;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vAlpha;').replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a *= vAlpha;');
+      };
+      const m = new THREE.InstancedMesh(geo, mat, MAX_PARTICLES);
+      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 3), 3);
+      m.frustumCulled = false;
+      m.count = 0;
+      m.renderOrder = 4;
+      this.group.add(m);
+      return m;
+    };
+    this.smoke = makeSoft(THREE.NormalBlending, this.smokeAlpha);
+    this.fire = makeSoft(THREE.AdditiveBlending, this.fireAlpha);
 
     // persistent decal layer: a transparent canvas laid over the floor
     this.decalCanvas = document.createElement('canvas');
@@ -132,6 +172,11 @@ export class Fx {
     this.holes.count = 0;
     this.holes.renderOrder = 2;
     this.group.add(this.holes);
+  }
+
+  /** The camera the puffs face (set once by main; the iso camera never turns). */
+  faceCamera(q: THREE.Quaternion): void {
+    this.camQ.copy(q);
   }
 
   /** Remember the cover boxes of the arena in play (bullet holes stick to them). */
@@ -404,22 +449,53 @@ export class Fx {
     }
     const d = this.dummy;
     const m = this.mesh;
+    let nb = 0;
+    let ns = 0;
+    let nf = 0;
     for (let i = 0; i < this.live; i++) {
       const t = this.life[i]! / this.maxLife[i]!;
+      const kind = this.kind[i]!;
       let s = this.size[i]!;
-      if (this.kind[i] === Kind.Smoke) s *= 1 + (1 - t) * 2.2;
-      else if (this.kind[i] === Kind.Fire || this.kind[i] === Kind.Spark) s *= t;
-      else if (t < 0.25) s *= t * 4;
-      d.position.set(this.px[i]!, this.py[i]!, this.pz[i]!);
-      d.rotation.set(this.rot[i]! + this.spin[i]! * (1 - t), this.rot[i]! * 0.5, this.spin[i]! * (1 - t) * 0.5);
-      d.scale.setScalar(s);
-      d.updateMatrix();
-      m.setMatrixAt(i, d.matrix);
-      m.setColorAt(i, this.c.setRGB(this.col[i * 3]!, this.col[i * 3 + 1]!, this.col[i * 3 + 2]!));
+      if (kind === Kind.Smoke) {
+        // a puff swells and thins out
+        d.position.set(this.px[i]!, this.py[i]!, this.pz[i]!);
+        d.quaternion.copy(this.camQ);
+        d.rotateZ(this.rot[i]! + this.spin[i]! * (1 - t) * 0.15);
+        d.scale.setScalar(s * (2.2 + (1 - t) * 3.2));
+        d.updateMatrix();
+        this.smoke.setMatrixAt(ns, d.matrix);
+        this.smoke.setColorAt(ns, this.c.setRGB(this.col[i * 3]!, this.col[i * 3 + 1]!, this.col[i * 3 + 2]!));
+        this.smokeAlpha[ns++] = Math.min(1, t * 2.2) * 0.55;
+      } else if (kind === Kind.Fire) {
+        d.position.set(this.px[i]!, this.py[i]!, this.pz[i]!);
+        d.quaternion.copy(this.camQ);
+        d.rotateZ(this.rot[i]!);
+        d.scale.setScalar(s * (2.4 + t * 1.6));
+        d.updateMatrix();
+        this.fire.setMatrixAt(nf, d.matrix);
+        this.fire.setColorAt(nf, this.c.setRGB(this.col[i * 3]!, this.col[i * 3 + 1]!, this.col[i * 3 + 2]!));
+        this.fireAlpha[nf++] = Math.min(1, t * 1.8) * 0.8;
+      } else {
+        if (kind === Kind.Spark) s *= t;
+        else if (t < 0.25) s *= t * 4;
+        d.position.set(this.px[i]!, this.py[i]!, this.pz[i]!);
+        d.rotation.set(this.rot[i]! + this.spin[i]! * (1 - t), this.rot[i]! * 0.5, this.spin[i]! * (1 - t) * 0.5);
+        d.scale.setScalar(s);
+        d.updateMatrix();
+        m.setMatrixAt(nb, d.matrix);
+        m.setColorAt(nb++, this.c.setRGB(this.col[i * 3]!, this.col[i * 3 + 1]!, this.col[i * 3 + 2]!));
+      }
     }
-    m.count = this.live;
+    m.count = nb;
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    for (const [mesh, n, attr] of [[this.smoke, ns, this.smokeAlpha], [this.fire, nf, this.fireAlpha]] as const) {
+      mesh.count = n;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      (mesh.geometry.getAttribute('iAlpha') as THREE.InstancedBufferAttribute).needsUpdate = true;
+      void attr;
+    }
   }
 
   private remove(i: number): void {

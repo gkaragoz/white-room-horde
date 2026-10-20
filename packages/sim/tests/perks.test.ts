@@ -299,3 +299,59 @@ describe('power-ups', () => {
     expect(hashWorld(w)).not.toBe(h);
   });
 });
+
+describe('new enemy types', () => {
+  it('a bloater bursts into crawlers and hurts whoever is close', () => {
+    const w = quiet(20);
+    addPlayer(w, 0, 0, 0, 'ar');
+    const b = spawnEnemy(w, T('bloater'), 2, 0, false);
+    w.eCooldown[b] = 1e9;
+    w.eHp[b] = 1;
+    const hp0 = w.pHp[0]!;
+    for (let i = 0; i < 20 && w.kills === 0; i++) step(w, [FIRE]);
+    expect(w.kills).toBe(1);
+    let crawlers = 0;
+    for (let i = 0; i < w.eActive.length; i++) if (w.eActive[i] && w.eType[i] === T('crawler')) crawlers++;
+    expect(crawlers).toBe(3);
+    expect(w.pHp[0]!).toBeLessThan(hp0);
+  });
+
+  it('a screamer makes the enemies around it faster', () => {
+    const dist = (screamer: boolean): number => {
+      const w = quiet(21);
+      addPlayer(w, 0, -15, 0);
+      const g = spawnEnemy(w, T('grunt'), 5, 0, false);
+      if (screamer) {
+        const s = spawnEnemy(w, T('screamer'), 6, 1, false);
+        w.eCooldown[s] = 1e9;
+      }
+      const x0 = w.eX[g]!;
+      for (let i = 0; i < 30; i++) step(w, [NONE]);
+      return Math.abs(w.eX[g]! - x0);
+    };
+    expect(dist(true)).toBeGreaterThan(dist(false) * 1.2);
+  });
+
+  it('a leaper jumps: it covers the same ground much faster than a runner would', () => {
+    const w = quiet(22);
+    addPlayer(w, 0, -10, 0);
+    const l = spawnEnemy(w, T('leaper'), 0, 0, false);
+    let fastest = 0;
+    let px = w.eX[l]!;
+    for (let i = 0; i < 100; i++) {
+      step(w, [NONE]);
+      fastest = Math.max(fastest, Math.abs(w.eX[l]! - px));
+      px = w.eX[l]!;
+    }
+    expect(fastest).toBeGreaterThan((BALANCE.enemies.leaper.speed / 30) * 2);
+  });
+
+  it('the new types are unlocked later in the game', () => {
+    expect(BALANCE.waves.unlock.crawler).toBeGreaterThanOrEqual(4);
+    expect(BALANCE.waves.unlock.screamer).toBeGreaterThan(BALANCE.waves.unlock.leaper);
+    for (const id of ['crawler', 'leaper', 'bloater', 'screamer'] as const) {
+      expect(BALANCE.enemies[id].hp).toBeGreaterThan(0);
+      expect(BALANCE.progression.xp[id]).toBeGreaterThan(0);
+    }
+  });
+});

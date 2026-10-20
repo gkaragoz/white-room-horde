@@ -1,0 +1,43 @@
+{
+ "type": "crawler",
+ "scale": 1.1,
+ "vertexCount": 567,
+ "indexCount": 1854,
+ "frames": 142,
+ "clips": [
+  {
+   "id": "z_crawl",
+   "start": 0,
+   "frames": 40,
+   "loop": true,
+   "duration": 5.1667
+  },
+  {
+   "id": "z_headbutt",
+   "start": 40,
+   "frames": 32,
+   "loop": false,
+   "duration": 2.6333
+  },
+  {
+   "id": "z_death_back",
+   "start": 72,
+   "frames": 36,
+   "loop": false,
+   "duration": 3.0
+  },
+  {
+   "id": "z_scream",
+   "start": 108,
+   "frames": 34,
+   "loop": false,
+   "duration": 2.8333
+  }
+ ],
+ "extent": [
+  0.942,
+  1.536,
+  1.202
+ ],
+ "layout": "geo.bin = positions f32[3n], uv f32[2n], color f32[3n], indices u16[indexCount]"
+}

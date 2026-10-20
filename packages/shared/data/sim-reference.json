@@ -26,7 +26,7 @@
       "map": 1,
       "difficulty": 2,
       "wave": 6,
-      "hash": 1631490003
+      "hash": 248860089
     },
     {
       "seed": 12,
@@ -35,7 +35,7 @@
       "map": 2,
       "difficulty": 0,
       "wave": 11,
-      "hash": 2769037243
+      "hash": 239573035
     },
     {
       "seed": 13,
@@ -44,7 +44,7 @@
       "map": 3,
       "difficulty": 1,
       "wave": 9,
-      "hash": 2939412989
+      "hash": 3970469917
     },
     {
       "seed": 14,
@@ -53,7 +53,7 @@
       "map": 0,
       "difficulty": 2,
       "wave": 4,
-      "hash": 2950922439
+      "hash": 4072906016
     }
   ]
 }

@@ -72,6 +72,8 @@ fx.powerFor = (slot) => {
   return st.damage + st.rate * 0.7;
 };
 stage.scene.add(fx.group);
+stage.camera.updateMatrixWorld(true);
+fx.faceCamera(stage.camera.quaternion);
 const crowd = await Crowd.create(150, backend);
 stage.scene.add(crowd.group);
 const ragdolls = await RagdollPool.create(40);
@@ -83,8 +85,8 @@ stage.scene.add(pickups.group);
 const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.17, 0.17, 1.0), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), MAX_BULLETS);
 // a soft additive halo around every round so it reads at any distance and glows at night
 const bulletGlow = new THREE.InstancedMesh(
-  new THREE.BoxGeometry(0.5, 0.5, 1.6),
-  new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
+  new THREE.CapsuleGeometry(0.2, 1.0, 3, 10).rotateX(Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
   MAX_BULLETS,
 );
 bulletGlow.frustumCulled = false;
@@ -107,7 +109,7 @@ const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
   gl: { color: new THREE.Color('#9fe870'), w: 3.2, l: 1.4 },
 };
 const tracerScale = new THREE.Vector3();
-const GLOW_SCALE = new THREE.Vector3(2.6, 2.6, 1.5);
+const GLOW_SCALE = new THREE.Vector3(2.4, 2.4, 1.3);
 const tracerColor = new THREE.Color();
 const HOT = new THREE.Color('#ff3a2a');
 const COOL = new THREE.Color('#35d6ff');
@@ -741,6 +743,7 @@ function frame(nowMs: number): void {
     const fx0 = prevX[target]! + (curX[target]! - prevX[target]!) * alpha;
     const fy0 = prevY[target]! + (curY[target]! - prevY[target]!) * alpha;
     stage.follow(fx0, -fy0, fx.shake);
+    fx.faceCamera(stage.camera.quaternion);
     // time of day, real-time lights and the flashlight of the local player
     stage.nightTarget = nightFor(w);
     stage.update(dt, fx0, -fy0);

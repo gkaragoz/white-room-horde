@@ -36,6 +36,10 @@ TYPES = {
     "shielder": ("spec_shielder", 1.5, 1.5, ["z_walk_creep", "z_punch", "z_death_back"]),
     "spawner": ("spec_spawner", 1.5, 1.5, ["z_walk_creep", "z_scream", "z_death_back"]),
 }
+TYPES["crawler"] = ("spec_crawler", 1.1, 1.5, ["z_crawl", "z_headbutt", "z_death_back", "z_scream"])
+TYPES["leaper"] = ("spec_leaper", 1.35, 1.5, ["z_run", "z_kick", "z_death_fwd", "z_scream"])
+TYPES["bloater"] = ("spec_bloater", 1.9, 1.5, ["z_walk_creep", "z_punch", "z_death_back", "z_scream"])
+TYPES["screamer"] = ("spec_screamer", 1.3, 1.5, ["z_walk", "z_scream", "z_death_back"])
 # bosses: one look per boss wave (the client cycles through them)
 BOSS = ["z_walk", "z_attack_overhead", "z_death_back", "z_scream"]
 TYPES["boss_dev_grunt"] = ("spec_dev_grunt", 3.0, 1.7, BOSS)
