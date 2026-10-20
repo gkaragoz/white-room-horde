@@ -1,8 +1,9 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, WEAPON_IDS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
 import { ELITE, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
 import { dropLoot } from './pickups';
+import { addTelegraph, aimAt } from './hazards';
 import { cellIndex } from './flowfield';
 import { applyObstacles, out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { SH_H, SH_W } from './spatial';
@@ -57,7 +58,11 @@ function rad(w: World, i: number): number {
   return w.eBoss[i] ? r * BALANCE.progression.boss.radiusMul : r;
 }
 
-/** Recompute the wave multipliers (repeated multiplication, no pow) and restart the wave clock. */
+/** Past the first floors enemies hit harder (and are a little tougher) on top of the base growth, so a strong squad keeps being tested. */
+function lateFloors(w: World): number {
+  return w.wave > BALANCE.late.start ? w.wave - BALANCE.late.start : 0;
+}
+
 /** How many enemies the current wave brings in total (fixed when the wave starts). */
 function waveTotal(w: World): number {
   const cfg = BALANCE.waves;
@@ -102,10 +107,11 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     if (w.eActive[i]) continue;
     let players = 0;
     for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) players++;
-    const hp = HP[type]! * w.hpMul * BALANCE.difficulty.hp[w.difficulty]! * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
+    const hp = HP[type]! * w.hpMul * (1 + lateFloors(w) * BALANCE.late.hpPerFloor) * BALANCE.difficulty.hp[w.difficulty]! * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
     w.eActive[i] = 1;
     w.eBoss[i] = 0;
     w.eMod[i] = 0;
+    w.eFrost[i] = 0;
     w.eType[i] = type;
     w.eState[i] = withScream ? EnemyState.Spawn : EnemyState.Move;
     w.eStateTick[i] = w.tick;
@@ -154,43 +160,148 @@ function summonRing(w: World, x: number, y: number, type: number, n: number): vo
   }
 }
 
+/** A random living player (-1 when nobody is up), for aimed boss attacks. */
+function pickPlayer(w: World): number {
+  let n = 0;
+  for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pHp[s]! > 0 && w.pState[s] === PlayerState.Alive) n++;
+  if (n === 0) return -1;
+  let k = w.rng.int(n);
+  for (let s = 0; s < MAX_PLAYERS; s++) {
+    if (!w.pActive[s] || w.pHp[s]! <= 0 || w.pState[s] !== PlayerState.Alive) continue;
+    if (k-- === 0) return s;
+  }
+  return -1;
+}
+
+/** Meteors: circles that land on the players one after the other (each charges, then hits whoever still stands in it). */
+function meteorRain(w: World, count: number): void {
+  const m = BALANCE.bossAttacks.meteors;
+  for (let k = 0; k < count; k++) {
+    const s = pickPlayer(w);
+    if (s < 0) return;
+    const x = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 3.5, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
+    const y = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 3.5, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
+    addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, m.radius, 0, m.delay + k * m.stagger, m.damage);
+  }
+}
+
+/** A line of damage from the boss through a player, all the way across the arena. */
+function sweepAt(w: World, x: number, y: number): void {
+  const sw = BALANCE.bossAttacks.sweep;
+  const s = pickPlayer(w);
+  if (s < 0) return;
+  const a = aimAt(x, y, w.pX[s]!, w.pY[s]!);
+  const half = 32;
+  addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + cos(a) * half, y + sin(a) * half, a, sw.width, half, sw.delay, sw.damage);
+}
+
+/** The purge: a big part of the arena slowly paints red, then everybody still in it loses half their health (all of it on later floors). */
+function purge(w: World, x: number, y: number): void {
+  const p = BALANCE.bossAttacks.purge;
+  const effect = w.wave >= p.killFloor ? TeleEffect.Kill : TeleEffect.Half;
+  const W = ARENA_HALF_W * 2;
+  const H = ARENA_HALF_H * 2;
+  const kind = w.rng.int(4);
+  if (kind === 0) {
+    // radial: a disc around the boss covering the same share of the floor
+    const r = sqrt((p.areaFraction * W * H) / 3.141592653589793);
+    addTelegraph(w, TeleShape.Circle, effect, x, y, 0, r, 0, p.delay, 0);
+  } else if (kind === 1 || kind === 2) {
+    // a vertical slab from the left or the right edge
+    const half = (p.areaFraction * W) / 2;
+    addTelegraph(w, TeleShape.Rect, effect, (kind === 1 ? -1 : 1) * (ARENA_HALF_W - half), 0, 0, ARENA_HALF_H, half, p.delay, 0);
+  } else {
+    // a horizontal slab from the top or the bottom edge
+    const half = (p.areaFraction * H) / 2;
+    addTelegraph(w, TeleShape.Rect, effect, 0, (w.rng.int(2) ? 1 : -1) * (ARENA_HALF_H - half), 0, half, ARENA_HALF_W, p.delay, 0);
+  }
+}
+
 /**
- * The four bosses fight differently: the brute charges, the king summons grunts, the queen spits out spitters, the
- * swarm leader speeds up its horde (see collectAuras) and calls runners.
+ * The six bosses fight differently: the brute charges and slams, the king summons grunts and calls meteors, the queen
+ * spits out spitters and leaves acid, the swarm leader speeds up its horde and sweeps a line, the meteor lord rains
+ * fire, the purger paints most of the arena red.
  */
 function bossAbilities(w: World, i: number, x: number, y: number, dist: number): void {
   const cfg = BALANCE.progression.boss;
+  const ba = BALANCE.bossAttacks;
   const variant = w.eBoss[i]!;
   const t = w.tick - w.waveTick;
   if (t <= 0) return;
+  const every = (sec: number, offset = 0): boolean => (t + offset) % Math.round(sec * TICK_RATE) === 0;
   const callState = (): void => {
     w.eState[i] = EnemyState.Attack;
     w.eStateTick[i] = w.tick;
   };
+  const slam = (): void => {
+    addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, ba.slam.radius, 0, ba.slam.delay, ba.slam.damage);
+    w.events.push({ type: 'bossAbility', kind: 'slam', x, y });
+    callState();
+  };
+  const meteors = (n: number): void => {
+    meteorRain(w, n);
+    w.events.push({ type: 'bossAbility', kind: 'meteor', x, y });
+    callState();
+  };
   if (variant === 1) {
-    if (t % (cfg.chargeSeconds * TICK_RATE) === 0 && dist > 4 && w.eAux[i]! <= 0) {
+    if (every(cfg.chargeSeconds) && dist > 4 && w.eAux[i]! <= 0) {
       w.eAux[i] = cfg.chargeTicks;
       w.events.push({ type: 'bossAbility', kind: 'charge', x, y });
       callState();
     }
+    if (every(ba.slam.every, 100) && dist < 11) slam();
   } else if (variant === 2) {
-    if (t % (cfg.summonSeconds * TICK_RATE) === 0) {
+    if (every(cfg.summonSeconds)) {
       summonRing(w, x, y, T_GRUNT, cfg.summonCount);
       w.events.push({ type: 'bossAbility', kind: 'summon', x, y });
       callState();
     }
+    if (every(ba.meteors.every + 2, 140)) meteors(ba.meteors.count - 1);
   } else if (variant === 3) {
-    if (t % (cfg.queenSummonSeconds * TICK_RATE) === 0) {
+    if (every(cfg.queenSummonSeconds)) {
       summonRing(w, x, y, T_SPITTER, cfg.queenCount);
       w.events.push({ type: 'bossAbility', kind: 'summon', x, y });
       callState();
     }
+    if (every(ba.pools.every, 120)) {
+      for (let k = 0; k < ba.pools.count; k++) {
+        const s = pickPlayer(w);
+        if (s < 0) break;
+        const px = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 2.5, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
+        const py = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 2.5, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Acid, px, py, 0, ba.pools.radius, 0, ba.pools.delay + k * 0.2, ba.pools.radius);
+      }
+      w.events.push({ type: 'bossAbility', kind: 'acid', x, y });
+      callState();
+    }
   } else if (variant === 4) {
-    if (t % (cfg.summonSeconds * TICK_RATE) === 0) {
+    if (every(cfg.summonSeconds)) {
       summonRing(w, x, y, T_RUNNER, cfg.summonCount);
       w.events.push({ type: 'bossAbility', kind: 'aura', x, y });
       callState();
     }
+    if (every(ba.sweep.every, 160)) {
+      sweepAt(w, x, y);
+      w.events.push({ type: 'bossAbility', kind: 'sweep', x, y });
+      callState();
+    }
+  } else if (variant === 5) {
+    if (every(ba.meteors.every - 2, 90)) meteors(ba.meteors.count + 3);
+    if (every(ba.slam.every + 6, 200) && dist < 11) slam();
+  } else if (variant === 6) {
+    // the first purge ten seconds in, then on its own cycle
+    const period = Math.round(ba.purge.every * TICK_RATE);
+    if (t >= 300 && (t - 300) % period === 0) {
+      purge(w, x, y);
+      w.events.push({ type: 'bossAbility', kind: 'purge', x, y });
+      callState();
+    }
+    if (every(ba.sweep.every + 2, 170)) {
+      sweepAt(w, x, y);
+      w.events.push({ type: 'bossAbility', kind: 'sweep', x, y });
+      callState();
+    }
+    if (every(cfg.summonSeconds * 2, 60)) summonRing(w, x, y, T_RUNNER, 4);
   }
 }
 
@@ -198,7 +309,7 @@ export function spawnBoss(w: World): number {
   edgePoint(w);
   const i = spawnEnemy(w, T_TANK, spawnX, spawnY);
   if (i >= 0) {
-    w.eBoss[i] = 1 + ((((w.wave / BALANCE.progression.boss.everyWaves) | 0) - 1 + 4) % 4);
+    w.eBoss[i] = 1 + ((((w.wave / BALANCE.progression.boss.everyWaves) | 0) - 1 + 6) % 6);
     w.eHp[i] = w.eHp[i]! * BALANCE.progression.boss.hpMul;
   }
   return i;
@@ -356,15 +467,19 @@ function runWaves(w: World, playerCount: number): void {
     w.misc[MISC.Remaining] = remaining;
   } else if (total > 0 && w.enemyCount === 0) {
     // everybody is dead: the floor is cleared
+    // the last blow gets its finisher (everybody frozen in place, the camera zooms in on it) before the countdown starts
+    const cine = Math.round(fl.finisherSeconds * TICK_RATE);
     w.misc[MISC.Phase] = FloorPhase.Cleared;
-    w.misc[MISC.PhaseEnd] = w.tick + Math.round(fl.clearedSeconds * TICK_RATE);
+    w.misc[MISC.Cine] = w.tick + cine;
+    w.misc[MISC.PhaseEnd] = w.tick + cine + Math.round(fl.clearedSeconds * TICK_RATE);
+    w.events.push({ type: 'finalKill', by: w.misc[MISC.Killer]!, x: w.misc[MISC.KillX]!, y: w.misc[MISC.KillY]! });
     w.events.push({ type: 'waveCleared', wave: w.wave });
   }
 }
 
 export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number, attacker = -1): boolean {
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
-  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * w.modArmor[slot]! * w.pModArmor[slot]!);
+  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * (1 + lateFloors(w) * BALANCE.late.damagePerFloor) * w.modArmor[slot]! * w.pModArmor[slot]!);
   const thorns = perk(w, slot, PERK.Thorns);
   if (thorns > 0 && attacker >= 0 && w.eActive[attacker]) {
     const prev = killer;
@@ -464,6 +579,12 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
       if (dx * dx + dy * dy <= r * r) hurtPlayer(w, s, 18, w.pX[s]!, w.pY[s]!);
     }
   }
+  // the blow that empties the floor is remembered for the finisher
+  if (w.enemyCount === 0 && w.misc[MISC.Remaining] === 0 && w.misc[MISC.Total]! > 0) {
+    w.misc[MISC.Killer] = killer;
+    w.misc[MISC.KillX] = ex;
+    w.misc[MISC.KillY] = ey;
+  }
 }
 
 /** Apply bullet damage; returns true when the enemy died. */
@@ -521,8 +642,12 @@ export function updateEnemies(w: World): void {
   refreshField(w);
   if (playerCount === 0) return;
   if (w.misc[0]! > 0) {
-    w.misc[0] = w.misc[0]! - TICK_DT; // frozen: everybody stands still
-    return;
+    // the freeze pickup's timer (the frozen enemies carry their own ticks in eFrost)
+    w.misc[0] = w.misc[0]! - TICK_DT;
+    if (w.misc[0]! <= 0) {
+      w.misc[0] = 0;
+      w.events.push({ type: 'thaw' });
+    }
   }
   const g = w.grid;
   const field = w.field;
@@ -530,6 +655,11 @@ export function updateEnemies(w: World): void {
 
   for (let i = 0; i < MAX_ENEMIES; i++) {
     if (!w.eActive[i]) continue;
+    if (w.eFrost[i]! > 0) {
+      w.eFrost[i] = w.eFrost[i]! - 1; // frozen solid: no step, no attack, no clock
+      w.eStateTick[i] = w.eStateTick[i]! + 1;
+      continue;
+    }
     const type = w.eType[i]!;
     let x = w.eX[i]!;
     let y = w.eY[i]!;
@@ -566,9 +696,10 @@ export function updateEnemies(w: World): void {
 
     let mx = 0;
     let my = 0;
+    if (boss && state !== EnemyState.Spawn) bossAbilities(w, i, x, y, dist);
+    state = w.eState[i]!;
     if (state === EnemyState.Move) {
       let wantMove = true;
-      if (boss) bossAbilities(w, i, x, y, dist);
       if (type === T_SPITTER) {
         if (dist < SPIT_HOLD) wantMove = false;
         if (dist <= SPIT_RANGE && w.eCooldown[i]! <= 0 && !segmentBlocked(x, y, w.pX[best]!, w.pY[best]!)) {

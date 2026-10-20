@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, PERKS, WEAPON_IDS } from '@wrh/shared';
+import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_TELE, MAX_ZONES, PERKS, WEAPON_IDS } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -26,7 +26,7 @@ export type SimEvent =
   | { type: 'reloadStart'; slot: number }
   | { type: 'reloadDone'; slot: number }
   | { type: 'dash'; slot: number; x: number; y: number }
-  | { type: 'bossAbility'; kind: 'charge' | 'summon' | 'aura'; x: number; y: number }
+  | { type: 'bossAbility'; kind: 'charge' | 'summon' | 'aura' | 'slam' | 'meteor' | 'acid' | 'sweep' | 'purge'; x: number; y: number }
   | { type: 'playerDown'; slot: number; x: number; y: number }
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
@@ -38,6 +38,13 @@ export type SimEvent =
   | { type: 'levelUp'; slot: number; level: number }
   | { type: 'cardOffer'; slot: number; cards: number[] }
   | { type: 'cardPicked'; card: number; by: number }
+  | { type: 'thaw' }
+  /** The last enemy of a floor fell: `by` is the character who landed the blow (-1 none). The floor-clear countdown starts after the finisher. */
+  | { type: 'finalKill'; by: number; x: number; y: number }
+  /** A telegraphed attack starts charging (shape and effect: see TeleShape, TeleEffect) / lands. */
+  | { type: 'telegraph'; shape: number; x: number; y: number }
+  | { type: 'teleHit'; shape: number; effect: number; x: number; y: number; radius: number }
+  | { type: 'launch'; slot: number; x: number; y: number }
   | { type: 'gameOver'; wave: number; kills: number };
 
 /** Struct-of-arrays world (docs/DESIGN.md section 15): fixed-size pools, ids are slot indices. */
@@ -135,6 +142,32 @@ export interface World {
   eCooldown: Float64Array;
   /** Elite modifier of an enemy (0 none; see ELITE in features.ts). */
   eMod: Uint8Array;
+  /** Ticks an enemy stays frozen (stands still, no attacks). */
+  eFrost: Int32Array;
+  /** Per player: stun ticks (no steering, no shooting), the push velocity from a blow and ticks spent in the air (the toss). */
+  pStun: Int32Array;
+  pKnockX: Float64Array;
+  pKnockY: Float64Array;
+  pAir: Int32Array;
+  /** Lingering ground effects (acid, fire): kind, centre, radius, ticks left. */
+  zActive: Uint8Array;
+  zKind: Uint8Array;
+  zX: Float64Array;
+  zY: Float64Array;
+  zR: Float64Array;
+  zLeft: Int32Array;
+  /** Telegraphed ground attacks that are charging: shape, effect, geometry (centre, angle, half width / radius, length), amount, ticks left of ticks total. */
+  tActive: Uint8Array;
+  tShape: Uint8Array;
+  tEffect: Uint8Array;
+  tX: Float64Array;
+  tY: Float64Array;
+  tA: Float64Array;
+  tW: Float64Array;
+  tL: Float64Array;
+  tAmt: Float64Array;
+  tLeft: Int32Array;
+  tTotal: Int32Array;
   // explosive barrels
   brActive: Uint8Array;
   brX: Float64Array;
@@ -263,12 +296,34 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     eAux: new Float64Array(MAX_ENEMIES),
     eCooldown: new Float64Array(MAX_ENEMIES),
     eMod: new Uint8Array(MAX_ENEMIES),
+    eFrost: new Int32Array(MAX_ENEMIES),
+    pStun: new Int32Array(MAX_PLAYERS),
+    pKnockX: new Float64Array(MAX_PLAYERS),
+    pKnockY: new Float64Array(MAX_PLAYERS),
+    pAir: new Int32Array(MAX_PLAYERS),
+    zActive: new Uint8Array(MAX_ZONES),
+    zKind: new Uint8Array(MAX_ZONES),
+    zX: new Float64Array(MAX_ZONES),
+    zY: new Float64Array(MAX_ZONES),
+    zR: new Float64Array(MAX_ZONES),
+    zLeft: new Int32Array(MAX_ZONES),
+    tActive: new Uint8Array(MAX_TELE),
+    tShape: new Uint8Array(MAX_TELE),
+    tEffect: new Uint8Array(MAX_TELE),
+    tX: new Float64Array(MAX_TELE),
+    tY: new Float64Array(MAX_TELE),
+    tA: new Float64Array(MAX_TELE),
+    tW: new Float64Array(MAX_TELE),
+    tL: new Float64Array(MAX_TELE),
+    tAmt: new Float64Array(MAX_TELE),
+    tLeft: new Int32Array(MAX_TELE),
+    tTotal: new Int32Array(MAX_TELE),
     brActive: new Uint8Array(MAX_BARRELS),
     brX: new Float64Array(MAX_BARRELS),
     brY: new Float64Array(MAX_BARRELS),
     brHp: new Float64Array(MAX_BARRELS),
     brT: new Float64Array(MAX_BARRELS),
-    misc: new Float64Array(8),
+    misc: new Float64Array(12),
     gActive: new Uint8Array(MAX_GRENADES),
     gX: new Float64Array(MAX_GRENADES),
     gY: new Float64Array(MAX_GRENADES),

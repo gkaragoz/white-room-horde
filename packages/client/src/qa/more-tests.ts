@@ -1,12 +1,14 @@
 import * as THREE from 'three';
-import { Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
-import { addPlayer, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
+import { Buttons, TeleEffect, TeleShape, ZoneKind, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
+import { addPlayer, addTelegraph, addZone, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
 import { AimSolver, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
 import { renderControlsSheet, renderSettingsPanel } from '../settingsPanel';
 import { Fx } from '../render/fx';
+import { GroundFx } from '../render/groundFx';
+import { Cinematic } from '../render/cinematic';
 import { AmmoRing } from '../render/ammoRing';
 import { RagdollPool } from '../render/ragdoll';
 import { PowerView, strengthOf } from '../render/power';
@@ -905,7 +907,7 @@ export const moreTests: QaTest[] = [
       addPlayer(w, 0, 6.8, -2.3, 'pistol');
       const e = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 16, -2.3, false);
       w.eCooldown[e] = 1e9;
-      w.misc[0] = 1000; // frozen: it stays where it is
+      w.eFrost[e] = 100000; // frozen: it stays where it is
       const plain = pickTarget(w, 0, null);
       if (!plain) problems.push('the setup is wrong: the target is not visible from the middle of the player');
       const aimed = pickTarget(w, 0, null, (x) => solver.shotClear(w, 0, x, 1));
@@ -918,6 +920,7 @@ export const moreTests: QaTest[] = [
       // a second target in the open is chosen instead of the hidden one
       const open = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 6.8, 9, false);
       w.eCooldown[open] = 1e9;
+      w.eFrost[open] = 100000;
       const next = pickTarget(w, 0, null, (x) => solver.shotClear(w, 0, x, 1));
       if (!next || next.id !== open) problems.push('the visible enemy was not chosen over the hidden one');
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'visible targets preferred, nearest hidden one as the fallback' };
@@ -1148,6 +1151,107 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'dps, kills and the hover text' };
+    },
+  },
+  {
+    id: 'ground.telegraph',
+    title: 'Telegraphed attacks paint their area (circle, rectangle) and spread the fill as the blow nears; acid and fire puddles show',
+    async run(ctx) {
+      const problems: string[] = [];
+      const w = createWorld(5);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, 0);
+      const ground = new GroundFx();
+      ctx.stage.scene.add(ground.group);
+      const reddish = (px: Uint8Array): number => {
+        let n = 0;
+        for (let i = 0; i < px.length; i += 4) if (px[i]! > px[i + 1]! + 45 && px[i]! > px[i + 2]! + 35) n++;
+        return n;
+      };
+      const greenish = (px: Uint8Array): number => {
+        let n = 0;
+        for (let i = 0; i < px.length; i += 4) if (px[i + 1]! > px[i]! + 25 && px[i + 1]! > px[i + 2]! + 60) n++;
+        return n;
+      };
+      const shot = (): Uint8Array => {
+        ground.update(w, 1, null, 0.016);
+        ctx.stage.follow(0, 0);
+        ctx.stage.render();
+        return grab(ctx);
+      };
+      try {
+        const empty = shot();
+        // a circle of radius 6 charging for 2 seconds: early and late
+        const t = addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, 0, 0, 0, 6, 0, 2, 20);
+        w.tLeft[t] = Math.round(w.tTotal[t]! * 0.85);
+        const early = shot();
+        w.tLeft[t] = Math.round(w.tTotal[t]! * 0.1);
+        const late = shot();
+        const r0 = reddish(empty);
+        const rE = reddish(early);
+        const rL = reddish(late);
+        if (rE < r0 + 400) problems.push(`early circle paints too little (${rE - r0} red px)`);
+        if (rL < rE * 1.3) problems.push(`the fill does not spread (${rE} -> ${rL} red px)`);
+        ground.colorblind = true;
+        const blind = shot();
+        if (reddish(blind) > rL * 0.5) problems.push('colour-blind mode still paints red');
+        if (diffCount(blind, late) < 2000) problems.push('colour-blind mode looks the same as red');
+        ground.colorblind = false;
+        w.tActive[t] = 0;
+        // a rectangle along the x axis, 10 long either way and 2 wide
+        const q = addTelegraph(w, TeleShape.Rect, TeleEffect.Kill, 0, 0, 0, 2, 10, 2, 0);
+        w.tLeft[q] = Math.round(w.tTotal[q]! * 0.2);
+        const rect = shot();
+        if (reddish(rect) < r0 + 300 && diffCount(rect, empty) < 1500) problems.push('the rectangle is not drawn');
+        w.tActive[q] = 0;
+        // acid and fire puddles
+        const baseGreen = greenish(shot());
+        addZone(w, -2, 0, 3, 5, ZoneKind.Acid);
+        const acid = shot();
+        if (greenish(acid) < baseGreen + 300) problems.push('the acid puddle is not green enough to see');
+        w.zActive[0] = 0;
+        addZone(w, 2, 0, 3, 5, ZoneKind.Fire);
+        const fire = shot();
+        if (reddish(fire) < r0 + 150) problems.push('the fire puddle is not drawn');
+        w.zActive[0] = 0;
+        const gone = shot();
+        if (diffCount(gone, empty) > 300) problems.push('effects leave something behind');
+      } finally {
+        ctx.stage.scene.remove(ground.group);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'circle, rectangle, spreading fill, colour-blind palette, acid and fire' };
+    },
+  },
+  {
+    id: 'cine.finisher',
+    title: 'The finisher pushes the camera in and slows effects, then returns to the normal view exactly',
+    async run() {
+      const problems: string[] = [];
+      const c = new Cinematic();
+      if (c.update(0, 2).zoom !== 1) problems.push('idle cinematic changes the view');
+      c.start(10, 2.5, 3, 4, 1);
+      let peakZoom = 1;
+      let minScale = 1;
+      let outSounds = 0;
+      let last = null as null | ReturnType<Cinematic['update']>;
+      for (let t = 10; t < 13; t += 1 / 60) {
+        last = c.update(t, 1.8);
+        peakZoom = Math.max(peakZoom, last.zoom);
+        minScale = Math.min(minScale, c.timeScale());
+        if (c.takeOutSound(t)) outSounds++;
+      }
+      if (peakZoom < 1.75) problems.push(`peak zoom ${peakZoom.toFixed(2)}, expected about 1.8`);
+      if (minScale > 0.3) problems.push(`slow motion only reaches ${minScale.toFixed(2)}`);
+      if (outSounds !== 1) problems.push(`${outSounds} pull-back sounds`);
+      if (!last || last.zoom !== 1 || last.focus !== 0 || c.active) problems.push('the view does not return to normal');
+      if (c.timeScale() !== 1) problems.push('effects stay slow after the finisher');
+      // paused: the clock stands still
+      c.start(20, 2.5, 0, 0, -1);
+      c.update(20.5, 1.8);
+      c.hold(5);
+      if (!c.active || c.update(25.6, 1.8).zoom <= 1) problems.push('a pause lost the finisher');
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `peak zoom ${peakZoom.toFixed(2)}, slowest ${minScale.toFixed(2)}` };
     },
   },
 ];

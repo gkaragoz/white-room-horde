@@ -7,6 +7,15 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**New mechanics (rules change: update the server and reload the page)**
+- Bosses fight with telegraphed area attacks: a red outline appears on the ground, a hatched fill spreads over it and the blow lands when it is full (a dash through it dodges it). Slams around the boss, meteor rain on the squad, acid pools that stay, a sweeping line across the arena and the purge: most of the arena (about 60%, as a disc around the boss or as a slab from one side) slowly paints red, and everybody still standing in it loses half their health (all of it from floor 35). Two new bosses (the meteor lord and the purger) join the cycle, which now has six.
+- Players can be thrown: knocked-back characters fly away and are stunned (no steering, no shooting, no dash) for a moment. The client prediction follows it exactly.
+- Frozen enemies are frozen one by one now (they stand still, no attacks) and thaw with a sound; acid and fire puddles burn whoever stands in them.
+- The last enemy of a floor ends with a finisher: the camera pushes in between the character that landed the blow and the enemy, effects slow down, bars and a vignette frame it with the name of whoever struck, then it pulls back out and the floor-clear countdown starts after it (everybody holds still meanwhile, so it is the same on every machine).
+- Past floor 15 enemies hit harder (6% per floor) and are tougher (2.5% per floor), so a strong squad keeps being tested. A headless bot squad test keeps the balance honest.
+- New sounds: telegraph warnings, slam, purge, acid splash, throw.
+- Concept renders of vertical arenas (ramps, bridges, tunnels) in tools/blender/out/arena_previews (not in the game yet).
+
 ## v0.11.0 (2026-10-20)
 
 **Feel and fixes (rules change: update the server and reload the page)**

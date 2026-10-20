@@ -21,6 +21,7 @@ import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, spawnBoss, spawnEnemy
 import { out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { Crc32 } from './hash';
 import { updatePickups } from './pickups';
+import { KNOCK_DECAY, updateHazards } from './hazards';
 import { updateCards } from './progression';
 import { ensureUsable, equipLoadout, selectByRank, selectNext } from './loadout';
 import { applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, updateBarrels, updatePlayerPerks } from './features';
@@ -78,6 +79,10 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pCardTimer[slot] = 0;
   w.pCardLock[slot] = 0;
   w.pCardPrev[slot] = 0;
+  w.pStun[slot] = 0;
+  w.pKnockX[slot] = 0;
+  w.pKnockY[slot] = 0;
+  w.pAir[slot] = 0;
   for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = -1;
   w.pCards.fill(0, slot * CARD_IDS.length, (slot + 1) * CARD_IDS.length);
   w.modDamage[slot] = w.modRate[slot] = w.modSpeed[slot] = w.modRevive[slot] = w.modMagnet[slot] = w.modXp[slot] = 1;
@@ -150,7 +155,8 @@ function spawnBullet(w: World, owner: number, ox: number, oy: number, x: number,
   }
 }
 
-function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDash: boolean): number {
+function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDashIn: boolean): number {
+  let canDash = canDashIn;
   let mx = inp.moveX / 127;
   let my = inp.moveY / 127;
   const len = sqrt(mx * mx + my * my);
@@ -160,6 +166,15 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
   }
   const angle = inp.aim * AIM_TO_RAD;
   const dc = BALANCE.dash;
+  // stunned (thrown, slammed): no steering, no dash, no shooting until it wears off
+  const stunned = w.pStun[s]! > 0;
+  if (stunned) {
+    w.pStun[s] = w.pStun[s]! - 1;
+    mx = 0;
+    my = 0;
+    canDash = false;
+  }
+  if (w.pAir[s]! > 0) w.pAir[s] = w.pAir[s]! - 1;
   if (canDash) {
     if (w.pDashCd[s]! > 0) w.pDashCd[s] = w.pDashCd[s]! - TICK_DT;
     if ((inp.buttons & Buttons.Dash) !== 0 && w.pDashCd[s]! <= 0 && w.pDash[s]! === 0) {
@@ -185,11 +200,13 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
     w.pDash[s] = w.pDash[s]! - 1;
     w.pMoving[s] = 1;
   } else {
-    w.pMoving[s] = len > 0.05 ? 1 : 0;
+    w.pMoving[s] = !stunned && len > 0.05 ? 1 : 0;
   }
   const r = BALANCE.player.radius;
-  w.pX[s] = clamp(w.pX[s]! + mx * speed * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
-  w.pY[s] = clamp(w.pY[s]! + my * speed * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+  w.pX[s] = clamp(w.pX[s]! + (mx * speed + w.pKnockX[s]!) * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
+  w.pY[s] = clamp(w.pY[s]! + (my * speed + w.pKnockY[s]!) * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+  w.pKnockX[s] = Math.abs(w.pKnockX[s]!) < 0.05 ? 0 : w.pKnockX[s]! * KNOCK_DECAY;
+  w.pKnockY[s] = Math.abs(w.pKnockY[s]!) < 0.05 ? 0 : w.pKnockY[s]! * KNOCK_DECAY;
   if (pushOut(w.pX[s]!, w.pY[s]!, r)) {
     w.pX[s] = out.x;
     w.pY[s] = out.y;
@@ -227,6 +244,9 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
   let dashY = w.pDashY[s]!;
   let angle = w.pAngle[s]!;
   let moving = w.pMoving[s]! === 1;
+  let stun = w.pStun[s]!;
+  let kx = w.pKnockX[s]!;
+  let ky = w.pKnockY[s]!;
   const alive = w.pState[s] === PlayerState.Alive;
   const downed = w.pState[s] === PlayerState.Downed;
   const dc = BALANCE.dash;
@@ -240,9 +260,10 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
   const phase = w.misc[MISC.Phase]!;
   const phaseEnd = w.misc[MISC.PhaseEnd]!;
   const ascendTicks = Math.round(BALANCE.floors.ascendSeconds * TICK_RATE);
+  const cineEnd = w.misc[MISC.Cine]!;
   let t = w.tick;
   for (const inpIn of inputs) {
-    const locked = (phase === FloorPhase.Ascend && t <= phaseEnd) || (phase === FloorPhase.Cleared && t > phaseEnd && t <= phaseEnd + ascendTicks);
+    const locked = (phase === FloorPhase.Ascend && t <= phaseEnd) || (phase === FloorPhase.Cleared && t > phaseEnd && t <= phaseEnd + ascendTicks) || t < cineEnd;
     t++;
     const inp = locked ? { moveX: 0, moveY: 0, aim: inpIn.aim, buttons: 0 } : inpIn;
     prevX = x;
@@ -256,7 +277,13 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
     }
     angle = inp.aim * AIM_TO_RAD;
     const busy = busyNear && (inp.buttons & Buttons.Revive) !== 0;
-    const canDash = alive && !busy;
+    const stunned = stun > 0;
+    if (stunned) {
+      stun--;
+      mx = 0;
+      my = 0;
+    }
+    const canDash = alive && !busy && !stunned;
     if (canDash) {
       if (dashCd > 0) dashCd -= TICK_DT;
       if ((inp.buttons & Buttons.Dash) !== 0 && dashCd <= 0 && dash === 0) {
@@ -273,11 +300,13 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
       dash--;
       moving = true;
     } else {
-      moving = len > 0.05;
+      moving = !stunned && len > 0.05;
     }
     const speed = downed ? BALANCE.player.crawlSpeed : base * (busy ? BALANCE.player.reviveMoveMul : 1);
-    x = clamp(x + mx * speed * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
-    y = clamp(y + my * speed * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+    x = clamp(x + (mx * speed + kx) * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
+    y = clamp(y + (my * speed + ky) * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+    kx = Math.abs(kx) < 0.05 ? 0 : kx * KNOCK_DECAY;
+    ky = Math.abs(ky) < 0.05 ? 0 : ky * KNOCK_DECAY;
     if (pushOut(x, y, r)) {
       x = out.x;
       y = out.y;
@@ -414,7 +443,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
   }
   for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pIFrames[s]! > 0) w.pIFrames[s] = w.pIFrames[s]! - TICK_DT;
   // while the party is lifted to the next floor nobody can move, shoot or throw: only the aim is kept
-  if (w.misc[MISC.Phase] === FloorPhase.Ascend) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: 0, ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}), ...(i.gAim !== undefined ? { gAim: i.gAim } : {}) } : i));
+  if (w.misc[MISC.Phase] === FloorPhase.Ascend || w.tick < w.misc[MISC.Cine]!) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: 0, ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}), ...(i.gAim !== undefined ? { gAim: i.gAim } : {}) } : i));
   updateCards(w, inputs);
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s] || w.pState[s] === PlayerState.Dead) continue;
@@ -437,7 +466,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
     // a helper holding Revive next to a downed teammate is busy: slower, no shooting (moving off interrupts the revive)
     const busy = (inp.buttons & Buttons.Revive) !== 0 && downedNear(w, s);
     const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
-    if (!busy) fireWeapon(w, s, inp, angle);
+    if (!busy && w.pStun[s] === 0) fireWeapon(w, s, inp, angle);
   }
   updatePlayerPerks(w);
   updateBarrels(w);
@@ -445,6 +474,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
   updateGrenades(w, inputs);
 
   updateEnemies(w);
+  updateHazards(w);
   updateProjectiles(w);
   updatePickups(w);
 
@@ -509,7 +539,7 @@ export function hashWorld(w: World): number {
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
   c.typed(w.kActive).typed(w.kData).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
-  c.typed(w.pPerk).typed(w.eMod).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
+  c.typed(w.pPerk).typed(w.eMod).typed(w.eFrost).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);

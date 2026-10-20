@@ -20,6 +20,9 @@ export const PLAYER_COLORS = [
 export const MAX_GRENADES = 32;
 export const MAX_BARRELS = 12;
 export const MAX_SPIT = 160;
+/** Pools of the ground effects: lingering acid and fire, and the telegraphed attacks that are still charging. */
+export const MAX_ZONES = 96;
+export const MAX_TELE = 48;
 
 export interface Box {
   x: number;
@@ -129,4 +132,9 @@ export const MAX_PICKUPS = 64;
 export const FloorPhase = { Fight: 0, Cleared: 1, Ascend: 2, Arrive: 3 } as const;
 
 /** Slots of `world.misc`. */
-export const MISC = { Freeze: 0, Remaining: 1, Cleared: 2, Total: 3, Phase: 4, PhaseEnd: 5, Entered: 6 } as const;
+export const MISC = { Freeze: 0, Remaining: 1, Cleared: 2, Total: 3, Phase: 4, PhaseEnd: 5, Entered: 6, Killer: 7, KillX: 8, KillY: 9, Cine: 10 } as const;
+
+/** Shapes and effects of a telegraphed ground attack (`world.tShape`, `world.tEffect`). */
+export const TeleShape = { Circle: 0, Rect: 1, Fill: 2 } as const;
+export const TeleEffect = { Hurt: 0, Half: 1, Kill: 2, Acid: 3 } as const;
+export const ZoneKind = { Acid: 0, Fire: 1 } as const;

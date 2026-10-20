@@ -349,6 +349,16 @@ export class Stage {
     this.camera.updateProjectionMatrix();
   }
 
+  private zoom = 1;
+
+  /** Push the camera in (1 = the normal view): the finisher. */
+  setZoom(z: number): void {
+    if (Math.abs(z - this.zoom) < 1e-4) return;
+    this.zoom = z;
+    this.camera.zoom = z;
+    this.camera.updateProjectionMatrix();
+  }
+
   /** Follow a point on the floor (three coordinates). */
   follow(x: number, z: number, shake = 0, height = 0): void {
     const t = new THREE.Vector3(x + (Math.random() - 0.5) * shake * 0.5, 0.6 + height, z + (Math.random() - 0.5) * shake * 0.5);

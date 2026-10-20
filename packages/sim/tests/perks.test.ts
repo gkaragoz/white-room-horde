@@ -264,9 +264,10 @@ describe('power-ups', () => {
     grab(PickupType.Nuke);
     expect(w.eActive[e]).toBe(0);
     expect(w.eHp[boss]!).toBeLessThan(bossHp);
+    const f = spawnEnemy(w, T('runner'), 12, 0, false);
     grab(PickupType.Freeze);
     expect(w.misc[0]!).toBeGreaterThan(2);
-    const f = spawnEnemy(w, T('runner'), 12, 0, false);
+    expect(w.eFrost[f]!).toBeGreaterThan(60);
     const x0 = w.eX[f]!;
     for (let i = 0; i < 20; i++) step(w, [NONE]);
     expect(w.eX[f]).toBe(x0); // frozen

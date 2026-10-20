@@ -9,3 +9,4 @@ export { xpForNext } from './progression';
 export { livingPlayers } from './enemies';
 export { serializeWorld, restoreWorld } from './snapshot';
 export { giveWeapon, selectWeapon, usable, owns } from './loadout';
+export { addTelegraph, addZone, launchPlayer } from './hazards';

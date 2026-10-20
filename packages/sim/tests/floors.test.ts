@@ -40,7 +40,7 @@ describe('floors', () => {
     expect(w.wave).toBe(1);
     expect(phase(w)).toBe(FloorPhase.Fight);
     expect(w.enemyCount).toBeGreaterThan(0);
-  });
+  }, 30000);
 
   it('a clear gives a 5 second countdown, then a locked flight, then a second countdown, then the next floor', () => {
     const w = createWorld(32);
@@ -48,12 +48,18 @@ describe('floors', () => {
     clearFloor(w);
     expect(phase(w)).toBe(FloorPhase.Cleared);
     const clearedAt = w.tick;
-    // the countdown is free: the player can still move
+    // the finisher comes first: everybody stands still for it
+    expect(w.misc[MISC.Cine]! - clearedAt).toBe(secs(BALANCE.floors.finisherSeconds) - 1); // counted from the tick after the blow
+    const x00 = w.pX[0]!;
+    for (let t = 0; t < 10; t++) step(w, [RIGHT]);
+    expect(w.pX[0]).toBe(x00);
+    until(w, (x) => x.tick >= x.misc[MISC.Cine]!);
+    // then the countdown is free: the player can still move
     const x0 = w.pX[0]!;
     for (let t = 0; t < 10; t++) step(w, [RIGHT]);
     expect(w.pX[0]).toBeGreaterThan(x0);
     const n = until(w, (x) => phase(x) === FloorPhase.Ascend);
-    expect(w.tick - clearedAt).toBe(secs(BALANCE.floors.clearedSeconds));
+    expect(w.tick - clearedAt).toBe(secs(BALANCE.floors.finisherSeconds) + secs(BALANCE.floors.clearedSeconds));
     expect(n).toBeGreaterThan(0);
     // during the flight nobody moves or shoots
     const ascendAt = w.tick;

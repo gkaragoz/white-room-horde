@@ -1,4 +1,4 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, WEAPON_IDS } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, TICK_RATE, WEAPON_IDS } from '@wrh/shared';
 import { clamp, cos, sin, sqrt } from './detmath';
 import { PERK } from '@wrh/shared';
 import { nuke, perk, setPerk, waveModOf } from './features';
@@ -151,6 +151,7 @@ function collect(w: World, s: number, i: number): void {
     nuke(w, s);
   } else if (kind === PickupType.Freeze) {
     w.misc[0] = BALANCE.pickups.freezeSeconds;
+    for (let e = 0; e < MAX_ENEMIES; e++) if (w.eActive[e]) w.eFrost[e] = Math.round(BALANCE.pickups.freezeSeconds * TICK_RATE);
     w.events.push({ type: 'freeze', seconds: BALANCE.pickups.freezeSeconds });
   } else if (kind === PickupType.Weapon) {
     giveWeapon(w, s, w.kData[i]!);

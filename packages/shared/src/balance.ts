@@ -83,7 +83,7 @@ export const BALANCE = data as unknown as {
   enemies: Record<EnemyType, EnemyStats>;
   waves: WaveConfig;
   /** The climb between floors: countdown after a clear, charge + lift, countdown on arrival, hp of those brought back. */
-  floors: { clearedSeconds: number; ascendSeconds: number; chargeSeconds: number; arriveSeconds: number; reviveHp: number };
+  floors: { clearedSeconds: number; ascendSeconds: number; chargeSeconds: number; arriveSeconds: number; reviveHp: number; finisherSeconds: number };
   player: { reviveMoveMul: number; reviveDrain: number; hp: number; speed: number; iFrames: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };
   weapons: Record<WeaponId, WeaponStats>;
   classes: ClassStats[];
@@ -91,6 +91,16 @@ export const BALANCE = data as unknown as {
   elites: Record<EliteKey, number>;
   barrels: Record<BarrelKey, number>;
   knock: { perDamage: number; max: number };
+  hazards: { acid: { dps: number; radius: number; seconds: number }; fire: { dps: number; radius: number; seconds: number } };
+  /** Past floor `start` enemies hit harder and have more health per floor than the base growth. */
+  late: { start: number; damagePerFloor: number; hpPerFloor: number };
+  bossAttacks: {
+    slam: { every: number; radius: number; delay: number; damage: number; stun: number; push: number };
+    meteors: { every: number; count: number; radius: number; delay: number; stagger: number; damage: number; stun: number; push: number };
+    sweep: { every: number; width: number; delay: number; damage: number; stun: number; push: number };
+    purge: { every: number; delay: number; areaFraction: number; killFloor: number };
+    pools: { every: number; count: number; radius: number; delay: number };
+  };
 };
 
 type PerkKey = 'outOfCombatSeconds' | 'baseRegen' | 'cardRegen' | 'auraRadius' | 'thorns' | 'shockRadius' | 'shockDamage' | 'shockPush' | 'volatileChance' | 'volatileRadius' | 'volatileDamage' | 'frostRadius' | 'frostSlow' | 'scavChance' | 'rageMax' | 'secondHp' | 'adrenSeconds' | 'adrenSpeed' | 'barrierAmount' | 'barrierCd';

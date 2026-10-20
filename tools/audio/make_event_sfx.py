@@ -139,6 +139,21 @@ def build():
     c["slowmo_in"] = mix((sw, 0.6, 0.0), (hb, 0.9, 0.0))
     back = lowpass_env(fft_filter(noise(0.9), lo=100) * np.linspace(0, 1, int(0.9 * SR)) ** 1.5 * env(int(0.9 * SR), 0.5, 0.15, 1), 300, 9000)
     c["slowmo_out"] = mix((back, 0.7, 0.0), (tone(sweep(120, 480, 0.7, 1.4), 0.7, release=0.3), 0.25, 0.0))
+    # ground attacks: a rising warning, the blows that land, acid, a throw
+    beep = lambda f, s: tone(f, s, ((1, 1), (2, 0.2)), 0.004, s * 0.6, 1.5)
+    c["warn_circle"] = mix((beep(660, 0.12), 0.8, 0.0), (beep(740, 0.12), 0.8, 0.16), (beep(880, 0.16), 0.9, 0.32))
+    c["warn_line"] = mix((tone(sweep(300, 1500, 0.8, 1.6), 0.8, ((1, 1), (3, 0.15)), 0.05, 0.1, 1.2), 0.6, 0.0))
+    slam = lowpass_env(noise(0.8), 600, 70) * env(int(0.8 * SR), 0.002, 0.8, 2.2)
+    crack = fft_filter(noise(0.18), lo=1200) * env(int(0.18 * SR), 0.0005, 0.18, 3)
+    c["slam_hit"] = mix((slam, 1.0, 0.0), (crack, 0.6, 0.0), (tone(sweep(120, 38, 0.6, 0.5), 0.6, release=0.55), 0.9, 0.0))
+    purge = lowpass_env(noise(1.8), 900, 50) * env(int(1.8 * SR), 0.004, 1.8, 1.7)
+    rev = fft_filter(noise(0.7), lo=200, hi=6000) * np.linspace(0, 1, int(0.7 * SR)) ** 2.5 * env(int(0.7 * SR), 0.3, 0.02, 1)
+    c["purge_hit"] = mix((rev, 0.5, 0.0), (purge, 1.0, 0.45), (tone(sweep(80, 26, 1.7, 0.6), 1.7, release=1.6, curve=1.4), 1.0, 0.45))
+    splat = lowpass_env(noise(0.25), 3000, 300) * env(int(0.25 * SR), 0.001, 0.25, 2)
+    fizz = fft_filter(noise(0.7), lo=4000) * env(int(0.7 * SR), 0.02, 0.7, 1.2) * (0.5 + 0.5 * np.sin(np.arange(int(0.7 * SR)) / SR * 90))
+    c["acid_splash"] = mix((splat, 1.0, 0.0), (fizz, 0.35, 0.05))
+    whoosh = lowpass_env(fft_filter(noise(0.5), lo=150) * np.sin(np.linspace(0, np.pi, int(0.5 * SR))) ** 1.2, 6000, 700)
+    c["launch"] = mix((whoosh, 0.9, 0.0), (tone(sweep(150, 60, 0.25), 0.25, release=0.22), 0.7, 0.0))
     return {k: normalise(v) for k, v in c.items()}
 
 

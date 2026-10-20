@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { Cinematic } from './render/cinematic';
 import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { createGame, decodeReplay, encodeReplay, hashWorld, predictPlayer, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
+import { addTelegraph, addZone, launchPlayer, createGame, decodeReplay, encodeReplay, hashWorld, predictPlayer, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
 import { Input, type Action } from './input';
@@ -12,6 +13,7 @@ import { PickupView, TIER_COLORS } from './render/pickups';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
 import { AmmoRing } from './render/ammoRing';
+import { GroundFx } from './render/groundFx';
 import { TargetMarker } from './render/targetMarker';
 import { PropsView } from './render/props';
 import { FloorClimb } from './render/floorFx';
@@ -144,6 +146,8 @@ stage.scene.add(bulletGlow);
 stage.scene.add(power.group);
 const ammoRing = new AmmoRing();
 stage.scene.add(ammoRing.group);
+const ground = new GroundFx();
+stage.scene.add(ground.group);
 const targetMarker = new TargetMarker();
 stage.scene.add(targetMarker.group);
 const aimMarker = new AimMarker();
@@ -380,7 +384,7 @@ function afterStep(w: World): void {
     const dy = curY[s]! - prevY[s]!;
     if (dx * dx + dy * dy > 1e-6) moveAngle[s] = Math.atan2(dy, dx);
   }
-  if (!catchingUp) crowd.onEvents(w, w.events, nowSec, (e) => tryRagdoll(w, e));
+  if (!catchingUp) crowd.onEvents(w, w.events, animSec, (e) => tryRagdoll(w, e));
   for (const e of w.events) handleEvent(e);
 }
 
@@ -464,6 +468,24 @@ function handleEvent(e: SimEvent): void {
       ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${L.wave} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
       break;
     }
+    case 'finalKill': {
+      // the finisher: push in on the blow (between the character that landed it and the enemy that fell)
+      if (document.hidden) break;
+      let x = e.x;
+      let y = e.y;
+      if (e.by >= 0 && world && world.pActive[e.by]) {
+        x = (e.x + world.pX[e.by]!) / 2;
+        y = (e.y + world.pY[e.by]!) / 2;
+      }
+      cine.start(nowSec, BALANCE.floors.finisherSeconds - 0.12, x, y, e.by);
+      audio.play('slowIn');
+      audio.duckMusic(0.4, BALANCE.floors.finisherSeconds + 0.3);
+      ui.screenFlash('#ffffff', 220);
+      break;
+    }
+    case 'floorAscend':
+      cine.cancel();
+      break;
     case 'waveCleared':
       break; // the big countdown under the top bar says it
     case 'secondWind':
@@ -522,6 +544,7 @@ function handleEvent(e: SimEvent): void {
       ui.banner(e.kind === 'charge' ? (ui.lang === 'tr' ? 'HÜCUM!' : 'CHARGE!') : e.kind === 'aura' ? (ui.lang === 'tr' ? 'Sürü hızlandı!' : 'The swarm speeds up!') : (ui.lang === 'tr' ? 'Takviye çağırdı!' : 'Reinforcements!'), '', 1400);
       break;
     case 'gameOver':
+      cine.cancel();
       over = true;
       setTimeout(() => audio.stopMusic(), 4000);
       {
@@ -573,10 +596,22 @@ function damageNumber(x: number, y: number, damage: number, teammate: string | n
 }
 
 // ---- hit feel: a short freeze on heavy kills, slow motion on big moments ----
+const cine = new Cinematic();
+/** Clock of everything that animates by itself (the horde, corpses): it slows down with the finisher and hit-stops. */
+let animSec = 0;
 let stopT = 0;
 let slowT = 0;
 /** 1 normally; tiny during a hit-stop, 0.35 in slow motion. Solo games slow the simulation too, online only the visuals. */
 let timeScale = 1;
+/** How far the finisher pushes in: enough to fill the screen with the blow, less when the two are far apart. */
+function cineZoom(): number {
+  if (!world || !cine.active) return 1;
+  let far = 0;
+  const by = cine.by;
+  if (by >= 0 && world.pActive[by]) far = Math.hypot(world.pX[by]! - cine.x, world.pY[by]! - cine.y) * 2;
+  return Math.max(1.25, Math.min(2.0, 2.0 - far / 22));
+}
+
 function hitStop(seconds: number): void {
   if (!settings.hitStop) return;
   if (seconds > stopT) stopT = seconds;
@@ -905,8 +940,17 @@ function frame(nowMs: number): void {
   last = nowMs;
   stopT = Math.max(0, stopT - realDt);
   slowT = Math.max(0, slowT - realDt);
-  timeScale = stopT > 0 ? 0.04 : slowT > 0 ? 0.35 : 1;
+  const paused0 = mode === 'solo' && paused;
+  if (cine.active && paused0) cine.hold(realDt);
+  const cineFrame = cine.update(nowMs / 1000, cineZoom());
+  if (cine.active) {
+    // the finisher owns the clock: effects slow right down, the simulation itself keeps its pace (it holds everybody still for the same time)
+    stopT = slowT = 0;
+    timeScale = cine.timeScale();
+    if (cine.takeOutSound(nowMs / 1000)) audio.play('slowOut');
+  } else timeScale = stopT > 0 ? 0.04 : slowT > 0 ? 0.35 : 1;
   const dt = realDt * timeScale;
+  animSec += dt;
   nowSec = nowMs / 1000;
   let alpha = 0;
 
@@ -945,7 +989,7 @@ function frame(nowMs: number): void {
   if (world && mode === 'solo' && paused) {
     acc = 0;
   } else if (world && mode === 'solo') {
-    acc += dt; // already scaled: a hit-stop freezes the solo simulation
+    acc += cine.active ? realDt : dt; // a hit-stop freezes the solo simulation; the finisher only slows the drawing
     while (acc >= TICK_DT) {
       acc -= TICK_DT;
       let inputs: (PlayerInput | undefined)[] = [];
@@ -1061,7 +1105,9 @@ function frame(nowMs: number): void {
       const x = vx[s]!;
       const y = vy[s]!;
       const ang = s === localSlot && localFacing !== null ? localFacing : lerpAngle(prevA[s]!, curA[s]!, alpha);
-      c.root.position.set(x, lifted.lift, -y);
+      // a thrown character is tossed up and comes down again (14 ticks of air)
+      const air = w.pAir[s]! > 0 ? Math.sin(Math.PI * (1 - w.pAir[s]! / 14)) * 3.2 : 0;
+      c.root.position.set(x, lifted.lift + air, -y);
       c.root.rotation.y = ang + Math.PI / 2;
       const cls = w.pPerk[s * PERKS + PERK.Class]!;
       c.root.scale.setScalar(PowerView.bodyScale(w, s) * (cls === 2 ? 1.18 : cls === 3 ? 0.92 : 1));
@@ -1083,9 +1129,15 @@ function frame(nowMs: number): void {
     if (w.pState[target] === PlayerState.Dead) {
       for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pState[s] === PlayerState.Alive) { target = s; break; }
     }
-    const fx0 = vx[target]!;
-    const fy0 = vy[target]!;
-    stage.follow(fx0, -fy0, fx.shake * settings.shake, lifted.lift);
+    let fx0 = vx[target]!;
+    let fy0 = vy[target]!;
+    if (cineFrame.focus > 0) {
+      fx0 += (cine.x - fx0) * cineFrame.focus;
+      fy0 += (cine.y - fy0) * cineFrame.focus;
+    }
+    stage.setZoom(cineFrame.zoom);
+    ui.setCine(cineFrame.bars, cine.by >= 0 ? names[cine.by] ?? '' : '', cine.by >= 0 ? PLAYER_COLORS[cine.by % PLAYER_COLORS.length]! : '#ffffff');
+    stage.follow(fx0, -fy0, fx.shake * settings.shake * (1 - cineFrame.focus * 0.8), lifted.lift);
     fx.faceCamera(stage.camera.quaternion);
     // time of day, real-time lights and the flashlight of the local player
     stage.nightTarget = nightFor(w);
@@ -1182,7 +1234,9 @@ function frame(nowMs: number): void {
     }
     audio.setListener(fx0, fy0);
     audio.tick(w, localSlot, dt);
-    crowd.update(w, alpha, nowSec);
+    crowd.update(w, alpha, animSec);
+    ground.colorblind = settings.colorblind;
+    ground.update(w, nowSec, catchingUp ? null : fx, dt);
     fx.update(dt);
     ragdolls.update(dt);
     pickups.update(w, nowSec);
@@ -1357,6 +1411,8 @@ setTimeout(() => stage.warmFlight(), 800);
   ui,
   ragdolls,
   spawnBoss: () => (world ? spawnBoss(world) : -1),
+  hazards: { addTelegraph, addZone, launchPlayer },
+  cine,
   get ws() {
     return ws;
   },

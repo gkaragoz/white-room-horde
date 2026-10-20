@@ -433,6 +433,24 @@ export class Fx {
         this.flash(e.x, 0.6, -e.y, 0.4, e.kind === 'charge' ? '#ff5533' : '#a050ff', 0.5, 5);
         this.shake = Math.min(0.5, this.shake + 0.2);
         break;
+      case 'teleHit': {
+        // the blow lands: a ring that sweeps out, dust and a hard shake (bigger for the deadly ones)
+        const deadly = e.effect === 1 || e.effect === 2;
+        const acid = e.effect === 3;
+        const col = acid ? '#a6ff4d' : deadly ? '#ff3da8' : '#ffb04a';
+        this.shockRing(e.x, e.y, col, Math.min(6, e.radius * 0.9));
+        this.burst(Kind.Smoke, e.x, e.y, 0.3, Math.min(40, 6 + Math.round(e.radius * 2)), 3 + e.radius * 0.4, 0, 0, 6.28, 0.9, 0.35, acid ? '#9ad65a' : '#d9cfc0');
+        if (!acid) {
+          this.flash(e.x, 1.0, -e.y, 0.9, col, 0.4, Math.min(12, e.radius * 2.5));
+          this.shake = Math.min(0.9, this.shake + (deadly ? 0.5 : 0.28));
+        }
+        break;
+      }
+      case 'launch':
+        this.burst(Kind.Smoke, e.x, e.y, 0.2, 10, 3, 0, 0, 6.28, 0.5, 0.3, '#d9cfc0');
+        this.burst(Kind.Spark, e.x, e.y, 0.6, 8, 5, 0, 0, 6.28, 0.3, 0.07, '#ffe27a');
+        break;
+
       case 'pickup':
         this.burst(Kind.Spark, e.x, e.y, 0.6, 8, 4, 0, 0, 6.28, 0.35, 0.07, e.kind === 1 ? '#6dff9a' : e.kind === 3 ? '#d79bff' : '#ffe27a');
         break;

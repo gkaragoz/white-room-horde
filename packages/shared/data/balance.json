@@ -299,7 +299,8 @@
     "ascendSeconds": 3.6,
     "chargeSeconds": 0.9,
     "arriveSeconds": 5,
-    "reviveHp": 0.5
+    "reviveHp": 0.5,
+    "finisherSeconds": 2.6
   },
   "waves": {
     "baseCount": 30,
@@ -655,5 +656,21 @@
   "knock": {
     "perDamage": 0.012,
     "max": 0.45
+  },
+  "hazards": {
+    "acid": { "dps": 14, "radius": 2.2, "seconds": 7 },
+    "fire": { "dps": 20, "radius": 2.0, "seconds": 5 }
+  },
+  "late": {
+    "start": 15,
+    "damagePerFloor": 0.06,
+    "hpPerFloor": 0.025
+  },
+  "bossAttacks": {
+    "slam": { "every": 7, "radius": 7, "delay": 1.3, "damage": 38, "stun": 0.8, "push": 14 },
+    "meteors": { "every": 9, "count": 6, "radius": 3, "delay": 1.7, "stagger": 0.14, "damage": 46, "stun": 0.5, "push": 9 },
+    "sweep": { "every": 11, "width": 5, "delay": 1.5, "damage": 40, "stun": 0.6, "push": 12 },
+    "purge": { "every": 22, "delay": 6, "areaFraction": 0.6, "killFloor": 35 },
+    "pools": { "every": 10, "count": 4, "radius": 3, "delay": 1.4 }
   }
 }

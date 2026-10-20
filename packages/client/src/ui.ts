@@ -217,6 +217,7 @@ const BASE_STRINGS = {
     secondWind: 'Second wind!',
     mvp: 'MVP',
     squadKills: 'Kills',
+    finalBlow: 'Final blow',
     dpsLabel: 'DPS',
     dmgTotal: 'Damage dealt',
     killsTip: 'Kills',
@@ -412,6 +413,7 @@ const BASE_STRINGS = {
     secondWind: 'İkinci nefes!',
     mvp: 'MVP',
     squadKills: 'Öldürme',
+    finalBlow: 'Son vuruş',
     dpsLabel: 'DPS',
     dmgTotal: 'Verilen hasar',
     killsTip: 'Öldürme',
@@ -575,6 +577,11 @@ const CSS = `
 .wrh-cards{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);text-align:center;pointer-events:none;width:max-content;max-width:98vw;white-space:nowrap}
 @media (max-width:640px){.wrh-card{width:29vw!important;margin:0 3px!important}.wrh-card .art{height:70px!important}.wrh-card span{font-size:10px!important}}
 .wrh-cards h3{margin:0 0 8px;text-shadow:0 1px 0 #fff}
+.wrh-ui.cine-on .wrh-cards,.wrh-ui.cine-on .wrh-hint,.wrh-ui.cine-on .wrh-warn,.wrh-ui.cine-on .wrh-inv,.wrh-ui.cine-on .wrh-relics{opacity:0;transition:opacity .2s}
+.wrh-cine{position:absolute;inset:0;pointer-events:none;z-index:6;display:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(10,6,20,calc(.55*var(--k))) 100%)}
+.wrh-cine i{position:absolute;left:0;right:0;height:calc(9vh*var(--k));background:#07060c}
+.wrh-cine i.top{top:0}.wrh-cine i.bot{bottom:0}
+.wrh-cine b{position:absolute;left:0;right:0;bottom:calc(9vh*var(--k) + 18px);text-align:center;font-size:clamp(18px,3.2vw,38px);letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 0 12px var(--who,#fff),0 3px 0 rgba(0,0,0,.6);opacity:calc(var(--k)*var(--k));transform:translateY(calc((1 - var(--k))*14px))}
 .wrh-more{display:inline-block;margin-left:6px;padding:0 8px;border-radius:10px;background:#ffd54a;color:#3a2a00;font-size:.8em;vertical-align:middle}
 .wrh-cards .wrh-card{animation:wrh-cardin .28s cubic-bezier(.2,1.4,.4,1) both}
 .wrh-cards .wrh-card:nth-child(3){animation-delay:.05s}.wrh-cards .wrh-card:nth-child(4){animation-delay:.1s}
@@ -1937,6 +1944,34 @@ export class Ui {
     if (on) el.innerHTML = `&#9208; ${this.t.hostPaused}${canResume ? `<small>${this.t.hostResume}</small>` : ''}`;
   }
 
+  private readonly cineEl = document.createElement('div');
+  private cineLabel = '';
+
+  /** The finisher's look: letterbox bars, a vignette and the name of whoever landed the last blow. `k` is 0 (off) to 1. */
+  setCine(k: number, who: string, color: string): void {
+    const el = this.cineEl;
+    if (!el.isConnected) {
+      el.className = 'wrh-cine';
+      el.innerHTML = '<i class="top"></i><i class="bot"></i><b></b>';
+      this.root.appendChild(el);
+    }
+    this.root.classList.toggle('cine-on', k > 0.05);
+    if (k <= 0.001) {
+      if (el.style.display !== 'none') el.style.display = 'none';
+      this.cineLabel = '';
+      return;
+    }
+    el.style.display = 'block';
+    el.style.setProperty('--k', k.toFixed(3));
+    const label = who ? `${this.t.finalBlow}: ${who}` : this.t.finalBlow;
+    if (label !== this.cineLabel) {
+      this.cineLabel = label;
+      const b = el.querySelector('b')!;
+      b.textContent = label;
+    }
+    el.style.setProperty('--who', color);
+  }
+
   /** A full-screen flash of a colour that fades out (nukes, freezes). */
   screenFlash(color: string, ms: number): void {
     const el = document.createElement('div');
@@ -2107,7 +2142,9 @@ export class Ui {
     set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.pLevel[slot]}<br><small style="font-weight:600;opacity:.75">${sub}</small>`);
     // the big countdown under the top bar: after a clear (before the climb) and on the new floor (before the fight)
     const secsLeft = Math.max(0, Math.ceil((world.misc[MISC.PhaseEnd]! - world.tick) / TICK_RATE));
-    if (phase === FloorPhase.Cleared) this.setFloorCountdown(t.waveCleared, `${t.climbIn}`, secsLeft);
+    // (the countdown does not start until the finisher is over)
+    if (phase === FloorPhase.Cleared && world.tick < world.misc[MISC.Cine]!) this.setFloorCountdown(null, '', 0);
+    else if (phase === FloorPhase.Cleared) this.setFloorCountdown(t.waveCleared, `${t.climbIn}`, secsLeft);
     else if (phase === FloorPhase.Arrive) this.setFloorCountdown(`${t.arrivedTitle} ${world.wave}`, t.getReady, secsLeft);
     else this.setFloorCountdown(null, '', 0);
     (this.hud.querySelector('#h-xp') as HTMLElement).style.width = `${Math.min(100, (world.pXp[slot]! / xpForNext(world, slot)) * 100)}%`;
