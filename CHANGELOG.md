@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.3.1 (2026-10-20)
+
 - Four new enemy kinds with their own Blender models and baked animations: crawlers (fast, low, from wave 4), leapers (jump at you every few seconds, wave 6), bloaters (slow and fat; when they die the belly bursts, burns whoever is close and a litter of crawlers crawls out, wave 9) and screamers (speed up every enemy around them, wave 12).
 - Smoke and fire are soft round puffs instead of cubes; the bullet glow is round too.
 
