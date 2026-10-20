@@ -98,6 +98,7 @@ ragdolls.restLife = [1.2, 3.2, 10][settings.corpseTime]!;
 stage.scene.add(ragdolls.group);
 const pickups = new PickupView();
 stage.scene.add(pickups.group);
+void pickups.load();
 
 const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.06, 0.8), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), MAX_BULLETS);
 // a soft additive halo around every round so it reads at any distance and glows at night

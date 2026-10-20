@@ -316,7 +316,10 @@ def cull_hidden(mesh):
     kill = set()
     for f in bm.faces:
         c = f.calc_center_median()
-        if inside(c + f.normal * 0.006):
+        # buried only when the centre and every corner region are inside another part (a tall wall with one hoop
+        # around its middle is not buried)
+        pts = [c] + [v.co * 0.85 + c * 0.15 for v in f.verts]
+        if all(inside(p + f.normal * 0.006) for p in pts):
             kill.add(f.index)
     # coplanar duplicates: same plane and same facing, the smaller face goes
     faces = [f for f in bm.faces if f.index not in kill]

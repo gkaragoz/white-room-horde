@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { MAX_PICKUPS } from '@wrh/shared';
 import type { World } from '@wrh/sim';
+import { asset } from '../assets';
+import { loadGLB } from './character';
+
+const MODELS = ['ammo', 'health', 'grenade', 'weapon', 'shield', 'haste', 'quad', 'nuke', 'freeze'] as const;
+const MODEL_SCALE = 0.6;
 
 const COLORS = ['#ffcf3a', '#3ddc6a', '#6b8f4a', '#c06bff', '#35c8ff', '#fff23a', '#ff3a3a', '#ffb000', '#9be8ff'];
 const KINDS = COLORS.length;
@@ -34,6 +39,39 @@ export class PickupView {
     this.group.add(this.rings);
   }
 
+  /** Swap the placeholder shapes for the Blender models (ammo box, medkit, grenade ...); the shapes stay if loading fails. */
+  async load(): Promise<void> {
+    await Promise.all(
+      MODELS.map(async (n, k) => {
+        try {
+          const g = await loadGLB(asset(`models/pickups/pickup_${n}.glb`));
+          let mesh: THREE.Mesh | null = null;
+          g.scene.traverse((o) => {
+            if (!mesh && (o as THREE.Mesh).isMesh) mesh = o as THREE.Mesh;
+          });
+          const found = mesh as THREE.Mesh | null;
+          if (!found) return;
+          const m = this.crates[k]!;
+          m.geometry = found.geometry;
+          const mat = (Array.isArray(found.material) ? found.material : [found.material]).map((x) => {
+            const c = x.clone() as THREE.MeshStandardMaterial;
+            if (c.emissive) {
+              c.emissive = c.color.clone();
+              c.emissiveIntensity = 0.18;
+            }
+            return c;
+          });
+          m.material = mat.length === 1 ? mat[0]! : mat;
+          this.modelScale[k] = MODEL_SCALE;
+        } catch {
+          /* keep the placeholder */
+        }
+      }),
+    );
+  }
+
+  private readonly modelScale = new Array<number>(KINDS).fill(1);
+
   update(w: World, now: number): void {
     this.counts.fill(0);
     let rings = 0;
@@ -47,7 +85,7 @@ export class PickupView {
       const bob = 0.55 + Math.sin(now * 3 + i) * 0.1;
       d.position.set(w.kX[i]!, bob, -w.kY[i]!);
       d.rotation.set(0, now * 1.6 + i, 0);
-      d.scale.setScalar(1);
+      d.scale.setScalar(this.modelScale[kind]!);
       d.updateMatrix();
       this.crates[kind]!.setMatrixAt(this.counts[kind]!++, d.matrix);
       d.position.set(w.kX[i]!, 0.03, -w.kY[i]!);

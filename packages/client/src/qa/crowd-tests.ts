@@ -485,6 +485,7 @@ export const crowdTests: QaTest[] = [
       w.countMul = 0;
       addPlayer(w, 0, 0, 0);
       const view = new PickupView();
+      await view.load();
       ctx.stage.scene.add(view.group);
       const problems: string[] = [];
       try {
