@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.18.0 (2026-10-20)
+
 **Bigger arenas, a built and demolished floor, a game-over page full of numbers (rules change: update the server and reload the page)**
 
 - Every arena is about three times the area (104 x 70) and was redrawn for it: open ground to run in and gather a crowd, cover, lanes, choke points, bridges and tunnels. A map test checks that no pocket is sealed off, the rim is open to the crowd and every deck can be reached.
