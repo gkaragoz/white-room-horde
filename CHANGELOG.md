@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.12.0 (2026-10-20)
+
 **New mechanics (rules change: update the server and reload the page)**
 - Bosses fight with telegraphed area attacks: a red outline appears on the ground, a hatched fill spreads over it and the blow lands when it is full (a dash through it dodges it). Slams around the boss, meteor rain on the squad, acid pools that stay, a sweeping line across the arena and the purge: most of the arena (about 60%, as a disc around the boss or as a slab from one side) slowly paints red, and everybody still standing in it loses half their health (all of it from floor 35). Two new bosses (the meteor lord and the purger) join the cycle, which now has six.
 - Players can be thrown: knocked-back characters fly away and are stunned (no steering, no shooting, no dash) for a moment. The client prediction follows it exactly.
