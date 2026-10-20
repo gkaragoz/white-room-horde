@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.10.0 (2026-10-20)
+
 **Relics, range, aim (rules change: update the server and reload the page)**
 - The cards you took sit bottom centre as small icons like relics (same card stacked with a count, a border in the rarity colour). Hover one: it gets a yellow outline and a text opens at the pointer with what it does; it works in the pause menu too.
 - Every weapon shoots much further (pistol 14 to 26, AR 18 to 32, shotgun 7 to 16, SMG 10 to 20, sniper 40 to 70, ...; the flamethrower stays short).
