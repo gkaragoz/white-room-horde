@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.8.3 (2026-10-20)
+
 **Aim**
 - The big orange grenade ring is gone. The enemy (or barrel) the auto aim is locked on gets a round target sign in your own colour; a small ring shows where the grenade will land.
 - Shots no longer miss: the aim is worked out from where the muzzle really is (it sits ahead and to the side of the character), leads a walking enemy and allows for the delay of the input; targets hidden behind cover are skipped, the nearest one you can actually shoot is chosen. A new QA test fires 96 auto-aimed shots at walking enemies and demands they land.
