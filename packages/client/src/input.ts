@@ -93,6 +93,9 @@ export class Input {
   private touchSwitch = false;
   /** Weapon choice of the last key press (1-9 = rank, 14 = next), sent once with the next sample. */
   private queuedWeapon = 0;
+  /** The shot direction of the last sample, and whether a stick (pad, phone) is aiming. */
+  lastShot = 0;
+  stickAiming = false;
   private padSwitchHeld = false;
   private touchSwitchHeld = false;
   private touchLayer: HTMLElement | null = null;
@@ -222,7 +225,7 @@ export class Input {
     return null;
   }
 
-  sample(playerX: number, playerY: number, autoAim: number | null = null): { input: PlayerInput; moveAngle: number; aimAngle: number } {
+  sample(playerX: number, playerY: number, autoAim: number | null = null, autoMode = false): { input: PlayerInput; moveAngle: number; aimAngle: number } {
     const dx = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
     const dy = (this.held('up') ? 1 : 0) - (this.held('down') ? 1 : 0);
     let m = keysToMove(dx, dy);
@@ -302,8 +305,17 @@ export class Input {
     } else aimAngle = this.lastAim;
     this.lastAim = aimAngle;
 
-    // auto-aim turns the character (and the bullets) toward the nearest target; the cursor direction stays in gAim for grenades
-    const shotAngle = autoAim ?? aimAngle;
+    // Auto aim: the character and the bullets follow the target the caller found (`autoAim`); with nothing to shoot at they
+    // follow the way the character walks, or stay as they were. The cursor never turns the character: it only steers the
+    // grenades (gAim, aimDist). A stick on a pad or a phone is an explicit aim and wins.
+    this.stickAiming = !!(touchAim || padAim);
+    let shotAngle = aimAngle;
+    if (autoMode && !this.stickAiming) {
+      if (autoAim !== null) shotAngle = autoAim;
+      else if (Math.hypot(m.x, m.y) > 0.2) shotAngle = Math.atan2(m.y, m.x);
+      else shotAngle = this.lastShot;
+    }
+    this.lastShot = shotAngle;
     const input: PlayerInput = {
       moveX: Math.round(m.x * 127),
       moveY: Math.round(m.y * 127),

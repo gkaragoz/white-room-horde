@@ -411,6 +411,11 @@ export class Crowd {
     this.triangles = tris;
   }
 
+  /** Where enemy `i` was drawn last frame (sim coordinates), for markers that stick to it. */
+  drawnPos(i: number): { x: number; y: number } | null {
+    return this.drawn[i] ? { x: this.drawX[i]!, y: this.drawY[i]! } : null;
+  }
+
   /** What an enemy was doing when it died (for a ragdoll to continue from): clip, time, velocity and heading. */
   deathInfo(w: World, id: number): { clip: string; time: number; vx: number; vy: number; yaw: number; boss: boolean } {
     return {

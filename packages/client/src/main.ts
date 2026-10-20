@@ -15,7 +15,8 @@ import { AmmoRing } from './render/ammoRing';
 import { TargetMarker } from './render/targetMarker';
 import { PropsView } from './render/props';
 import { FloorClimb } from './render/floorFx';
-import { angleTo, pickTarget, type AimTarget } from './autoAim';
+import { AimSolver, pickTarget, type AimTarget } from './autoAim';
+import { AimMarker } from './render/aimMarker';
 import { NetDiag } from './netDiag';
 import { InputTimer } from './inputTimer';
 import { PowerView, strengthOf } from './render/power';
@@ -145,6 +146,8 @@ const ammoRing = new AmmoRing();
 stage.scene.add(ammoRing.group);
 const targetMarker = new TargetMarker();
 stage.scene.add(targetMarker.group);
+const aimMarker = new AimMarker();
+stage.scene.add(aimMarker.group);
 
 // cover boxes of the current layout (rebuilt per game)
 const arena = new ArenaView();
@@ -767,17 +770,32 @@ async function downloadReport(): Promise<void> {
   ui.warn(ui.lang === 'tr' ? 'Rapor indirildi' : 'Report downloaded');
 }
 
+const aimSolver = new AimSolver();
 let aimTarget: AimTarget | null = null;
+
+/** Simulation ticks between the world as drawn now and the moment an input sent now takes effect (online: the lead). */
+function inputDelayTicks(): number {
+  return mode === 'online' && session ? Math.max(1, session.inputTick() - (world?.tick ?? 0)) : 1;
+}
+
+/**
+ * Auto aim: finds the nearest enemy or barrel the player can shoot (in reach, not behind cover) and returns the angle that
+ * hits it from where the muzzle will be, leading a moving target. Null when there is nothing to shoot at or auto aim is off.
+ */
+function lockOn(): number | null {
+  const w = world;
+  if (!w || !settings.autoAim || !w.pActive[localSlot] || w.pState[localSlot] !== PlayerState.Alive) {
+    aimTarget = null;
+    return null;
+  }
+  aimSolver.track(w);
+  aimTarget = pickTarget(w, localSlot, aimTarget);
+  return aimTarget ? aimSolver.angle(w, localSlot, aimTarget, inputDelayTicks()) : null;
+}
 
 function sampleLocal(): PlayerInput {
   if (dev.auto && mode === 'solo') return scriptedInput(world!.tick, 0);
-  // auto-aim: the nearest enemy or barrel within reach of the weapon; the cursor keeps steering the grenades
-  let auto: number | null = null;
-  if (world && settings.autoAim && world.pActive[localSlot] && world.pState[localSlot] === PlayerState.Alive) {
-    aimTarget = pickTarget(world, localSlot, aimTarget);
-    if (aimTarget) auto = angleTo(world, localSlot, aimTarget);
-  } else aimTarget = null;
-  const s = input.sample(curX[localSlot]!, curY[localSlot]!, auto);
+  const s = input.sample(curX[localSlot]!, curY[localSlot]!, lockOn(), settings.autoAim);
   return s.input;
 }
 
@@ -945,6 +963,12 @@ function frame(nowMs: number): void {
       vy[s] = prevY[s]! + (curY[s]! - prevY[s]!) * alpha;
     }
     const lifted = climb.update(w, alpha, nowSec, dt, vx, vy);
+    // the local character turns the instant the aim does (no wait for the simulation or the network)
+    let localFacing: number | null = null;
+    if (settings.autoAim && w.pActive[localSlot] && w.pState[localSlot] === PlayerState.Alive) {
+      const locked = lockOn();
+      localFacing = input.stickAiming ? input.lastShot : locked ?? input.lastShot;
+    }
     // sounds that follow the climb: the thrusters when the lift begins, a tick for every countdown second
     if (lifted.active && climb.lift01 > 0 && !liftSounded) {
       liftSounded = true;
@@ -963,7 +987,7 @@ function frame(nowMs: number): void {
       }
       const x = vx[s]!;
       const y = vy[s]!;
-      const ang = lerpAngle(prevA[s]!, curA[s]!, alpha);
+      const ang = s === localSlot && localFacing !== null ? localFacing : lerpAngle(prevA[s]!, curA[s]!, alpha);
       c.root.position.set(x, lifted.lift, -y);
       c.root.rotation.y = ang + Math.PI / 2;
       const cls = w.pPerk[s * PERKS + PERK.Class]!;
@@ -976,7 +1000,7 @@ function frame(nowMs: number): void {
           fx.dust(x, y);
         }
       }
-      const aimDriven = animator.apply(w, s, c, nowSec, { firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: curA[s]! });
+      const aimDriven = animator.apply(w, s, c, nowSec, { firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: s === localSlot && localFacing !== null ? localFacing : curA[s]! });
       c.update(dt);
       if (aimDriven) c.applyAim(dir.set(Math.cos(ang), 0, -Math.sin(ang)));
     }
@@ -1002,7 +1026,7 @@ function frame(nowMs: number): void {
       const me = localSlot;
       const lx = prevX[me]! + (curX[me]! - prevX[me]!) * alpha;
       const ly = prevY[me]! + (curY[me]! - prevY[me]!) * alpha;
-      const a = lerpAngle(prevA[me]!, curA[me]!, alpha);
+      const a = localFacing !== null ? localFacing : lerpAngle(prevA[me]!, curA[me]!, alpha);
       stage.setFlashlight(lx, -ly, Math.cos(a), -Math.sin(a), w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive);
       // ammo ring around the feet: green full, red empty, rounds left beside it
       const alive = w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive;
@@ -1015,9 +1039,26 @@ function frame(nowMs: number): void {
       {
         const gc = BALANCE.grenade;
         const dist = input.grenadeDistance(lx, ly, gc.range, gc.minRange, gc.maxRange);
-        const bm = w.modBlast * w.pPerk[me * PERKS + PERK.Blast]!;
-        targetMarker.update(lx + Math.cos(a) * dist, -(ly + Math.sin(a) * dist), gc.radius * bm, nowSec, alive && !w.gameOver && w.pGren[me]! > 0 && !paused && !lifted.active, (input.sample as unknown) !== undefined && w.pGrenCd[me]! > 0);
+        // grenades fly to the cursor, whatever the character is looking at
+        const cursor = input.aimPoint();
+        const ga = input.stickAiming || !settings.autoAim ? a : Math.atan2(cursor.y - ly, cursor.x - lx);
+        targetMarker.update(lx + Math.cos(ga) * dist, -(ly + Math.sin(ga) * dist), 0.45, nowSec, alive && !w.gameOver && w.pGren[me]! > 0 && !paused && !lifted.active, w.pGrenCd[me]! > 0);
       }
+      // the sign on the enemy or barrel the auto aim is locked on, in the player's colour
+      if (aimTarget && alive && !w.gameOver && !lifted.active) {
+        let tx = aimTarget.x;
+        let ty = aimTarget.y;
+        let rad = 0.8;
+        if (aimTarget.kind === 0) {
+          const p = crowd.drawnPos(aimTarget.id);
+          if (p) {
+            tx = p.x;
+            ty = p.y;
+          }
+          rad = Math.max(0.85, BALANCE.enemies[ENEMY_TYPES[w.eType[aimTarget.id]!]!]!.radius * (w.eBoss[aimTarget.id] ? 2.2 : 1.35) + 0.15);
+        }
+        aimMarker.update(tx, -ty, rad, colorFor(localSlot), nowSec, aimTarget.kind * 10000 + aimTarget.id);
+      } else aimMarker.update(null, 0, 0, '#ffffff', nowSec, -1);
       const show = alive && !w.gameOver && settings.ammoRing && !lifted.active;
       ammoRing.update(lx, -ly, frac, reloading, nowSec, show);
       ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, show, reloading);

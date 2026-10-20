@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, PERSONAL_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
-import { addPlayer, createWorld, giveWeapon, spawnEnemy } from '@wrh/sim';
-import { angleTo, pickTarget } from '../autoAim';
+import { addPlayer, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
+import { AimSolver, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
@@ -128,7 +128,7 @@ export const moreTests: QaTest[] = [
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyQ' }));
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Digit3' }));
       // auto-aim moves the shot direction but the cursor keeps steering grenades
-      const aimed = input.sample(0, 0, 1.5).input;
+      const aimed = input.sample(0, 0, 1.5, true).input;
       if (Math.abs(aimed.aim - Math.round((1.5 / (Math.PI * 2)) * 65536)) > 2) problems.push('auto aim angle is not sent as the shot direction');
       if (aimed.gAim === aimed.aim) problems.push('the grenade direction followed the auto aim');
       input.resetBindings();
@@ -735,7 +735,7 @@ export const moreTests: QaTest[] = [
       const near = spawnEnemy(w, g, 0, 5, false);
       let t = pickTarget(w, 0, null);
       if (!t || t.kind !== 0 || t.id !== near) problems.push('the nearest enemy was not chosen');
-      else if (Math.abs(angleTo(w, 0, t) - Math.PI / 2) > 1e-6) problems.push('wrong angle to the nearest enemy');
+      else if (Math.abs(Math.atan2(t.y - w.pY[0]!, t.x - w.pX[0]!) - Math.PI / 2) > 1e-6) problems.push('wrong angle to the nearest enemy');
       // sticky: a rival only slightly nearer does not steal the lock
       const rival = spawnEnemy(w, g, 0, -4.8, false);
       const sticky = pickTarget(w, 0, t);
@@ -803,6 +803,47 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'list, keys, outline and faded empty rows are right' };
+    },
+  },
+  {
+    id: 'aim.hits',
+    title: 'Auto-aimed shots hit: from the muzzle, leading a walking enemy, in every direction and with every kind of gun',
+    async run() {
+      const problems: string[] = [];
+      const solver = new AimSolver();
+      const weapons = ['pistol', 'smg', 'ar', 'shotgun', 'sniper', 'revolver'] as const;
+      let hits = 0;
+      let total = 0;
+      const missed: string[] = [];
+      for (const weapon of weapons) {
+        for (let k = 0; k < 8; k++) {
+          for (const dist of [6, 13]) {
+            const w = createWorld(100 + k);
+            w.waveTick = 1e9;
+            w.countMul = 0;
+            addPlayer(w, 0, 0, 0, weapon);
+            w.pHp[0] = w.pMaxHp[0] = 1e9;
+            const th = (k / 8) * Math.PI * 2 + 0.2;
+            const e = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), Math.cos(th) * dist, Math.sin(th) * dist, false);
+            w.eHp[e] = 14; // two pistol hits would be fine too, but one lucky pellet should not decide
+            let target: ReturnType<typeof pickTarget> = null;
+            let killed = false;
+            for (let t = 0; t < 120 && !killed; t++) {
+              solver.track(w);
+              target = pickTarget(w, 0, target);
+              const angle = target ? solver.angle(w, 0, target, 1) : 0;
+              step(w, [{ moveX: 0, moveY: 0, aim: Math.round((((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * 65536) & 0xffff, buttons: Buttons.Fire }]);
+              killed = !w.eActive[e] || w.kills > 0;
+            }
+            total++;
+            if (killed) hits++;
+            else missed.push(`${weapon} ${f((th * 180) / Math.PI, 0)}deg ${dist}u`);
+          }
+        }
+      }
+      // a few pellets of a shotgun or the odd wide spread may miss at long range; the aim itself must be right
+      if (hits / total < 0.94) problems.push(`only ${hits} of ${total} auto-aimed shots killed their target (${missed.slice(0, 6).join(', ')})`);
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${hits} of ${total} auto-aimed shots hit their walking target` };
     },
   },
 ];

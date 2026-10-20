@@ -25,6 +25,12 @@ import { applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks,
 import { createWorld, type World } from './state';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
+
+/** Is the straight line between two points free of cover on the world's map? (The client's auto-aim uses it.) */
+export function lineClear(w: World, x0: number, y0: number, x1: number, y1: number): boolean {
+  useMap(w.map);
+  return !segmentBlocked(x0, y0, x1, y1);
+}
 export type { World };
 
 /** Aim is a 16-bit angle (see PlayerInput); this is the factor to radians. */
