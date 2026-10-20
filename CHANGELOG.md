@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.15.0 (2026-10-20)
+
 **Verticality: ramps, bridges, tunnels (rules change: update the server and reload the page)**
 - Five new arenas with a second level: *Overpass* (a long bridge with 30 degree ramps at both ends, the ground runs under it between pillars), *Depot* (a raised platform with a tunnel through it, a long ramp and a steep one), *Ramp yard* (two plateaus reached by 30 and 45 degree ramps), *Tunnel hub* (a bank with three tunnels) and *Gallery* (a mezzanine on pillars). They join the floor rotation after the six flat ones.
 - Everybody is on the ground or on a deck and walks between them by the ramps (the grade is 30 or 45 degrees: climbing is slower the steeper it is, going down is a little faster); a deck has rails and no edge to fall off. Characters, the camera, the aim cursor, bullets, loot, name tags and the ammo ring follow the real height.
