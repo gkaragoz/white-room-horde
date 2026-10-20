@@ -1,3 +1,4 @@
+import { POWERS } from './render/power';
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
@@ -125,6 +126,10 @@ const BASE_STRINGS = {
     newBest: 'New record!',
     unlockedWeapon: 'Unlocked',
     reconnecting: 'Connection lost, reconnecting...',
+    syncing: 'Catching up with the game...',
+    powerNames: ['Damage', 'Fire rate', 'Piercing', 'Crit chance', 'Blast radius', 'Move speed', 'Max health', 'Armor', 'Magnet', 'Luck', 'XP gain', 'Revive speed', 'Reload speed', 'Dash cooldown', 'Lifesteal'],
+    joining: 'Joining the game in progress...',
+    loading: 'Loading',
     maps: { '-1': 'Random', '0': 'Warehouse', '1': 'Courtyard', '2': 'Corridors', '3': 'Open field', '4': 'Ruins', '5': 'Factory' },
     diffs: ['Easy', 'Normal', 'Hard'],
     accs: ['Bandana', 'Cap', 'Goggles', 'Headphones', 'Helmet', 'Crown', 'Devil horns', 'Top hat', 'Cowboy hat', 'Ninja band', 'Mohawk', 'Bunny ears', 'Cyber visor', 'Pirate hat', 'Wizard hat', 'Viking helmet', 'Santa hat', 'Chef hat', 'Astronaut', 'Cat ears', 'Halo', 'Alien antennae', 'Gas mask', 'Beanie', 'Samurai helmet', 'Shades', 'Flower crown'],
@@ -298,6 +303,10 @@ const BASE_STRINGS = {
     newBest: 'Yeni rekor!',
     unlockedWeapon: 'Açıldı',
     reconnecting: 'Bağlantı koptu, yeniden bağlanıyor...',
+    syncing: 'Oyuna yetişiliyor...',
+    powerNames: ['Hasar', 'Ateş hızı', 'Delme', 'Kritik şansı', 'Patlama alanı', 'Hareket hızı', 'Azami can', 'Zırh', 'Mıknatıs', 'Şans', 'XP kazancı', 'Kaldırma hızı', 'Doldurma hızı', 'Atılma bekleme', 'Can çalma'],
+    joining: 'Devam eden oyuna katılınıyor...',
+    loading: 'Yükleniyor',
     maps: { '-1': 'Rastgele', '0': 'Depo', '1': 'Avlu', '2': 'Koridorlar', '3': 'Açık alan', '4': 'Harabe', '5': 'Fabrika' },
     diffs: ['Kolay', 'Normal', 'Zor'],
     accs: ['Bandana', 'Şapka', 'Gözlük', 'Kulaklık', 'Kask', 'Taç', 'Şeytan boynuzu', 'Silindir şapka', 'Kovboy şapkası', 'Ninja bandı', 'Mohawk', 'Tavşan kulağı', 'Siber vizör', 'Korsan şapkası', 'Büyücü şapkası', 'Viking miğferi', 'Noel şapkası', 'Aşçı şapkası', 'Astronot', 'Kedi kulağı', 'Hale', 'Uzaylı anteni', 'Gaz maskesi', 'Bere', 'Samuray kaskı', 'Güneş gözlüğü', 'Çiçek tacı'],
@@ -494,10 +503,25 @@ const CSS = `
 .wrh-bar>i{display:block;height:100%;background:#1fa2ff;width:0}
 .wrh-bar.boss{width:420px;height:14px}
 .wrh-bar.boss>i{background:#d8362e}
-.wrh-squad{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:5px}
-.wrh-squad div{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600}
-.wrh-squad .hp{width:120px;height:9px;border-radius:5px;background:rgba(60,45,20,.22);overflow:hidden}
-.wrh-squad .hp>i{display:block;height:100%}
+.wrh-squad{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:7px;max-width:260px}
+.wrh-pc{width:196px;padding:6px 9px 7px;border-radius:12px;background:rgba(251,246,234,.82);border:1.5px solid rgba(43,58,82,.18);border-left:4px solid var(--pc);box-shadow:0 2px 8px rgba(20,28,44,.18);backdrop-filter:blur(2px);font-size:12px;font-weight:600;color:#2b3a52}
+.wrh-pc.me{width:230px;padding:8px 11px 9px;font-size:13px}
+.wrh-pc .top{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.wrh-pc .top b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+.wrh-pc .top em{font-style:normal;font-variant-numeric:tabular-nums;font-weight:800;font-size:1.12em}
+.wrh-pc .top em small{font-size:.78em;font-weight:600;opacity:.6}
+.wrh-pc .bar{position:relative;height:11px;border-radius:6px;background:rgba(30,40,58,.3);box-shadow:inset 0 1px 2px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.35);overflow:hidden}
+.wrh-pc.me .bar{height:14px;border-radius:7px}
+.wrh-pc .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:inherit;transition:width .18s ease-out;box-shadow:inset 0 -3px 4px rgba(0,0,0,.18),inset 0 2px 2px rgba(255,255,255,.4)}
+.wrh-pc .bar s{position:absolute;left:0;top:0;height:35%;border-radius:inherit;background:linear-gradient(180deg,#bfe4ff,#5aa6ff);box-shadow:0 0 0 .5px rgba(20,60,120,.5);transition:width .18s}
+.wrh-pc.low .bar i{animation:wrh-lowhp .7s ease-in-out infinite alternate}
+@keyframes wrh-lowhp{to{filter:brightness(1.35)}}
+.wrh-pc .chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+.wrh-pc .chip{display:inline-flex;align-items:center;gap:3px;padding:1px 6px 1px 2px;border-radius:9px;background:rgba(43,58,82,.1);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent);font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;line-height:15px}
+.wrh-pc .chip i{display:inline-block;min-width:15px;height:15px;border-radius:50%;background:var(--c);color:#12202f;font-style:normal;text-align:center;font-size:10px;line-height:15px;text-shadow:0 0 1px rgba(255,255,255,.5)}
+.wrh-pc .chip.timed{animation:wrh-lowhp .5s ease-in-out infinite alternate}
+.wrh-pc:not(.me) .chips{margin-top:4px}
+.wrh-pc:not(.me) .chip{font-size:9.5px}
 .wrh-me{position:absolute;right:14px;bottom:12px;text-align:right;font-weight:700;font-size:15px;text-shadow:0 1px 0 rgba(255,255,255,.7)}
 .wrh-hurt{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(200,20,30,0) 45%,rgba(200,20,30,.55) 100%);opacity:0}
 .wrh-banner{position:absolute;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-weight:800;font-size:30px;color:#c8242c;text-shadow:0 2px 0 #fff,0 0 18px rgba(255,255,255,.8)}
@@ -575,6 +599,13 @@ const CSS = `
 @media (max-width:560px){.wrh-set-row,.wrh-ctl-row{grid-template-columns:1fr}.wrh-set-row:has(.wrh-range){grid-template-columns:1fr 48px}.wrh-set-row:has(.wrh-range) label{grid-column:1/-1}}
 .wrh-gear{position:absolute;right:12px;top:10px;pointer-events:auto;cursor:pointer;width:34px;height:34px;border-radius:50%;background:rgba(250,244,232,.9);border:2px solid #cdbfa5;text-align:center;line-height:30px;font-size:18px}
 .wrh-hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;opacity:.7;text-shadow:0 1px 0 #fff}
+.wrh-loading{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(10,14,22,.55);backdrop-filter:blur(3px);pointer-events:none}
+.wrh-loading .box{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:240px;padding:22px 30px;border-radius:16px;background:rgba(251,246,234,.96);color:#2b3a52;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.wrh-loading i{width:38px;height:38px;border-radius:50%;border:4px solid rgba(43,58,82,.18);border-top-color:#1fa2ff;animation:wrh-spin .8s linear infinite}
+.wrh-loading b{font-size:16px;letter-spacing:.02em}
+.wrh-loading u{display:block;width:100%;height:8px;border-radius:5px;background:rgba(43,58,82,.15);overflow:hidden;text-decoration:none}
+.wrh-loading s{display:block;height:100%;width:0;background:linear-gradient(90deg,#1fa2ff,#3ddc6a);transition:width .2s}
+@keyframes wrh-spin{to{transform:rotate(360deg)}}
 .wrh-warn{position:absolute;left:50%;top:60px;transform:translateX(-50%);color:#fff;background:#d8362e;padding:4px 12px;border-radius:8px;font-weight:700}
 .wrh-mini{position:absolute;right:14px;bottom:52px;width:180px;height:120px;border:2px solid #cdbfa5;border-radius:8px;background:rgba(250,244,232,.78);box-shadow:0 3px 10px rgba(60,45,20,.25)}
 .wrh-dmg{position:absolute;font-weight:800;font-size:15px;color:#fff;text-shadow:0 0 3px #7d0d14,0 0 3px #7d0d14,0 1px 0 #7d0d14;pointer-events:none;will-change:transform,opacity}
@@ -609,7 +640,7 @@ const CSS = `
 .wrh-statrow{display:flex;gap:8px;align-items:center;justify-content:center;font-size:14px;margin:2px 0}
 .wrh-statrow .wrh-dot{flex:none}
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
-.wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{color:#e9effa;text-shadow:0 1px 2px #000}
+.wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{text-shadow:none}
 .wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
 .wrh-plabel{position:absolute;left:0;top:0;pointer-events:none;display:none;white-space:nowrap;font:700 12px/1 system-ui,sans-serif;color:#fff;background:rgba(20,26,38,.62);padding:3px 7px;border-radius:9px;border:1.5px solid #fff;text-shadow:0 1px 1px rgba(0,0,0,.5)}
 .wrh-ammo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none}
@@ -633,6 +664,25 @@ const CSS = `
 .wrh-tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(250,244,232,.85);border:2px solid;white-space:nowrap;pointer-events:none}
 .wrh-reload{position:absolute;right:14px;bottom:36px;width:180px;height:6px;border-radius:4px;background:rgba(60,45,20,.25);overflow:hidden;display:none}
 .wrh-reload>i{display:block;height:100%;background:#ff9a3a;width:0}
+/* polish: soft cards, smooth anti-aliased bars, steady text rendering */
+.wrh-ui{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.wrh-top{padding:6px 18px 9px;border-radius:14px;background:rgba(251,246,234,.74);box-shadow:0 2px 10px rgba(20,28,44,.16);backdrop-filter:blur(2px);border:1.5px solid rgba(43,58,82,.14)}
+.wrh-top .big{font-size:21px;letter-spacing:.01em;text-shadow:none;color:#2b3a52}
+.wrh-top small{text-shadow:none}
+.wrh-bar{position:relative;height:11px;border-radius:6px;background:rgba(30,40,58,.28);box-shadow:inset 0 1px 2px rgba(0,0,0,.3),0 0 0 1px rgba(255,255,255,.35)}
+.wrh-bar>i{border-radius:inherit;background:linear-gradient(180deg,#5cc4ff,#1587e6);box-shadow:inset 0 2px 2px rgba(255,255,255,.45),inset 0 -2px 3px rgba(0,40,100,.25);transition:width .25s ease-out}
+.wrh-bar.boss>i{background:linear-gradient(180deg,#f2665b,#c0281f)}
+.wrh-me{padding:7px 12px;border-radius:12px;background:rgba(251,246,234,.78);box-shadow:0 2px 8px rgba(20,28,44,.16);border:1.5px solid rgba(43,58,82,.14);text-shadow:none;color:#2b3a52}
+.wrh-me small{text-shadow:none}
+.wrh-hint{padding:3px 12px;border-radius:10px;background:rgba(251,246,234,.6);opacity:.85;text-shadow:none;color:#2b3a52}
+.wrh-gear{box-shadow:0 2px 8px rgba(20,28,44,.2);transition:transform .12s,background .12s}
+.wrh-gear:hover{transform:scale(1.08);background:#fff}
+.wrh-warn{border-radius:10px;padding:5px 14px;box-shadow:0 3px 12px rgba(120,20,16,.35);animation:wrh-lowhp .6s ease-in-out infinite alternate}
+.wrh-mini{border-radius:12px;box-shadow:0 3px 12px rgba(20,28,44,.22)}
+.wrh-reload{height:8px;border-radius:5px;background:rgba(30,40,58,.3);box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+.wrh-reload>i{border-radius:inherit;background:linear-gradient(180deg,#ffb561,#ff8a1f);box-shadow:inset 0 1px 1px rgba(255,255,255,.5)}
+.wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint{color:#2b3a52;text-shadow:none}
+
 .wrh-scroll{max-height:92vh;overflow:auto}
 .wrh-ui button.wrh-wp:disabled{opacity:.45;cursor:not-allowed}
 .wrh-keys{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin:4px 0 8px;font-size:12px}
@@ -765,7 +815,7 @@ export class Ui {
   }
 
   /** Translate a UI string key (for messages the game shows outside the UI module). */
-  tr(key: 'noServer' | 'noConnect' | 'connLost' | 'desync' | 'reconnecting'): string {
+  tr(key: 'noServer' | 'noConnect' | 'connLost' | 'desync' | 'reconnecting' | 'syncing' | 'joining'): string {
     return (this.t as unknown as Record<string, string>)[key]!;
   }
 
@@ -1288,6 +1338,30 @@ export class Ui {
     });
   }
 
+  private loadingEl: HTMLElement | null = null;
+
+  /** Full-screen "loading" overlay with a spinner (and a progress bar when `frac` is given); null hides it. */
+  setLoading(text: string | null, frac?: number): void {
+    let el = this.loadingEl;
+    if (text === null) {
+      if (el && el.style.display !== 'none') el.style.display = 'none';
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'wrh-loading';
+      el.innerHTML = '<div class="box"><i></i><b></b><u><s></s></u></div>';
+      this.root.appendChild(el);
+      this.loadingEl = el;
+    }
+    el.style.display = 'flex';
+    const label = el.querySelector('b')!;
+    if (label.textContent !== text) label.textContent = text;
+    const bar = el.querySelector('u') as HTMLElement;
+    bar.style.display = frac === undefined ? 'none' : 'block';
+    if (frac !== undefined) (bar.firstElementChild as HTMLElement).style.width = `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`;
+  }
+
   showConnecting(): void {
     this.screen.innerHTML = `<div class="wrh-panel wrh-center"><h1>${this.t.connecting}</h1></div>`;
   }
@@ -1610,15 +1684,35 @@ export class Ui {
       bl.textContent = t.boss;
     }
 
-    // squad
+    // squad: one card per player with a smooth health bar (and its number), shield and the upgrades they carry
     let squad = '';
+    const glyph: Record<string, string> = { damage: '⚔', rate: '»', pierce: '↠', crit: '✦', blast: '✹', speed: '➤', hp: '♥', armor: '◈', magnet: '⊛', luck: '♣', scholar: '✎', medic: '✚', quick: '↻', roll: '↺', vampire: 'V' };
+    const powerNames = t.powerNames as readonly string[];
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (!world.pActive[s]) continue;
       const st = world.pState[s]!;
-      const frac = st === PlayerState.Alive ? world.pHp[s]! / world.pMaxHp[s]! : st === PlayerState.Downed ? world.pTimer[s]! / BALANCE.player.downedSeconds : 0;
+      const maxHp = world.pMaxHp[s]!;
+      const frac = st === PlayerState.Alive ? world.pHp[s]! / maxHp : st === PlayerState.Downed ? world.pTimer[s]! / BALANCE.player.downedSeconds : 0;
       const col = this.slotColor(s);
-      const tag = st === PlayerState.Downed ? ' &#9760;' : st === PlayerState.Dead ? ' &#10007;' : '';
-      squad += `<div style="opacity:${st === PlayerState.Dead ? 0.45 : 1}"><span class="wrh-dot" style="background:${col}"></span>${esc(names[s] ?? 'P' + (s + 1))}${tag}<span class="hp"><i style="width:${Math.max(0, frac * 100)}%;background:${st === PlayerState.Downed ? '#e8a020' : '#3dd66a'}"></i></span></div>`;
+      const down = st === PlayerState.Downed;
+      const num = st === PlayerState.Alive ? `${Math.ceil(world.pHp[s]!)}<small>/${Math.round(maxHp)}</small>` : down ? `${Math.ceil(world.pTimer[s]!)}s` : '&#10007;';
+      const fill = down ? '#f0a020' : `hsl(${Math.round(Math.max(0, Math.min(1, frac)) * 120)} 72% 46%)`;
+      const shield = Math.max(0, Math.min(100, world.pPerk[s * PERKS + PERK.Shield]!));
+      let chips = '';
+      for (let k = 0; k < POWERS.length; k++) {
+        const lv = POWERS[k]!.level(world, s);
+        if (lv < 0.005) continue;
+        chips += `<span class="chip" style="--c:${POWERS[k]!.color}" title="${esc(powerNames[k] ?? POWERS[k]!.id)}"><i>${glyph[POWERS[k]!.id] ?? '+'}</i>${Math.round(lv * 100)}%</span>`;
+      }
+      const haste = world.pPerk[s * PERKS + PERK.Haste]!;
+      const quad = world.pPerk[s * PERKS + PERK.Quad]!;
+      if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>&#9889;</i>${Math.ceil(haste)}s</span>`;
+      if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>&#10006;4</i>${Math.ceil(quad)}s</span>`;
+      squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${frac < 0.3 && st === PlayerState.Alive ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
+        `<div class="top"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' &#9760;' : ''}<em>${num}</em></div>` +
+        `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
+        (chips ? `<div class="chips">${chips}</div>` : '') +
+        '</div>';
     }
     set('h-squad', squad);
 

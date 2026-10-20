@@ -1,4 +1,4 @@
-import { Buttons, MAX_BULLETS, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, MAX_BULLETS, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createWorld, hashWorld, step } from '../src';
 
@@ -43,7 +43,7 @@ describe('sim rules', () => {
     const w = createWorld(1);
     addPlayer(w, 0, 0, 0);
     for (let i = 0; i < 30; i++) step(w, [{ moveX: 127, moveY: 0, aim: 0, buttons: 0 }]);
-    expect(w.pX[0]).toBeCloseTo(6, 5); // 6 units/s for 1 s
+    expect(w.pX[0]).toBeCloseTo(BALANCE.player.speed, 5); // one second at full speed
     for (let i = 0; i < 1000; i++) step(w, [{ moveX: 127, moveY: 127, aim: 0, buttons: 0 }]);
     expect(Math.abs(w.pX[0]!)).toBeLessThanOrEqual(30);
     expect(Math.abs(w.pY[0]!)).toBeLessThanOrEqual(20);
@@ -54,7 +54,7 @@ describe('sim rules', () => {
     addPlayer(w, 0, 0, 0);
     step(w, [{ moveX: 127, moveY: 127, aim: 0, buttons: 0 }]);
     const d = Math.hypot(w.pX[0]!, w.pY[0]!);
-    expect(d).toBeCloseTo(6 / 30, 6);
+    expect(d).toBeCloseTo(BALANCE.player.speed / 30, 6);
   });
 
   it('pistol fires about 3 shots per second with infinite ammo', () => {

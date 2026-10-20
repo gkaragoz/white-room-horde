@@ -336,9 +336,12 @@ const prevX = new Float64Array(MAX_PLAYERS), prevY = new Float64Array(MAX_PLAYER
 const curX = new Float64Array(MAX_PLAYERS), curY = new Float64Array(MAX_PLAYERS), curA = new Float64Array(MAX_PLAYERS);
 const moveAngle = new Float64Array(MAX_PLAYERS);
 const lastShot = new Float64Array(MAX_PLAYERS).fill(-10);
-let lastStepAt = performance.now();
 let nowSec = 0;
+const lastDust: number[] = new Array<number>(MAX_PLAYERS).fill(0);
 let catchingUp = false;
+let catchupPeak = 0;
+let joinedLate = false;
+let reconnecting = false;
 
 function beforeStep(w: World): void {
   for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -350,7 +353,6 @@ function beforeStep(w: World): void {
 }
 
 function afterStep(w: World): void {
-  lastStepAt = performance.now();
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s]) continue;
     if (prevX[s] === 0 && prevY[s] === 0 && curX[s] === 0 && curY[s] === 0) {
@@ -669,6 +671,7 @@ function connect(name: string, rawServer: string, code: string | null, password 
   session = sess;
   sock.onopen = () => {
     reconnectTries = 0;
+    if (code) joinedLate = true;
     if (rejoinToken && code) sess.rejoin(code, rejoinToken);
     else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
     else sess.create(name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
@@ -681,7 +684,7 @@ function connect(name: string, rawServer: string, code: string | null, password 
     if (over || session !== sess) return;
     if (world && sess.token && reconnectTries < 6) {
       reconnectTries++;
-      ui.warn(ui.tr('reconnecting'));
+      reconnecting = true;
       setTimeout(() => connect(name, server, sess.code, '', sess.token), 800 * reconnectTries);
       return;
     }
@@ -825,20 +828,31 @@ function frame(nowMs: number): void {
     }
     alpha = acc / TICK_DT;
   } else if (world && mode === 'online' && session) {
-    acc += dt;
+    acc += realDt; // inputs keep their 30 Hz cadence whatever the hit-stop does to the picture
     while (acc >= TICK_DT) {
       acc -= TICK_DT;
       session.sendInput(sampleLocal());
     }
-    catchingUp = session.backlog > 20;
+    catchingUp = session.catchingUp || session.backlog > 20;
     const s0 = performance.now();
-    const n = session.pump(session.backlog > 8 ? 4 : 2, { before: beforeStep, after: afterStep });
+    const n = session.drive(realDt, { before: beforeStep, after: afterStep });
     if (n) {
       stepMs += performance.now() - s0;
       stepN += n;
     }
+    // far behind the server (late join, a tab that was in the background): say so instead of looking frozen
+    const behind = session.backlog;
+    if (session.catchingUp) {
+      catchupPeak = Math.max(catchupPeak, behind);
+      ui.setLoading(ui.tr(joinedLate ? 'joining' : 'syncing'), 1 - behind / Math.max(1, catchupPeak));
+    } else {
+      catchupPeak = 0;
+      joinedLate = false;
+      ui.setLoading(reconnecting ? ui.tr('reconnecting') : null);
+    }
+    if (n && !session.catchingUp) reconnecting = false;
     catchingUp = false;
-    alpha = Math.min(1, (performance.now() - lastStepAt) / (TICK_DT * 1000));
+    alpha = session.catchingUp ? 0 : session.playFraction;
     for (let s = 0; s < MAX_PLAYERS; s++) if (world.pActive[s]) ensureCharacter(s);
     if (session.desyncTicks.length) ui.warn(ui.tr('desync'));
   }
@@ -864,6 +878,13 @@ function frame(nowMs: number): void {
       const cls = w.pPerk[s * PERKS + PERK.Class]!;
       c.root.scale.setScalar(PowerView.bodyScale(w, s) * (cls === 2 ? 1.18 : cls === 3 ? 0.92 : 1));
       power.slot(w, s, x, y, nowSec, dt, s === localSlot);
+      if (w.pState[s] === PlayerState.Alive && nowSec - lastDust[s]! > 0.1) {
+        const sp = Math.hypot(curX[s]! - prevX[s]!, curY[s]! - prevY[s]!) / TICK_DT;
+        if (sp > 7) {
+          lastDust[s] = nowSec;
+          fx.dust(x, y);
+        }
+      }
       const aimDriven = animator.apply(w, s, c, nowSec, { firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: curA[s]! });
       c.update(dt);
       if (aimDriven) c.applyAim(dir.set(Math.cos(ang), 0, -Math.sin(ang)));
@@ -977,12 +998,14 @@ function frame(nowMs: number): void {
       const owner = w.bOwner[i]!;
       if (!strength[owner]) strength[owner] = strengthOf(w, owner);
       const st = strength[owner]!;
-      dummy.position.set(w.bX[i]!, BALANCE.weapons[wid].muzzleH, -w.bY[i]!);
+      // bullets fly fast now: draw them between the last two simulated positions instead of jumping a whole step
+      const back = (1 - alpha) * TICK_DT;
+      dummy.position.set(w.bX[i]! - w.bVx[i]! * back, BALANCE.weapons[wid].muzzleH, -(w.bY[i]! - w.bVy[i]! * back));
       q.setFromUnitVectors(fwd, dir.set(w.bVx[i]!, 0, -w.bVy[i]!).normalize());
       dummy.quaternion.copy(q);
       // upgrades show in the rounds: damage fattens and reddens them, piercing stretches them, crits flash gold
       const fat = 1 + Math.min(0.35, st.damage * 0.5);
-      dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * (1 + Math.min(0.6, st.pierce * 0.2 + st.damage * 0.2))));
+      dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * 1.6 * (1 + Math.min(0.6, st.pierce * 0.2 + st.damage * 0.2))));
       dummy.updateMatrix();
       bulletMesh.setMatrixAt(n, dummy.matrix);
       dummy.scale.multiply(GLOW_SCALE);

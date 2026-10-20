@@ -59,6 +59,9 @@ class Client {
   private downLast = 0;
   private acc = 0;
   private localTick = 0;
+  /** Smooth playout instead of stepping as soon as bundles arrive; records when each tick was simulated. */
+  useDrive = false;
+  readonly stepTimes: number[] = [];
 
   constructor(
     private readonly net: Net,
@@ -86,7 +89,10 @@ class Client {
         this.session.sendInput(inp);
       }
     }
-    this.session.pump();
+    if (this.useDrive) {
+      const n = this.session.drive(1 / 1000);
+      for (let i = 0; i < n; i++) this.stepTimes.push(this.net.now);
+    } else this.session.pump();
   }
 }
 
@@ -101,6 +107,37 @@ function lobby(latencies: number[], jitter = 20, opts: ManagerOptions = {}): Net
 }
 
 describe('lockstep over a laggy network', () => {
+  it('smooth playout steps on an even clock even when bundles arrive in bursts', () => {
+    const net = lobby([50, 50], 70);
+    const c = net.clients[1]!;
+    c.useDrive = true;
+    net.clients[0]!.session.start();
+    net.advance(1500);
+    c.stepTimes.length = 0;
+    net.advance(6000);
+    const gaps: number[] = [];
+    for (let i = 1; i < c.stepTimes.length; i++) gaps.push(c.stepTimes[i]! - c.stepTimes[i - 1]!);
+    gaps.sort((a, b) => a - b);
+    expect(c.stepTimes.length).toBeGreaterThan(150);
+    const p90 = gaps[Math.floor(gaps.length * 0.9)]!;
+    expect(p90).toBeLessThanOrEqual(60); // bursts would show as 0 ms gaps followed by long ones
+    expect(c.session.jitterMs).toBeGreaterThan(5);
+    expect(c.session.playoutTicks).toBeGreaterThanOrEqual(2);
+  });
+
+  it('stays in step with a pump-driven client on the same checkpoints', () => {
+    const net = lobby([40, 90], 40);
+    net.clients[1]!.useDrive = true;
+    net.clients[0]!.session.start();
+    net.advance(5000);
+    const a = net.clients[0]!.session.world!;
+    const b = net.clients[1]!.session.world!;
+    expect(net.clients[1]!.session.desyncTicks.length).toBe(0);
+    const common = Math.min(a.tick, b.tick);
+    expect(common).toBeGreaterThan(60);
+    expect(net.clients[1]!.session.resyncs).toBe(0);
+  });
+
   it('builds a room with a code and starts for everyone', () => {
     const net = lobby([40, 40, 40, 40, 40]);
     const host = net.clients[0]!.session;

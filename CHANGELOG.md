@@ -7,6 +7,18 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Speed (rules change: update the server and reload the page)**
+- Everyone walks twice as fast (players 6 to 12, every enemy speed doubled), bullets and spit fly twice as fast (ranges unchanged, so a shot lives half as long); the dash is a shorter, sharper burst (x2.4).
+- Enemies bounce with every stride, leapers jump in a real arc and a hit pops the body up; running players kick up dust; bullets are drawn between ticks so fast rounds do not jump.
+
+**HUD**
+- Player cards in the bottom left: health with its number, a smooth bar, shield overlay, and a chip for every upgrade (damage, fire rate, piercing, ...) plus haste/quad timers. Softer cards, bars and buttons across the HUD.
+- Loading overlay with a spinner and progress for joining a game in progress, catching up after the tab was in the background, and reconnecting.
+
+**Network**
+- Smooth playout: the simulation steps on an even clock with a buffer sized from the measured jitter (1 to 5 ticks), so bursts of bundles no longer make movement stutter. A large backlog is replayed in 10 ms slices instead of one long freeze.
+- A player who stops sending inputs (background tab) stands still after 0.4 s instead of running into a wall; inputs keep their 30 Hz cadence during a hit-stop.
+
 ## v0.5.3 (2026-10-20)
 
 **Loot**

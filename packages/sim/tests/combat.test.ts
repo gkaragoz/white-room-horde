@@ -19,6 +19,7 @@ describe('grenades', () => {
     const cluster = [];
     for (let i = 0; i < 6; i++) cluster.push(spawnEnemy(w, T('grunt'), -4 + (i % 3) * 0.6, (i >> 1) * 0.6 - 0.6, false));
     for (const c of cluster) w.eCooldown[c] = 1e9;
+    w.misc[0] = 30; // time freeze: the cluster stays where the grenade lands
     step(w, [{ ...NONE, buttons: Buttons.Grenade }]);
     expect(w.pGren[0]).toBe(BALANCE.grenade.max - 1);
     let boom = false;

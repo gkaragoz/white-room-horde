@@ -283,6 +283,11 @@ export class Fx {
     this.flashes.push({ mesh: m, life: 0.28, max: 0.28, grow: size * 2.2 });
   }
 
+  /** A small kick of dust under a running character's feet. */
+  dust(x: number, y: number): void {
+    this.burst(Kind.Smoke, x, y, 0.12, 1, 0.9, 0, 0, 6.28, 0.35, 0.15, '#d9d3c6');
+  }
+
   /** One puff of flame along a flamethrower's path. */
   flame(x: number, y: number, h: number): void {
     this.burst(Kind.Fire, x, y, h, 1, 1.2, 0, 0, 6.28, 0.35, 0.2, '#ff8a2a');

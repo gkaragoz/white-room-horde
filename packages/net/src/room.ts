@@ -23,6 +23,8 @@ interface Member {
   /** Input tagged by target tick, and the last one that was applied. */
   pending: Map<number, PlayerInput>;
   last: PlayerInput | undefined;
+  /** Ticks in a row without a fresh input (a stalled or backgrounded tab). */
+  miss?: number;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -260,8 +262,11 @@ export class Room {
       let inp = m.pending.get(this.tick);
       if (inp) {
         m.last = inp;
+        m.miss = 0;
       } else {
-        inp = m.last ? { ...m.last } : { ...NO_INPUT };
+        m.miss = (m.miss ?? 0) + 1;
+        // a short gap repeats the last input (smooth); a long one means the player is gone for now: stand still, keep aim
+        inp = m.last && m.miss <= 12 ? { ...m.last } : { ...NO_INPUT, aim: m.last?.aim ?? 0 };
       }
       for (const t of m.pending.keys()) if (t <= this.tick) m.pending.delete(t);
       inputs.push(inp);

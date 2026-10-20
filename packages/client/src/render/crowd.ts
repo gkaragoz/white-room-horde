@@ -41,9 +41,16 @@ const CLIPS: Record<EnemyType, { move: string; attack: string; spawn: string; de
   screamer: { move: 'z_walk', attack: 'z_scream', spawn: 'z_scream', death: 'z_death_back' },
 };
 
+const LEAP_TICKS = 9;
+const LEAPER = ENEMY_TYPES.indexOf('leaper');
+const RUNNER = ENEMY_TYPES.indexOf('runner');
+const CRAWLER = ENEMY_TYPES.indexOf('crawler');
+const EXPLODER = ENEMY_TYPES.indexOf('exploder');
+
 const VERTEX_DECL = /* glsl */ `
 attribute vec4 iPosYaw;
 attribute vec4 iAnim;
+attribute float iHop;
 uniform highp sampler2D uVat;
 `;
 
@@ -54,7 +61,7 @@ vec3 transformed = mix( pa, pb, iAnim.z );
 float yc = cos( iPosYaw.w );
 float ys = sin( iPosYaw.w );
 transformed *= iPosYaw.y;
-transformed = vec3( yc * transformed.x + ys * transformed.z, transformed.y, - ys * transformed.x + yc * transformed.z ) + vec3( iPosYaw.x, 0.0, iPosYaw.z );
+transformed = vec3( yc * transformed.x + ys * transformed.z, transformed.y, - ys * transformed.x + yc * transformed.z ) + vec3( iPosYaw.x, iHop, iPosYaw.z );
 `;
 
 function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolean): void {
@@ -79,6 +86,7 @@ async function makeNodeMaterial(vat: THREE.DataTexture, paint: THREE.Texture): P
   const { attribute, vertexIndex, textureLoad, ivec2, int, vec3, vec4, mix, cos, sin, texture } = tsl;
   const posYaw = attribute('iPosYaw', 'vec4');
   const anim = attribute('iAnim', 'vec4');
+  const hop = attribute('iHop', 'float');
   const idx = int(vertexIndex);
   const pa = textureLoad(vat, ivec2(idx, int(anim.x))).xyz;
   const pb = textureLoad(vat, ivec2(idx, int(anim.y))).xyz;
@@ -87,7 +95,7 @@ async function makeNodeMaterial(vat: THREE.DataTexture, paint: THREE.Texture): P
   const ys = sin(posYaw.w);
   const rotated = vec3(yc.mul(p.x).add(ys.mul(p.z)), p.y, ys.negate().mul(p.x).add(yc.mul(p.z)));
   const mat = new webgpu.MeshStandardNodeMaterial({ flatShading: true, roughness: 0.85, metalness: 0 });
-  mat.positionNode = rotated.add(vec3(posYaw.x, 0, posYaw.z));
+  mat.positionNode = rotated.add(vec3(posYaw.x, hop, posYaw.z));
   const col = attribute('color', 'vec3');
   mat.colorNode = vec4(texture(paint).rgb.mul(col).mul(anim.w), 1);
   return mat;
@@ -98,6 +106,7 @@ interface TypeRenderer {
   geometry: THREE.InstancedBufferGeometry;
   posYaw: Float32Array;
   anim: Float32Array;
+  hop: Float32Array;
   clips: Map<string, ClipRef>;
   count: number;
   capacity: number;
@@ -192,6 +201,8 @@ export class Crowd {
     const anim = new Float32Array(capacity * 4);
     const aPos = new THREE.InstancedBufferAttribute(posYaw, 4).setUsage(THREE.DynamicDrawUsage);
     const aAnim = new THREE.InstancedBufferAttribute(anim, 4).setUsage(THREE.DynamicDrawUsage);
+    const hop = new Float32Array(capacity);
+    geometry.setAttribute('iHop', new THREE.InstancedBufferAttribute(hop, 1).setUsage(THREE.DynamicDrawUsage));
     geometry.setAttribute('iPosYaw', aPos);
     geometry.setAttribute('iAnim', aAnim);
     geometry.instanceCount = 0;
@@ -222,7 +233,7 @@ export class Crowd {
 
     const clips = new Map<string, ClipRef>();
     for (const c of meta.clips) clips.set(c.id, c);
-    return { mesh, geometry, posYaw, anim, clips, count: 0, capacity, scale: meta.scale };
+    return { mesh, geometry, posYaw, anim, hop, clips, count: 0, capacity, scale: meta.scale };
   }
 
   /** Call before each sim step so the next frames can interpolate from the previous tick. */
@@ -271,8 +282,9 @@ export class Crowd {
     while (this.corpses.length > this.maxCorpses) this.corpses.shift();
   }
 
-  private put(t: TypeRenderer, x: number, z: number, yaw: number, rowA: number, rowB: number, mix: number, shade: number, scale = 1): void {
+  private put(t: TypeRenderer, x: number, z: number, yaw: number, rowA: number, rowB: number, mix: number, shade: number, scale = 1, hop = 0): void {
     const k = t.count * 4;
+    t.hop[t.count] = hop;
     t.posYaw[k] = x;
     t.posYaw[k + 1] = scale;
     t.posYaw[k + 2] = z;
@@ -360,7 +372,12 @@ export class Crowd {
       // elites stand out: giants are big, swift ones bright, armoured ones dark, volatile ones glow hot
       const mod = w.eMod[i]!;
       const eliteShade = mod === 6 ? 0.55 : mod === 4 ? 1.9 : mod === 2 ? 1.35 : mod === 3 ? 1.25 : mod === 5 ? 1.15 : 1;
-      this.put(t, x, -y, this.yaw[i]!, s.a, s.b, s.m, (0.9 + ((i * 53) % 10) * 0.02) * eliteShade + this.flash[i]! * 1.6, mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : 1);
+      // hops: a leaper's leap is a real arc, fast runners bounce with every stride, a hit pops the body up a little
+      let hop = this.flash[i]! * 0.14;
+      const etype = w.eType[i]!;
+      if (etype === LEAPER && w.eAux[i]! > 0) hop += 1.5 * Math.sin(Math.PI * Math.min(1, (LEAP_TICKS - w.eAux[i]! + alpha) / LEAP_TICKS));
+      else if (clip.loop && state !== EnemyState.Attack && (etype === RUNNER || etype === CRAWLER || etype === EXPLODER || etype === LEAPER)) hop += Math.abs(Math.sin(this.phase[i]! * Math.PI * 2)) * 0.13;
+      this.put(t, x, -y, this.yaw[i]!, s.a, s.b, s.m, (0.9 + ((i * 53) % 10) * 0.02) * eliteShade + this.flash[i]! * 1.6, mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : 1, hop);
     }
     // corpses do not pile up: after a few seconds they shrink away and only the blood stays on the floor
     for (let k = this.corpses.length - 1; k >= 0; k--) if (now - this.corpses[k]!.born > this.corpseLife) this.corpses.splice(k, 1);
@@ -382,6 +399,7 @@ export class Crowd {
       t.geometry.instanceCount = t.count;
       (t.geometry.getAttribute('iPosYaw') as THREE.InstancedBufferAttribute).needsUpdate = true;
       (t.geometry.getAttribute('iAnim') as THREE.InstancedBufferAttribute).needsUpdate = true;
+      (t.geometry.getAttribute('iHop') as THREE.InstancedBufferAttribute).needsUpdate = true;
       tris += t.count * ((t.geometry.index?.count ?? 0) / 3);
     }
     this.triangles = tris;
@@ -413,6 +431,7 @@ export class Crowd {
       r.geometry.instanceCount = r.count;
       (r.geometry.getAttribute('iPosYaw') as THREE.InstancedBufferAttribute).needsUpdate = true;
       (r.geometry.getAttribute('iAnim') as THREE.InstancedBufferAttribute).needsUpdate = true;
+      (r.geometry.getAttribute('iHop') as THREE.InstancedBufferAttribute).needsUpdate = true;
     }
     return { rows: clip.frames, clip };
   }

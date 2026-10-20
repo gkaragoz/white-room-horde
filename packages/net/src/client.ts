@@ -47,6 +47,10 @@ export class NetSession {
   paused = false;
   private pendingStart: { seed: number; players: { slot: number; weapon: WeaponId; cls: number }[] } | null = null;
   private nextPing = 0;
+  private lastArrival = 0;
+  /** Smoothed deviation of the bundle arrival gaps from one tick, in milliseconds. */
+  jitterMs = 0;
+  private playAcc = 0;
 
   constructor(
     private readonly transport: Transport,
@@ -106,6 +110,13 @@ export class NetSession {
     if (typeof data !== 'string') {
       if (data[0] === Bin.Bundle) {
         const b = decodeBundle(data, MAX_SLOTS);
+        const at = this.clock();
+        if (this.lastArrival > 0 && at - this.lastArrival < 1000) {
+          // bundles should come every tick; how far the gaps stray from that is the jitter the playout buffer must absorb
+          const dev = Math.abs(at - this.lastArrival - TICK_DT * 1000);
+          this.jitterMs = this.jitterMs * 0.92 + Math.min(200, dev) * 0.08;
+        }
+        this.lastArrival = at;
         this.bundles.set(b.tick, b);
         if (b.tick > this.received) this.received = b.tick;
       } else if (data[0] === Bin.SnapshotDeliver && this.world) {
@@ -177,6 +188,29 @@ export class NetSession {
     for (const [t, b] of this.history) if (t >= tick) this.bundles.set(t, b);
   }
 
+  private stepOne(b: Bundle, hooks?: { before?: (w: World) => void; after?: (w: World) => void }): void {
+    const w = this.world!;
+    this.bundles.delete(b.tick);
+    this.history.set(b.tick, b);
+    this.history.delete(b.tick - 900);
+    for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!, j.cls);
+    hooks?.before?.(w);
+    step(w, b.inputs);
+    hooks?.after?.(w);
+    this.applied = b.tick;
+    if (w.tick % CHECKPOINT_TICKS === 0 && this.received - this.applied < 60) {
+      this.sendJson({ t: 'hash', tick: w.tick, hash: hashWorld(w) });
+    }
+  }
+
+  private ping(): void {
+    const now = this.clock();
+    if (now >= this.nextPing) {
+      this.nextPing = now + 2000;
+      this.sendJson({ t: 'ping', ts: now });
+    }
+  }
+
   /** Apply as many confirmed ticks as are available. Returns the number of ticks stepped. */
   pump(max = MAX_STEPS_PER_PUMP, hooks?: { before?: (w: World) => void; after?: (w: World) => void }): number {
     const w = this.world;
@@ -187,25 +221,66 @@ export class NetSession {
     while (n < budget) {
       const b = this.bundles.get(this.applied + 1);
       if (!b) break;
-      this.bundles.delete(b.tick);
-      this.history.set(b.tick, b);
-      this.history.delete(b.tick - 900);
-      for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!, j.cls);
-      hooks?.before?.(w);
-      step(w, b.inputs);
-      hooks?.after?.(w);
-      this.applied = b.tick;
+      this.stepOne(b, hooks);
       n++;
-      if (w.tick % CHECKPOINT_TICKS === 0 && this.received - this.applied < 60) {
-        this.sendJson({ t: 'hash', tick: w.tick, hash: hashWorld(w) });
-      }
     }
     this.lastSteps = n;
-    const now = this.clock();
-    if (now >= this.nextPing) {
-      this.nextPing = now + 2000;
-      this.sendJson({ t: 'ping', ts: now });
+    this.ping();
+    return n;
+  }
+
+  /** How many confirmed ticks to keep in hand: enough to ride out the measured jitter, 1 to 5. */
+  get playoutTicks(): number {
+    return Math.max(1, Math.min(5, Math.round(1 + this.jitterMs / 14)));
+  }
+
+  /** Fraction of the next tick that has elapsed (0..1) for drawing between two simulated ticks. */
+  get playFraction(): number {
+    return Math.min(1, this.playAcc / TICK_DT);
+  }
+
+  /** True while far behind the server (a tab that was in the background, a late join): ticks are replayed in time slices. */
+  catchingUp = false;
+
+  /**
+   * Smooth playout: the simulation advances on a steady clock (a little faster when a backlog builds up, a little slower
+   * when the buffer runs dry), so movement does not stutter when bundles arrive in bursts. A big backlog is replayed in
+   * slices of `sliceMs` per call so the page stays responsive.
+   */
+  drive(dtSec: number, hooks?: { before?: (w: World) => void; after?: (w: World) => void }, sliceMs = 10): number {
+    const w = this.world;
+    if (!w || this.state !== 'playing') return 0;
+    this.ping();
+    let n = 0;
+    const behind = this.received - this.applied;
+    if (behind > 45) {
+      this.catchingUp = true;
+      const t0 = performance.now();
+      while (performance.now() - t0 < sliceMs) {
+        const b = this.bundles.get(this.applied + 1);
+        if (!b) break;
+        this.stepOne(b, hooks);
+        n++;
+      }
+      this.playAcc = 0;
+      this.lastSteps = n;
+      return n;
     }
+    this.catchingUp = false;
+    const target = this.playoutTicks;
+    const rate = Math.max(0.6, Math.min(2, 1 + (behind - target) * 0.12));
+    this.playAcc += dtSec * rate;
+    while (this.playAcc >= TICK_DT && n < 8) {
+      const b = this.bundles.get(this.applied + 1);
+      if (!b) {
+        this.playAcc = Math.min(this.playAcc, TICK_DT);
+        break;
+      }
+      this.stepOne(b, hooks);
+      this.playAcc -= TICK_DT;
+      n++;
+    }
+    this.lastSteps = n;
     return n;
   }
 
