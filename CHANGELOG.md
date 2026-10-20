@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.19.0 (2026-10-20)
+
 **More of everything: 10 enemies, 5 elites, 5 bosses, 10 guns, harder floors (rules and wire format change: update the server and reload the page)**
 
 - Ten new enemies: the **pouncer** marks one player and leaps onto the spot, the **hurler** picks up its own soldiers and throws them at you, the **grabber** catches you and throws you across the room, the **spiker** shoots a fan of spikes, the **shocker** pulses a ring of lightning, the **brood** mother bursts into crawlers, the **trapper** lays mines, the **warcaller** blows a horn and calls reinforcements (and speeds its horde up), the **chopper** throws an axe that comes back, the **quaker** stomps and rains rocks.
