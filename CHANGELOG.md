@@ -7,6 +7,9 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+- The floor sounds are balanced against the rest of the mix (countdown ticks, charge, lift and horn were about twice as loud as the other effects).
+- CI: the multi-floor lockstep test no longer depends on how quickly the scripted players clear a floor.
+
 ## v0.7.1 (2026-10-20)
 
 **Sound**
