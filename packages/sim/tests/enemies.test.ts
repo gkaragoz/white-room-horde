@@ -135,7 +135,7 @@ describe('enemies', () => {
     const a = runScripted(77, 900, 6);
     const b = runScripted(77, 900, 6);
     expect(a.hash).toBe(b.hash);
-    expect(a.world.enemyCount).toBeGreaterThan(20);
+    expect(a.world.kills + a.world.enemyCount).toBeGreaterThan(20);
     expect(a.world.kills).toBeGreaterThan(0);
   });
 

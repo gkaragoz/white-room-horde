@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
@@ -15,6 +15,9 @@ import { AmmoRing } from './render/ammoRing';
 import { TargetMarker } from './render/targetMarker';
 import { PropsView } from './render/props';
 import { FloorClimb } from './render/floorFx';
+import { angleTo, pickTarget, type AimTarget } from './autoAim';
+import { NetDiag } from './netDiag';
+import { InputTimer } from './inputTimer';
 import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
@@ -32,7 +35,7 @@ const params = new URLSearchParams(location.search);
 // ---- settings (persisted) ----
 let worldReady = false;
 function defaultSettings(): Settings {
-  return { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, time: 'cycle', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0.6, shadows: 2, scale: 1, lang: ((['tr', 'de', 'es', 'fr', 'ru'] as const).find((l) => navigator.language.toLowerCase().startsWith(l)) ?? 'en') as Settings['lang'] };
+  return { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, time: 'cycle', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0.6, shadows: 2, scale: 1, lang: ((['tr', 'de', 'es', 'fr', 'ru'] as const).find((l) => navigator.language.toLowerCase().startsWith(l)) ?? 'en') as Settings['lang'] };
 }
 
 function loadSettings(): Settings {
@@ -425,7 +428,12 @@ function handleEvent(e: SimEvent): void {
   if (e.type === 'weaponSwitch' && e.slot === localSlot && e.auto) {
     const L = UI_STRINGS[ui.lang];
     const n = (L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!];
-    ui.warn(`${e.weapon === 0 ? L.switched : L.backToMain} ${n}`);
+    ui.warn(`${L.switched} ${n}`);
+  }
+  if (e.type === 'weaponGet' && e.slot === localSlot && e.fresh) {
+    const L = UI_STRINGS[ui.lang];
+    const rank = WEAPON_RANK.indexOf(WEAPON_IDS[e.weapon]!);
+    ui.banner(`${L.newWeapon}: ${(L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!]}`, rank < 9 ? `[${rank + 1}]` : '[Q]', 1800);
   }
   if (catchingUp) return;
   fx.onEvent(e, localSlot);
@@ -592,6 +600,8 @@ function beginPlaying(w: World, slot: number): void {
   stage.setNightNow(nightFor(w));
   stage.update(0, 0, 0);
   climb.props.setNight(stage.night);
+  // build the climb's blur composer and shaders now, in a calm moment, instead of at the first climb
+  setTimeout(() => stage.warmFlight(), 1200);
   world = w;
   localSlot = slot;
   ui.clearScreen();
@@ -722,20 +732,50 @@ function lerpAngle(a: number, b: number, t: number): number {
   return a + d * t;
 }
 
+let aimTarget: AimTarget | null = null;
+
 function sampleLocal(): PlayerInput {
   if (dev.auto && mode === 'solo') return scriptedInput(world!.tick, 0);
-  if (world) input.switchTarget = world.pSel[localSlot] === 0 ? 1 : 0;
-  const s = input.sample(curX[localSlot]!, curY[localSlot]!);
+  // auto-aim: the nearest enemy or barrel within reach of the weapon; the cursor keeps steering the grenades
+  let auto: number | null = null;
+  if (world && settings.autoAim && world.pActive[localSlot] && world.pState[localSlot] === PlayerState.Alive) {
+    aimTarget = pickTarget(world, localSlot, aimTarget);
+    if (aimTarget) auto = angleTo(world, localSlot, aimTarget);
+  } else aimTarget = null;
+  const s = input.sample(curX[localSlot]!, curY[localSlot]!, auto);
   return s.input;
 }
 
+const diag = new NetDiag();
+let diagLastTick = 0;
+let diagLastSample = 0;
+
+/** One input per simulation tick, sent from the worker timer whatever the page is doing. */
+function onlineInputTick(): void {
+  if (mode !== 'online' || !session || session.state !== 'playing' || !world) return;
+  session.sendInput(sampleLocal());
+  diag.input();
+}
+const inputTimer = new InputTimer(onlineInputTick);
+inputTimer.start();
+
 let lastDrawn = 0;
 let slowSeconds = 0;
+let autoScaleQuiet = 0;
 let fastSeconds = 0;
 
 /** Dynamic resolution: shed pixels when the frame rate sags, win them back when there is headroom. */
 function adaptScale(currentFps: number, seconds: number): void {
   if (!settings.autoScale || !world) return;
+  // moments that are slow for other reasons (a catch-up after the tab was hidden, the climb, a loading overlay) say nothing about the machine
+  autoScaleQuiet = Math.max(0, autoScaleQuiet - seconds);
+  if (document.hidden || catchingUp || session?.catchingUp || climb.active) {
+    autoScaleQuiet = 3;
+    slowSeconds = 0;
+    fastSeconds = 0;
+    return;
+  }
+  if (autoScaleQuiet > 0) return;
   const target = settings.fpsCap || 60;
   if (currentFps < target * 0.8) {
     slowSeconds += seconds;
@@ -744,16 +784,19 @@ function adaptScale(currentFps: number, seconds: number): void {
     fastSeconds += seconds;
     slowSeconds = 0;
   }
-  if (slowSeconds >= 1.5 && autoScale > 0.55) {
-    autoScale = Math.max(0.55, autoScale - 0.1);
+  // small steps, and never two changes within five seconds: every change re-creates the canvas buffers and can flash
+  if (slowSeconds >= 3 && autoScale > 0.55) {
+    autoScale = Math.max(0.55, autoScale - 0.05);
     stage.setScale(autoScale);
     if (autoScale <= 0.65) crowd.setShadows(false); // last resort for slow machines: the horde stops casting shadows
     slowSeconds = 0;
-  } else if (fastSeconds >= 6 && autoScale < settings.scale) {
+    autoScaleQuiet = 5;
+  } else if (fastSeconds >= 10 && autoScale < settings.scale) {
     autoScale = Math.min(settings.scale, autoScale + 0.05);
     stage.setScale(autoScale);
     if (autoScale >= 0.8) crowd.setShadows(true);
     fastSeconds = 0;
+    autoScaleQuiet = 5;
   }
 }
 
@@ -833,11 +876,8 @@ function frame(nowMs: number): void {
     }
     alpha = acc / TICK_DT;
   } else if (world && mode === 'online' && session) {
-    acc += realDt; // inputs keep their 30 Hz cadence whatever the hit-stop does to the picture
-    while (acc >= TICK_DT) {
-      acc -= TICK_DT;
-      session.sendInput(sampleLocal());
-    }
+    // inputs go out from the worker timer (inputTimer), so a slow or hidden page does not starve the others
+    acc = 0;
     catchingUp = session.catchingUp || session.backlog > 20;
     const s0 = performance.now();
     const n = session.drive(realDt, { before: beforeStep, after: afterStep });
@@ -1082,6 +1122,17 @@ function frame(nowMs: number): void {
   frameN++;
   frames++;
   fpsT += dt;
+  {
+    // diagnostics: ticks simulated this frame, stalls, and one sample per second
+    const tickNow = world?.tick ?? 0;
+    diag.frame(nowMs, Math.max(0, tickNow - diagLastTick));
+    diagLastTick = tickNow;
+    if (mode === 'online' && session && session.state === 'playing' && !session.paused) diag.bundleGap(session.sinceBundleMs, nowMs);
+    if (nowMs - diagLastSample >= 1000) {
+      diagLastSample = nowMs;
+      diag.sample(nowMs, { rtt: session?.rttMs ?? 0, jitter: session?.jitterMs ?? 0, backlog: session?.backlog ?? 0, playout: session?.playoutTicks ?? 0, bufferedBytes: ws?.bufferedAmount ?? 0 });
+    }
+  }
   if (fpsT >= 0.5) {
     fps = Math.round(frames / fpsT);
     perf.fps = fps;
@@ -1100,12 +1151,30 @@ function frame(nowMs: number): void {
           `enemies ${perf.enemies} &middot; corpses ${perf.corpses} &middot; particles ${perf.particles}` +
           ` &middot; ${backend}` +
           (world ? ` &middot; tick ${world.tick} &middot; hash ${hashWorld(world).toString(16)}` : '') +
-          (session ? ` &middot; rtt ${Math.round(session.rttMs)} ms &middot; backlog ${session.backlog}` : ''),
+          (session ? ` &middot; rtt ${Math.round(session.rttMs)} ms &middot; backlog ${session.backlog}` : '') +
+          (session ? `<br>${diag.line()}` : ''),
       );
     }
   }
   requestAnimationFrame(frame);
 }
+
+// F3 shows the frame rate and network numbers, F4 copies a full network report for a bug report
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'F3') {
+    e.preventDefault();
+    settings.showFps = !settings.showFps;
+    applySettings();
+    if (!settings.showFps) ui.setDev('');
+  } else if (e.code === 'F4') {
+    e.preventDefault();
+    const text = diag.report(`${BUILD.version} ${BUILD.commit} ${backend} ${session ? `room ${session.code} slot ${session.slot} players ${session.players.length}` : 'offline'}`);
+    void navigator.clipboard?.writeText(text).then(
+      () => ui.warn(ui.lang === 'tr' ? 'Ağ raporu panoya kopyalandı' : 'Network report copied'),
+      () => console.log(text),
+    );
+  }
+});
 
 const replayUrl = params.get('replay');
 if (replayUrl) {

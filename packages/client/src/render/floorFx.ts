@@ -205,20 +205,35 @@ export class FloorClimb {
     return this.flying;
   }
 
+  /**
+   * Build the next floor off-screen at the height of the shaft. The cover boxes and the scenery are built on two different
+   * frames (so no single frame carries all of it), and the shaders and textures are warmed with the first build only.
+   */
   private prepare(map: number): void {
     if (this.preparedMap === map) return;
     const nx = this.other;
-    nx.arena.setMap(map);
+    if (this.building !== map) {
+      this.building = map;
+      nx.arena.setMap(map);
+      nx.arena.group.position.y = nx.props.group.position.y = nx.floor.position.y = FLOOR_GAP;
+      return; // the scenery follows on the next frame
+    }
     nx.props.setMap(map);
     nx.props.setNight(this.stage.night);
-    nx.arena.group.position.y = nx.props.group.position.y = nx.floor.position.y = FLOOR_GAP;
     this.preparedMap = map;
-    // warm the shaders and textures of the new floor now, while the countdown runs, so the flight never hitches
-    nx.arena.group.visible = nx.props.group.visible = nx.floor.visible = true;
-    const warm = (this.stage.renderer as unknown as { compileAsync?: (s: THREE.Object3D, c: THREE.Camera) => Promise<void> }).compileAsync;
-    if (warm) void warm.call(this.stage.renderer, this.stage.scene, this.stage.camera).catch(() => undefined);
-    nx.arena.group.visible = nx.props.group.visible = nx.floor.visible = false;
+    this.building = -1;
+    if (!this.warmed) {
+      this.warmed = true;
+      // warm the shaders and textures of the new floor once, while the countdown runs
+      nx.arena.group.visible = nx.props.group.visible = nx.floor.visible = true;
+      const warm = (this.stage.renderer as unknown as { compileAsync?: (s: THREE.Object3D, c: THREE.Camera) => Promise<void> }).compileAsync;
+      if (warm) void warm.call(this.stage.renderer, this.stage.scene, this.stage.camera).catch(() => undefined);
+      nx.arena.group.visible = nx.props.group.visible = nx.floor.visible = false;
+    }
   }
+
+  private building = -1;
+  private warmed = false;
 
   private rebase(w: World): void {
     const old = this.sets[this.cur]!;
@@ -233,6 +248,7 @@ export class FloorClimb {
     this.entered = false;
     this.lampsSwitched = false;
     this.preparedMap = -1;
+    this.building = -1;
     this.fx.clearFloor();
     this.fx.setMap(w.map);
     this.lastMap = w.map;
@@ -286,10 +302,14 @@ export class FloorClimb {
     this.charge01 = c;
     this.lift01 = p;
     const nx = this.other;
+    // a late join or a resync can land here with the next floor not built yet: build it in one go
+    if (this.preparedMap !== nextMap) {
+      this.prepare(nextMap);
+      this.prepare(nextMap);
+    }
     if (!this.flying) {
       this.flying = true;
       this.entered = false;
-      this.prepare(nextMap);
       for (let s = 0; s < MAX_PLAYERS; s++) {
         this.start.x[s] = px[s]!;
         this.start.y[s] = py[s]!;

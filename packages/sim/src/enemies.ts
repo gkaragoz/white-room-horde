@@ -9,6 +9,8 @@ import { SH_H, SH_W } from './spatial';
 import type { World } from './state';
 
 const N_TYPES = ENEMY_TYPES.length;
+/** Aim units (0..65535) to radians. */
+const AIM_RAD = 6.283185307179586 / 65536;
 const T_EXPLODER = ENEMY_TYPES.indexOf('exploder');
 const T_SPITTER = ENEMY_TYPES.indexOf('spitter');
 const T_SPAWNER = ENEMY_TYPES.indexOf('spawner');
@@ -819,7 +821,7 @@ export function updateGrenades(w: World, inputs: ReadonlyArray<PlayerInput | und
       }
     }
     const inp = inputs[s];
-    if (inp && (inp.buttons & Buttons.Grenade) !== 0 && w.pGren[s]! > 0 && w.pGrenCd[s]! <= 0) throwGrenade(w, s, w.pAngle[s]!, inp.aimDist ?? 0);
+    if (inp && (inp.buttons & Buttons.Grenade) !== 0 && w.pGren[s]! > 0 && w.pGrenCd[s]! <= 0) throwGrenade(w, s, inp.gAim !== undefined ? inp.gAim * AIM_RAD : w.pAngle[s]!, inp.aimDist ?? 0);
   }
 }
 

@@ -90,10 +90,11 @@ export class Input {
   private touchMove: TouchStick | null = null;
   private touchAim: TouchStick | null = null;
   private touchButtons = 0;
-  /** Weapon slot (0 main, 1 sidearm) that a press of the switch key goes to; main keeps it up to date. */
-  switchTarget = 1;
-  private switchLatch: number | null = null;
   private touchSwitch = false;
+  /** Weapon choice of the last key press (1-9 = rank, 14 = next), sent once with the next sample. */
+  private queuedWeapon = 0;
+  private padSwitchHeld = false;
+  private touchSwitchHeld = false;
   private touchLayer: HTMLElement | null = null;
 
   constructor(
@@ -110,6 +111,11 @@ export class Input {
         return;
       }
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing in a text box
+      if (!e.repeat && this.enabled) {
+        const digit = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+        if (digit) this.queuedWeapon = Number(digit[1]);
+        else if (this.bindings.switch.includes(e.code)) this.queuedWeapon = 14;
+      }
       this.keys.add(e.code);
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
     });
@@ -216,7 +222,7 @@ export class Input {
     return null;
   }
 
-  sample(playerX: number, playerY: number): { input: PlayerInput; moveAngle: number; aimAngle: number } {
+  sample(playerX: number, playerY: number, autoAim: number | null = null): { input: PlayerInput; moveAngle: number; aimAngle: number } {
     const dx = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
     const dy = (this.held('up') ? 1 : 0) - (this.held('down') ? 1 : 0);
     let m = keysToMove(dx, dy);
@@ -226,15 +232,12 @@ export class Input {
     if (this.held('revive')) buttons |= Buttons.Revive;
     if (this.held('reload')) buttons |= Buttons.Reload;
     if (this.held('dash')) buttons |= Buttons.Dash;
-    // weapon switch: the card buttons double as "take weapon slot 1 / 2" while no card offer is open. Q latches the
-    // slot that is not in the hands at the moment of the press, so holding the key does not flip back and forth.
+    // weapon choice: 1-9 and Q (next) are one-shot presses queued by the key handler; the pad's Y and the touch button too
     const padSwitch = !!this.pad()?.buttons[3]?.pressed;
-    if (this.held('switch') || padSwitch || this.touchSwitch) {
-      if (this.switchLatch === null) this.switchLatch = this.switchTarget;
-      buttons |= this.switchLatch === 0 ? Buttons.Card1 : Buttons.Card2;
-    } else {
-      this.switchLatch = null;
-    }
+    if (padSwitch && !this.padSwitchHeld) this.queuedWeapon = 14;
+    this.padSwitchHeld = padSwitch;
+    if (this.touchSwitch && !this.touchSwitchHeld) this.queuedWeapon = 14;
+    this.touchSwitchHeld = this.touchSwitch;
     if (this.held('card1')) buttons |= Buttons.Card1;
     if (this.held('card2')) buttons |= Buttons.Card2;
     if (this.held('card3')) buttons |= Buttons.Card3;
@@ -299,15 +302,20 @@ export class Input {
     } else aimAngle = this.lastAim;
     this.lastAim = aimAngle;
 
+    // auto-aim turns the character (and the bullets) toward the nearest target; the cursor direction stays in gAim for grenades
+    const shotAngle = autoAim ?? aimAngle;
     const input: PlayerInput = {
       moveX: Math.round(m.x * 127),
       moveY: Math.round(m.y * 127),
-      aim: encodeAim(aimAngle),
+      aim: encodeAim(shotAngle),
       buttons: buttons | this.queued,
       aimDist,
+      wsel: this.queuedWeapon,
+      gAim: encodeAim(aimAngle),
     };
     this.queued = 0;
-    return { input, moveAngle: Math.atan2(m.y, m.x), aimAngle };
+    this.queuedWeapon = 0;
+    return { input, moveAngle: Math.atan2(m.y, m.x), aimAngle: shotAngle };
   }
 
   /** Two virtual sticks and four round buttons for phones and tablets. */

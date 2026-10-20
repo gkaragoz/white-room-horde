@@ -1,91 +1,162 @@
-import { BALANCE, WEAPON_IDS } from '@wrh/shared';
+import { BALANCE, RANK_INDEX, RANK_OF, WEAPON_IDS } from '@wrh/shared';
 import type { World } from './state';
+
+const NW = WEAPON_IDS.length;
+const PISTOL = WEAPON_IDS.indexOf('pistol');
+const stats = (weapon: number) => BALANCE.weapons[WEAPON_IDS[weapon]!]!;
+
+export function owns(w: World, slot: number, weapon: number): boolean {
+  return ((w.pOwned[slot]! >> weapon) & 1) === 1;
+}
+
+/** Can this weapon be fired (or reloaded) right now? Infinite reserve, a round in the magazine or a reserve are enough. */
+export function usable(w: World, slot: number, weapon: number): boolean {
+  const st = stats(weapon);
+  if (st.ammo < 0) return true;
+  if (weapon === w.pWeapon[slot]) return w.pMag[slot]! > 0 || w.pAmmo[slot]! > 0;
+  return w.pInvMag[slot * NW + weapon]! > 0 || w.pInvAmmo[slot * NW + weapon]! > 0;
+}
 
 /** Put a weapon in a player's hands: full magazine, full reserve (reserve is -1 for weapons with infinite ammo). */
 export function equipWeapon(w: World, slot: number, weaponIndex: number): void {
-  const stats = BALANCE.weapons[WEAPON_IDS[weaponIndex]!]!;
+  const st = stats(weaponIndex);
   w.pWeapon[slot] = weaponIndex;
-  w.pMag[slot] = stats.mag;
-  w.pAmmo[slot] = stats.ammo; // reserve outside the magazine
+  w.pMag[slot] = st.mag;
+  w.pAmmo[slot] = st.ammo; // reserve outside the magazine
   w.pReload[slot] = 0;
   w.pCooldown[slot] = 0;
 }
 
-const PISTOL = WEAPON_IDS.indexOf('pistol');
-
-/** A fresh loadout: the chosen weapon in the hands and, unless that is the pistol itself, a pistol as the sidearm. */
-export function equipLoadout(w: World, slot: number, weaponIndex: number): void {
-  equipWeapon(w, slot, weaponIndex);
-  w.pSel[slot] = 0;
-  if (weaponIndex === PISTOL) {
-    w.pStashW[slot] = -1;
-  } else {
-    const p = BALANCE.weapons.pistol;
-    w.pStashW[slot] = PISTOL;
-    w.pStashMag[slot] = p.mag;
-    w.pStashAmmo[slot] = p.ammo;
-  }
+/** Write the live magazine and reserve of the weapon in the hands back to the inventory. */
+function stash(w: World, slot: number): void {
+  const cur = w.pWeapon[slot]!;
+  w.pInvMag[slot * NW + cur] = w.pMag[slot]!;
+  w.pInvAmmo[slot * NW + cur] = w.pAmmo[slot]!;
 }
 
-/** Take the main weapon (slot 0) or the sidearm (slot 1) into the hands. Returns true when something changed. */
-export function selectSlot(w: World, slot: number, target: number, auto = false): boolean {
-  if (w.pSel[slot] === target || w.pStashW[slot]! < 0) return false;
-  const weapon = w.pWeapon[slot]!;
-  const mag = w.pMag[slot]!;
-  const ammo = w.pAmmo[slot]!;
-  w.pWeapon[slot] = w.pStashW[slot]!;
-  w.pMag[slot] = w.pStashMag[slot]!;
-  w.pAmmo[slot] = w.pStashAmmo[slot]!;
-  w.pStashW[slot] = weapon;
-  w.pStashMag[slot] = mag;
-  w.pStashAmmo[slot] = ammo;
-  w.pSel[slot] = target;
+/** A fresh loadout: the chosen weapon in the hands, a pistol next to it; both are the player's for the rest of the run. */
+export function equipLoadout(w: World, slot: number, weaponIndex: number): void {
+  w.pOwned[slot] = (1 << weaponIndex) | (1 << PISTOL);
+  for (let i = 0; i < NW; i++) {
+    const st = stats(i);
+    w.pInvMag[slot * NW + i] = st.mag;
+    w.pInvAmmo[slot * NW + i] = st.ammo;
+  }
+  equipWeapon(w, slot, weaponIndex);
+}
+
+/** Take a weapon of the inventory into the hands (it has to be owned and usable). Returns true when something changed. */
+export function selectWeapon(w: World, slot: number, weapon: number, auto = false): boolean {
+  if (weapon === w.pWeapon[slot] || weapon < 0 || weapon >= NW || !owns(w, slot, weapon) || !usable(w, slot, weapon)) return false;
+  stash(w, slot);
+  w.pWeapon[slot] = weapon;
+  w.pMag[slot] = w.pInvMag[slot * NW + weapon]!;
+  w.pAmmo[slot] = w.pInvAmmo[slot * NW + weapon]!;
   w.pReload[slot] = 0;
   w.pCooldown[slot] = 0.25; // a short draw time so switching is not a free reload
-  w.events.push({ type: 'weaponSwitch', slot, weapon: w.pWeapon[slot]!, auto });
+  w.events.push({ type: 'weaponSwitch', slot, weapon, auto });
   return true;
 }
 
-/** A new main weapon (crate, arsenal card): it replaces the main slot, whichever one is in the hands. */
-export function giveMainWeapon(w: World, slot: number, weaponIndex: number): void {
-  if (w.pSel[slot] === 1) selectSlot(w, slot, 0);
-  const hadSidearm = w.pStashW[slot]! >= 0;
-  equipWeapon(w, slot, weaponIndex);
-  if (weaponIndex === PISTOL) {
-    if (hadSidearm) w.pStashW[slot] = -1;
-  } else if (!hadSidearm) {
-    const p = BALANCE.weapons.pistol;
-    w.pStashW[slot] = PISTOL;
-    w.pStashMag[slot] = p.mag;
-    w.pStashAmmo[slot] = p.ammo;
+/** The weapon at a rank (1 = weakest) as an index into WEAPON_IDS, or -1. */
+export function weaponAtRank(rank: number): number {
+  return RANK_INDEX[rank - 1] ?? -1;
+}
+
+/** The number key / rank selection: only an owned weapon that can still shoot. */
+export function selectByRank(w: World, slot: number, rank: number): boolean {
+  return selectWeapon(w, slot, weaponAtRank(rank));
+}
+
+/** Q: the next stronger usable weapon, wrapping from the strongest to the weakest; empty ones are skipped. */
+export function selectNext(w: World, slot: number): boolean {
+  const here = RANK_OF[w.pWeapon[slot]!]!;
+  for (let d = 1; d < NW; d++) {
+    const idx = RANK_INDEX[(here + d) % NW]!;
+    if (owns(w, slot, idx) && usable(w, slot, idx)) return selectWeapon(w, slot, idx);
+  }
+  return false;
+}
+
+/** An unusable weapon never stays in the hands: the nearest usable one by rank takes over (one rank lower first, then higher). */
+export function ensureUsable(w: World, slot: number): void {
+  const cur = w.pWeapon[slot]!;
+  if (usable(w, slot, cur)) return;
+  const here = RANK_OF[cur]!;
+  for (let d = 1; d < NW; d++) {
+    for (const r of [here - d, here + d]) {
+      if (r < 0 || r >= NW) continue;
+      const idx = RANK_INDEX[r]!;
+      if (owns(w, slot, idx) && usable(w, slot, idx)) {
+        selectWeapon(w, slot, idx, true);
+        return;
+      }
+    }
   }
 }
 
-/** Refill the magazine and reserve of both weapons (ammo card). */
+/** A crate or a card gives a weapon for good; getting one that is already owned refills it. It goes to the inventory, not into the hands. */
+export function giveWeapon(w: World, slot: number, weapon: number): void {
+  const fresh = !owns(w, slot, weapon);
+  w.pOwned[slot] = w.pOwned[slot]! | (1 << weapon);
+  const st = stats(weapon);
+  if (weapon === w.pWeapon[slot]) {
+    w.pMag[slot] = st.mag;
+    w.pAmmo[slot] = st.ammo;
+  } else {
+    w.pInvMag[slot * NW + weapon] = st.mag;
+    w.pInvAmmo[slot * NW + weapon] = st.ammo;
+  }
+  w.events.push({ type: 'weaponGet', slot, weapon, fresh });
+}
+
+/** Refill the magazine and reserve of every weapon the player owns (ammo crate, ammo card). */
 export function refillAll(w: World, slot: number): void {
-  equipWeapon(w, slot, w.pWeapon[slot]!);
-  if (w.pStashW[slot]! >= 0) {
-    const st = BALANCE.weapons[WEAPON_IDS[w.pStashW[slot]!]!]!;
-    w.pStashMag[slot] = st.mag;
-    w.pStashAmmo[slot] = st.ammo;
+  for (let i = 0; i < NW; i++) {
+    if (!owns(w, slot, i)) continue;
+    const st = stats(i);
+    if (i === w.pWeapon[slot]) {
+      w.pMag[slot] = st.mag;
+      w.pAmmo[slot] = st.ammo;
+    } else {
+      w.pInvMag[slot * NW + i] = st.mag;
+      w.pInvAmmo[slot * NW + i] = st.ammo;
+    }
   }
 }
 
-/** The main weapon (slot 0), whether it is in the hands or in the stash. */
-export function mainWeapon(w: World, slot: number): number {
-  return w.pSel[slot] === 0 ? w.pWeapon[slot]! : w.pStashW[slot]!;
+/** Would an ammo crate add anything: some owned weapon with a finite reserve is below its cap or magazine. */
+export function ammoNeeded(w: World, slot: number): boolean {
+  for (let i = 0; i < NW; i++) {
+    if (!owns(w, slot, i)) continue;
+    const st = stats(i);
+    if (st.ammo < 0) continue;
+    const live = i === w.pWeapon[slot];
+    const mag = live ? w.pMag[slot]! : w.pInvMag[slot * NW + i]!;
+    const ammo = live ? w.pAmmo[slot]! : w.pInvAmmo[slot * NW + i]!;
+    if (ammo < st.ammo || mag < st.mag) return true;
+  }
+  return false;
 }
 
-/** Reserve ammo of the main weapon and its cap (-1 = infinite). Ammo crates fill the main weapon even while the sidearm is out. */
-export function mainReserve(w: World, slot: number): number {
-  return w.pSel[slot] === 0 ? w.pAmmo[slot]! : w.pStashAmmo[slot]!;
+/** True when the player carries a finite-ammo weapon that is running low (loot leans toward ammo then). */
+export function ammoLow(w: World, slot: number): boolean {
+  for (let i = 0; i < NW; i++) {
+    if (!owns(w, slot, i)) continue;
+    const st = stats(i);
+    if (st.ammo < 0) continue;
+    const ammo = i === w.pWeapon[slot] ? w.pAmmo[slot]! : w.pInvAmmo[slot * NW + i]!;
+    if (ammo < st.ammo * 0.25) return true;
+  }
+  return false;
 }
 
-export function reserveMax(w: World, slot: number): number {
-  return BALANCE.weapons[WEAPON_IDS[mainWeapon(w, slot)]!]!.ammo;
-}
-
-export function setMainReserve(w: World, slot: number, value: number): void {
-  if (w.pSel[slot] === 0) w.pAmmo[slot] = value;
-  else w.pStashAmmo[slot] = value;
+/** The next stronger weapon the player does not own yet (wraps to the weakest missing one), or -1 when they have them all. */
+export function nextMissing(w: World, slot: number): number {
+  const top = Math.max(...RANK_INDEX.map((idx, r) => (owns(w, slot, idx) ? r : -1)));
+  for (let d = 1; d <= NW; d++) {
+    const idx = RANK_INDEX[(top + d) % NW]!;
+    if (!owns(w, slot, idx)) return idx;
+  }
+  return -1;
 }

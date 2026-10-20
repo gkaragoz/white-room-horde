@@ -2,7 +2,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { GAME_VERSION, TICK_DT } from '@wrh/shared';
-import { RoomManager, type Conn, type ManagerOptions } from '@wrh/net';
+import { LoopStats, RoomManager, type Conn, type ManagerOptions } from '@wrh/net';
 import { WebSocketServer } from 'ws';
 
 const MIME: Record<string, string> = {
@@ -39,6 +39,11 @@ export async function startServer(opts: { port: number; staticRoot?: string; man
       res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify({ version: GAME_VERSION, rooms: manager.rooms.size }));
       return;
     }
+    if (url.pathname === '/stats') {
+      const body = { version: GAME_VERSION, rooms: manager.rooms.size, sockets: wss.clients.size, ...loop.snapshot(manager.messages, performance.now()) };
+      res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }).end(JSON.stringify(body));
+      return;
+    }
     let path = normalize(decodeURIComponent(url.pathname));
     if (path === '/' || path === '\\') path = '/index.html';
     const file = join(root, path);
@@ -51,6 +56,7 @@ export async function startServer(opts: { port: number; staticRoot?: string; man
   });
 
   const manager = new RoomManager(opts.manager);
+  const loop = new LoopStats();
   const wss = new WebSocketServer({ server: http, path: '/ws', maxPayload: 2_100_000 });
   wss.on('connection', (ws) => {
     const conn: Conn = { send: (d) => ws.readyState === ws.OPEN && ws.send(d), close: () => ws.close() };
@@ -69,6 +75,7 @@ export async function startServer(opts: { port: number; staticRoot?: string; man
     const now = performance.now();
     if (now - nextTick > periodMs * 5) nextTick = now - periodMs * 5;
     while (now >= nextTick) {
+      loop.record(now - nextTick);
       manager.tick();
       nextTick += periodMs;
     }

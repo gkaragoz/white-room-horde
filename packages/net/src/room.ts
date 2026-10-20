@@ -1,4 +1,4 @@
-import { GAME_VERSION, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { GAME_VERSION, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { Bin, decodeInputMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
@@ -25,6 +25,8 @@ interface Member {
   last: PlayerInput | undefined;
   /** Ticks in a row without a fresh input (a stalled or backgrounded tab). */
   miss?: number;
+  /** Round trip time the client measured (ms), reported with its pings: used to pick the snapshot donor. */
+  rtt?: number;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -60,7 +62,8 @@ export class Room {
   readonly history: Uint8Array[] = [];
   private pendingJoins: { slot: number; weaponIndex: number; cls: number }[] = [];
   private readonly votes = new Map<number, Map<number, number>>();
-  private readonly diverged = new Set<number>();
+  /** Slots whose last hash vote disagreed with the rest (they get a snapshot, and never upload one). */
+  readonly diverged = new Set<number>();
   private readonly jobs: SnapJob[] = [];
   private startPlayers: { slot: number; weapon: WeaponId; cls: number }[] = [];
 
@@ -118,6 +121,24 @@ export class Room {
     return m;
   }
 
+  /**
+   * Who uploads a snapshot: a connected, healthy member other than the one asking, preferring the best connection and
+   * (when there is a choice) not the host, who already carries the most.
+   */
+  pickDonor(exceptSlot: number): Member | undefined {
+    let best: Member | undefined;
+    let bestCost = Infinity;
+    for (const m of this.members) {
+      if (!m?.conn || !m.joined || m.slot === exceptSlot || this.diverged.has(m.slot)) continue;
+      const cost = (m.rtt ?? 150) + (m.host ? 120 : 0);
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = m;
+      }
+    }
+    return best;
+  }
+
   /** Send a client the history it missed: all of it for young games, otherwise a donor's snapshot plus what came after. */
   private catchUp(m: Member): void {
     if (!m.conn) return;
@@ -125,7 +146,7 @@ export class Room {
       for (const b of this.history) m.conn.send(b);
       return;
     }
-    const donor = this.members.find((x) => x && x.conn && x.joined && x.slot !== m.slot && !this.diverged.has(x.slot));
+    const donor = this.pickDonor(m.slot);
     if (!donor?.conn) {
       for (const b of this.history) m.conn.send(b);
       return;
@@ -222,7 +243,7 @@ export class Room {
 
   /** A diverged client asks for a fresh state: pick a healthy donor and have it upload a snapshot. */
   resync(slot: number): void {
-    const donor = this.members.find((m) => m?.conn && m.joined && m.slot !== slot && !this.diverged.has(m.slot));
+    const donor = this.pickDonor(slot);
     if (!donor?.conn) return;
     this.jobs.push({ slot, history: false });
     send(donor.conn, { t: 'snapshotRequest' });
@@ -356,13 +377,17 @@ export class RoomManager {
     return false;
   }
 
+  /** Messages received since the start, for the /stats endpoint of the relay and the server. */
+  messages = 0;
+
   handle(conn: Conn, data: string | Uint8Array): void {
+    this.messages++;
     if (!this.allow(conn)) return;
     const a = this.attached.get(conn);
     if (a) a.room.lastActive = this.now;
     if (typeof data !== 'string') {
       if (!a) return;
-      if (data[0] === Bin.Input && data.length === 11) {
+      if (data[0] === Bin.Input && data.length === 5 + INPUT_BYTES) {
         const { tick, input } = decodeInputMsg(data);
         if (Number.isFinite(tick)) a.room.input(a.slot, tick, input);
       } else if (data[0] === Bin.Snapshot) {
@@ -432,6 +457,10 @@ export class RoomManager {
         break;
       case 'ping':
         if (Number.isFinite(msg.ts)) send(conn, { t: 'pong', ts: msg.ts });
+        if (a && Number.isFinite(msg.rtt)) {
+          const mem = a.room.members[a.slot];
+          if (mem) mem.rtt = Math.max(0, Math.min(5000, msg.rtt!));
+        }
         break;
       case 'resync':
         if (a) a.room.resync(a.slot);

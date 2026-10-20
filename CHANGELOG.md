@@ -7,6 +7,24 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Weapons (rules change: update the server and reload the page)**
+- A real inventory: every weapon you pick up is yours for the rest of the run, with its own magazine and reserve. Ammo crates refill every weapon you own; a weapon crate you already have refills that weapon. New weapons go into the bag, not into your hands.
+- Fixed keys, weakest to strongest: `1`-`9` take the first nine weapons, `Q` takes the next stronger weapon with ammo (and wraps from the strongest to the weakest); the last four weapons are reached with `Q`. A weapon without ammo cannot be selected and never stays in your hands: when it runs dry the nearest weapon by rank takes over.
+- The list above the minimap shows the key, an icon, the name and the ammo of every weapon you own; the one in your hands has a yellow outline, empty ones are faded. Icons are rendered with Blender (`tools/blender/make_weapon_icons.py`).
+- Weapon drops are about two and a half times as frequent and favour weapons somebody in the squad does not have yet. The arsenal card hands out the next missing weapon.
+
+**Aim**
+- Auto aim (on by default, setting "Auto aim"): you only press fire, the shot goes to the nearest enemy or explosive barrel in reach of the weapon (barrels right next to you are left alone). Grenades still fly to the cursor.
+
+**Online**
+- Inputs are sent from a worker timer, so a slow, hidden or covered game page no longer starves the others (the likely reason for the host looking frozen to everybody).
+- Snapshots for late joiners and resyncs come from the connection with the best round trip time, not from the host if somebody else can do it.
+- `F3` shows the frame rate and network numbers (rtt, jitter, buffer, stalls), `F4` copies a full network report; the relay and the server answer `/stats` (tick lag, messages per second).
+
+**Smoother**
+- The climb no longer recompiles every shader when the shaft darkens the sky (one permanent fog), its blur composer is built and warmed at the start of a game, and the next floor is built over two frames.
+- Enemies shoved by blasts slide instead of snapping; the automatic resolution scaler changes in smaller steps, waits after a hidden tab or a climb and never changes twice within five seconds.
+
 ## v0.7.2 (2026-10-20)
 
 - The floor sounds are balanced against the rest of the mix (countdown ticks, charge, lift and horn were about twice as loud as the other effects).

@@ -1,7 +1,8 @@
-import { BALANCE, Buttons, decodeTick, encodeTick, ENEMY_TYPES, PickupType, PlayerState, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, decodeTick, encodeTick, ENEMY_TYPES, PickupType, PlayerState, WEAPON_IDS, WEAPON_RANK, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createWorld, hashWorld, restoreWorld, serializeWorld, spawnEnemy, step } from '../src';
-import { spawnPickup } from '../src/pickups';
+import { giveWeapon, owns, usable } from '../src/loadout';
+import { pickWeapon, spawnPickup } from '../src/pickups';
 
 const NONE: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 const FIRE: PlayerInput = { ...NONE, buttons: Buttons.Fire };
@@ -90,44 +91,91 @@ describe('weapons are distinct', () => {
   });
 });
 
-describe('weapon slots', () => {
-  const C1: PlayerInput = { ...NONE, buttons: Buttons.Card1 };
-  const C2: PlayerInput = { ...NONE, buttons: Buttons.Card2 };
+describe('weapon inventory', () => {
+  const key = (rank: number): PlayerInput => ({ ...NONE, wsel: rank });
+  const NEXT = key(14);
+  const idx = (id: (typeof WEAPON_IDS)[number]): number => WEAPON_IDS.indexOf(id);
+  const rankOf = (id: (typeof WEAPON_IDS)[number]): number => WEAPON_RANK.indexOf(id) + 1;
+  const hands = (w: ReturnType<typeof quiet>): string => WEAPON_IDS[w.pWeapon[0]!]!;
 
-  it('a player with another weapon also carries a pistol as the sidearm; a pistol player carries none', () => {
+  it('the ranking is a permutation of the weapons, weakest first', () => {
+    expect([...WEAPON_RANK].sort()).toEqual([...WEAPON_IDS].sort());
+    expect(WEAPON_RANK[0]).toBe('pistol');
+    expect(WEAPON_RANK[WEAPON_RANK.length - 1]).toBe('minigun');
+  });
+
+  it('a player starts with the chosen weapon and a pistol; a pistol player owns only the pistol', () => {
     const w = quiet(1);
     addPlayer(w, 0, 0, 0, 'smg');
     addPlayer(w, 1, 2, 0, 'pistol');
-    expect(WEAPON_IDS[w.pStashW[0]!]).toBe('pistol');
-    expect(w.pStashW[1]).toBe(-1);
+    expect(owns(w, 0, idx('smg'))).toBe(true);
+    expect(owns(w, 0, idx('pistol'))).toBe(true);
+    expect(owns(w, 0, idx('ar'))).toBe(false);
+    expect(owns(w, 1, idx('smg'))).toBe(false);
   });
 
-  it('keys 1 and 2 pick the main weapon and the sidearm, each keeping its own ammo', () => {
+  it('a number key picks the weapon of that rank and each weapon keeps its own ammo', () => {
     const w = quiet(1);
     addPlayer(w, 0, 0, 0, 'ar');
     for (let i = 0; i < 20; i++) step(w, [FIRE]);
     const mag = w.pMag[0]!;
     expect(mag).toBeLessThan(BALANCE.weapons.ar.mag);
-    step(w, [C2]);
-    expect(WEAPON_IDS[w.pWeapon[0]!]).toBe('pistol');
-    expect(w.pSel[0]).toBe(1);
-    step(w, [C2]); // pressing the same key again changes nothing
-    expect(w.pSel[0]).toBe(1);
-    step(w, [C1]);
-    expect(WEAPON_IDS[w.pWeapon[0]!]).toBe('ar');
+    step(w, [key(rankOf('pistol'))]);
+    expect(hands(w)).toBe('pistol');
+    step(w, [key(rankOf('pistol'))]); // the same key again changes nothing
+    expect(hands(w)).toBe('pistol');
+    step(w, [key(rankOf('ar'))]);
+    expect(hands(w)).toBe('ar');
     expect(w.pMag[0]).toBe(mag);
+    // a weapon the player does not own cannot be picked
+    step(w, [key(rankOf('smg'))]);
+    expect(hands(w)).toBe('ar');
   });
 
-  it('a dry main weapon falls back to the pistol by itself, and an ammo crate brings the main weapon back', () => {
+  it('Q walks up the owned weapons, skips empty ones and wraps around', () => {
     const w = quiet(2);
-    addPlayer(w, 0, 0, 0, 'dbl');
+    addPlayer(w, 0, 0, 0, 'pistol');
+    for (const id of ['mp', 'ar', 'minigun'] as const) giveWeapon(w, 0, idx(id));
+    const seen: string[] = [hands(w)];
+    for (let i = 0; i < 5; i++) {
+      step(w, [NEXT]);
+      seen.push(hands(w));
+    }
+    expect(seen).toEqual(['pistol', 'mp', 'ar', 'minigun', 'pistol', 'mp']);
+    // an empty weapon is skipped
+    step(w, [key(rankOf('pistol'))]);
+    w.pInvMag[idx('mp')] = 0;
+    w.pInvAmmo[idx('mp')] = 0;
+    step(w, [NEXT]);
+    expect(hands(w)).toBe('ar');
+    // and cannot be chosen by its number
+    step(w, [key(rankOf('mp'))]);
+    expect(hands(w)).toBe('ar');
+  });
+
+  it('a weapon that runs dry is replaced by the nearest usable one, one rank lower first', () => {
+    const w = quiet(3);
+    addPlayer(w, 0, 0, 0, 'ar');
+    for (const id of ['smg', 'dbl'] as const) giveWeapon(w, 0, idx(id));
+    // ar (rank 7) runs dry: smg (rank 6) is one lower
     w.pMag[0] = 0;
     w.pAmmo[0] = 0;
-    let switched = false;
+    let auto = false;
     step(w, [NONE]);
-    for (const e of w.events) if (e.type === 'weaponSwitch' && e.auto) switched = true;
-    expect(switched).toBe(true);
-    expect(WEAPON_IDS[w.pWeapon[0]!]).toBe('pistol');
+    for (const e of w.events) if (e.type === 'weaponSwitch' && e.auto) auto = true;
+    expect(auto).toBe(true);
+    expect(hands(w)).toBe('smg');
+    // the smg goes dry too: dbl (rank 5) is nearer than the pistol or ar
+    w.pMag[0] = 0;
+    w.pAmmo[0] = 0;
+    step(w, [NONE]);
+    expect(hands(w)).toBe('dbl');
+    // nothing but the pistol is left usable at the end: the dry weapons never stay in the hands
+    w.pMag[0] = 0;
+    w.pAmmo[0] = 0;
+    step(w, [NONE]);
+    expect(hands(w)).toBe('pistol');
+    expect(usable(w, 0, w.pWeapon[0]!)).toBe(true);
     // the pistol keeps shooting
     let shots = 0;
     for (let i = 0; i < 40; i++) {
@@ -135,31 +183,66 @@ describe('weapon slots', () => {
       shots += w.events.filter((e) => e.type === 'shot').length;
     }
     expect(shots).toBeGreaterThan(0);
-    // an ammo crate on the floor: the main weapon is refilled and taken back
-    spawnPickup(w, PickupType.Ammo, w.pX[0]!, w.pY[0]!);
-    for (let i = 0; i < 10; i++) step(w, [NONE]);
-    expect(WEAPON_IDS[w.pWeapon[0]!]).toBe('dbl');
-    expect(w.pAmmo[0]).toBeGreaterThan(0);
   });
 
-  it('a weapon crate replaces the main weapon but keeps the pistol', () => {
-    const w = quiet(3);
-    addPlayer(w, 0, 0, 0, 'smg');
-    step(w, [C2]); // pistol in the hands
-    spawnPickup(w, PickupType.Weapon, w.pX[0]!, w.pY[0]!, WEAPON_IDS.indexOf('gl'));
+  it('an ammo crate refills every weapon of the inventory, the ones in the hands and the ones in the bag', () => {
+    const w = quiet(4);
+    addPlayer(w, 0, 0, 0, 'ar');
+    for (const id of ['smg', 'sniper'] as const) giveWeapon(w, 0, idx(id));
+    w.pMag[0] = 1;
+    w.pAmmo[0] = 3;
+    w.pInvMag[idx('smg')] = 0;
+    w.pInvAmmo[idx('smg')] = 0;
+    w.pInvAmmo[idx('sniper')] = 2;
+    spawnPickup(w, PickupType.Ammo, w.pX[0]!, w.pY[0]!);
     for (let i = 0; i < 10; i++) step(w, [NONE]);
-    expect(WEAPON_IDS[w.pWeapon[0]!]).toBe('gl');
-    expect(WEAPON_IDS[w.pStashW[0]!]).toBe('pistol');
+    expect(w.pMag[0]).toBe(BALANCE.weapons.ar.mag);
+    expect(w.pAmmo[0]).toBe(BALANCE.weapons.ar.ammo);
+    expect(w.pInvMag[idx('smg')]).toBe(BALANCE.weapons.smg.mag);
+    expect(w.pInvAmmo[idx('smg')]).toBe(BALANCE.weapons.smg.ammo);
+    expect(w.pInvAmmo[idx('sniper')]).toBe(BALANCE.weapons.sniper.ammo);
+  });
+
+  it('a weapon crate adds the weapon for good without taking it into the hands; a second one refills it', () => {
+    const w = quiet(5);
+    addPlayer(w, 0, 0, 0, 'smg');
+    spawnPickup(w, PickupType.Weapon, w.pX[0]!, w.pY[0]!, idx('gl'));
+    for (let i = 0; i < 10; i++) step(w, [NONE]);
+    expect(hands(w)).toBe('smg');
+    expect(owns(w, 0, idx('gl'))).toBe(true);
+    expect(w.events.length).toBeGreaterThanOrEqual(0);
+    w.pInvMag[idx('gl')] = 0;
+    w.pInvAmmo[idx('gl')] = 0;
+    spawnPickup(w, PickupType.Weapon, w.pX[0]!, w.pY[0]!, idx('gl'));
+    for (let i = 0; i < 10; i++) step(w, [NONE]);
+    expect(w.pInvAmmo[idx('gl')]).toBe(BALANCE.weapons.gl.ammo);
+    // and it stays in the inventory through everything: floors, deaths of other weapons
+    step(w, [key(rankOf('gl'))]);
+    expect(hands(w)).toBe('gl');
+  });
+
+  it('weapon drops prefer weapons the squad is still missing', () => {
+    const w = quiet(6);
+    addPlayer(w, 0, 0, 0, 'pistol');
+    for (const id of WEAPON_IDS) if (id !== 'minigun') giveWeapon(w, 0, idx(id));
+    const seen = new Set<number>();
+    for (let i = 0; i < 40; i++) seen.add(pickWeapon(w));
+    expect([...seen]).toEqual([idx('minigun')]);
+    giveWeapon(w, 0, idx('minigun'));
+    const any = new Set<number>();
+    for (let i = 0; i < 200; i++) any.add(pickWeapon(w)); // nothing is missing any more: any weapon may drop
+    expect(any.size).toBeGreaterThan(5);
   });
 
   it('survives a snapshot round trip', () => {
     const w = quiet(4);
     addPlayer(w, 0, 0, 0, 'ar');
-    step(w, [C2]);
+    giveWeapon(w, 0, idx('sniper'));
+    step(w, [key(rankOf('pistol'))]);
     const copy = createWorld(4);
     restoreWorld(copy, serializeWorld(w));
-    expect(copy.pSel[0]).toBe(1);
-    expect(WEAPON_IDS[copy.pStashW[0]!]).toBe('ar');
+    expect(copy.pOwned[0]).toBe(w.pOwned[0]);
+    expect(WEAPON_IDS[copy.pWeapon[0]!]).toBe('pistol');
     expect(hashWorld(copy)).toBe(hashWorld(w));
   });
 });

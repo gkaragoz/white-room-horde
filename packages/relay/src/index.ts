@@ -1,5 +1,5 @@
 import { GAME_VERSION, TICK_DT } from '@wrh/shared';
-import { RoomManager, type Conn } from '@wrh/net';
+import { LoopStats, RoomManager, type Conn } from '@wrh/net';
 
 // Minimal shapes of the Workers runtime used here (the full types live in @cloudflare/workers-types).
 interface WorkerSocket {
@@ -26,6 +26,7 @@ export class Hub {
   private timer: ReturnType<typeof setInterval> | null = null;
   private sockets = 0;
   private nextTick = 0;
+  private readonly stats = new LoopStats();
 
   private startTicking(): void {
     if (this.timer) return;
@@ -35,6 +36,7 @@ export class Hub {
       const now = Date.now();
       if (now - this.nextTick > period * 5) this.nextTick = now - period * 5;
       while (now >= this.nextTick) {
+        this.stats.record(now - this.nextTick);
         this.manager.tick();
         this.nextTick += period;
       }
@@ -51,6 +53,10 @@ export class Hub {
     const cors = { 'access-control-allow-origin': '*' };
     if (url.pathname === '/version.json') {
       return new Response(JSON.stringify({ version: GAME_VERSION, rooms: this.manager.rooms.size }), { headers: { 'content-type': 'application/json', ...cors } });
+    }
+    if (url.pathname === '/stats') {
+      const body = { version: GAME_VERSION, rooms: this.manager.rooms.size, sockets: this.sockets, ...this.stats.snapshot(this.manager.messages, Date.now()) };
+      return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json', ...cors } });
     }
     if (url.pathname !== '/ws' || req.headers.get('Upgrade') !== 'websocket') return new Response('white-room-horde relay', { headers: cors });
     const pair = new WebSocketPair();

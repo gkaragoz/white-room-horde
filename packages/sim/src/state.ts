@@ -1,4 +1,4 @@
-import { BALANCE, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, PERKS } from '@wrh/shared';
+import { BALANCE, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, PERKS, WEAPON_IDS } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -13,6 +13,7 @@ export type SimEvent =
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
   | { type: 'weaponSwitch'; slot: number; weapon: number; auto: boolean }
+  | { type: 'weaponGet'; slot: number; weapon: number; fresh: boolean }
   | { type: 'secondWind'; slot: number }
   | { type: 'barrelHit'; x: number; y: number }
   | { type: 'nuke'; x: number; y: number }
@@ -92,11 +93,10 @@ export interface World {
   pIFrames: Float64Array;
   pWeapon: Int32Array;
   pAmmo: Int32Array;
-  /** Two weapon slots: 0 = the main weapon, 1 = the sidearm (pistol). pSel is the one in the hands; the stash holds the other. */
-  pSel: Uint8Array;
-  pStashW: Int32Array;
-  pStashMag: Int32Array;
-  pStashAmmo: Int32Array;
+  /** Inventory: bitmask of the weapons (indices into WEAPON_IDS) a player owns for good, and the magazine / reserve of every weapon that is not in the hands (`pMag`/`pAmmo` hold the one that is). */
+  pOwned: Int32Array;
+  pInvMag: Int32Array;
+  pInvAmmo: Int32Array;
   pMoving: Uint8Array;
   /** Rounds in the magazine, reload countdown (s), dash ticks left / cooldown (s) / direction, personal card multipliers. */
   pMag: Int32Array;
@@ -225,10 +225,9 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pIFrames: new Float64Array(MAX_PLAYERS),
     pWeapon: new Int32Array(MAX_PLAYERS),
     pAmmo: new Int32Array(MAX_PLAYERS),
-    pSel: new Uint8Array(MAX_PLAYERS),
-    pStashW: new Int32Array(MAX_PLAYERS).fill(-1),
-    pStashMag: new Int32Array(MAX_PLAYERS),
-    pStashAmmo: new Int32Array(MAX_PLAYERS),
+    pOwned: new Int32Array(MAX_PLAYERS),
+    pInvMag: new Int32Array(MAX_PLAYERS * WEAPON_IDS.length),
+    pInvAmmo: new Int32Array(MAX_PLAYERS * WEAPON_IDS.length),
     pMoving: new Uint8Array(MAX_PLAYERS),
     pMag: new Int32Array(MAX_PLAYERS),
     pReload: new Float64Array(MAX_PLAYERS),

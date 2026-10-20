@@ -449,7 +449,7 @@ export class Fx {
     this.shake *= Math.max(0, 1 - dt * 7);
     this.hurt = Math.max(0, this.hurt - dt * 2.2);
     this.decalAge += dt;
-    if (this.decalDirty && this.decalAge > 0.1) {
+    if (this.decalDirty && this.decalAge > 0.2) {
       this.decalTex.needsUpdate = true;
       this.decalDirty = false;
       this.decalAge = 0;

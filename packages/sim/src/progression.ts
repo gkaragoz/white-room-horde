@@ -1,7 +1,7 @@
-import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, MAX_PLAYERS, PlayerState, RARITY_WEIGHT, TICK_RATE, WEAPON_IDS, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, MAX_PLAYERS, PlayerState, RARITY_WEIGHT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { PERK } from '@wrh/shared';
 import { addPerk, perk, setPerk } from './features';
-import { giveMainWeapon, mainWeapon, refillAll } from './loadout';
+import { giveWeapon, nextMissing, refillAll, selectWeapon } from './loadout';
 import type { World } from './state';
 
 const CARDS = CARD_IDS.length;
@@ -74,7 +74,11 @@ function applyCard(w: World, card: number, by: number): void {
     case 'arsenal':
       for (let s = 0; s < MAX_PLAYERS; s++) {
         if (!w.pActive[s]) continue;
-        giveMainWeapon(w, s, (mainWeapon(w, s) + 1) % WEAPON_IDS.length);
+        const gift = nextMissing(w, s);
+        if (gift >= 0) {
+          giveWeapon(w, s, gift);
+          selectWeapon(w, s, gift);
+        } else refillAll(w, s);
       }
       break;
     case 'sharp':

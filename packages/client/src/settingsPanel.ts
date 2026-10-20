@@ -38,7 +38,7 @@ const EN = {
   gore: 'Blood and gibs',
   corpses: 'Corpses stay',
   shake: 'Screen shake',
-  showFps: 'Show frame rate',
+  showFps: 'Show frame rate and network (F3, copy report: F4)',
   volume: 'Master volume',
   music: 'Music',
   sfx: 'Sound effects',
@@ -47,6 +47,7 @@ const EN = {
   hitStop: 'Hit-stop on kills',
   damageNumbers: 'Damage numbers',
   announcer: 'Kill streak announcer',
+  autoAim: 'Auto aim (nearest enemy or barrel)',
   ammoRing: 'Ammo ring at your feet',
   nameTags: 'Teammate name tags',
   minimap: 'Minimap',
@@ -81,7 +82,9 @@ const EN = {
   ctlReload: 'Reload',
   ctlReloadTip: 'Also happens by itself when the magazine is empty',
   ctlSwitch: 'Switch weapon',
-  ctlSwitchTip: 'Main weapon or pistol; a dry main weapon falls back to the pistol',
+  ctlSwitchTip: 'The next stronger weapon with ammo; from the strongest it goes back to the weakest',
+  ctlWeapons: 'Pick weapon',
+  ctlWeaponsTip: 'Fixed numbers, weakest to strongest (the HUD list shows them); the last four weapons only with Q. A weapon without ammo cannot be picked',
   ctlDash: 'Dash',
   ctlDashTip: 'A quick burst of speed with a moment of invulnerability',
   ctlRevive: 'Revive a teammate',
@@ -142,7 +145,7 @@ const TR: Partial<typeof EN> = {
   gore: 'Kan ve parçalar',
   corpses: 'Cesetler kalır',
   shake: 'Ekran sarsıntısı',
-  showFps: 'Kare hızını göster',
+  showFps: 'Kare hızı ve ağ bilgisini göster (F3, rapor kopyala: F4)',
   volume: 'Ana ses',
   music: 'Müzik',
   sfx: 'Ses efektleri',
@@ -151,6 +154,7 @@ const TR: Partial<typeof EN> = {
   hitStop: 'Öldürmede kısa duraklama',
   damageNumbers: 'Hasar sayıları',
   announcer: 'Seri öldürme anonsu',
+  autoAim: 'Otomatik nişan (en yakın düşman veya varil)',
   ammoRing: 'Ayaktaki mermi halkası',
   nameTags: 'Takım arkadaşı isimleri',
   minimap: 'Mini harita',
@@ -185,7 +189,9 @@ const TR: Partial<typeof EN> = {
   ctlReload: 'Şarjör doldur',
   ctlReloadTip: 'Şarjör boşalınca kendiliğinden de başlar',
   ctlSwitch: 'Silah değiştir',
-  ctlSwitchTip: 'Ana silah ya da tabanca; ana silahın mermisi bitince tabancaya geçilir',
+  ctlSwitchTip: 'Mermisi olan bir sonraki güçlü silah; en güçlüden sonra en zayıfa döner',
+  ctlWeapons: 'Silah seç',
+  ctlWeaponsTip: 'Sabit numaralar, en zayıftan en güçlüye (HUD listesinde yazıyor); son dört silah yalnızca Q ile. Mermisi olmayan silah seçilemez',
   ctlDash: 'Atıl',
   ctlDashTip: 'Kısa süreli hız patlaması ve anlık dokunulmazlık',
   ctlRevive: 'Arkadaşı kaldır',
@@ -317,7 +323,10 @@ function tabsFor(t: PanelText, c: PanelContext): { id: string; label: string; gr
       groups: [
         {
           title: t.gFeel,
-          rows: [{ kind: 'toggle', key: 'hitStop', label: t.hitStop }],
+          rows: [
+            { kind: 'toggle', key: 'autoAim', label: t.autoAim },
+            { kind: 'toggle', key: 'hitStop', label: t.hitStop },
+          ],
         },
         {
           title: t.gHud,
@@ -524,6 +533,9 @@ export function renderControlsSheet(host: HTMLElement, c: Pick<PanelContext, 'la
   gren.append(el('em', undefined, '/'), caps(b('grenade')));
   body.append(line(gren, t.ctlGrenade, t.ctlGrenadeTip));
   body.append(line(caps(b('reload')), t.ctlReload, t.ctlReloadTip));
+  const nums = el('span', 'wrh-keys-row');
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9'].forEach((k) => nums.append(keycap(k)));
+  body.append(line(nums, t.ctlWeapons, t.ctlWeaponsTip));
   body.append(line(caps(b('switch')), t.ctlSwitch, t.ctlSwitchTip));
   body.append(line(caps(b('dash')), t.ctlDash, t.ctlDashTip));
   body.append(line(caps(b('revive')), t.ctlRevive, t.ctlReviveTip));

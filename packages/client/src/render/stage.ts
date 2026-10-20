@@ -130,6 +130,7 @@ export class Stage {
     this.flashlight = new THREE.SpotLight('#fff3d6', 0, 22, Math.PI / 5, 0.45, 1.3);
     this.scene.add(this.flashlight, this.flashlight.target);
 
+    this.scene.fog = new THREE.Fog(this.bg.clone(), 1e5, 1e6);
     this.floor = makeFloor(opts.texture ?? 1);
     this.scene.add(this.floor);
     if (opts.aa === 'smaa' && backend === 'webgl') {
@@ -293,12 +294,16 @@ export class Stage {
       this.hemi.intensity *= 1 - 0.45 * this.dark;
       this.renderer.toneMappingExposure *= 1 - 0.18 * this.dark;
     }
+    // one fog object for the whole run: adding or removing `scene.fog` changes the shader of every material and makes the
+    // renderer recompile them all (a long hitch), so "no fog" is a fog that starts a million units away
+    const fog = this.scene.fog as THREE.Fog;
     if (t > 0.02 || this.dark > 0.02) {
-      if (!this.scene.fog) this.scene.fog = new THREE.Fog(this.bg.clone(), 38, 95);
-      (this.scene.fog as THREE.Fog).color.copy(this.bg);
-      (this.scene.fog as THREE.Fog).far = 95 - 30 * Math.max(t, this.dark * 0.9);
+      fog.color.copy(this.bg);
+      fog.near = 38;
+      fog.far = 95 - 30 * Math.max(t, this.dark * 0.9);
     } else {
-      this.scene.fog = null;
+      fog.near = 1e5;
+      fog.far = 1e6;
     }
   }
 
@@ -384,6 +389,21 @@ export class Stage {
     }
     return this.flightComposer;
   }
+
+  /**
+   * Build the multisampled flight composer and compile its shaders now, with one frame drawn through it, so the first
+   * blurred frame of a climb is not the moment all that happens. Safe to call more than once.
+   */
+  warmFlight(): void {
+    if (this.backend !== 'webgl' || this.blurWarm) return;
+    this.blurWarm = true;
+    const saved = this.blur;
+    this.blur = 0.0006;
+    this.render();
+    this.blur = saved;
+  }
+
+  private blurWarm = false;
 
   render(): void {
     const blurred = this.blur > 0.0004 && this.backend === 'webgl';

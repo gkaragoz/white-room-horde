@@ -40,7 +40,7 @@ const check = (label, ok, detail = '') => {
 const state = () =>
   page.evaluate(() => {
     const w = window.__wrh.world;
-    return w ? { tick: w.tick, x: w.pX[0], y: w.pY[0], mag: w.pMag[0], reload: w.pReload[0], dashCd: w.pDashCd[0], enemies: w.enemyCount, hp: w.pHp[0], kills: w.kills } : null;
+    return w ? { tick: w.tick, x: w.pX[0], y: w.pY[0], mag: w.pMag[0], weapon: w.pWeapon[0], reload: w.pReload[0], dashCd: w.pDashCd[0], enemies: w.enemyCount, hp: w.pHp[0], kills: w.kills } : null;
   });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Hold keys until the simulation has really advanced `ticks` (slow headless rendering must not swallow short presses). */
@@ -107,6 +107,24 @@ try {
   await hold(['ShiftLeft', 'KeyD'], 4);
   const f1 = await state();
   check('Shift dashes (cooldown starts, fast movement)', f1.dashCd > 0 && Math.hypot(f1.x - f0.x, f1.y - f0.y) > 0.8, `cooldown ${f1.dashCd.toFixed(2)}`);
+
+  // weapon keys: put an MP (rank 2) and a shotgun (rank 3) in the bag; 2 picks the MP, Q walks up to the shotgun, 1 is the pistol
+  await page.evaluate(() => {
+    const w = window.__wrh.world;
+    w.pOwned[0] |= (1 << 8) | (1 << 3); // mp and shotgun (indices in WEAPON_IDS)
+    w.pInvMag[8] = 20;
+    w.pInvAmmo[8] = 100;
+    w.pInvMag[3] = 6;
+    w.pInvAmmo[3] = 24;
+  });
+  await hold(['Digit2'], 4);
+  check('key 2 takes the weapon of rank 2 (MP)', (await state()).weapon === 8, `weapon ${(await state()).weapon}`);
+  await hold(['KeyQ'], 4);
+  check('Q takes the next stronger weapon (shotgun)', (await state()).weapon === 3, `weapon ${(await state()).weapon}`);
+  await hold(['Digit1'], 4);
+  check('key 1 takes the pistol', (await state()).weapon === 0, `weapon ${(await state()).weapon}`);
+  const inv = await page.evaluate(() => document.querySelectorAll('.wrh-inv .row').length);
+  check('the weapon list shows the owned weapons', inv === 3, `${inv} rows`);
 
   // Esc pauses the simulation and resumes it
   await page.keyboard.press('Escape');

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { Buttons, CARD_IDS, CARD_RARITY, MAPS, PERSONAL_CARDS, WEAPON_IDS } from '@wrh/shared';
-import { addPlayer, createWorld } from '@wrh/sim';
+import { Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, PERSONAL_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
+import { addPlayer, createWorld, giveWeapon, spawnEnemy } from '@wrh/sim';
+import { angleTo, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
@@ -111,18 +112,25 @@ export const moreTests: QaTest[] = [
       if (!(input.sample(0, 0).input.buttons & Buttons.Reload)) problems.push('rebound reload key does nothing');
       input.debugKeys(['KeyR']);
       if (input.sample(0, 0).input.buttons & Buttons.Reload) problems.push('old reload key still works');
-      // weapon switch: Q takes the slot that is not in the hands, latched at the press so holding it does not flip back
+      // weapon keys are one-shot presses: a digit picks that rank, Q the next weapon, holding repeats nothing
       input.resetBindings();
-      input.switchTarget = 1;
-      input.debugKeys(['KeyQ']);
-      if (!(input.sample(0, 0).input.buttons & Buttons.Card2)) problems.push('Q does not select the sidearm');
-      input.switchTarget = 0; // the world changed under the held key
-      if (!(input.sample(0, 0).input.buttons & Buttons.Card2) || input.sample(0, 0).input.buttons & Buttons.Card1) problems.push('a held Q flips back and forth');
       input.debugKeys([]);
-      input.sample(0, 0);
-      input.debugKeys(['KeyQ']);
-      if (!(input.sample(0, 0).input.buttons & Buttons.Card1)) problems.push('a new Q press does not go back to the main weapon');
-      input.debugKeys([]);
+      const press = (code: string, repeat = false): void => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code, repeat }));
+      };
+      press('Digit3');
+      if (input.sample(0, 0).input.wsel !== 3) problems.push('digit 3 does not queue weapon rank 3');
+      if (input.sample(0, 0).input.wsel !== 0) problems.push('a weapon key press is sent more than once');
+      press('KeyQ');
+      if (input.sample(0, 0).input.wsel !== 14) problems.push('Q does not queue the next weapon');
+      press('KeyQ', true);
+      if (input.sample(0, 0).input.wsel !== 0) problems.push('a held Q keeps cycling weapons');
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyQ' }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Digit3' }));
+      // auto-aim moves the shot direction but the cursor keeps steering grenades
+      const aimed = input.sample(0, 0, 1.5).input;
+      if (Math.abs(aimed.aim - Math.round((1.5 / (Math.PI * 2)) * 65536)) > 2) problems.push('auto aim angle is not sent as the shot direction');
+      if (aimed.gAim === aimed.aim) problems.push('the grenade direction followed the auto aim');
       input.resetBindings();
       input.setBinding('reload', 'KeyT');
       input.setBinding('dash', 'KeyT'); // a key belongs to one action only
@@ -355,7 +363,7 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
@@ -417,7 +425,7 @@ export const moreTests: QaTest[] = [
       document.body.appendChild(host);
       const looks: [number, number][] = [];
       const weapons: string[] = [];
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: (w) => weapons.push(w), onLook: (a, c) => looks.push([a, c]), getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
@@ -501,7 +509,7 @@ export const moreTests: QaTest[] = [
       document.body.appendChild(host);
       const problems: string[] = [];
       const changes: [string, unknown][] = [];
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0.6, shadows: 2, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0.6, shadows: 2, scale: 1, lang: 'en' };
       let tab = 'graphics';
       const draw = (): void =>
         renderSettingsPanel(host, {
@@ -676,7 +684,7 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
@@ -702,6 +710,92 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'revive ring and teammate arrow behave' };
+    },
+  },
+  {
+    id: 'aim.auto',
+    title: 'Auto-aim picks the nearest enemy or barrel in reach, sticks to it, and keeps away from barrels at the shooter\'s feet',
+    async run() {
+      const problems: string[] = [];
+      const w = createWorld(3);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, 0, 'ar');
+      w.brActive.fill(0);
+      if (pickTarget(w, 0, null)) problems.push('a target appeared out of nothing');
+      const g = ENEMY_TYPES.indexOf('grunt');
+      const far = spawnEnemy(w, g, 12, 0, false);
+      const near = spawnEnemy(w, g, 0, 5, false);
+      let t = pickTarget(w, 0, null);
+      if (!t || t.kind !== 0 || t.id !== near) problems.push('the nearest enemy was not chosen');
+      else if (Math.abs(angleTo(w, 0, t) - Math.PI / 2) > 1e-6) problems.push('wrong angle to the nearest enemy');
+      // sticky: a rival only slightly nearer does not steal the lock
+      const rival = spawnEnemy(w, g, 0, -4.8, false);
+      const sticky = pickTarget(w, 0, t);
+      if (!sticky || sticky.id !== near) problems.push('the lock flickered to a barely nearer enemy');
+      // a clearly nearer one does
+      w.eY[rival] = -2;
+      t = pickTarget(w, 0, sticky);
+      if (!t || t.id !== rival) problems.push('a clearly nearer enemy did not take over');
+      // a barrel counts like an enemy, unless it is right next to the shooter
+      w.eActive.fill(0);
+      w.enemyCount = 0;
+      w.brActive[0] = 1;
+      w.brX[0] = 6;
+      w.brY[0] = 0;
+      t = pickTarget(w, 0, null);
+      if (!t || t.kind !== 1) problems.push('a barrel in reach was ignored');
+      w.brX[0] = 1;
+      if (pickTarget(w, 0, null)) problems.push('a barrel at the shooter\'s feet was targeted');
+      // out of reach
+      w.brX[0] = 200;
+      w.brActive[0] = 0;
+      if (pickTarget(w, 0, null)) problems.push('a target far out of reach was chosen');
+      void far;
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'nearest, sticky, barrel-safe and range-limited' };
+    },
+  },
+  {
+    id: 'ui.inventory',
+    title: 'The weapon list above the minimap: key labels, ammo, a yellow outline on the selected weapon, faded empty weapons',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+      }, settings);
+      const w = createWorld(4);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, 0, 'ar');
+      try {
+        giveWeapon(w, 0, WEAPON_IDS.indexOf('sniper'));
+        giveWeapon(w, 0, WEAPON_IDS.indexOf('minigun'));
+        w.pInvMag[WEAPON_IDS.indexOf('sniper')] = 0;
+        w.pInvAmmo[WEAPON_IDS.indexOf('sniper')] = 0;
+        ui.update(w, 0, 0, 1000, ['p']);
+        const rows = [...host.querySelectorAll<HTMLElement>('.wrh-inv .row')];
+        const expected = ['pistol', 'ar', 'sniper', 'minigun'].length;
+        if (rows.length !== expected) problems.push(`${rows.length} rows, expected ${expected}`);
+        const keys = rows.map((r) => r.querySelector('kbd')?.textContent);
+        const rankKey = (id: (typeof WEAPON_RANK)[number]): string => (WEAPON_RANK.indexOf(id) < 9 ? String(WEAPON_RANK.indexOf(id) + 1) : 'Q');
+        if (keys.join(',') !== ['pistol', 'ar', 'sniper', 'minigun'].map((id) => rankKey(id as (typeof WEAPON_RANK)[number])).join(',')) problems.push(`keys ${keys.join(',')} are not the fixed ranks`);
+        const cur = rows.filter((r) => r.classList.contains('cur'));
+        if (cur.length !== 1 || !cur[0]!.textContent?.includes('Assault')) problems.push('the weapon in the hands is not the single outlined row');
+        else if (!getComputedStyle(cur[0]!).borderTopColor.includes('255, 210, 31')) problems.push('the selected row has no yellow outline');
+        const dry = rows.filter((r) => r.classList.contains('dry'));
+        if (dry.length !== 1 || !dry[0]!.textContent?.includes('Sniper')) problems.push('the empty sniper is not the one faded row');
+        else if (Number(getComputedStyle(dry[0]!).opacity) > 0.6) problems.push('the empty weapon is not see-through');
+        if (!rows[0]!.textContent?.includes('\u221e')) problems.push('the pistol does not show an infinite reserve');
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'list, keys, outline and faded empty rows are right' };
     },
   },
 ];

@@ -64,7 +64,7 @@ describe('magazines and reloading', () => {
     addPlayer(w2, 0, 0, 0, 'shotgun');
     w2.pAmmo[0] = 0;
     w2.pMag[0] = 0;
-    w2.pStashW[0] = -1; // no sidearm to fall back to
+    w2.pOwned[0] = 1 << WEAPON_IDS.indexOf('shotgun'); // nothing else to fall back to
     for (let t = 0; t < 120; t++) step(w2, [{ ...NONE, buttons: Buttons.Fire }]);
     expect(w2.pMag[0]).toBe(0);
     expect(w2.pReload[0]).toBe(0);
@@ -112,13 +112,14 @@ describe('personal cards, weapon drops and difficulty', () => {
     expect(w.pMaxHp[1]).toBe(BALANCE.player.hp);
   });
 
-  it('a weapon crate swaps the weapon and fills the magazine', () => {
+  it('a weapon crate adds the weapon to the inventory with a full magazine', () => {
     const w = quiet(7);
     addPlayer(w, 0, 0, 0, 'pistol');
     spawnPickup(w, PickupType.Weapon, 0.3, 0, WEAPON_IDS.indexOf('sniper'));
     step(w, [NONE]);
-    expect(w.pWeapon[0]).toBe(WEAPON_IDS.indexOf('sniper'));
-    expect(w.pMag[0]).toBe(BALANCE.weapons.sniper.mag);
+    expect(w.pWeapon[0]).toBe(WEAPON_IDS.indexOf('pistol'));
+    expect((w.pOwned[0]! >> WEAPON_IDS.indexOf('sniper')) & 1).toBe(1);
+    expect(w.pInvMag[WEAPON_IDS.indexOf('sniper')]).toBe(BALANCE.weapons.sniper.mag);
   });
 
   it('hard mode has tougher enemies and fewer-hit players than easy mode', () => {

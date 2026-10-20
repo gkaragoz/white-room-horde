@@ -146,6 +146,8 @@ export class Crowd {
   private readonly prevX = new Float32Array(MAX_ENEMIES);
   private readonly prevY = new Float32Array(MAX_ENEMIES);
   private readonly prevActive = new Uint8Array(MAX_ENEMIES);
+  /** State start tick of every slot at the last snapshot: a different one means the slot holds a new enemy. */
+  private readonly prevStateTick = new Int32Array(MAX_ENEMIES);
   private corpses: Corpse[] = [];
   /** Seconds a death animation stays on screen (a setting). */
   corpseLife = CORPSE_DEFAULT;
@@ -241,6 +243,7 @@ export class Crowd {
     this.prevX.set(w.eX);
     this.prevY.set(w.eY);
     this.prevActive.set(w.eActive);
+    this.prevStateTick.set(w.eStateTick);
   }
 
   private renderIndex(w: World, id: number, etype: number): number {
@@ -330,10 +333,13 @@ export class Crowd {
       const spec = this.specFor(ri);
       let x = w.eX[i]!;
       let y = w.eY[i]!;
-      if (this.prevActive[i]) {
+      // blasts shove enemies several units in one tick: they slide there instead of snapping; a slot that was refilled by a
+      // new enemy (it starts in the spawn state this very tick) is placed straight away
+      const fresh = w.eState[i] === EnemyState.Spawn && w.eStateTick[i] !== this.prevStateTick[i];
+      if (this.prevActive[i] && !fresh) {
         const dx = x - this.prevX[i]!;
         const dy = y - this.prevY[i]!;
-        if (dx * dx + dy * dy < 4) {
+        if (dx * dx + dy * dy < 100) {
           x = this.prevX[i]! + dx * alpha;
           y = this.prevY[i]! + dy * alpha;
         }

@@ -1,5 +1,5 @@
-import { Buttons, ENEMY_TYPES, FloorPhase, MISC, TICK_DT, BALANCE } from '@wrh/shared';
-import { addPlayer, createWorld, spawnEnemy, step, type World } from '@wrh/sim';
+import { Buttons, ENEMY_TYPES, FloorPhase, MISC, TICK_DT, BALANCE, WEAPON_IDS } from '@wrh/shared';
+import { addPlayer, createGame, createWorld, scriptedInput, setWave, spawnEnemy, step, type World } from '@wrh/sim';
 import { BOSS_TYPES, Crowd } from '../render/crowd';
 import { Fx } from '../render/fx';
 import { RagdollPool } from '../render/ragdoll';
@@ -613,6 +613,59 @@ export const crowdTests: QaTest[] = [
         ctx.stage.follow(0, 0);
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'charge, lift, blur and arrival behave' };
+    },
+  },
+  {
+    id: 'visual.stability',
+    title: 'Nothing jumps on screen: no enemy or player teleports between two ticks, no NaN positions, through fights, a boss floor and a climb',
+    async run() {
+      const problems: string[] = [];
+      let worstEnemy = 0;
+      let worstPlayer = 0;
+      let worstWhy = '';
+      const scenarios: { name: string; wave: number; ticks: number }[] = [
+        { name: 'fight', wave: 1, ticks: 700 },
+        { name: 'late waves', wave: 8, ticks: 700 },
+        { name: 'boss floor', wave: BALANCE.progression.boss.everyWaves, ticks: 500 },
+      ];
+      for (const sc of scenarios) {
+        const w = createGame({ seed: 40 + sc.wave, players: [0, 1, 2, 3].map((slot) => ({ slot, weapon: WEAPON_IDS[slot]! })) });
+        if (sc.wave > 1) setWave(w, sc.wave);
+        for (let s = 0; s < 4; s++) w.pHp[s] = w.pMaxHp[s] = 1e7;
+        const ex = new Float64Array(w.eX);
+        const ey = new Float64Array(w.eY);
+        const was = new Uint8Array(w.eActive);
+        const px = new Float64Array(w.pX);
+        const py = new Float64Array(w.pY);
+        for (let t = 0; t < sc.ticks; t++) {
+          step(w, [0, 1, 2, 3].map((slot) => scriptedInput(t, slot)));
+          for (let i = 0; i < w.eActive.length; i++) {
+            // a slot that died and was filled again within the same tick is a new enemy, not a jump
+            if (w.eActive[i] && was[i] && w.eStateTick[i]! < w.tick - 1) {
+              const d = Math.hypot(w.eX[i]! - ex[i]!, w.eY[i]! - ey[i]!);
+              if (!Number.isFinite(d)) problems.push(`${sc.name}: enemy ${i} has a NaN position at tick ${t}`);
+              else if (d > worstEnemy) {
+                worstEnemy = d;
+                worstWhy = `${sc.name} tick ${t} ${ENEMY_TYPES[w.eType[i]!]} boss ${w.eBoss[i]} state ${w.eState[i]} aux ${w.eAux[i]} elite ${w.eMod[i]}`;
+              }
+            }
+            ex[i] = w.eX[i]!;
+            ey[i] = w.eY[i]!;
+            was[i] = w.eActive[i]!;
+          }
+          for (let p = 0; p < 4; p++) {
+            const d = Math.hypot(w.pX[p]! - px[p]!, w.pY[p]! - py[p]!);
+            if (!Number.isFinite(d)) problems.push(`${sc.name}: player ${p} has a NaN position`);
+            else if (d > worstPlayer) worstPlayer = d;
+            px[p] = w.pX[p]!;
+            py[p] = w.pY[p]!;
+          }
+        }
+      }
+      // walking, a boss charge or a leap is under a unit per tick; a barrel blast shoves a few units (the crowd slides them); a player moves at most a hasted dash
+      if (worstEnemy > 6) problems.push(`an enemy jumped ${f(worstEnemy)} units in one tick (${worstWhy})`);
+      if (worstPlayer > 2.2) problems.push(`a player jumped ${f(worstPlayer)} units in one tick`);
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 6).join(' | ') : `largest step: enemy ${f(worstEnemy)}, player ${f(worstPlayer)} units per tick` };
     },
   },
 ];

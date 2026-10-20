@@ -2,7 +2,7 @@ import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_PICKUPS, MAX_PLAYERS, PickupTy
 import { clamp, cos, sin, sqrt } from './detmath';
 import { PERK } from '@wrh/shared';
 import { nuke, perk, setPerk, waveModOf } from './features';
-import { giveMainWeapon, selectSlot, mainReserve, mainWeapon, reserveMax, setMainReserve } from './loadout';
+import { ammoLow, ammoNeeded, giveWeapon, owns, refillAll } from './loadout';
 import type { World } from './state';
 
 export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0): void {
@@ -23,10 +23,23 @@ export function spawnPickup(w: World, kind: number, x: number, y: number, data =
 function ammoStarved(w: World): boolean {
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive) continue;
-    const max = reserveMax(w, s);
-    if (max > 0 && w.pAmmo[s]! < max * 0.25) return true;
+    if (ammoLow(w, s)) return true;
   }
   return false;
+}
+
+/** The weapon of a crate: one somebody in the squad does not own yet, so drops widen the arsenal first. */
+export function pickWeapon(w: World): number {
+  const missing: number[] = [];
+  for (let i = 0; i < WEAPON_IDS.length; i++) {
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      if (w.pActive[s] && w.pState[s] !== PlayerState.Dead && !owns(w, s, i)) {
+        missing.push(i);
+        break;
+      }
+    }
+  }
+  return missing.length ? missing[w.rng.int(missing.length)]! : w.rng.int(WEAPON_IDS.length);
 }
 
 /** Roll loot for a dead enemy at (x, y). Bosses always drop a handful around them. */
@@ -49,7 +62,7 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
   if (r < ammoChance) spawnPickup(w, PickupType.Ammo, x, y);
   else if (r < ammoChance + cfg.chance.health * luck) spawnPickup(w, PickupType.Health, x, y);
   else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade) * luck) spawnPickup(w, PickupType.Grenade, x, y);
-  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, w.rng.int(WEAPON_IDS.length));
+  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, pickWeapon(w));
   else {
     // the rarer power-ups
     let edge = ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck;
@@ -113,12 +126,11 @@ export function updatePickups(w: World): void {
 function wants(w: World, s: number, kind: number, i: number): boolean {
   if (kind === PickupType.Health) return w.pHp[s]! < w.pMaxHp[s]!;
   if (kind === PickupType.Grenade) return w.pGren[s]! < BALANCE.grenade.max;
-  if (kind === PickupType.Weapon) return mainWeapon(w, s) !== w.kData[i]!;
+  if (kind === PickupType.Weapon) return !owns(w, s, w.kData[i]!) || ammoNeeded(w, s);
   if (kind === PickupType.Shield) return perk(w, s, PERK.Shield) < 100;
   if (kind >= PickupType.Haste) return true;
-  const max = reserveMax(w, s);
-  // infinite weapons turn an ammo crate into a grenade
-  return max > 0 ? mainReserve(w, s) < max : w.pGren[s]! < BALANCE.grenade.max;
+  // with every weapon full an ammo crate turns into a grenade
+  return ammoNeeded(w, s) || w.pGren[s]! < BALANCE.grenade.max;
 }
 
 function collect(w: World, s: number, i: number): void {
@@ -140,14 +152,10 @@ function collect(w: World, s: number, i: number): void {
     w.misc[0] = BALANCE.pickups.freezeSeconds;
     w.events.push({ type: 'freeze', seconds: BALANCE.pickups.freezeSeconds });
   } else if (kind === PickupType.Weapon) {
-    giveMainWeapon(w, s, w.kData[i]!);
+    giveWeapon(w, s, w.kData[i]!);
   } else {
-    const max = reserveMax(w, s);
-    if (max > 0) {
-      setMainReserve(w, s, max);
-      // the main weapon was dry and the sidearm is out: go back to it now that there is ammo
-      if (w.pSel[s] === 1 && w.pStashMag[s] === 0) selectSlot(w, s, 0, true);
-    }
+    // an ammo crate fills every weapon of the inventory; with everything full it is a grenade instead
+    if (ammoNeeded(w, s)) refillAll(w, s);
     else w.pGren[s] = w.pGren[s]! + 1;
   }
   w.kActive[i] = 0;

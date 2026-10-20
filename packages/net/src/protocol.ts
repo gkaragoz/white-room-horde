@@ -1,4 +1,4 @@
-import { decodeTick, encodeTick, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { INPUT_BYTES, decodeTick, encodeTick, type PlayerInput, type WeaponId } from '@wrh/shared';
 
 /** First byte of every binary message. */
 export const Bin = { Input: 1, Bundle: 2, Snapshot: 3, SnapshotDeliver: 4 } as const;
@@ -39,7 +39,7 @@ export type ClientMsg =
   | { t: 'rejoin'; code: string; token: string; v?: string }
   | { t: 'start' }
   | { t: 'hash'; tick: number; hash: number }
-  | { t: 'ping'; ts: number }
+  | { t: 'ping'; ts: number; rtt?: number }
   | { t: 'resync' }
   | { t: 'weapon'; weapon: WeaponId }
   | { t: 'options'; map: number; difficulty: number }
@@ -71,10 +71,10 @@ export interface Bundle {
 /** Client to server: the input a player wants applied at `tick`. */
 export function encodeInputMsg(tick: number, input: PlayerInput): Uint8Array {
   const body = encodeTick([input]);
-  const out = new Uint8Array(5 + 6);
+  const out = new Uint8Array(5 + INPUT_BYTES);
   out[0] = Bin.Input;
   new DataView(out.buffer).setUint32(1, tick, true);
-  // single-input wire form: skip the slot mask, six bytes of input
+  // single-input wire form: skip the slot mask, one input record
   out.set(body.subarray(2), 5);
   return out;
 }
@@ -82,9 +82,9 @@ export function encodeInputMsg(tick: number, input: PlayerInput): Uint8Array {
 export function decodeInputMsg(buf: Uint8Array): { tick: number; input: PlayerInput } {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const tick = dv.getUint32(1, true);
-  const mask = new Uint8Array(2 + 6);
+  const mask = new Uint8Array(2 + INPUT_BYTES);
   mask[0] = 1;
-  mask.set(buf.subarray(5, 11), 2);
+  mask.set(buf.subarray(5, 5 + INPUT_BYTES), 2);
   const d = decodeTick(mask, 1);
   return { tick, input: d.inputs[0]! };
 }

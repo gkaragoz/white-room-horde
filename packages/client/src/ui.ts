@@ -1,5 +1,5 @@
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, FloorPhase, MISC, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, FloorPhase, MISC, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -95,7 +95,7 @@ const BASE_STRINGS = {
     high: 'High',
     desync: 'Desync detected!',
     connecting: 'Connecting...',
-    controls: 'WASD move · mouse aim · click fire · R reload · Q switch weapon · Shift dash · right-click grenade · E revive · 1-3 cards',
+    controls: 'WASD move · auto aim · click fire · R reload · 1-9 / Q weapons · Shift dash · right-click grenade at the cursor · E revive · 1-3 cards',
     weapon: 'Starting weapon',
     arena: 'Arena',
     difficulty: 'Difficulty',
@@ -116,6 +116,7 @@ const BASE_STRINGS = {
     statRange: 'Range',
     statAcc: 'Accuracy',
     switched: 'Out of ammo, switched to',
+    newWeapon: 'New weapon',
     backToMain: 'Ammo found, back to',
     sidearm: 'Sidearm',
     statReload: 'Reload',
@@ -276,7 +277,7 @@ const BASE_STRINGS = {
     high: 'Yüksek',
     desync: 'Senkron bozuldu!',
     connecting: 'Bağlanıyor...',
-    controls: 'WASD hareket · fare nişan · tık ateş · R doldur · Q silah değiştir · Shift atıl · sağ tık bomba · E kaldır · 1-3 kart',
+    controls: 'WASD hareket · otomatik nişan · tık ateş · R doldur · 1-9 / Q silahlar · Shift atıl · sağ tık imlece bomba · E kaldır · 1-3 kart',
     weapon: 'Başlangıç silahı',
     arena: 'Arena',
     difficulty: 'Zorluk',
@@ -297,6 +298,7 @@ const BASE_STRINGS = {
     statRange: 'Menzil',
     statAcc: 'İsabet',
     switched: 'Mermi bitti, geçildi:',
+    newWeapon: 'Yeni silah',
     backToMain: 'Mermi bulundu, dönüldü:',
     sidearm: 'Yedek silah',
     statReload: 'Doldurma',
@@ -450,6 +452,8 @@ export interface Settings {
   hitStop: boolean;
   damageNumbers: boolean;
   announcer: boolean;
+  /** Aim at the nearest enemy or barrel by itself; the cursor still steers grenades. */
+  autoAim: boolean;
   ammoRing: boolean;
   nameTags: boolean;
   minimap: boolean;
@@ -470,7 +474,7 @@ export interface Settings {
 const CSS = `
 .wrh-ui{position:fixed;inset:0;pointer-events:none;font-family:system-ui,sans-serif;color:#3a352d}
 .wrh-ui *{box-sizing:border-box}
-.wrh-panel,.wrh-top,.wrh-me,.wrh-squad{zoom:var(--wrh-zoom,1)}
+.wrh-panel,.wrh-top,.wrh-me,.wrh-squad,.wrh-inv{zoom:var(--wrh-zoom,1)}
 .wrh-panel{pointer-events:auto;background:rgba(250,244,232,.95);border:2px solid #cdbfa5;border-radius:14px;padding:18px 22px;box-shadow:0 8px 30px rgba(60,45,20,.25)}
 .wrh-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:300px;max-width:92vw}
 .wrh-ui h1{margin:0 0 2px;font-size:28px;letter-spacing:.5px}
@@ -556,7 +560,7 @@ const CSS = `
 .wrh-ui.no-minimap .wrh-mini{display:none}
 /* layers: labels that follow things in the world sit under the HUD, the HUD under menus, menus under settings */
 .wrh-plabel,.wrh-ammo,.wrh-tag,.wrh-ring,.wrh-arrow-off,.wrh-dmg,.wrh-combo{z-index:1}
-.wrh-top,.wrh-me,.wrh-squad,.wrh-mini,.wrh-cards,.wrh-banner,.wrh-gear,.wrh-warn,.wrh-hint{z-index:5}
+.wrh-top,.wrh-me,.wrh-squad,.wrh-mini,.wrh-inv,.wrh-cards,.wrh-banner,.wrh-gear,.wrh-warn,.wrh-hint{z-index:5}
 .wrh-hostpause{z-index:8}
 .wrh-center{z-index:20}
 .wrh-ui.no-tags .wrh-tag{display:none}
@@ -656,6 +660,14 @@ const CSS = `
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
 .wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{text-shadow:none}
 .wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
+.wrh-inv{position:absolute;right:14px;bottom:182px;width:236px;display:flex;flex-direction:column;gap:3px;z-index:5;pointer-events:none}
+.wrh-inv .row{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px 0 4px;border-radius:9px;border:2px solid transparent;background:rgba(251,246,234,.82);box-shadow:0 1px 4px rgba(20,28,44,.14);font-size:12px;font-weight:700;color:#2b3a52}
+.wrh-inv kbd{min-width:19px;height:19px;line-height:19px;border-radius:5px;background:#2b3a52;color:#fff;text-align:center;font:800 11px/19px system-ui,sans-serif}
+.wrh-inv img{width:46px;height:22px;object-fit:contain;flex:none}
+.wrh-inv .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrh-inv b{font-variant-numeric:tabular-nums;font-size:11px}
+.wrh-inv .row.cur{border-color:#ffd21f;background:rgba(255,248,214,.97);box-shadow:0 0 0 1px rgba(255,210,31,.55),0 0 10px rgba(255,210,31,.5)}
+.wrh-inv .row.dry{opacity:.4}
 .wrh-plabel{position:absolute;left:0;top:0;pointer-events:none;display:none;white-space:nowrap;font:700 12px/1 system-ui,sans-serif;color:#fff;background:rgba(20,26,38,.62);padding:3px 7px;border-radius:9px;border:1.5px solid #fff;text-shadow:0 1px 1px rgba(0,0,0,.5)}
 .wrh-ammo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none}
 /* the ring itself is a 3D object on the floor (render/ammoRing.ts); this element only carries the count */
@@ -1352,6 +1364,25 @@ export class Ui {
     });
   }
 
+  /** The weapon list above the minimap: key, icon, name and ammo of every owned weapon, the one in the hands outlined in yellow, the empty ones faded. */
+  private inventoryHtml(world: World, slot: number): string {
+    const names = this.t.weapons as Record<string, string>;
+    const cur = world.pWeapon[slot]!;
+    let rows = '';
+    WEAPON_RANK.forEach((id, rank) => {
+      const idx = WEAPON_IDS.indexOf(id);
+      if (((world.pOwned[slot]! >> idx) & 1) === 0) return;
+      const st = BALANCE.weapons[id];
+      const live = idx === cur;
+      const mag = live ? world.pMag[slot]! : world.pInvMag[slot * WEAPON_IDS.length + idx]!;
+      const reserve = live ? world.pAmmo[slot]! : world.pInvAmmo[slot * WEAPON_IDS.length + idx]!;
+      const dry = st.ammo >= 0 && mag <= 0 && reserve <= 0;
+      const key = rank < 9 ? String(rank + 1) : 'Q';
+      rows += `<div class="row${live ? ' cur' : ''}${dry ? ' dry' : ''}"><kbd>${key}</kbd><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${mag}/${st.ammo < 0 ? '&infin;' : reserve}</b></div>`;
+    });
+    return rows;
+  }
+
   private countEl: HTMLElement | null = null;
   /** Seconds currently shown by the floor countdown (for the pop animation and the tick sound). */
   countShown = -1;
@@ -1498,6 +1529,7 @@ export class Ui {
       <div class="wrh-hurt" id="h-hurt"></div>
       <div class="wrh-top"><div class="big" id="h-wave"></div><div class="wrh-bar"><i id="h-xp"></i></div><div class="wrh-bar boss" id="h-bossbar" style="display:none"><i id="h-boss"></i></div><div id="h-bosslabel" style="display:none;color:#d8362e"></div></div>
       <div class="wrh-squad" id="h-squad"></div>
+      <div class="wrh-inv" id="h-inv"></div>
       <canvas class="wrh-mini" id="h-mini" width="360" height="240"></canvas>
       <div class="wrh-reload" id="h-reload"><i></i></div>
       <div class="wrh-me" id="h-me"></div>
@@ -1782,11 +1814,9 @@ export class Ui {
       set(
         'h-me',
         `${(t.weapons as Record<string, string>)[wid]} &middot; <span class="${low || (mag === 0 && reserve === 0) ? 'wrh-low' : ''}">${reloading ? t.reloading : `${mag}/${reserve < 0 ? '&infin;' : reserve}`}${low ? ' !' : ''}</span>` +
-          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>` +
-          (world.pStashW[slot]! >= 0
-            ? `<br><small style="opacity:.7">[Q] ${(t.weapons as Record<string, string>)[WEAPON_IDS[world.pStashW[slot]!]!]} ${world.pStashMag[slot]}/${world.pStashAmmo[slot]! < 0 ? '&infin;' : world.pStashAmmo[slot]}</small>`
-            : ''),
+          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>`,
       );
+      set('h-inv', this.inventoryHtml(world, slot));
       const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
       bar.style.display = reloading ? 'block' : 'none';
       if (reloading) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (1 - world.pReload[slot]! / stats.reload) * 100))}%`;

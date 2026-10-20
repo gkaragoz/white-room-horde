@@ -20,7 +20,7 @@ import { out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { Crc32 } from './hash';
 import { updatePickups } from './pickups';
 import { updateCards } from './progression';
-import { equipLoadout, selectSlot } from './loadout';
+import { ensureUsable, equipLoadout, selectByRank, selectNext } from './loadout';
 import { applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
 
@@ -298,7 +298,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
   }
   for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pIFrames[s]! > 0) w.pIFrames[s] = w.pIFrames[s]! - TICK_DT;
   // while the party is lifted to the next floor nobody can move, shoot or throw: only the aim is kept
-  if (w.misc[MISC.Phase] === FloorPhase.Ascend) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: 0, ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}) } : i));
+  if (w.misc[MISC.Phase] === FloorPhase.Ascend) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: 0, ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}), ...(i.gAim !== undefined ? { gAim: i.gAim } : {}) } : i));
   updateCards(w, inputs);
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s] || w.pState[s] === PlayerState.Dead) continue;
@@ -311,13 +311,13 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
       movePlayer(w, s, inp, BALANCE.player.crawlSpeed, false);
       continue;
     }
-    // while no card offer is open, the card buttons select a weapon slot: 1 the main weapon, 2 the sidearm
-    if (w.cardOffer[0]! < 0) {
-      if (inp.buttons & Buttons.Card1) selectSlot(w, s, 0);
-      else if (inp.buttons & Buttons.Card2) selectSlot(w, s, 1);
+    // the number keys (rank 1-9) and Q (next) pick a weapon while no card offer is open (the digits choose cards then)
+    if (w.cardOffer[0]! < 0 && inp.wsel) {
+      if (inp.wsel === 14) selectNext(w, s);
+      else selectByRank(w, s, inp.wsel);
     }
-    // the main weapon ran dry: fall back to the sidearm by itself
-    if (w.pSel[s] === 0 && w.pMag[s] === 0 && w.pAmmo[s]! === 0 && w.pReload[s]! <= 0) selectSlot(w, s, 1, true);
+    // a weapon that cannot shoot any more never stays in the hands
+    ensureUsable(w, s);
     // a helper holding Revive next to a downed teammate is busy: slower, no shooting (moving off interrupts the revive)
     const busy = (inp.buttons & Buttons.Revive) !== 0 && downedNear(w, s);
     const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
@@ -393,7 +393,7 @@ export function hashWorld(w: World): number {
   c.typed(w.kActive).typed(w.kData).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
   c.typed(w.pPerk).typed(w.eMod).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
-  c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pSel).typed(w.pStashW).typed(w.pStashMag).typed(w.pStashAmmo);
+  c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
   return c.digest();

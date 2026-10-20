@@ -207,7 +207,7 @@ export class NetSession {
     const now = this.clock();
     if (now >= this.nextPing) {
       this.nextPing = now + 2000;
-      this.sendJson({ t: 'ping', ts: now });
+      this.sendJson({ t: 'ping', ts: now, rtt: Math.round(this.rttMs) });
     }
   }
 
@@ -282,6 +282,11 @@ export class NetSession {
     }
     this.lastSteps = n;
     return n;
+  }
+
+  /** Milliseconds since the last server tick arrived (0 before the first). */
+  get sinceBundleMs(): number {
+    return this.lastArrival ? this.clock() - this.lastArrival : 0;
   }
 
   get backlog(): number {

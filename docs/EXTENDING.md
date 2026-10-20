@@ -15,7 +15,7 @@ same world from the same inputs. Anything stored in the world must be in `snapsh
 (`hashWorld` in `sim.ts`).
 
 ## A new weapon
-1. `packages/shared/src/types.ts`: add the id to `WeaponId` and `WEAPON_IDS` (append, never reorder).
+1. `packages/shared/src/types.ts`: add the id to `WeaponId` and `WEAPON_IDS` (append, never reorder) and to `WEAPON_RANK` (weakest to strongest: the number keys and the inventory list follow it).
 2. `packages/shared/data/balance.json` `weapons.<id>`: damage, rate, pellets, spread, range, pierce, magazine, reload, ammo
    (`-1` infinite). Keep sustained DPS inside the band checked by `packages/sim/tests/weapons.test.ts` (40 to 100).
    `blast` and `blastDamage` make the round explode where it ends.

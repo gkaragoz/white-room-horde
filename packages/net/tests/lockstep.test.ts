@@ -61,6 +61,8 @@ class Client {
   private localTick = 0;
   /** Smooth playout instead of stepping as soon as bundles arrive; records when each tick was simulated. */
   useDrive = false;
+  /** A frozen page: nothing is sent and nothing is simulated while true. */
+  muted = false;
   readonly stepTimes: number[] = [];
 
   constructor(
@@ -81,6 +83,7 @@ class Client {
   }
 
   frame(): void {
+    if (this.muted) return;
     this.acc += 1;
     if (this.acc >= 1000 / 30) {
       this.acc -= 1000 / 30;
@@ -107,6 +110,48 @@ function lobby(latencies: number[], jitter = 20, opts: ManagerOptions = {}): Net
 }
 
 describe('lockstep over a laggy network', () => {
+  it('a client that freezes for 600 ms never holds the others back and catches up without a desync', () => {
+    const net = lobby([40, 40, 40], 15);
+    net.clients[1]!.useDrive = true;
+    net.clients[0]!.session.start();
+    net.advance(3000);
+    const before = net.clients[0]!.session.world!.tick;
+    net.clients[1]!.muted = true;
+    net.advance(600);
+    const during = net.clients[0]!.session.world!.tick;
+    // the others kept simulating at full speed while the page was frozen
+    expect(during - before).toBeGreaterThan(14);
+    expect(net.clients[2]!.session.world!.tick - before).toBeGreaterThan(14);
+    net.clients[1]!.muted = false;
+    net.advance(4000);
+    const w0 = net.clients[0]!.session.world!;
+    const w1 = net.clients[1]!.session.world!;
+    expect(Math.abs(w0.tick - w1.tick)).toBeLessThan(15);
+    expect(net.clients.every((c) => c.session.desyncTicks.length === 0)).toBe(true);
+    expect(net.clients[1]!.session.resyncs).toBe(0);
+    expect(net.clients[1]!.session.backlog).toBeLessThan(10);
+  });
+
+  it('the snapshot donor is the healthiest connection and not the host when someone else will do', () => {
+    const net = lobby([40, 40, 40, 40], 5);
+    net.clients[0]!.session.start();
+    net.advance(1500);
+    const room = [...net.manager.rooms.values()][0]!;
+    const m = room.members;
+    m[0]!.rtt = 20; // the host: fastest, but it carries the most already
+    m[1]!.rtt = 300;
+    m[2]!.rtt = 60;
+    m[3]!.rtt = 90;
+    expect(room.pickDonor(1)!.slot).toBe(2);
+    expect(room.pickDonor(2)!.slot).toBe(3);
+    // with the host as the only healthy member left it is the donor after all
+    for (const s of [1, 2, 3]) room.diverged.add(s);
+    expect(room.pickDonor(1)!.slot).toBe(0);
+    room.diverged.clear();
+    // nobody else at all: no donor
+    expect(room.pickDonor(0)!.slot).not.toBe(0);
+  });
+
   it('smooth playout steps on an even clock even when bundles arrive in bursts', () => {
     const net = lobby([50, 50], 70);
     const c = net.clients[1]!;

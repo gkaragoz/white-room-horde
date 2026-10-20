@@ -12,6 +12,10 @@ export interface PlayerInput {
   buttons: number;
   /** Distance to the cursor in quarter units (0 = not given: grenades fly their normal range). */
   aimDist?: number;
+  /** Weapon choice: 0 = none, 1..9 = the weapon of that rank (WEAPON_RANK), 14 = the next usable weapon. */
+  wsel?: number;
+  /** Direction the grenade is thrown (same scale as `aim`); defaults to `aim`. Auto-aim moves `aim`, the cursor keeps `gAim`. */
+  gAim?: number;
 }
 
 export const Buttons = {
@@ -29,6 +33,16 @@ export const NO_INPUT: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 
 export type WeaponId = 'pistol' | 'smg' | 'ar' | 'shotgun' | 'hmg' | 'minigun' | 'sniper' | 'revolver' | 'mp' | 'dbl' | 'dmr' | 'flamer' | 'gl';
 export const WEAPON_IDS: readonly WeaponId[] = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper', 'revolver', 'mp', 'dbl', 'dmr', 'flamer', 'gl'];
+
+/**
+ * Fixed order of the weapons from the weakest to the strongest (sustained damage and area, see balance.json). The number
+ * keys 1-9 pick the first nine of them, Q walks up the list; the order never changes, so a key always means the same gun.
+ */
+export const WEAPON_RANK: readonly WeaponId[] = ['pistol', 'mp', 'shotgun', 'revolver', 'dbl', 'smg', 'ar', 'flamer', 'sniper', 'dmr', 'hmg', 'gl', 'minigun'];
+/** WEAPON_RANK as indices into WEAPON_IDS. */
+export const RANK_INDEX: readonly number[] = WEAPON_RANK.map((id) => WEAPON_IDS.indexOf(id));
+/** Position of a weapon (index into WEAPON_IDS) in the ranking, 0 = weakest. */
+export const RANK_OF: readonly number[] = WEAPON_IDS.map((id) => WEAPON_RANK.indexOf(id));
 
 export type EnemyType = 'grunt' | 'runner' | 'tank' | 'exploder' | 'spitter' | 'shielder' | 'spawner' | 'crawler' | 'leaper' | 'bloater' | 'screamer';
 /** Index in this array is the numeric type stored in the sim and used by the renderer. */
