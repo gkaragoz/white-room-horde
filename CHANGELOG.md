@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.15.1 (2026-10-20)
+
 **Test pass and a fix**
 
 - Fixed: an enemy or player could be left on a bridge level with no bridge under it (found by the new random-play tests); they now drop to the ground. Everybody in a room should reload to 0.15.1.
