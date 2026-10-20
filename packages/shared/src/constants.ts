@@ -9,7 +9,7 @@ export const ARENA_HALF_W = 30;
 export const ARENA_HALF_H = 20;
 
 /** Camera (docs/DESIGN.md section 5, iso62): orthographic, elevation 28 deg, yaw 30 deg, ~17 units wide. */
-export const CAMERA = { orthoWidth: 32, elevationDeg: 28, yawDeg: 30 } as const;
+export const CAMERA = { orthoWidth: 42, elevationDeg: 28, yawDeg: 30 } as const;
 
 /** Player vest colours (docs/DESIGN.md section 3), slot 0..10. */
 export const PLAYER_COLORS = [

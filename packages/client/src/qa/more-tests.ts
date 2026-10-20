@@ -4,6 +4,7 @@ import { addPlayer, createWorld } from '@wrh/sim';
 import { DEFAULT_BINDINGS, Input } from '../input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
+import { Fx } from '../render/fx';
 import { PowerView, strengthOf } from '../render/power';
 import { Character } from '../render/character';
 import { PlayerAnimator } from '../render/playerAnim';
@@ -199,7 +200,19 @@ export const moreTests: QaTest[] = [
       const tr = keys(UI_STRINGS.tr).sort();
       for (const k of en) if (!tr.includes(k)) problems.push(`tr is missing ${k}`);
       for (const k of tr) if (!en.includes(k)) problems.push(`en is missing ${k}`);
-      for (const lang of ['en', 'tr'] as const) {
+      const flat = (o: unknown, prefix = ''): Record<string, string> =>
+        Object.fromEntries(Object.entries(o as Record<string, unknown>).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(flat(v, `${prefix}${k}.`)) : [[`${prefix}${k}`, JSON.stringify(v)] as [string, string]])));
+      const enFlat = flat(UI_STRINGS.en);
+      for (const lang of ['tr', 'de', 'es', 'fr', 'ru'] as const) {
+        const f = flat(UI_STRINGS[lang]);
+        const missing = Object.keys(enFlat).filter((k) => !(k in f));
+        if (missing.length) problems.push(`${lang}: missing ${missing.slice(0, 3).join(', ')}`);
+        const translated = Object.keys(enFlat).filter((k) => f[k] !== enFlat[k]).length;
+        if (translated < Object.keys(enFlat).length * 0.6) problems.push(`${lang}: only ${translated} of ${Object.keys(enFlat).length} strings differ from English`);
+        const t2 = UI_STRINGS[lang] as unknown as Record<string, unknown[]>;
+        for (const [k, n] of [['classNames', 7], ['classTips', 7], ['waveMods', 6], ['waveModTips', 6], ['elites', 7], ['powerups', 9], ['combos', 6]] as const) if (t2[k]!.length !== n) problems.push(`${lang}: ${k} needs ${n} entries`);
+      }
+      for (const lang of ['en', 'tr', 'de', 'es', 'fr', 'ru'] as const) {
         const t = UI_STRINGS[lang] as unknown as Record<string, Record<string, unknown>>;
         for (const c of CARD_IDS) if (!Array.isArray(t.cards![c]) || (t.cards![c] as string[]).length !== 2) problems.push(`${lang}: card ${c} has no title and text`);
         for (const wp of WEAPON_IDS) if (!t.weapons![wp]) problems.push(`${lang}: weapon ${wp} has no name`);
@@ -208,7 +221,7 @@ export const moreTests: QaTest[] = [
         if ((UI_STRINGS[lang].diffs as readonly string[]).length !== 3) problems.push(`${lang}: needs three difficulty names`);
         if ((UI_STRINGS[lang].accs as readonly string[]).length !== ACCESSORIES.length) problems.push(`${lang}: needs a name for each of the ${ACCESSORIES.length} accessories`);
       }
-      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 12).join(' | ') : `${en.length} strings in two languages` };
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 12).join(' | ') : `${en.length} strings in six languages` };
     },
   },
   {
@@ -339,7 +352,7 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
@@ -401,7 +414,7 @@ export const moreTests: QaTest[] = [
       document.body.appendChild(host);
       const looks: [number, number][] = [];
       const weapons: string[] = [];
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: (w) => weapons.push(w), onLook: (a, c) => looks.push([a, c]), getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
@@ -451,6 +464,32 @@ export const moreTests: QaTest[] = [
       const r = el.getBoundingClientRect();
       if (r.width < 10 || r.right < 0 || r.bottom < 0 || r.left > innerWidth) return { status: 'fail', detail: 'badge is not visible' };
       return { status: 'pass', detail: text };
+    },
+  },
+  {
+    id: 'perf.budget',
+    title: 'The scene stays within its budget: a fixed number of lights, bounded draw calls, triangles and particles',
+    async run(ctx) {
+      const problems: string[] = [];
+      let lights = 0;
+      let meshes = 0;
+      ctx.stage.scene.traverse((o) => {
+        if ((o as THREE.Light).isLight) lights++;
+        if ((o as THREE.Mesh).isMesh) meshes++;
+      });
+      // sun, sky, bounce, 8 flash lights, 4 lamps, the player's own light and the flashlight are the fixed set
+      if (lights > 20) problems.push(`${lights} lights in the scene (budget 20)`);
+      const fx = new Fx(undefined, 0);
+      ctx.stage.scene.add(fx.group);
+      for (let i = 0; i < 400; i++) fx.sparkle(Math.random() * 20 - 10, Math.random() * 10 - 5, 0.5, '#ffd36a', 1, 3);
+      fx.update(0.016);
+      ctx.stage.render();
+      const info = ctx.stage.renderer.info.render;
+      if (info.calls > 90) problems.push(`${info.calls} draw calls (budget 90)`);
+      if (info.triangles > 260000) problems.push(`${info.triangles} triangles (budget 260000)`);
+      if (fx.particleCount > 3600) problems.push(`${fx.particleCount} particles (cap 3600)`);
+      ctx.stage.scene.remove(fx.group);
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${lights} lights, ${meshes} meshes, ${info.calls} draw calls, ${info.triangles} triangles` };
     },
   },
   {
@@ -507,7 +546,7 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,

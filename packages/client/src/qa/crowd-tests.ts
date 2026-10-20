@@ -129,7 +129,7 @@ export const crowdTests: QaTest[] = [
             shots.push(grab(ctx));
           }
           const sil = silhouette(shots[0]!, bg);
-          if (sil.count < 400) problems.push(`${type}: enemy not visible (${sil.count} px)`);
+          if (sil.count < 150) problems.push(`${type}: enemy not visible (${sil.count} px)`);
           const changes = [1, 2, 3].map((i) => diffCount(shots[0]!, shots[i]!));
           if (Math.max(...changes) < 60) problems.push(`${type}: ${walk} looks frozen (pixel change ${changes.join('/')})`);
           const closing = diffCount(shots[0]!, shots[4]!);
@@ -147,7 +147,7 @@ export const crowdTests: QaTest[] = [
           const dead = silhouette(grab(ctx), bg);
           const h0 = alive.bottom - alive.top;
           const h1 = dead.bottom - dead.top;
-          if (dead.count < 150) problems.push(`${type}: corpse invisible`);
+          if (dead.count < 50) problems.push(`${type}: corpse invisible`);
           if (!(h1 < h0 * 0.8)) problems.push(`${type}: death pose is not lower than standing (${h1}px vs ${h0}px)`);
           notes.push(`${type} death ${h0}px to ${h1}px`);
         }
@@ -431,7 +431,7 @@ export const crowdTests: QaTest[] = [
             shots.push(await shot());
           }
           const sil = silhouette(shots[0]!, bg);
-          if (sil.count < 400) problems.push(`${type}: not visible on WebGPU (${sil.count} px)`);
+          if (sil.count < 150) problems.push(`${type}: not visible on WebGPU (${sil.count} px)`);
           const changes = [1, 2, 3].map((k) => diffCount(shots[0]!, shots[k]!));
           if (Math.max(...changes) < 60) problems.push(`${type}: frozen on WebGPU (${changes.join('/')})`);
           const closing = diffCount(shots[0]!, shots[4]!);
@@ -503,7 +503,7 @@ export const crowdTests: QaTest[] = [
           ctx.stage.render();
           const px = silhouette(grab(ctx), bg).count;
           sizes.push(px);
-          if (px < 150) problems.push(`pickup kind ${kind} barely visible (${px} px)`);
+          if (px < 50) problems.push(`pickup kind ${kind} barely visible (${px} px)`);
         }
         w.kActive.fill(0);
         view.update(w, 0.3);

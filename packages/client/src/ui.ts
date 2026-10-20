@@ -3,13 +3,30 @@ import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS, keyLabel } from './input';
 import { THEMES } from './render/arena';
+import { EXTRA } from './i18n';
 import { discoverRelay } from './relay';
 import { Preview } from './render/preview';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
 
-export type Lang = 'en' | 'tr';
+export type Lang = 'en' | 'tr' | 'de' | 'es' | 'fr' | 'ru';
+export const LANGS: { id: Lang; label: string }[] = [
+  { id: 'en', label: 'English' },
+  { id: 'tr', label: 'Türkçe' },
+  { id: 'de', label: 'Deutsch' },
+  { id: 'es', label: 'Español' },
+  { id: 'fr', label: 'Français' },
+  { id: 'ru', label: 'Русский' },
+];
 
-export const UI_STRINGS = {
+/** Layer a partial translation over a complete one (objects merge key by key, everything else is replaced). */
+function merge<T>(base: T, over: unknown): T {
+  if (!over || typeof over !== 'object' || Array.isArray(over) || typeof base !== 'object' || base === null || Array.isArray(base)) return (over ?? base) as T;
+  const out: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+  for (const [k, v] of Object.entries(over as Record<string, unknown>)) out[k] = merge((base as Record<string, unknown>)[k], v);
+  return out as T;
+}
+
+const BASE_STRINGS = {
   en: {
     title: 'white-room-horde',
     tag: 'co-op horde survival',
@@ -55,6 +72,9 @@ export const UI_STRINGS = {
     night: 'Night',
     cycle: 'Day and night',
     dynLights: 'Real-time lights (flashes, explosions, lamps)',
+    weather: 'Rain',
+    colorblind: 'Colour-blind mode',
+    textSize: 'Text size',
     on: 'On',
     quality: 'Render scale',
     language: 'Language',
@@ -220,6 +240,9 @@ export const UI_STRINGS = {
     night: 'Gece',
     cycle: 'Gece gündüz döngüsü',
     dynLights: 'Gerçek zamanlı ışıklar (namlu, patlama, lamba)',
+    weather: 'Yağmur',
+    colorblind: 'Renk körü modu',
+    textSize: 'Yazı boyutu',
     on: 'Açık',
     quality: 'Çözünürlük ölçeği',
     language: 'Dil',
@@ -342,6 +365,17 @@ export const UI_STRINGS = {
   },
 } as const;
 
+type StringSet = (typeof BASE_STRINGS)['en'];
+/** Every interface language, complete: translations that are missing fall back to English. */
+export const UI_STRINGS: Record<Lang, StringSet> = {
+  en: BASE_STRINGS.en,
+  tr: BASE_STRINGS.tr as unknown as StringSet,
+  de: merge(BASE_STRINGS.en, EXTRA.de),
+  es: merge(BASE_STRINGS.en, EXTRA.es),
+  fr: merge(BASE_STRINGS.en, EXTRA.fr),
+  ru: merge(BASE_STRINGS.en, EXTRA.ru),
+};
+
 export interface UiHandlers {
   onSolo(name: string): void;
   onHost(name: string, server: string, password: string): void;
@@ -360,7 +394,7 @@ export interface UiHandlers {
   onResume(): void;
   onReplay(): void;
   onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
-  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'time' | 'dynLights' | 'renderer' | 'fpsCap' | 'texture' | 'autoScale', value: number | string | boolean): void;
+  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'time' | 'dynLights' | 'weather' | 'colorblind' | 'textSize' | 'renderer' | 'fpsCap' | 'texture' | 'autoScale', value: number | string | boolean): void;
 }
 
 export interface Settings {
@@ -376,6 +410,12 @@ export interface Settings {
   time: 'day' | 'night' | 'cycle';
   /** Real-time lights: muzzle flashes, explosions, street lamps, flashlight. */
   dynLights: boolean;
+  /** Rain on some night waves. */
+  weather: boolean;
+  /** Colour-blind safe player colours and numbered name tags. */
+  colorblind: boolean;
+  /** Menu and HUD text size: 0 normal, 1 larger, 2 largest. */
+  textSize: 0 | 1 | 2;
   volume: number;
   shadows: 0 | 1 | 2;
   scale: number;
@@ -385,6 +425,7 @@ export interface Settings {
 const CSS = `
 .wrh-ui{position:fixed;inset:0;pointer-events:none;font-family:system-ui,sans-serif;color:#3a352d}
 .wrh-ui *{box-sizing:border-box}
+.wrh-panel,.wrh-top,.wrh-me,.wrh-squad{zoom:var(--wrh-zoom,1)}
 .wrh-panel{pointer-events:auto;background:rgba(250,244,232,.95);border:2px solid #cdbfa5;border-radius:14px;padding:18px 22px;box-shadow:0 8px 30px rgba(60,45,20,.25)}
 .wrh-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:300px;max-width:92vw}
 .wrh-ui h1{margin:0 0 2px;font-size:28px;letter-spacing:.5px}
@@ -1246,6 +1287,28 @@ export class Ui {
   }
 
   /** Big message in the middle for a moment (wave start, boss, revive). */
+  private hurtDirEl: HTMLElement | null = null;
+  private hurtDirTimer = 0;
+
+  /** A red arc on the screen edge pointing at where the hit came from (angle in screen space, radians). */
+  hurtFrom(angle: number): void {
+    let el = this.hurtDirEl;
+    if (!el) {
+      el = document.createElement('div');
+      el.style.cssText = 'position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;transition:opacity .5s ease-out;opacity:0';
+      el.innerHTML = '<i style="position:absolute;left:min(34vw,42vh);top:-38px;width:34px;height:76px;border-radius:50%;background:radial-gradient(ellipse at 20% 50%,rgba(220,30,40,.95),rgba(220,30,40,0) 70%)"></i>';
+      this.root.appendChild(el);
+      this.hurtDirEl = el;
+    }
+    el.style.transition = 'none';
+    el.style.transform = `rotate(${angle}rad)`;
+    el.style.opacity = '1';
+    void el.offsetWidth;
+    el.style.transition = 'opacity .55s ease-out';
+    el.style.opacity = '0';
+    this.hurtDirTimer = performance.now();
+  }
+
   /** A full-screen flash of a colour that fades out (nukes, freezes). */
   screenFlash(color: string, ms: number): void {
     const el = document.createElement('div');
@@ -1291,12 +1354,15 @@ export class Ui {
       <label>${t.aa} <small>(${t.reloads})</small></label><div class="wrh-row">${(['off', 'msaa', 'smaa'] as const).map((m) => `<button class="wrh-wp${s.aa === m ? ' on' : ''}" data-aa="${m}">${m === 'off' ? t.off : m.toUpperCase()}</button>`).join('')}</div>
       <label>${t.timeOfDay}</label><div class="wrh-row">${(['day', 'night', 'cycle'] as const).map((m) => `<button class="wrh-wp${s.time === m ? ' on' : ''}" data-tod="${m}">${t[m]}</button>`).join('')}</div>
       <label>${t.dynLights}</label><div class="wrh-row"><button class="wrh-wp${s.dynLights ? ' on' : ''}" id="s-dl1">${t.on}</button><button class="wrh-wp${!s.dynLights ? ' on' : ''}" id="s-dl0">${t.off}</button></div>
+      <label>${t.weather}</label><div class="wrh-row"><button class="wrh-wp${s.weather ? ' on' : ''}" id="s-wx1">${t.on}</button><button class="wrh-wp${!s.weather ? ' on' : ''}" id="s-wx0">${t.off}</button></div>
       <label>${t.bounce}</label><div class="wrh-row"><button class="wrh-wp${s.bounce ? ' on' : ''}" id="s-bn1">${t.on}</button><button class="wrh-wp${!s.bounce ? ' on' : ''}" id="s-bn0">${t.off}</button></div>
       <label>${t.controlsTitle}</label><div class="wrh-keys" id="s-keys">${this.keyRows()}</div><button class="alt" id="s-resetkeys">${t.resetKeys}</button>
       <label>${t.fpsCap}</label><div class="wrh-row">${([0, 30, 60, 120] as const).map((v) => `<button class="wrh-wp${s.fpsCap === v ? ' on' : ''}" data-fps="${v}">${v === 0 ? t.unlimited : v}</button>`).join('')}</div>
       <label>${t.texture} <small>(${t.reloads})</small></label><div class="wrh-row"><button class="wrh-wp${s.texture === 0 ? ' on' : ''}" data-tex="0">${t.low}</button><button class="wrh-wp${s.texture === 1 ? ' on' : ''}" data-tex="1">${t.high}</button></div>
       <label>${t.autoScale}</label><div class="wrh-row"><button class="wrh-wp${s.autoScale ? ' on' : ''}" id="s-as1">${t.on}</button><button class="wrh-wp${!s.autoScale ? ' on' : ''}" id="s-as0">${t.off}</button></div>
-      <label>${t.language}</label><div class="wrh-row"><button class="alt" id="s-en">English</button><button class="alt" id="s-tr">Türkçe</button></div>
+      <label>${t.language}</label><div class="wrh-row">${LANGS.map((l) => `<button class="wrh-wp${s.lang === l.id ? ' on' : ''}" data-lang="${l.id}">${l.label}</button>`).join('')}</div>
+      <label>${t.colorblind}</label><div class="wrh-row"><button class="wrh-wp${s.colorblind ? ' on' : ''}" id="s-cb1">${t.on}</button><button class="wrh-wp${!s.colorblind ? ' on' : ''}" id="s-cb0">${t.off}</button></div>
+      <label>${t.textSize}</label><div class="wrh-row">${([0, 1, 2] as const).map((v) => `<button class="wrh-wp${s.textSize === v ? ' on' : ''}" data-ts="${v}">${['A', 'A+', 'A++'][v]}</button>`).join('')}</div>
       <button id="s-close">${t.close}</button>
     </div>`;
     const q = <E extends HTMLInputElement>(id: string): E => this.settingsEl.querySelector<E>('#' + id)!;
@@ -1313,6 +1379,8 @@ export class Ui {
     this.settingsEl.querySelectorAll<HTMLElement>('[data-tod]').forEach((el) => {
       el.onclick = () => this.h.onSetting('time', el.dataset.tod!);
     });
+    q('s-wx1').onclick = () => this.h.onSetting('weather', true);
+    q('s-wx0').onclick = () => this.h.onSetting('weather', false);
     q('s-dl1').onclick = () => this.h.onSetting('dynLights', true);
     q('s-dl0').onclick = () => this.h.onSetting('dynLights', false);
     q('s-bn1').onclick = () => this.h.onSetting('bounce', true);
@@ -1335,13 +1403,20 @@ export class Ui {
     });
     q('s-as1').onclick = () => this.h.onSetting('autoScale', true);
     q('s-as0').onclick = () => this.h.onSetting('autoScale', false);
-    q('s-en').onclick = () => this.h.onSetting('lang', 'en');
-    q('s-tr').onclick = () => this.h.onSetting('lang', 'tr');
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-lang]').forEach((el) => {
+      el.onclick = () => this.h.onSetting('lang', el.dataset.lang!);
+    });
+    this.settingsEl.querySelectorAll<HTMLElement>('[data-ts]').forEach((el) => {
+      el.onclick = () => this.h.onSetting('textSize', Number(el.dataset.ts));
+    });
+    q('s-cb1').onclick = () => this.h.onSetting('colorblind', true);
+    q('s-cb0').onclick = () => this.h.onSetting('colorblind', false);
     q('s-close').onclick = () => this.toggleSettings();
   }
 
   applySettings(s: Settings): void {
     this.settings = s;
+    this.root.style.setProperty('--wrh-zoom', String([1, 1.18, 1.38][s.textSize] ?? 1));
     this.lang = s.lang;
     if (this.settingsOpen) this.renderSettings();
     this.lastCards = '';

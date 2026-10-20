@@ -204,3 +204,37 @@ describe('reviving', () => {
     expect(w.events.some((e) => e.type === 'shot')).toBe(false);
   });
 });
+
+describe('weapon balance', () => {
+  /** Damage per second over a whole magazine including the reload, blast damage included. */
+  const sustained = (id: WeaponId): number => {
+    const s = BALANCE.weapons[id];
+    const shot = s.damage * s.pellets + (s.blastDamage ?? 0);
+    return (shot * s.mag) / (s.mag / s.rate + s.reload);
+  };
+
+  it('no weapon is hopeless or dominant: sustained damage per second stays in one band', () => {
+    const all = WEAPON_IDS.map((id) => [id, sustained(id)] as const);
+    for (const [id, dps] of all) {
+      expect(dps, id).toBeGreaterThan(38);
+      expect(dps, id).toBeLessThan(102);
+    }
+    const values = all.map(([, v]) => v);
+    expect(Math.max(...values) / Math.min(...values)).toBeLessThan(2.7);
+  });
+
+  it('burst damage is capped so the minigun and heavy machine gun do not melt everything', () => {
+    for (const id of WEAPON_IDS) {
+      const s = BALANCE.weapons[id];
+      expect(s.damage * s.pellets * s.rate, id).toBeLessThan(165);
+    }
+  });
+
+  it('the roles stay different: the sniper outranges everything, the flamethrower is short and the minigun spins up', () => {
+    const range = (id: WeaponId): number => BALANCE.weapons[id].range;
+    expect(Math.max(...WEAPON_IDS.map(range))).toBe(range('sniper'));
+    expect(range('flamer')).toBeLessThan(6);
+    expect(BALANCE.weapons.minigun.spinUp ?? 0).toBeGreaterThan(0);
+    expect(BALANCE.weapons.shotgun.pellets).toBeGreaterThan(5);
+  });
+});

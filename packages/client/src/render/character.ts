@@ -382,7 +382,7 @@ export class Character {
       hand.updateWorldMatrix(true, false);
       const wp = weapon.getWorldPosition(new THREE.Vector3());
       wp.y -= T.drop;
-      wp.addScaledVector(right, T.out).addScaledVector(dir, T.push);
+      wp.addScaledVector(right, T.out).addScaledVector(dir, T.push - this.recoil);
       weapon.position.copy(hand.worldToLocal(wp));
       this.root.updateMatrixWorld(true);
     }
@@ -436,7 +436,15 @@ export class Character {
     this.currentName = name;
   }
 
+  private recoil = 0;
+
+  /** Kick the weapon back along the barrel (recoil); it settles on its own. */
+  kick(amount: number): void {
+    this.recoil = Math.min(0.4, Math.max(this.recoil, amount));
+  }
+
   update(dt: number): void {
     this.mixer.update(dt);
+    this.recoil = Math.max(0, this.recoil - dt * 2.4);
   }
 }

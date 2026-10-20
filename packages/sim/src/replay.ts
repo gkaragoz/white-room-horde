@@ -42,17 +42,42 @@ export function playReplay(r: Replay, onTick?: (w: World) => void): { world: Wor
   return { world: w, mismatch, hash: hashWorld(w) };
 }
 
-/** Compact binary form: header (seed, players), then per tick the wire encoding, then the hashes. */
+/** Result of checking a replay against the simulation (the basis for server-side score verification). */
+export interface Verdict {
+  ok: boolean;
+  /** Tick of the first checkpoint whose hash did not match, or -1. */
+  mismatch: number;
+  ticks: number;
+  wave: number;
+  kills: number;
+  hash: number;
+}
+
+/** Re-run a replay and check every stored checkpoint (and, optionally, the final hash). */
+export function verifyReplay(r: Replay, expectedFinalHash?: number): Verdict {
+  const { world, mismatch, hash } = playReplay(r);
+  const finalOk = expectedFinalHash === undefined || expectedFinalHash >>> 0 === hash >>> 0;
+  return { ok: mismatch < 0 && finalOk && r.hashes.length > 0, mismatch, ticks: world.tick, wave: world.wave, kills: world.kills, hash };
+}
+
+/** Marks the second version of the binary form (map, difficulty and classes are stored too). */
+const MAGIC = [0x57, 0x52];
+
+/** Compact binary form: header (seed, map, difficulty, players), then per tick the wire encoding, then the hashes. */
 export function encodeReplay(r: Replay): Uint8Array {
   const parts: Uint8Array[] = [];
-  const head = new Uint8Array(4 + 1 + r.setup.players.length * 2 + 4 + 4);
+  const head = new Uint8Array(2 + 4 + 2 + 1 + r.setup.players.length * 2 + 4 + 4);
   const dv = new DataView(head.buffer);
-  dv.setUint32(0, r.setup.seed >>> 0, true);
-  head[4] = r.setup.players.length;
-  let o = 5;
+  head[0] = MAGIC[0]!;
+  head[1] = MAGIC[1]!;
+  dv.setUint32(2, r.setup.seed >>> 0, true);
+  head[6] = r.setup.map ?? 0;
+  head[7] = r.setup.difficulty ?? 1;
+  head[8] = r.setup.players.length;
+  let o = 9;
   for (const p of r.setup.players) {
     head[o++] = p.slot;
-    head[o++] = WEAPON_IDS.indexOf(p.weapon);
+    head[o++] = WEAPON_IDS.indexOf(p.weapon) | ((p.cls ?? 0) << 5);
   }
   dv.setUint32(o, r.ticks.length, true);
   dv.setUint32(o + 4, r.hashes.length, true);
@@ -75,20 +100,29 @@ export function encodeReplay(r: Replay): Uint8Array {
 
 export function decodeReplay(buf: Uint8Array): Replay {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-  const seed = dv.getUint32(0, true);
-  const n = buf[4]!;
-  let o = 5;
-  const players: { slot: number; weapon: WeaponId }[] = [];
+  const v2 = buf[0] === MAGIC[0] && buf[1] === MAGIC[1];
+  let o = v2 ? 2 : 0;
+  const seed = dv.getUint32(o, true);
+  o += 4;
+  let map = 0;
+  let difficulty = 1;
+  if (v2) {
+    map = buf[o++]!;
+    difficulty = buf[o++]!;
+  }
+  const n = buf[o++]!;
+  const players: { slot: number; weapon: WeaponId; cls: number }[] = [];
   let maxSlot = 0;
   for (let i = 0; i < n; i++) {
     const slot = buf[o++]!;
-    players.push({ slot, weapon: WEAPON_IDS[buf[o++]!]! });
+    const packed = buf[o++]!;
+    players.push({ slot, weapon: WEAPON_IDS[v2 ? packed & 31 : packed]!, cls: v2 ? packed >> 5 : 0 });
     if (slot > maxSlot) maxSlot = slot;
   }
   const ticks = dv.getUint32(o, true);
   const nh = dv.getUint32(o + 4, true);
   o += 8;
-  const out: Replay = { setup: { seed, players }, ticks: [], hashes: [] };
+  const out: Replay = { setup: { seed, players, map, difficulty }, ticks: [], hashes: [] };
   for (let t = 0; t < ticks; t++) {
     const d = decodeTick(buf.subarray(o), maxSlot + 1);
     out.ticks.push(d.inputs);

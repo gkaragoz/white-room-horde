@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
@@ -16,7 +16,7 @@ import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
 import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
-import { mountVersionBadge } from './buildinfo';
+import { BUILD, mountVersionBadge } from './buildinfo';
 import { Ui, UI_STRINGS, type Settings } from './ui';
 import { hideLoading, preloadAssets } from './preload';
 
@@ -28,7 +28,7 @@ const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
 function loadSettings(): Settings {
-  const def: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, time: 'cycle', dynLights: true, volume: 0.6, shadows: 2, scale: 1, lang: navigator.language.startsWith('tr') ? 'tr' : 'en' };
+  const def: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, time: 'cycle', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0.6, shadows: 2, scale: 1, lang: ((['tr', 'de', 'es', 'fr', 'ru'] as const).find((l) => navigator.language.toLowerCase().startsWith(l)) ?? 'en') as Settings['lang'] };
   try {
     return { ...def, ...(JSON.parse(localStorage.getItem('wrh.settings') ?? '{}') as Partial<Settings>) };
   } catch {
@@ -57,6 +57,13 @@ async function createStage(): Promise<Stage> {
     }</p></div>`;
     document.body.appendChild(box);
     hideLoading();
+
+// offline cache: models, sounds and card art are kept after the first visit (production builds on https or localhost only)
+if (import.meta.env.PROD && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js?v=${encodeURIComponent(`${BUILD.version}-${BUILD.commit}`)}`).catch(() => undefined);
+  });
+}
     throw e;
   }
 }
@@ -82,11 +89,11 @@ stage.scene.add(ragdolls.group);
 const pickups = new PickupView();
 stage.scene.add(pickups.group);
 
-const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.17, 0.17, 1.0), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), MAX_BULLETS);
+const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.06, 0.8), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), MAX_BULLETS);
 // a soft additive halo around every round so it reads at any distance and glows at night
 const bulletGlow = new THREE.InstancedMesh(
-  new THREE.CapsuleGeometry(0.2, 1.0, 3, 10).rotateX(Math.PI / 2),
-  new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
+  new THREE.CapsuleGeometry(0.07, 0.7, 3, 8).rotateX(Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
   MAX_BULLETS,
 );
 bulletGlow.frustumCulled = false;
@@ -95,21 +102,21 @@ bulletMesh.frustumCulled = false;
 /** Look of each weapon's rounds: colour and size of the tracer (width, length multipliers). */
 const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
   pistol: { color: new THREE.Color('#fff0a8'), w: 1, l: 1 },
-  smg: { color: new THREE.Color('#ffe58a'), w: 0.8, l: 0.9 },
-  ar: { color: new THREE.Color('#ffd86a'), w: 1, l: 1.2 },
-  shotgun: { color: new THREE.Color('#ffc65a'), w: 0.8, l: 0.5 },
-  hmg: { color: new THREE.Color('#ffb347'), w: 1.5, l: 1.4 },
-  minigun: { color: new THREE.Color('#ff9f3a'), w: 1.1, l: 1.6 },
-  sniper: { color: new THREE.Color('#d6f1ff'), w: 0.9, l: 3 },
-  revolver: { color: new THREE.Color('#ffd27a'), w: 1.4, l: 1.2 },
-  mp: { color: new THREE.Color('#fff2b0'), w: 0.7, l: 0.8 },
+  smg: { color: new THREE.Color('#ffe58a'), w: 0.8, l: 0.8 },
+  ar: { color: new THREE.Color('#ffd86a'), w: 1, l: 1.1 },
+  shotgun: { color: new THREE.Color('#ffc65a'), w: 0.9, l: 0.45 },
+  hmg: { color: new THREE.Color('#ffb347'), w: 1.4, l: 1.3 },
+  minigun: { color: new THREE.Color('#ff9f3a'), w: 1.1, l: 1.4 },
+  sniper: { color: new THREE.Color('#d6f1ff'), w: 1, l: 2.6 },
+  revolver: { color: new THREE.Color('#ffd27a'), w: 1.5, l: 1.1 },
+  mp: { color: new THREE.Color('#fff2b0'), w: 0.75, l: 0.8 },
   dbl: { color: new THREE.Color('#ffb13a'), w: 0.9, l: 0.45 },
-  dmr: { color: new THREE.Color('#bfe9ff'), w: 1, l: 2.2 },
-  flamer: { color: new THREE.Color('#ff7a1a'), w: 5, l: 1.6 },
-  gl: { color: new THREE.Color('#9fe870'), w: 3.2, l: 1.4 },
+  dmr: { color: new THREE.Color('#bfe9ff'), w: 1, l: 1.9 },
+  flamer: { color: new THREE.Color('#ff7a1a'), w: 2.6, l: 0.6 },
+  gl: { color: new THREE.Color('#9fe870'), w: 2.4, l: 0.9 },
 };
 const tracerScale = new THREE.Vector3();
-const GLOW_SCALE = new THREE.Vector3(2.4, 2.4, 1.3);
+const GLOW_SCALE = new THREE.Vector3(1.9, 1.9, 1.25);
 const tracerColor = new THREE.Color();
 const HOT = new THREE.Color('#ff3a2a');
 const COOL = new THREE.Color('#35d6ff');
@@ -228,13 +235,16 @@ const ui = new Ui(
       } else if (key === 'bounce') settings = { ...settings, bounce: value as boolean };
       else if (key === 'time') settings = { ...settings, time: value as Settings['time'] };
       else if (key === 'dynLights') settings = { ...settings, dynLights: value as boolean };
+      else if (key === 'weather') settings = { ...settings, weather: value as boolean };
       else if (key === 'aa') {
         settings = { ...settings, aa: value as Settings['aa'] };
         applySettings();
         location.reload();
         return;
       }
-      else settings = { ...settings, lang: value as 'en' | 'tr' };
+      else if (key === 'colorblind') settings = { ...settings, colorblind: value as boolean };
+      else if (key === 'textSize') settings = { ...settings, textSize: value as 0 | 1 | 2 };
+      else settings = { ...settings, lang: value as Settings['lang'] };
       applySettings();
     },
   },
@@ -260,8 +270,11 @@ function accFor(s: number): number {
 /** Vest colour of a slot: the lobby choice online, the profile colour for the local player, otherwise by slot. */
 function colorFor(s: number): string {
   const idx = session ? (session.players.find((p) => p.slot === s)?.color ?? -1) : s === localSlot ? ui.color : -1;
-  return PLAYER_COLORS[(idx >= 0 ? idx : s) % PLAYER_COLORS.length]!;
+  const i = (idx >= 0 ? idx : s) % PLAYER_COLORS.length;
+  return (settings.colorblind ? COLORBLIND_COLORS : PLAYER_COLORS)[i]!;
 }
+/** Okabe-Ito based, readable with the common kinds of colour blindness. */
+const COLORBLIND_COLORS = ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9', '#D55E00', '#F0E442', '#999999', '#882255', '#44AA99', '#117733'] as const;
 ui.slotColor = colorFor;
 
 /** How dark it should be: the setting, or in the day and night cycle four waves of day followed by four of night. */
@@ -342,7 +355,32 @@ function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boo
 }
 
 function handleEvent(e: SimEvent): void {
-  if (e.type === 'shot') lastShot[e.slot] = nowSec;
+  if (e.type === 'shot') {
+    lastShot[e.slot] = nowSec;
+    // recoil: the weapon kicks back by an amount that grows with the round's punch
+    const st = BALANCE.weapons[WEAPON_IDS[e.weapon]!];
+    chars[e.slot]?.kick(Math.min(0.32, 0.05 + st.damage * st.pellets * 0.0016));
+  }
+  if (e.type === 'playerHit' && e.slot === localSlot && world) {
+    // which way did it come from: the nearest enemy
+    let best = -1;
+    let bd = 25;
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      if (!world.eActive[i]) continue;
+      const d = (world.eX[i]! - e.x) ** 2 + (world.eY[i]! - e.y) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      _p.set(e.x, 0.5, -e.y).project(stage.camera);
+      const px = _p.x;
+      const py = _p.y;
+      _p.set(world.eX[best]!, 0.5, -world.eY[best]!).project(stage.camera);
+      ui.hurtFrom(Math.atan2(-(_p.y - py), _p.x - px));
+    }
+  }
   if (e.type === 'weaponSwitch' && e.slot === localSlot && e.auto) {
     const L = UI_STRINGS[ui.lang];
     const n = (L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!];
@@ -370,12 +408,16 @@ function handleEvent(e: SimEvent): void {
       if (e.kind === 7) ui.screenFlash('#ffffff', 700);
       break;
     case 'nuke':
+      slowMo(0.7);
       ui.screenFlash('#fff6c8', 900);
       break;
     case 'freeze':
       ui.screenFlash('#9be8ff', 800);
       break;
     case 'enemyDeath': {
+      // the kill you just made lands with a tiny freeze; heavy rounds freeze a little longer; bosses go to slow motion
+      if (nowSec - lastShot[localSlot]! < 0.25) hitStop(e.power >= 60 ? 0.06 : e.power >= 25 ? 0.04 : 0.02);
+      if (world && world.eBoss[e.id]) slowMo(0.9);
       if (nowSec - comboAt > 2.2) comboCount = 0;
       comboCount++;
       comboAt = nowSec;
@@ -444,6 +486,18 @@ function damageNumber(x: number, y: number, damage: number): void {
   const py = ((1 - _p.y) / 2) * app.clientHeight;
   if (px < 0 || py < 0 || px > app.clientWidth || py > app.clientHeight) return;
   ui.popNumber(px, py, String(Math.round(damage)), damage >= 25);
+}
+
+// ---- hit feel: a short freeze on heavy kills, slow motion on big moments ----
+let stopT = 0;
+let slowT = 0;
+/** 1 normally; tiny during a hit-stop, 0.35 in slow motion. Solo games slow the simulation too, online only the visuals. */
+let timeScale = 1;
+function hitStop(seconds: number): void {
+  if (seconds > stopT) stopT = seconds;
+}
+function slowMo(seconds: number): void {
+  if (seconds > slowT) slowT = seconds;
 }
 
 // ---- kill streaks ----
@@ -633,8 +687,12 @@ function frame(nowMs: number): void {
   lastDrawn = nowMs;
   const t0 = performance.now();
   if (input.consumePause()) setPaused(!paused);
-  const dt = Math.min(0.1, (nowMs - last) / 1000);
+  const realDt = Math.min(0.1, (nowMs - last) / 1000);
   last = nowMs;
+  stopT = Math.max(0, stopT - realDt);
+  slowT = Math.max(0, slowT - realDt);
+  timeScale = stopT > 0 ? 0.04 : slowT > 0 ? 0.35 : 1;
+  const dt = realDt * timeScale;
   nowSec = nowMs / 1000;
   let alpha = 0;
 
@@ -662,7 +720,7 @@ function frame(nowMs: number): void {
   if (world && mode === 'solo' && paused) {
     acc = 0;
   } else if (world && mode === 'solo') {
-    acc += dt;
+    acc += dt; // already scaled: a hit-stop freezes the solo simulation
     while (acc >= TICK_DT) {
       acc -= TICK_DT;
       let inputs: (PlayerInput | undefined)[] = [];
@@ -746,6 +804,8 @@ function frame(nowMs: number): void {
     fx.faceCamera(stage.camera.quaternion);
     // time of day, real-time lights and the flashlight of the local player
     stage.nightTarget = nightFor(w);
+    stage.setRain(settings.weather && stage.nightTarget > 0.5 && w.wave % 2 === 1);
+    audio.nightBias = stage.night * 0.15;
     stage.update(dt, fx0, -fy0);
     props.setNight(stage.night);
     ui.setNightHud(stage.night > 0.5);
@@ -774,7 +834,7 @@ function frame(nowMs: number): void {
         continue;
       }
       _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 2.7, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
-      ui.setTag(s, names[s] ?? 'P' + (s + 1), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
+      ui.setTag(s, (settings.colorblind ? `${s + 1} ` : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
     }
     // revive rings over downed players (red: bleeding out, green: being revived)
     for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -826,8 +886,8 @@ function frame(nowMs: number): void {
       q.setFromUnitVectors(fwd, dir.set(w.bVx[i]!, 0, -w.bVy[i]!).normalize());
       dummy.quaternion.copy(q);
       // upgrades show in the rounds: damage fattens and reddens them, piercing stretches them, crits flash gold
-      const fat = 1 + Math.min(1.2, st.damage * 1.4);
-      dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * (1 + Math.min(1.5, st.pierce * 0.5 + st.damage * 0.4))));
+      const fat = 1 + Math.min(0.35, st.damage * 0.5);
+      dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * (1 + Math.min(0.6, st.pierce * 0.2 + st.damage * 0.2))));
       dummy.updateMatrix();
       bulletMesh.setMatrixAt(n, dummy.matrix);
       dummy.scale.multiply(GLOW_SCALE);
@@ -836,9 +896,10 @@ function frame(nowMs: number): void {
       tracerColor.copy(tr.color).lerp(HOT, Math.min(0.85, st.damage * 1.2));
       if (st.pierce > 0.2) tracerColor.lerp(COOL, Math.min(0.6, st.pierce * 0.3));
       if (st.crit > 0 && (i * 7 + w.tick) % 5 === 0) tracerColor.set('#ffd21f');
-      tracerColor.multiplyScalar(1.5 + stage.night * 1.2);
+      tracerColor.multiplyScalar(1.25 + stage.night * 0.6);
       bulletMesh.setColorAt(n, tracerColor);
       bulletGlow.setColorAt(n++, tracerColor);
+      if (wid === 'flamer' && (i + w.tick) % 3 === 0) fx.flame(w.bX[i]!, w.bY[i]!, BALANCE.weapons.flamer.muzzleH);
     }
     dummy.scale.setScalar(1);
     bulletMesh.count = n;

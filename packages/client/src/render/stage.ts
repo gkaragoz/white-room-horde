@@ -41,6 +41,12 @@ export class Stage {
   private readonly flashlight: THREE.SpotLight;
   private readonly selfLight: THREE.PointLight;
   private dynamicLights = true;
+  /** Rain: a few hundred falling streaks that follow the camera (cosmetic, off in the settings). */
+  private rain: THREE.LineSegments | null = null;
+  private rainOn = false;
+  private rainAmount = 0;
+  private readonly rainPos = new Float32Array(900 * 6);
+  private readonly rainSeed = new Float32Array(900 * 3);
   private lampSpots: { x: number; y: number; z: number; color?: string }[] = [];
   private flashOn = false;
 
@@ -72,7 +78,7 @@ export class Stage {
 
     this.scene.background = new THREE.Color('#d5dde6');
 
-    // Camera: elevation 28 deg above the horizon, yaw 30 deg, orthographic 32 units wide.
+    // Camera: elevation 28 deg above the horizon, yaw 30 deg, orthographic 42 units wide.
     const el = THREE.MathUtils.degToRad(CAMERA.elevationDeg);
     const yaw = THREE.MathUtils.degToRad(CAMERA.yawDeg);
     this.camOffset = new THREE.Vector3(Math.sin(yaw) * Math.cos(el), Math.sin(el), Math.cos(yaw) * Math.cos(el)).multiplyScalar(40);
@@ -84,7 +90,7 @@ export class Stage {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
-    sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 80;
+    sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 80;
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun, this.sun.target);
@@ -125,6 +131,54 @@ export class Stage {
     }
     this.resize();
     window.addEventListener('resize', () => this.resize());
+  }
+
+  /** Rain on or off (it fades in and out). */
+  setRain(on: boolean): void {
+    this.rainOn = on;
+  }
+
+  private updateRain(dt: number, cx: number, cz: number): void {
+    this.rainAmount += Math.sign((this.rainOn ? 1 : 0) - this.rainAmount) * Math.min(Math.abs((this.rainOn ? 1 : 0) - this.rainAmount), dt * 0.5);
+    if (this.rainAmount <= 0.001) {
+      if (this.rain) this.rain.visible = false;
+      return;
+    }
+    if (!this.rain) {
+      for (let i = 0; i < 900; i++) {
+        this.rainSeed[i * 3] = (Math.random() - 0.5) * 56;
+        this.rainSeed[i * 3 + 1] = Math.random() * 14;
+        this.rainSeed[i * 3 + 2] = (Math.random() - 0.5) * 40;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(this.rainPos, 3));
+      this.rain = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: '#b8cfee', transparent: true, opacity: 0.35, depthWrite: false, toneMapped: false }));
+      this.rain.frustumCulled = false;
+      this.rain.renderOrder = 8;
+      this.scene.add(this.rain);
+    }
+    this.rain.visible = true;
+    (this.rain.material as THREE.LineBasicMaterial).opacity = 0.38 * this.rainAmount;
+    const count = Math.floor(900 * this.rainAmount);
+    for (let i = 0; i < 900; i++) {
+      const k = i * 6;
+      if (i >= count) {
+        this.rainPos[k + 1] = this.rainPos[k + 4] = -10;
+        continue;
+      }
+      let y = this.rainSeed[i * 3 + 1]! - dt * 24;
+      if (y < 0) y += 14;
+      this.rainSeed[i * 3 + 1] = y;
+      const x = cx + this.rainSeed[i * 3]!;
+      const z = cz + this.rainSeed[i * 3 + 2]!;
+      this.rainPos[k] = x;
+      this.rainPos[k + 1] = y;
+      this.rainPos[k + 2] = z;
+      this.rainPos[k + 3] = x + 0.12;
+      this.rainPos[k + 4] = y + 0.7;
+      this.rainPos[k + 5] = z + 0.05;
+    }
+    (this.rain.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   }
 
   /** Switch the real-time lights (muzzle flashes, explosions, lamps, flashlight) on or off. */
@@ -183,6 +237,7 @@ export class Stage {
       p.life -= dt;
       p.light.intensity = this.dynamicLights ? Math.max(0, p.life / p.max) * p.peak : 0;
     }
+    this.updateRain(dt, cx, cz);
     const n = this.night;
     // lamps: the four nearest to the camera focus
     const near = [...this.lampSpots].sort((a, b) => (a.x - cx) ** 2 + (a.z - cz) ** 2 - ((b.x - cx) ** 2 + (b.z - cz) ** 2)).slice(0, this.lampLights.length);

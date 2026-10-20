@@ -14,7 +14,7 @@
   },
   "weapons": {
     "pistol": {
-      "damage": 14,
+      "damage": 16,
       "rate": 3.2,
       "pellets": 1,
       "ammo": -1,
@@ -29,7 +29,7 @@
       "reload": 1.0
     },
     "smg": {
-      "damage": 6,
+      "damage": 6.5,
       "rate": 15,
       "pellets": 1,
       "ammo": 120,
@@ -75,7 +75,7 @@
     },
     "hmg": {
       "damage": 12,
-      "rate": 12,
+      "rate": 9,
       "pellets": 1,
       "ammo": 200,
       "spread": 0.05,
@@ -89,8 +89,8 @@
       "reload": 2.4
     },
     "minigun": {
-      "damage": 8,
-      "rate": 28,
+      "damage": 7,
+      "rate": 22,
       "pellets": 1,
       "ammo": 400,
       "spread": 0.07,
@@ -121,7 +121,7 @@
       "reload": 2.2
     },
     "revolver": {
-      "damage": 36,
+      "damage": 48,
       "rate": 1.7,
       "pellets": 1,
       "ammo": 48,
@@ -133,7 +133,7 @@
       "muzzleH": 0.81,
       "pierce": 1,
       "mag": 6,
-      "reload": 2.6
+      "reload": 2.2
     },
     "mp": {
       "damage": 4,
@@ -151,7 +151,7 @@
       "reload": 1.1
     },
     "dbl": {
-      "damage": 6,
+      "damage": 8,
       "rate": 1.0,
       "pellets": 12,
       "ammo": 32,
@@ -163,7 +163,7 @@
       "muzzleH": 0.69,
       "pierce": 0,
       "mag": 2,
-      "reload": 1.8
+      "reload": 1.5
     },
     "dmr": {
       "damage": 46,
@@ -181,7 +181,7 @@
       "reload": 2.0
     },
     "flamer": {
-      "damage": 3,
+      "damage": 2.6,
       "rate": 22,
       "pellets": 2,
       "ammo": 300,
@@ -191,12 +191,12 @@
       "muzzleFwd": 2.67,
       "muzzleSide": 0.29,
       "muzzleH": 0.66,
-      "pierce": 20,
+      "pierce": 10,
       "mag": 100,
       "reload": 2.8
     },
     "gl": {
-      "damage": 20,
+      "damage": 25,
       "rate": 0.9,
       "pellets": 1,
       "ammo": 20,
@@ -207,10 +207,10 @@
       "muzzleSide": 0.29,
       "muzzleH": 0.72,
       "pierce": 0,
-      "mag": 4,
-      "reload": 2.8,
+      "mag": 5,
+      "reload": 2.4,
       "blast": 2.4,
-      "blastDamage": 55
+      "blastDamage": 70
     }
   },
   "enemies": {

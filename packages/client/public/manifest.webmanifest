@@ -1,0 +1,14 @@
+{
+  "name": "white-room-horde",
+  "short_name": "horde",
+  "description": "Co-op horde survival shooter for up to 11 players",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#d5dde6",
+  "theme_color": "#1fa2ff",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

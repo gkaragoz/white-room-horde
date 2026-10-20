@@ -231,6 +231,8 @@ export class Audio {
   private wantMusic = false;
 
   private intensity = 0;
+  /** Extra music energy at night (set by main). */
+  nightBias = 0;
 
   private applyMusicGain(): void {
     if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(this.musicVolume * (0.38 + 0.22 * this.intensity) * this.duck, this.ctx.currentTime, 0.3);
@@ -591,7 +593,7 @@ export class Audio {
     if (!this.ctx) return;
     let boss = false;
     for (let i = 0; i < MAX_ENEMIES && !boss; i++) if (w.eActive[i] && w.eBoss[i]) boss = true;
-    this.setIntensity(w.enemyCount / 260 + (boss ? 0.45 : 0));
+    this.setIntensity(w.enemyCount / 260 + (boss ? 0.45 : 0) + this.nightBias);
     if (Math.abs(this.duck - this.duckTarget) > 0.01) {
       this.duck += (this.duckTarget - this.duck) * Math.min(1, dt * 2);
       this.applyMusicGain();

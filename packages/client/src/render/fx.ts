@@ -273,6 +273,21 @@ export class Fx {
   /** Strength of a player's offensive upgrades (0 = none): bigger muzzle flashes for stronger shooters. Set by main. */
   powerFor: (slot: number) => number = () => 0;
 
+  /** An expanding ring on the floor under a heavy hit. */
+  shockRing(x: number, y: number, color: string, size: number): void {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.06, -y);
+    m.scale.setScalar(0.5);
+    this.group.add(m);
+    this.flashes.push({ mesh: m, life: 0.28, max: 0.28, grow: size * 2.2 });
+  }
+
+  /** One puff of flame along a flamethrower's path. */
+  flame(x: number, y: number, h: number): void {
+    this.burst(Kind.Fire, x, y, h, 1, 1.2, 0, 0, 6.28, 0.35, 0.2, '#ff8a2a');
+  }
+
   /** A soft sparkle drifting up from a spot (upgrade auras). */
   sparkle(x: number, y: number, h: number, color: string, count: number, speed: number): void {
     this.burst(Kind.Spark, x, y, h, count, speed, 0, 0, 6.28, 0.7, 0.05, color);
@@ -307,6 +322,10 @@ export class Fx {
         this.light(mx, st.muzzleH + 0.2, -my, WEAPON_IDS[e.weapon] === 'flamer' ? '#ff8a2a' : '#ffd9a0', 4 + st.damage * 0.04 + pw * 3, 0.07, 8);
         if (pw > 0.25) this.burst(Kind.Spark, mx, my, st.muzzleH, Math.min(6, Math.round(pw * 4)), 6, Math.cos(e.angle), Math.sin(e.angle), 0.9, 0.2, 0.05, '#ff9a5a');
         this.burst(Kind.Spark, mx, my, st.muzzleH, 2, 5, Math.cos(e.angle), Math.sin(e.angle), 0.5, 0.18, 0.05, '#ffd36a');
+        if (WEAPON_IDS[e.weapon] !== 'flamer' && WEAPON_IDS[e.weapon] !== 'gl') {
+          // an empty brass case flips out to the right and bounces on the floor
+          this.burst(Kind.Gib, e.x + Math.cos(e.angle) * 0.9, e.y + Math.sin(e.angle) * 0.9, st.muzzleH, 1, 2.6, Math.sin(e.angle), -Math.cos(e.angle), 0.9, 0.9, 0.045, '#d9a441');
+        }
         if (WEAPON_IDS[e.weapon] === 'flamer') this.burst(Kind.Fire, mx, my, st.muzzleH, 3, 5, Math.cos(e.angle), Math.sin(e.angle), 0.5, 0.4, 0.22, '#ff8a1a');
         if (e.slot === localSlot) this.shake = Math.min(0.22, this.shake + Math.min(0.1, st.damage * 0.0006 * Math.sqrt(st.pellets)));
         break;
@@ -336,6 +355,7 @@ export class Fx {
       }
       case 'enemyHit':
         this.burst(Kind.Blood, e.x, e.y, 0.9, 5, 4, 0, 0, 6.28, 0.5, 0.07, '#8c1018');
+        if (e.damage >= 30) this.shockRing(e.x, e.y, e.damage >= 80 ? '#ffe9a0' : '#ffffff', 0.9 + Math.min(1.4, e.damage * 0.01));
         break;
       case 'enemyDeath': {
         const power = Math.min(1.6, 0.6 + e.power * 0.01);

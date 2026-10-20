@@ -7,6 +7,22 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Feel**
+- Bullets are slim again (the glow and the damage upgrades no longer blow them up); the flamethrower shoots soft flame puffs and the grenade launcher a round shell.
+- A short freeze on heavy kills (solo; online only the visuals slow down), slow motion for boss deaths and nukes, weapon recoil, ejected brass, a ring on the floor under heavy hits, and a red arc on the screen edge showing where a hit came from.
+- The camera is a lot further away (42 units wide) for a roomier play area.
+- Rain on some night waves (setting).
+
+**Balance**
+- Weapons rebalanced into one band of sustained damage per second (a test keeps it that way): the minigun and heavy machine gun are calmer, the revolver, pistol, double barrel and grenade launcher hit harder, the flamethrower pierces less.
+
+**Under the hood**
+- Six interface languages (English, Turkish, German, Spanish, French, Russian), a colour-blind palette with numbered name tags and three text sizes.
+- Installable and offline friendly (manifest, icon and a service worker that caches models, sounds and card art per version).
+- A budget check for the build (download size, script size) in CI and a QA test for lights, draw calls, triangles and particles.
+- `verifyReplay` re-runs a recorded game and checks every checkpoint hash (the base for a server-side leaderboard); replay files now also store the map, difficulty and classes.
+- `docs/EXTENDING.md` explains how to add a weapon, an enemy, a card or a language.
+
 ## v0.3.1 (2026-10-20)
 
 - Four new enemy kinds with their own Blender models and baked animations: crawlers (fast, low, from wave 4), leapers (jump at you every few seconds, wave 6), bloaters (slow and fat; when they die the belly bursts, burns whoever is close and a litter of crawlers crawls out, wave 9) and screamers (speed up every enemy around them, wave 12).
