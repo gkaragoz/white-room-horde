@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.16.0 (2026-10-20)
+
 **Melee fixes, a cleaner HUD and fewer frame spikes (rules change: update the server and reload the page)**
 
 - Blades and hammers set barrels off. They can no longer take guns or ammo (the loot stays for the others, and a squad of only melee classes stops getting gun and ammo drops). The swordsman and the hammerer regenerate much faster and take less damage.
