@@ -7,11 +7,14 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Sound**
+- Real sounds for the climb between floors (CC0 Kenney packs, built by `tools/audio/make_floor_sfx.py`): clear jingle, countdown ticks, charge swell, lift whoosh, arrival thump and the floor-start horn replace the synthesised stand-ins.
+
 ## v0.7.0 (2026-10-20)
 
 **Floors (rules change: update the server and reload the page)**
 - Waves are now floors. The next one never starts while an enemy is alive: clear the room and "FLOOR CLEARED" counts down 5 seconds at the top of the screen, then everyone is locked in place, a rune circle charges under the party and the whole squad flies up to the next map, with the camera following through a dark shaft of speed lines, a vertical motion blur and a glowing dissolve between the old floor and the new one. On arrival another 5 second countdown, then the next floor's enemies. The fallen come back at half health; maps follow each other in order.
-- Countdown ticks, a charge hum, a lift whoosh, an arrival thump and a floor-start horn (synthesised for now, files follow).
+- Countdown ticks, a charge hum, a lift whoosh, an arrival thump and a floor-start horn.
 - `periodSeconds` / `breatherSeconds` are gone from the balance; `floors` holds the new timings.
 
 ## v0.6.0 (2026-10-20)
