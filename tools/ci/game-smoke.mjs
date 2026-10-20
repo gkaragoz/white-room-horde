@@ -100,7 +100,7 @@ try {
   // R reloads
   await hold(['KeyR'], 3);
   const e1 = await state();
-  for (let i = 0; i < 160 && (await state()).mag < 12; i++) await sleep(50);
+  for (let i = 0; i < 700 && (await state()).mag < 12; i++) await sleep(50); // (CI renders in software: the reload takes long in real time)
   const e2 = await state();
   check('R starts a reload and the magazine fills again', (e1.reload > 0 || e2.mag === 12) && e2.mag === 12, `mag ${e2.mag}`);
 
