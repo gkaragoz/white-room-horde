@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Test pass and a fix**
+
+- Fixed: an enemy or player could be left on a bridge level with no bridge under it (found by the new random-play tests); they now drop to the ground. Everybody in a room should reload to 0.15.1.
+- New tests: random squads on every arena at high floors, a three-client run against the live relay, and a browser play-through of all nine classes, the five vertical arenas, the finisher and the menu (`tools/ci/play-all.mjs`).
+
 ## v0.15.0 (2026-10-20)
 
 **Verticality: ramps, bridges, tunnels (rules change: update the server and reload the page)**

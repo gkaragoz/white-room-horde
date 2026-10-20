@@ -17,7 +17,7 @@ import {
   type WeaponId,
 } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt, TAU } from './detmath';
-import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
+import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, settleLayers, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
 import { currentMap, out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { deckWalkable, nextLayer, rampAt, rampDir, rampGrade } from '@wrh/shared';
 import { Crc32 } from './hash';
@@ -527,6 +527,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
   updateGrenades(w, inputs);
 
   updateEnemies(w);
+  settleLayers(w);
   updateHazards(w);
   updateProjectiles(w);
   updatePickups(w);

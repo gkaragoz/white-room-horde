@@ -268,14 +268,15 @@ describe('fighting across the levels', () => {
     const v = createWorld(1, mapIndex('overpass'));
     v.waveTick = 1e9;
     v.countMul = 0;
-    addPlayer(v, 0, 0, 5, 'pistol', 7);
+    addPlayer(v, 0, 0, 11, 'pistol', 7);
+    v.pLayer[0] = 1; // on the bridge
     v.pHp[0] = v.pMaxHp[0] = 1e9;
-    const ground = still(v, 2, 5, 0);
-    const deck = still(v, 2, 5.5, 1);
+    const ground = still(v, 2, 11, 0); // right below the blade
+    const deck = still(v, 2, 11.5, 1);
     const hp = [v.eHp[ground]!, v.eHp[deck]!];
     for (let t = 0; t < 20; t++) step(v, [{ ...NONE, buttons: Buttons.Fire }]);
-    expect(v.eHp[ground]!).toBeLessThan(hp[0]!);
-    expect(v.eHp[deck]).toBe(hp[1]);
+    expect(v.eHp[deck]!).toBeLessThan(hp[1]!);
+    expect(v.eHp[ground]).toBe(hp[0]);
     void w;
   });
 });

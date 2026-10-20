@@ -97,6 +97,17 @@ export function setWave(w: World, wave: number): void {
   beginWave(w);
 }
 
+/**
+ * Whoever ends a tick on the deck layer where there is no deck (shoved or thrown over an edge, teleported) falls to the
+ * ground at that spot. Called once a tick after everything has moved.
+ */
+export function settleLayers(w: World): void {
+  const map = MAPS[w.map] ?? MAPS[0]!;
+  if (!map.decks) return;
+  for (let i = 0; i < MAX_ENEMIES; i++) if (w.eActive[i] && w.eLayer[i] === 1 && !deckWalkable(map, w.eX[i]!, w.eY[i]!)) w.eLayer[i] = 0;
+  for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pLayer[s] === 1 && !deckWalkable(map, w.pX[s]!, w.pY[s]!)) w.pLayer[s] = 0;
+}
+
 export function livingPlayers(w: World): number {
   let n = 0;
   for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pHp[s]! > 0) n++;
