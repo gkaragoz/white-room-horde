@@ -18,7 +18,8 @@ import {
 } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt, TAU } from './detmath';
 import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, spawnBoss, spawnEnemy, updateEnemies, updateGrenades, updateProjectiles } from './enemies';
-import { out, pushOut, segmentBlocked, useMap } from './obstacles';
+import { currentMap, out, pushOut, segmentBlocked, useMap } from './obstacles';
+import { deckWalkable, nextLayer, rampAt, rampDir, rampGrade } from '@wrh/shared';
 import { Crc32 } from './hash';
 import { updatePickups } from './pickups';
 import { KNOCK_DECAY, updateHazards } from './hazards';
@@ -31,9 +32,9 @@ import { createWorld, type World } from './state';
 export { createWorld, setWave, spawnBoss, spawnEnemy };
 
 /** Is the straight line between two points free of cover on the world's map? (The client's auto-aim uses it.) */
-export function lineClear(w: World, x0: number, y0: number, x1: number, y1: number): boolean {
+export function lineClear(w: World, x0: number, y0: number, x1: number, y1: number, layer = 0): boolean {
   useMap(w.map);
-  return !segmentBlocked(x0, y0, x1, y1);
+  return !segmentBlocked(x0, y0, x1, y1, layer);
 }
 export type { World };
 
@@ -86,6 +87,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pKnockX[slot] = 0;
   w.pKnockY[slot] = 0;
   w.pAir[slot] = 0;
+  w.pLayer[slot] = 0;
   w.pSpecCd[slot] = 0;
   w.pSpecT[slot] = 0;
   w.pRally[slot] = 0;
@@ -152,7 +154,8 @@ function spawnBullet(w: World, owner: number, ox: number, oy: number, x: number,
     w.bOwner[i] = owner;
     w.bPierce[i] = pierce;
     w.bHit.fill(-1, i * 4, i * 4 + 4);
-    if (segmentBlocked(ox, oy, x, y)) {
+    w.bLayer[i] = owner >= 0 ? w.pLayer[owner]! : 0;
+    if (segmentBlocked(ox, oy, x, y, w.bLayer[i]!)) {
       endBullet(w, i, ox, oy, 1);
     } else if (bulletVsBarrels(w, i, ox, oy, x, y)) {
       endBullet(w, i, w.bX[i]!, w.bY[i]!, 2);
@@ -161,6 +164,16 @@ function spawnBullet(w: World, owner: number, ox: number, oy: number, x: number,
     }
     return;
   }
+}
+
+/** Speed factor on a ramp: 1 elsewhere; climbing slows by the grade (30 degrees about 16%, 45 degrees 28%), going down speeds up a little. */
+function slopeFactor(map: ReturnType<typeof currentMap>, x: number, y: number, mx: number, my: number): number {
+  const ri = rampAt(map, x, y);
+  if (ri < 0) return 1;
+  const r = map.ramps![ri]!;
+  const d = rampDir(r);
+  const f = 1 - 0.28 * rampGrade(r) * (mx * d[0] + my * d[1]);
+  return f < 0.55 ? 0.55 : f > 1.25 ? 1.25 : f;
 }
 
 function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDashIn: boolean): number {
@@ -211,13 +224,27 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
     w.pMoving[s] = !stunned && len > 0.05 ? 1 : 0;
   }
   const r = BALANCE.player.radius;
+  const layer = w.pLayer[s]!;
+  const map = currentMap();
+  const oldX = w.pX[s]!;
+  const oldY = w.pY[s]!;
+  // ramps: uphill is slower (the steeper the slower), downhill a little faster
+  if (map.ramps) speed *= slopeFactor(map, oldX, oldY, mx, my);
   w.pX[s] = clamp(w.pX[s]! + (mx * speed + w.pKnockX[s]!) * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
   w.pY[s] = clamp(w.pY[s]! + (my * speed + w.pKnockY[s]!) * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
   w.pKnockX[s] = Math.abs(w.pKnockX[s]!) < 0.05 ? 0 : w.pKnockX[s]! * KNOCK_DECAY;
   w.pKnockY[s] = Math.abs(w.pKnockY[s]!) < 0.05 ? 0 : w.pKnockY[s]! * KNOCK_DECAY;
-  if (pushOut(w.pX[s]!, w.pY[s]!, r)) {
+  if (pushOut(w.pX[s]!, w.pY[s]!, r, layer)) {
     w.pX[s] = out.x;
     w.pY[s] = out.y;
+  }
+  if (map.decks) {
+    // a deck has no edge to fall off: where there is no deck or ramp the character stays where it was
+    if (layer === 1 && !deckWalkable(map, w.pX[s]!, w.pY[s]!)) {
+      w.pX[s] = oldX;
+      w.pY[s] = oldY;
+    }
+    w.pLayer[s] = nextLayer(map, w.pX[s]!, w.pY[s]!, layer);
   }
   w.pAngle[s] = angle;
   return angle;
@@ -255,6 +282,8 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
   let stun = w.pStun[s]!;
   let kx = w.pKnockX[s]!;
   let ky = w.pKnockY[s]!;
+  let layer = w.pLayer[s]!;
+  const map = currentMap();
   const alive = w.pState[s] === PlayerState.Alive;
   const downed = w.pState[s] === PlayerState.Downed;
   const dc = BALANCE.dash;
@@ -311,13 +340,23 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
       moving = !stunned && len > 0.05;
     }
     const speed = downed ? BALANCE.player.crawlSpeed : base * (busy ? BALANCE.player.reviveMoveMul : 1);
-    x = clamp(x + (mx * speed + kx) * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
-    y = clamp(y + (my * speed + ky) * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+    const oldX = x;
+    const oldY = y;
+    const sp2 = map.ramps ? speed * slopeFactor(map, x, y, mx, my) : speed;
+    x = clamp(x + (mx * sp2 + kx) * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
+    y = clamp(y + (my * sp2 + ky) * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
     kx = Math.abs(kx) < 0.05 ? 0 : kx * KNOCK_DECAY;
     ky = Math.abs(ky) < 0.05 ? 0 : ky * KNOCK_DECAY;
-    if (pushOut(x, y, r)) {
+    if (pushOut(x, y, r, layer)) {
       x = out.x;
       y = out.y;
+    }
+    if (map.decks) {
+      if (layer === 1 && !deckWalkable(map, x, y)) {
+        x = oldX;
+        y = oldY;
+      }
+      layer = nextLayer(map, x, y, layer);
     }
   }
   predicted.x = x;
@@ -500,7 +539,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
     w.bX[i] = x0 + w.bVx[i]! * TICK_DT;
     w.bY[i] = y0 + w.bVy[i]! * TICK_DT;
     w.bLife[i] = w.bLife[i]! - TICK_DT;
-    const wall = segmentBlocked(x0, y0, w.bX[i]!, w.bY[i]!);
+    const wall = segmentBlocked(x0, y0, w.bX[i]!, w.bY[i]!, w.bLayer[i]!);
     let spent = wall;
     if (!spent) spent = bulletVsBarrels(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
     if (!spent && w.enemyCount > 0) spent = bulletVsEnemies(w, i, x0, y0, w.bX[i]!, w.bY[i]!);
@@ -551,9 +590,9 @@ export function hashWorld(w: World): number {
   c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);
   c.typed(w.pMag).typed(w.pReload).typed(w.pDash).typed(w.pDashCd).typed(w.pDashX).typed(w.pDashY).typed(w.pModDmg).typed(w.pModSpeed);
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
-  c.typed(w.kActive).typed(w.kData).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
+  c.typed(w.kActive).typed(w.kData).typed(w.kLayer).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
-  c.typed(w.pPerk).typed(w.eMod).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
+  c.typed(w.pPerk).typed(w.eMod).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pLayer).typed(w.eLayer).typed(w.bLayer).typed(w.sLayer).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);

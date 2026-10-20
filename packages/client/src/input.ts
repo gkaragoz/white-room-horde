@@ -213,6 +213,11 @@ export class Input {
     return Math.max(min, Math.min(max, Math.hypot(a.x - playerX, a.y - playerY)));
   }
 
+  /** The cursor points at the floor of the level the character stands on (a deck is above the ground). */
+  setPlaneHeight(h: number): void {
+    this.plane.constant = -h;
+  }
+
   /** Aim point on the floor in sim coordinates. */
   aimPoint(): { x: number; y: number } {
     this.ray.setFromCamera(this.mouse, this.camera);
@@ -271,7 +276,7 @@ export class Input {
       if (b(2)) buttons |= Buttons.Revive;
       if (b(1)) buttons |= Buttons.Reload;
       if (b(0)) buttons |= Buttons.Dash;
-      if (b(3)) buttons |= Buttons.Special;
+      if (b(11)) buttons |= Buttons.Special;
       if (b(14)) buttons |= Buttons.Card1;
       if (b(12)) buttons |= Buttons.Card2;
       if (b(15)) buttons |= Buttons.Card3;

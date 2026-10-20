@@ -143,7 +143,7 @@ const BASE_STRINGS = {
     powerNames: ['Damage', 'Fire rate', 'Piercing', 'Crit chance', 'Blast radius', 'Move speed', 'Max health', 'Armor', 'Magnet', 'Luck', 'XP gain', 'Revive speed', 'Reload speed', 'Dash cooldown', 'Lifesteal'],
     joining: 'Joining the game in progress...',
     loading: 'Loading',
-    maps: { '-1': 'Random', '0': 'Warehouse', '1': 'Courtyard', '2': 'Corridors', '3': 'Open field', '4': 'Ruins', '5': 'Factory' },
+    maps: { '-1': 'Random', '0': 'Warehouse', '1': 'Courtyard', '2': 'Corridors', '3': 'Open field', '4': 'Ruins', '5': 'Factory' , '6': 'Overpass', '7': 'Depot', '8': 'Ramp yard', '9': 'Tunnel hub', '10': 'Gallery' },
     diffs: ['Easy', 'Normal', 'Hard'],
     accs: ['Bandana', 'Cap', 'Goggles', 'Headphones', 'Helmet', 'Crown', 'Devil horns', 'Top hat', 'Cowboy hat', 'Ninja band', 'Mohawk', 'Bunny ears', 'Cyber visor', 'Pirate hat', 'Wizard hat', 'Viking helmet', 'Santa hat', 'Chef hat', 'Astronaut', 'Cat ears', 'Halo', 'Alien antennae', 'Gas mask', 'Beanie', 'Samurai helmet', 'Shades', 'Flower crown'],
     controlsTitle: 'Controls',
@@ -342,7 +342,7 @@ const BASE_STRINGS = {
     powerNames: ['Hasar', 'Ateş hızı', 'Delme', 'Kritik şansı', 'Patlama alanı', 'Hareket hızı', 'Azami can', 'Zırh', 'Mıknatıs', 'Şans', 'XP kazancı', 'Kaldırma hızı', 'Doldurma hızı', 'Atılma bekleme', 'Can çalma'],
     joining: 'Devam eden oyuna katılınıyor...',
     loading: 'Yükleniyor',
-    maps: { '-1': 'Rastgele', '0': 'Depo', '1': 'Avlu', '2': 'Koridorlar', '3': 'Açık alan', '4': 'Harabe', '5': 'Fabrika' },
+    maps: { '-1': 'Rastgele', '0': 'Depo', '1': 'Avlu', '2': 'Koridorlar', '3': 'Açık alan', '4': 'Harabe', '5': 'Fabrika' , '6': 'Üst geçit', '7': 'Antrepo', '8': 'Rampa avlusu', '9': 'Tünel merkezi', '10': 'Galeri' },
     diffs: ['Kolay', 'Normal', 'Zor'],
     accs: ['Bandana', 'Şapka', 'Gözlük', 'Kulaklık', 'Kask', 'Taç', 'Şeytan boynuzu', 'Silindir şapka', 'Kovboy şapkası', 'Ninja bandı', 'Mohawk', 'Tavşan kulağı', 'Siber vizör', 'Korsan şapkası', 'Büyücü şapkası', 'Viking miğferi', 'Noel şapkası', 'Aşçı şapkası', 'Astronot', 'Kedi kulağı', 'Hale', 'Uzaylı anteni', 'Gaz maskesi', 'Bere', 'Samuray kaskı', 'Güneş gözlüğü', 'Çiçek tacı'],
     controlsTitle: 'Kontroller',
@@ -2101,8 +2101,24 @@ export class Ui {
     const X = (x: number): number => (x + ARENA_HALF_W) * sx;
     const Y = (y: number): number => (ARENA_HALF_H - y) * sy;
     g.clearRect(0, 0, W, H);
+    const mapDef = MAPS[world.map] ?? MAPS[0]!;
+    // decks lighter, ramps with a gradient that runs up to the high end
+    g.fillStyle = 'rgba(214,196,160,0.75)';
+    for (const d of mapDef.decks ?? []) g.fillRect(X(d.x - d.w / 2), Y(d.y + d.h / 2), d.w * sx, d.h * sy);
+    for (const r of mapDef.ramps ?? []) {
+      const x0 = X(r.x - r.w / 2);
+      const y0 = Y(r.y + r.h / 2);
+      const grad = g.createLinearGradient(r.dir === 0 ? x0 : r.dir === 2 ? x0 + r.w * sx : x0, r.dir === 1 ? y0 + r.h * sy : r.dir === 3 ? y0 : y0, r.dir === 0 ? x0 + r.w * sx : r.dir === 2 ? x0 : x0, r.dir === 1 ? y0 : r.dir === 3 ? y0 + r.h * sy : y0);
+      grad.addColorStop(0, 'rgba(242,200,121,0.2)');
+      grad.addColorStop(1, 'rgba(242,166,70,1)');
+      g.fillStyle = grad;
+      g.fillRect(x0, y0, r.w * sx, r.h * sy);
+    }
     g.fillStyle = '#8b7a5e';
-    for (const o of MAPS[world.map]?.boxes ?? MAPS[0]!.boxes) g.fillRect(X(o.x - o.w / 2), Y(o.y + o.h / 2), o.w * sx, o.h * sy);
+    for (const o of mapDef.boxes) {
+      if (o.kind === 'rail' || o.kind === 'rampwall') continue;
+      g.fillRect(X(o.x - o.w / 2), Y(o.y + o.h / 2), o.w * sx, o.h * sy);
+    }
     for (let i = 0; i < MAX_PICKUPS; i++) {
       if (!world.kActive[i]) continue;
       g.fillStyle = ['#ffcf3a', '#3ddc6a', '#6b8f4a', '#c06bff'][world.kType[i]!]!;
@@ -2115,7 +2131,12 @@ export class Ui {
       const r = boss ? 7 : 2.2;
       g.beginPath();
       g.arc(X(world.eX[i]!), Y(world.eY[i]!), r, 0, Math.PI * 2);
-      g.fill();
+      if (world.eLayer[i] === 1) {
+        // on a deck: drawn as a ring
+        g.strokeStyle = g.fillStyle as string;
+        g.lineWidth = 1.4;
+        g.stroke();
+      } else g.fill();
     }
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (!world.pActive[s] || world.pState[s] === PlayerState.Dead) continue;

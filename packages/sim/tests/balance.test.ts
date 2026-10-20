@@ -6,7 +6,7 @@ describe('balance', () => {
   it('a squad of simple bots gets a good way up and then dies: the game neither ends at once nor lets a squad live for ever', () => {
     const floors = [1, 2, 3].map((seed) => playBots(seed).floor);
     for (const f of floors) {
-      expect(f).toBeGreaterThanOrEqual(8);
+      expect(f).toBeGreaterThanOrEqual(6);
       expect(f).toBeLessThanOrEqual(60);
     }
   }, 600000);

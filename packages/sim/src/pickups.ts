@@ -1,11 +1,11 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, TICK_RATE, WEAPON_IDS } from '@wrh/shared';
+import { MAPS, deckWalkable, ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, TICK_RATE, WEAPON_IDS } from '@wrh/shared';
 import { clamp, cos, sin, sqrt } from './detmath';
 import { PERK } from '@wrh/shared';
 import { nuke, perk, setPerk, waveModOf } from './features';
 import { ammoLow, ammoNeeded, giveWeapon, isMelee, owns, refillAll } from './loadout';
 import type { World } from './state';
 
-export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0): void {
+export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0, layer = 0): void {
   for (let i = 0; i < MAX_PICKUPS; i++) {
     if (w.kActive[i]) continue;
     w.kActive[i] = 1;
@@ -14,6 +14,8 @@ export function spawnPickup(w: World, kind: number, x: number, y: number, data =
     w.kY[i] = clamp(y, -ARENA_HALF_H + 0.8, ARENA_HALF_H - 0.8);
     w.kLife[i] = BALANCE.pickups.lifeSeconds;
     w.kData[i] = data;
+    // loot of an enemy that died on a deck lies on the deck (or, thrown off its edge, on the ground)
+    w.kLayer[i] = layer === 1 && deckWalkable(MAPS[w.map] ?? MAPS[0]!, w.kX[i]!, w.kY[i]!) ? 1 : 0;
     w.events.push({ type: 'pickupDrop', kind, x: w.kX[i]!, y: w.kY[i]! });
     return;
   }
@@ -46,7 +48,7 @@ export function pickWeapon(w: World): number {
 }
 
 /** Roll loot for a dead enemy at (x, y). Bosses always drop a handful around them. */
-export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
+export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 0): void {
   const cfg = BALANCE.pickups;
   if (boss) {
     const kinds: number[] = [];
@@ -55,17 +57,17 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
     for (let i = 0; i < cfg.bossDrops.grenade; i++) kinds.push(PickupType.Grenade);
     kinds.forEach((k, n) => {
       const a = (n / kinds.length) * 6.283185307179586;
-      spawnPickup(w, k, x + cos(a) * 1.8, y + sin(a) * 1.8);
+      spawnPickup(w, k, x + cos(a) * 1.8, y + sin(a) * 1.8, 0, layer);
     });
     return;
   }
   const r = w.rng.float();
   const luck = w.modLoot * (waveModOf(w.wave) === 4 ? 2 : 1);
   const ammoChance = (cfg.chance.ammo + (ammoStarved(w) ? cfg.lowAmmoBonus : 0)) * luck;
-  if (r < ammoChance) spawnPickup(w, PickupType.Ammo, x, y);
-  else if (r < ammoChance + cfg.chance.health * luck) spawnPickup(w, PickupType.Health, x, y);
-  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade) * luck) spawnPickup(w, PickupType.Grenade, x, y);
-  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, pickWeapon(w));
+  if (r < ammoChance) spawnPickup(w, PickupType.Ammo, x, y, 0, layer);
+  else if (r < ammoChance + cfg.chance.health * luck) spawnPickup(w, PickupType.Health, x, y, 0, layer);
+  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade) * luck) spawnPickup(w, PickupType.Grenade, x, y, 0, layer);
+  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, pickWeapon(w), layer);
   else {
     // the rarer power-ups
     let edge = ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck;
@@ -79,7 +81,7 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean): void {
     for (const [kind, c] of table) {
       edge += c * luck;
       if (r < edge) {
-        spawnPickup(w, kind, x, y);
+        spawnPickup(w, kind, x, y, 0, layer);
         break;
       }
     }
@@ -100,7 +102,7 @@ export function updatePickups(w: World): void {
     let best = -1;
     let bd2 = 1e18;
     for (let s = 0; s < MAX_PLAYERS; s++) {
-      if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive) continue;
+      if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive || w.pLayer[s] !== w.kLayer[i]) continue;
       const dx = w.pX[s]! - w.kX[i]!;
       const dy = w.pY[s]! - w.kY[i]!;
       const d2 = dx * dx + dy * dy;

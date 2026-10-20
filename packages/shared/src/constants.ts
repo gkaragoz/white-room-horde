@@ -24,15 +24,11 @@ export const MAX_SPIT = 160;
 export const MAX_ZONES = 96;
 export const MAX_TELE = 48;
 
-export interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+export type { Box } from './layers';
+import { LAYERED_MAPS, type Box, type MapDef } from './layers';
 
 /** Arena layouts: axis-aligned boxes (centre x, y in sim coordinates, full width and height). Shared by sim and renderer. */
-export const MAPS: readonly { id: string; boxes: readonly Box[] }[] = [
+const FLAT_MAPS: readonly { id: string; boxes: readonly Box[] }[] = [
   {
     id: 'warehouse',
     boxes: [
@@ -121,6 +117,8 @@ export const MAPS: readonly { id: string; boxes: readonly Box[] }[] = [
     ],
   },
 ];
+/** Every arena: the six flat layouts first, then the vertical ones (ramps, bridges, tunnels; see layers.ts). */
+export const MAPS: readonly MapDef[] = [...FLAT_MAPS, ...LAYERED_MAPS];
 export const MAP_COUNT = MAPS.length;
 /** The first layout (kept for code that only needs one set of cover). */
 export const OBSTACLES: readonly Box[] = MAPS[0]!.boxes;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
+import { heightAt } from '@wrh/shared';
 import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, encodeReplay, hashWorld, predictPlayer, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
@@ -165,6 +166,8 @@ stage.scene.add(props.group);
 stage.scene.add(arena.group);
 const climb = new FloorClimb(stage, fx, arena, props);
 const vx: number[] = new Array<number>(MAX_PLAYERS).fill(0);
+/** Height of the floor under every character (ramps and decks). */
+const vz: number[] = new Array<number>(MAX_PLAYERS).fill(0);
 const vy: number[] = new Array<number>(MAX_PLAYERS).fill(0);
 const animator = new PlayerAnimator();
 
@@ -398,7 +401,7 @@ function afterStep(w: World): void {
 /** Hard hits and blasts throw the body as a physical ragdoll; lighter kills play the baked death animation. */
 function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boolean {
   const type = ENEMY_TYPES[e.etype]!;
-  if (type === 'exploder' || w.eBoss[e.id] || !ragdolls.ready) return false;
+  if (type === 'exploder' || w.eBoss[e.id] || !ragdolls.ready || w.eLayer[e.id] === 1) return false; // (a body on a deck lies down in its baked death pose: the ragdoll world has no decks)
   // chaos: nearly every kill throws a physical body, and a blast near the corpse launches it high and far
   if (!(e.power >= BALANCE.progression.ragdollPower || Math.random() < 0.8)) return false;
   let boost = 1;
@@ -1117,6 +1120,9 @@ function frame(nowMs: number): void {
         if (predictedSpeed > 0.5) moveAngle[localSlot] = Math.atan2(p.y - p.prevY, p.x - p.prevX);
       } else predReady = false;
     } else predReady = false;
+    const mapDef = MAPS[w.map] ?? MAPS[0]!;
+    for (let s = 0; s < MAX_PLAYERS; s++) vz[s] = w.pActive[s] ? heightAt(mapDef, vx[s]!, vy[s]!, w.pLayer[s]!) : 0;
+    input.setPlaneHeight(vz[localSlot]!);
     const lifted = climb.update(w, alpha, nowSec, dt, vx, vy);
     // the local character turns the instant the aim does (no wait for the simulation or the network)
     let localFacing: number | null = null;
@@ -1145,11 +1151,11 @@ function frame(nowMs: number): void {
       const ang = s === localSlot && localFacing !== null ? localFacing : lerpAngle(prevA[s]!, curA[s]!, alpha);
       // a thrown character is tossed up and comes down again (14 ticks of air)
       const air = w.pAir[s]! > 0 ? Math.sin(Math.PI * (1 - w.pAir[s]! / 14)) * 3.2 : 0;
-      c.root.position.set(x, lifted.lift + air, -y);
+      c.root.position.set(x, lifted.lift + air + vz[s]!, -y);
       c.root.rotation.y = ang + Math.PI / 2;
       const cls = w.pPerk[s * PERKS + PERK.Class]!;
       c.root.scale.setScalar(PowerView.bodyScale(w, s) * (cls === 2 ? 1.18 : cls === 3 ? 0.92 : 1));
-      power.slot(w, s, x, y, nowSec, dt, s === localSlot, lifted.lift);
+      power.slot(w, s, x, y, nowSec, dt, s === localSlot, lifted.lift + vz[s]!);
       if (w.pState[s] === PlayerState.Alive && nowSec - lastDust[s]! > 0.1) {
         const sp = s === localSlot && predictedSpeed >= 0 ? predictedSpeed : Math.hypot(curX[s]! - prevX[s]!, curY[s]! - prevY[s]!) / TICK_DT;
         if (sp > 7) {
@@ -1192,7 +1198,10 @@ function frame(nowMs: number): void {
     }
     stage.setZoom(cineFrame.zoom);
     ui.setCine(cineFrame.bars, cine.by >= 0 ? names[cine.by] ?? '' : '', cine.by >= 0 ? PLAYER_COLORS[cine.by % PLAYER_COLORS.length]! : '#ffffff');
-    stage.follow(fx0, -fy0, fx.shake * settings.shake * (1 - cineFrame.focus * 0.8), lifted.lift);
+    // the roof of a bridge or gallery thins out while the local character walks under it, so it stays in sight
+    const hidden = w.pActive[localSlot] === 1 && w.pLayer[localSlot] === 0 && climb.arena.hidesGround(stage.camera, vx[localSlot]!, vy[localSlot]!);
+    climb.arena.fadeRoof(hidden ? 0.2 : 1, dt);
+    stage.follow(fx0, -fy0, fx.shake * settings.shake * (1 - cineFrame.focus * 0.8), lifted.lift + vz[target]! * (1 - cineFrame.focus));
     fx.faceCamera(stage.camera.quaternion);
     // time of day, real-time lights and the flashlight of the local player
     stage.nightTarget = nightFor(w);
@@ -1240,7 +1249,7 @@ function frame(nowMs: number): void {
         aimMarker.update(tx, -ty, rad, colorFor(localSlot), nowSec, aimTarget.kind * 10000 + aimTarget.id);
       } else aimMarker.update(null, 0, 0, '#ffffff', nowSec, -1);
       const show = alive && !w.gameOver && settings.ammoRing && !lifted.active && !st.melee;
-      ammoRing.update(lx, -ly, frac, reloading, nowSec, show);
+      ammoRing.update(lx, -ly, frac, reloading, nowSec, show, vz[me]!);
       ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, show, reloading);
     }
 
@@ -1251,7 +1260,7 @@ function frame(nowMs: number): void {
         ui.setTag(s, '', '#000', 0, 0, false);
         continue;
       }
-      _p.set(vx[s]!, 2.7 + lifted.lift, -vy[s]!).project(stage.camera);
+      _p.set(vx[s]!, 2.7 + lifted.lift + vz[s]!, -vy[s]!).project(stage.camera);
       ui.setTag(s, (settings.colorblind ? `${s + 1} ` : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
     }
     // revive rings over downed players (red: bleeding out, green: being revived)
@@ -1261,7 +1270,7 @@ function frame(nowMs: number): void {
         ui.setRing(s, 0, 0, 0, 0, false, false);
         continue;
       }
-      _p.set(vx[s]!, 1.6 + lifted.lift, -vy[s]!).project(stage.camera);
+      _p.set(vx[s]!, 1.6 + lifted.lift + vz[s]!, -vy[s]!).project(stage.camera);
       // the fastest medic card in the squad sets the pace of the ring
       let medic = 1;
       for (let h = 0; h < MAX_PLAYERS; h++) if (w.pActive[h] && h !== s && w.modRevive[h]! < medic) medic = w.modRevive[h]!;
@@ -1325,7 +1334,7 @@ function frame(nowMs: number): void {
       const st = strength[owner]!;
       // bullets fly fast now: draw them between the last two simulated positions instead of jumping a whole step
       const back = (1 - alpha) * TICK_DT;
-      dummy.position.set(w.bX[i]! - w.bVx[i]! * back, BALANCE.weapons[wid].muzzleH, -(w.bY[i]! - w.bVy[i]! * back));
+      dummy.position.set(w.bX[i]! - w.bVx[i]! * back, BALANCE.weapons[wid].muzzleH + heightAt(mapDef, w.bX[i]!, w.bY[i]!, w.bLayer[i]!), -(w.bY[i]! - w.bVy[i]! * back));
       q.setFromUnitVectors(fwd, dir.set(w.bVx[i]!, 0, -w.bVy[i]!).normalize());
       dummy.quaternion.copy(q);
       // upgrades show in the rounds: damage fattens and reddens them, piercing stretches them, crits flash gold

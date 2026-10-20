@@ -118,7 +118,7 @@ describe('floors', () => {
     expect(w.wave).toBe(MAP_COUNT + 2);
     expect(new Set(maps).size).toBe(MAP_COUNT);
     expect(maps[maps.length - 1]).toBe(maps[1]);
-  });
+  }, 120000);
 
   it('is deterministic and survives a snapshot taken in the middle of the flight', () => {
     const run = (): World => {

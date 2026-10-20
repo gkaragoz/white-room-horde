@@ -43,7 +43,7 @@ function sweep(w: World, s: number, angle: number, arc: number, radius: number, 
   const py = w.pY[s]!;
   let hits = 0;
   for (let i = 0; i < MAX_ENEMIES; i++) {
-    if (!w.eActive[i]) continue;
+    if (!w.eActive[i] || w.eLayer[i] !== w.pLayer[s]) continue; // a swing only reaches the level it is made on
     const dx = w.eX[i]! - px;
     const dy = w.eY[i]! - py;
     const reach = radius + T_RADIUS[w.eType[i]!]! * (w.eBoss[i] ? 1.7 : 1);

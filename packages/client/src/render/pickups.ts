@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MAX_PICKUPS } from '@wrh/shared';
+import { MAPS, MAX_PICKUPS, heightAt } from '@wrh/shared';
 import type { World } from '@wrh/sim';
 import { WEAPON_IDS } from '@wrh/shared';
 import { asset } from '../assets';
@@ -133,6 +133,7 @@ export class PickupView {
     this.drops.length = 0;
     const seenWeapon: number[] = [];
     let rings = 0;
+    const mapDef = MAPS[w.map] ?? MAPS[0]!;
     const d = this.dummy;
     for (let i = 0; i < MAX_PICKUPS; i++) {
       if (!w.kActive[i]) continue;
@@ -140,7 +141,8 @@ export class PickupView {
       const left = w.kLife[i]!;
       // blink in the last seconds
       if (left < 4 && Math.floor(now * 8) % 2 === 0) continue;
-      const bob = 0.55 + Math.sin(now * 3 + i) * 0.1;
+      const gz = heightAt(mapDef, w.kX[i]!, w.kY[i]!, w.kLayer[i]!);
+      const bob = 0.55 + Math.sin(now * 3 + i) * 0.1 + gz;
       const tier = pickupTier(kind, w.kData[i]!);
       this.drops.push({ x: w.kX[i]!, z: -w.kY[i]!, kind, data: w.kData[i]!, tier });
       const tc = this.tierColor[tier]!;
@@ -172,7 +174,7 @@ export class PickupView {
           o.position.set(w.kX[i]!, bob + 0.1, -w.kY[i]!);
           o.rotation.set(0, now * 1.6 + i, 0);
           seenWeapon[i] = 1;
-          d.position.set(w.kX[i]!, 0.03, -w.kY[i]!);
+          d.position.set(w.kX[i]!, 0.03 + gz, -w.kY[i]!);
           d.rotation.set(-Math.PI / 2, 0, 0);
           d.scale.setScalar(1 + Math.sin(now * 4 + i) * 0.12);
           d.updateMatrix();
@@ -192,7 +194,7 @@ export class PickupView {
       d.scale.setScalar(this.modelScale[kind]!);
       d.updateMatrix();
       this.crates[kind]!.setMatrixAt(this.counts[kind]!++, d.matrix);
-      d.position.set(w.kX[i]!, 0.03, -w.kY[i]!);
+      d.position.set(w.kX[i]!, 0.03 + gz, -w.kY[i]!);
       d.rotation.set(-Math.PI / 2, 0, 0);
       d.scale.setScalar(1 + Math.sin(now * 4 + i) * 0.12);
       d.updateMatrix();

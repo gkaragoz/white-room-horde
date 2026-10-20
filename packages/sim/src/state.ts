@@ -152,6 +152,9 @@ export interface World {
   eMod: Uint8Array;
   /** Ticks an enemy stays frozen (stands still, no attacks). */
   eFrost: Int32Array;
+  eLayer: Uint8Array;
+  bLayer: Uint8Array;
+  sLayer: Uint8Array;
   /** The newer enemies act in phases: 0 free, 1 winding up, 2 acting, 3 recovering (eActT ticks left); a thrown enemy flies for eAir ticks at (eVX, eVY). */
   eAct: Uint8Array;
   eActT: Int32Array;
@@ -163,6 +166,8 @@ export interface World {
   pKnockX: Float64Array;
   pKnockY: Float64Array;
   pAir: Int32Array;
+  /** The layer every entity stands on: 0 ground, 1 deck (see shared/layers.ts). Bullets and spit remember where they were fired. */
+  pLayer: Uint8Array;
   /** Class ability: seconds until it can be used again, seconds a timed one is still on, the rally buff received from a soldier (s), the hammer's charge (s), shots left of the ranger's overcharge. */
   pSpecCd: Float64Array;
   pSpecT: Float64Array;
@@ -214,6 +219,8 @@ export interface World {
   kLife: Float64Array;
   /** Weapon index for weapon pickups. */
   kData: Int32Array;
+  /** The level a pickup lies on (a deck or the ground below it). */
+  kLayer: Uint8Array;
   // spitter projectiles
   sActive: Uint8Array;
   sX: Float64Array;
@@ -236,6 +243,8 @@ export interface World {
   events: SimEvent[];
   // derived data, rebuilt from the fields above (never hashed)
   field: FlowField;
+  /** The same for the deck layer (only used on maps with decks). */
+  field1: FlowField;
   grid: SpatialHash;
 }
 
@@ -319,6 +328,9 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     eCooldown: new Float64Array(MAX_ENEMIES),
     eMod: new Uint8Array(MAX_ENEMIES),
     eFrost: new Int32Array(MAX_ENEMIES),
+    eLayer: new Uint8Array(MAX_ENEMIES),
+    bLayer: new Uint8Array(MAX_BULLETS),
+    sLayer: new Uint8Array(MAX_SPIT),
     eAct: new Uint8Array(MAX_ENEMIES),
     eActT: new Int32Array(MAX_ENEMIES),
     eAir: new Int32Array(MAX_ENEMIES),
@@ -328,6 +340,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pKnockX: new Float64Array(MAX_PLAYERS),
     pKnockY: new Float64Array(MAX_PLAYERS),
     pAir: new Int32Array(MAX_PLAYERS),
+    pLayer: new Uint8Array(MAX_PLAYERS),
     pSpecCd: new Float64Array(MAX_PLAYERS),
     pSpecT: new Float64Array(MAX_PLAYERS),
     pRally: new Float64Array(MAX_PLAYERS),
@@ -370,6 +383,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     kY: new Float64Array(MAX_PICKUPS),
     kLife: new Float64Array(MAX_PICKUPS),
     kData: new Int32Array(MAX_PICKUPS),
+    kLayer: new Uint8Array(MAX_PICKUPS),
     sActive: new Uint8Array(MAX_SPIT),
     sX: new Float64Array(MAX_SPIT),
     sY: new Float64Array(MAX_SPIT),
@@ -388,8 +402,10 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     bHit: new Int32Array(MAX_BULLETS * 4).fill(-1),
     events: [],
     field: new FlowField(),
+    field1: new FlowField(),
     grid: new SpatialHash(),
   };
-  applyObstacles(w.field, map);
+  applyObstacles(w.field, map, 0);
+  applyObstacles(w.field1, map, 1);
   return w;
 }

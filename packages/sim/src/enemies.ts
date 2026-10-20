@@ -5,7 +5,8 @@ import { ELITE, abilityTaken, absorb, addPerk, barrelsBlast, placeBarrels, enemy
 import { dropLoot } from './pickups';
 import { addTelegraph, addZone, aimAt, launchPlayer } from './hazards';
 import { cellIndex } from './flowfield';
-import { applyObstacles, out, pushOut, segmentBlocked, useMap } from './obstacles';
+import { applyObstacles, currentMap, out, pushOut, segmentBlocked, useMap } from './obstacles';
+import { deckWalkable, isLayered, nextLayer, rampAt, rampDir, MAPS } from '@wrh/shared';
 import { SH_H, SH_W } from './spatial';
 import type { World } from './state';
 
@@ -49,7 +50,8 @@ const FIELD_PERIOD = 3;
 const SEP_MAX = 0.12;
 const SPAWN_MARGIN = 1.0;
 
-const sources = new Int32Array(MAX_PLAYERS);
+const sources = new Int32Array(MAX_PLAYERS + 16);
+const sources1 = new Int32Array(MAX_PLAYERS + 16);
 /** Player credited with the damage being dealt right now (-1 for enemies, explosions of exploders). */
 let killer = -1;
 
@@ -112,6 +114,7 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     w.eBoss[i] = 0;
     w.eMod[i] = 0;
     w.eFrost[i] = 0;
+    w.eLayer[i] = 0;
     w.eAct[i] = 0;
     w.eActT[i] = 0;
     w.eAir[i] = 0;
@@ -259,7 +262,7 @@ function special(w: World, i: number, type: number, x: number, y: number, best: 
         const a = w.pAngle[best]!;
         let bx = clamp(px - cos(a) * cfg.behind!, -ARENA_HALF_W + 1, ARENA_HALF_W - 1);
         let by = clamp(py - sin(a) * cfg.behind!, -ARENA_HALF_H + 1, ARENA_HALF_H - 1);
-        if (pushOut(bx, by, 0.6)) {
+        if (pushOut(bx, by, 0.6, w.eLayer[i]!)) {
           bx = out.x;
           by = out.y;
         }
@@ -624,7 +627,10 @@ function enterFloor(w: World): void {
   setWave(w, w.wave + 1);
   w.map = (w.wave - 1) % MAP_COUNT;
   useMap(w.map);
-  applyObstacles(w.field, w.map);
+  applyObstacles(w.field, w.map, 0);
+  applyObstacles(w.field1, w.map, 1);
+  w.pLayer.fill(0);
+  w.eLayer.fill(0);
   w.bActive.fill(0);
   w.gActive.fill(0);
   w.sActive.fill(0);
@@ -775,7 +781,7 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   w.enemyCount--;
   w.kills++;
   w.events.push({ type: 'enemyDeath', id: i, etype: type, x: w.eX[i]!, y: w.eY[i]!, dx, dy, power });
-  dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0);
+  dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0, w.eLayer[i]!);
   // experience belongs to the character that made the kill; a kill nobody owns is shared by the living
   const xp = w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]!;
   if (killer >= 0 && w.pActive[killer]) awardXp(w, killer, xp);
@@ -873,7 +879,7 @@ export function shove(w: World, i: number, dx: number, dy: number): void {
   const r = rad(w, i);
   let x = clamp(w.eX[i]! + dx, -ARENA_HALF_W + r, ARENA_HALF_W - r);
   let y = clamp(w.eY[i]! + dy, -ARENA_HALF_H + r, ARENA_HALF_H - r);
-  if (pushOut(x, y, r * 0.8)) {
+  if (pushOut(x, y, r * 0.8, w.eLayer[i]!)) {
     x = out.x;
     y = out.y;
   }
@@ -890,11 +896,33 @@ export function rebuildGrid(w: World): void {
 
 function refreshField(w: World): void {
   if (w.tick % FIELD_PERIOD !== 0) return;
-  let n = 0;
-  for (let s = 0; s < MAX_PLAYERS; s++) {
-    if (w.pActive[s] && w.pHp[s]! > 0) sources[n++] = cellIndex(w.pX[s]!, w.pY[s]!);
+  const map = MAPS[w.map] ?? MAPS[0]!;
+  if (!isLayered(map)) {
+    let n = 0;
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      if (w.pActive[s] && w.pHp[s]! > 0) sources[n++] = cellIndex(w.pX[s]!, w.pY[s]!);
+    }
+    w.field.compute(sources, n);
+    return;
   }
-  w.field.compute(sources, n);
+  // two levels: each level heads for the players on it, and for the way to the other level when somebody is there
+  let n0 = 0;
+  let n1 = 0;
+  for (let s = 0; s < MAX_PLAYERS; s++) {
+    if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
+    if (w.pLayer[s] === 1) sources1[n1++] = cellIndex(w.pX[s]!, w.pY[s]!);
+    else sources[n0++] = cellIndex(w.pX[s]!, w.pY[s]!);
+  }
+  const upstairs = n1 > 0;
+  const downstairs = n0 > 0;
+  for (const r of map.ramps ?? []) {
+    const d = rampDir(r);
+    const half = (r.dir === 0 || r.dir === 2 ? r.w : r.h) / 2 - 0.45;
+    if (upstairs) sources[n0++] = cellIndex(r.x - d[0] * half, r.y - d[1] * half); // the foot, for those who have to go up
+    if (downstairs) sources1[n1++] = cellIndex(r.x + d[0] * half, r.y + d[1] * half); // the top, for those who have to come down
+  }
+  w.field.compute(sources, n0);
+  w.field1.compute(sources1, n1);
 }
 
 /** Waves, flow field, spatial hash, enemy movement/separation and attacks. Called once per tick before bullets. */
@@ -914,8 +942,9 @@ export function updateEnemies(w: World): void {
     }
   }
   const g = w.grid;
-  const field = w.field;
   const pr = BALANCE.player.radius;
+  const map = currentMap();
+  const layered = isLayered(map);
 
   for (let i = 0; i < MAX_ENEMIES; i++) {
     if (!w.eActive[i]) continue;
@@ -946,20 +975,35 @@ export function updateEnemies(w: World): void {
       w.eStateTick[i] = w.tick;
     }
 
-    // nearest living player
+    // nearest living player on the same level (or, with nobody there, the nearest on the other one: it is walked to by the ramps)
+    const L = w.eLayer[i]!;
     let best = -1;
     let bd2 = 1e18;
+    let any = -1;
+    let anyD2 = 1e18;
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
       const dx = w.pX[s]! - x;
       const dy = w.pY[s]! - y;
       const d2 = dx * dx + dy * dy;
-      if (d2 < bd2) {
+      if (w.pLayer[s] === L && d2 < bd2) {
         bd2 = d2;
         best = s;
       }
+      if (d2 < anyD2) {
+        anyD2 = d2;
+        any = s;
+      }
+    }
+    if (best < 0) {
+      best = any;
+      bd2 = anyD2;
     }
     if (best < 0) continue;
+    const cross = w.pLayer[best] !== L;
+    const field = L === 1 ? w.field1 : w.field;
+    const oldX = x;
+    const oldY = y;
     const dist = sqrt(bd2);
     const tx = (w.pX[best]! - x) / (dist > 1e-6 ? dist : 1);
     const ty = (w.pY[best]! - y) / (dist > 1e-6 ? dist : 1);
@@ -982,8 +1026,8 @@ export function updateEnemies(w: World): void {
       let wantMove = true;
       if (type === T_SPITTER) {
         if (dist < SPIT_HOLD) wantMove = false;
-        if (dist <= SPIT_RANGE && w.eCooldown[i]! <= 0 && !segmentBlocked(x, y, w.pX[best]!, w.pY[best]!)) {
-          spawnSpit(w, x, y, tx, ty);
+        if (dist <= SPIT_RANGE && w.eCooldown[i]! <= 0 && !segmentBlocked(x, y, w.pX[best]!, w.pY[best]!, L)) {
+          spawnSpit(w, x, y, tx, ty, L);
           w.eCooldown[i] = INTERVAL[type]!;
           w.eState[i] = EnemyState.Attack;
           w.eStateTick[i] = w.tick;
@@ -996,11 +1040,11 @@ export function updateEnemies(w: World): void {
           if (w.enemyCount < BALANCE.waves.cap) spawnEnemy(w, T_GRUNT, x + (tx > 0 ? -1 : 1), y + (ty > 0 ? -1 : 1));
         }
       } else if (type === T_EXPLODER) {
-        if (dist <= reach + 0.3) {
+        if (!cross && dist <= reach + 0.3) {
           killEnemy(w, i, tx, ty, 0);
           continue;
         }
-      } else if (dist <= reach + 0.15) {
+      } else if (!cross && dist <= reach + 0.15) {
         wantMove = false;
         if (w.eCooldown[i]! <= 0 && hurtPlayer(w, best, boss ? BALANCE.progression.boss.damage : DAMAGE[type]!, w.pX[best]!, w.pY[best]!, i)) {
           w.eCooldown[i] = INTERVAL[type]!;
@@ -1011,11 +1055,20 @@ export function updateEnemies(w: World): void {
       if (wantMove && w.eState[i] === EnemyState.Move) {
         let dx = tx;
         let dy = ty;
-        if (dist > 3 || segmentBlocked(x, y, w.pX[best]!, w.pY[best]!)) {
+        if (cross || dist > 3 || segmentBlocked(x, y, w.pX[best]!, w.pY[best]!, L)) {
           const c = cellIndex(x, y);
           if (field.dirX[c]! !== 0 || field.dirY[c]! !== 0) {
             dx = field.dirX[c]!;
             dy = field.dirY[c]!;
+          }
+        }
+        // once on a ramp it keeps going toward the other level when that is where its target is: up from the ground, down from a deck
+        if (layered && cross) {
+          const ri = rampAt(map, x, y);
+          if (ri >= 0) {
+            const rd = rampDir(map.ramps![ri]!);
+            dx = rd[0] * (L === 0 ? 1 : -1);
+            dy = rd[1] * (L === 0 ? 1 : -1);
           }
         }
         // a leaper crouches and then jumps at its target every three seconds or so
@@ -1069,9 +1122,16 @@ export function updateEnemies(w: World): void {
     }
     x = clamp(x + mx + sx, -ARENA_HALF_W + r0, ARENA_HALF_W - r0);
     y = clamp(y + my + sy, -ARENA_HALF_H + r0, ARENA_HALF_H - r0);
-    if (pushOut(x, y, r0 * 0.8)) {
+    if (pushOut(x, y, r0 * 0.8, L)) {
       x = out.x;
       y = out.y;
+    }
+    if (layered) {
+      if (L === 1 && !deckWalkable(map, x, y)) {
+        x = oldX;
+        y = oldY;
+      }
+      w.eLayer[i] = nextLayer(map, x, y, L);
     }
     w.eX[i] = x;
     w.eY[i] = y;
@@ -1099,7 +1159,7 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
     for (let gy = cy0; gy <= cy1; gy++) {
       for (let gx = cx0; gx <= cx1; gx++) {
         for (let j = g.head[gy * SH_W + gx]!; j >= 0; j = g.next[j]!) {
-          if (!w.eActive[j]) continue;
+          if (!w.eActive[j] || w.eLayer[j]! > w.bLayer[b]!) continue;
           if (hits[b * 4]! === j || hits[b * 4 + 1]! === j || hits[b * 4 + 2]! === j || hits[b * 4 + 3]! === j) continue;
           const ex = w.eX[j]! - x0;
           const ey = w.eY[j]! - y0;
@@ -1184,10 +1244,11 @@ export function blastEnemies(w: World, x: number, y: number, radius: number, dam
   }
 }
 
-function spawnSpit(w: World, x: number, y: number, dx: number, dy: number): void {
+function spawnSpit(w: World, x: number, y: number, dx: number, dy: number, layer = 0): void {
   for (let i = 0; i < MAX_SPIT; i++) {
     if (w.sActive[i]) continue;
     w.sActive[i] = 1;
+    w.sLayer[i] = layer;
     w.sX[i] = x;
     w.sY[i] = y;
     w.sVx[i] = dx * BALANCE.spit.speed;
@@ -1274,9 +1335,9 @@ export function updateProjectiles(w: World): void {
     w.sX[i] = x1;
     w.sY[i] = y1;
     w.sLife[i] = w.sLife[i]! - TICK_DT;
-    let dead = w.sLife[i]! <= 0 || segmentBlocked(x0, y0, x1, y1);
+    let dead = w.sLife[i]! <= 0 || segmentBlocked(x0, y0, x1, y1, w.sLayer[i]!);
     for (let s = 0; s < MAX_PLAYERS && !dead; s++) {
-      if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
+      if (!w.pActive[s] || w.pHp[s]! <= 0 || w.pLayer[s]! > w.sLayer[i]!) continue;
       const dx = w.pX[s]! - x1;
       const dy = w.pY[s]! - y1;
       if (dx * dx + dy * dy <= r2) {

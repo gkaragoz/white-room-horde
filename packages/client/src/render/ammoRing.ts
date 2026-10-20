@@ -32,10 +32,10 @@ export class AmmoRing {
   }
 
   /** Place the ring at floor position (x, z) and show `frac` (0..1) of the magazine. */
-  update(x: number, z: number, frac: number, reloading: boolean, now: number, visible: boolean): void {
+  update(x: number, z: number, frac: number, reloading: boolean, now: number, visible: boolean, y = 0): void {
     this.group.visible = visible;
     if (!visible) return;
-    this.group.position.set(x, 0.04, z);
+    this.group.position.set(x, 0.04 + y, z);
     const f = Math.max(0, Math.min(1, frac));
     const step = Math.round(f * STEPS);
     if (step !== this.step) {

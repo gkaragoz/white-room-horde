@@ -172,6 +172,7 @@ export class PropsView {
     // little scenes on top of some cover boxes
     const boxes = MAPS[index]?.boxes ?? MAPS[0]!.boxes;
     for (const b of boxes) {
+      if (b.kind && b.kind !== 'cover') continue; // scenes stand on cover, not on rails, pillars and the sides of ramps
       if (rand() < 0.45) continue;
       const n = 1 + Math.floor(rand() * 2);
       for (let k = 0; k < n; k++) {

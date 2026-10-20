@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ENEMY_TYPES, EnemyState, MAX_ENEMIES, TICK_DT, type EnemyType } from '@wrh/shared';
+import { ENEMY_TYPES, EnemyState, MAPS, MAX_ENEMIES, TICK_DT, heightAt, type EnemyType } from '@wrh/shared';
 import type { SimEvent, World } from '@wrh/sim';
 import type { Backend } from './backend';
 import { asset } from '../assets';
@@ -177,6 +177,8 @@ interface Corpse {
   vy: number;
   /** Index into `types` (boss looks live after the regular types). */
   render: number;
+  /** The level it died on (0 ground, 1 deck): its height comes from the map. */
+  layer: number;
 }
 
 /** Ground speed (model units per second, before scale) each baked locomotion clip was authored for. */
@@ -333,6 +335,7 @@ export class Crowd {
         scale: 1,
         vx: e.dx * kick,
         vy: e.dy * kick,
+        layer: w.eLayer[e.id]!,
       });
     }
     while (this.corpses.length > this.maxCorpses) this.corpses.shift();
@@ -377,6 +380,7 @@ export class Crowd {
     this.lastNow = now;
     for (let i = 0; i < MAX_ENEMIES; i++) if (this.flash[i]! > 0) this.flash[i] = Math.max(0, this.flash[i]! - dt * 8);
     this.thawed.length = 0;
+    const map = MAPS[w.map] ?? MAPS[0]!;
     for (let i = 0; i < MAX_ENEMIES; i++) {
       const on = w.eActive[i] === 1 && w.eFrost[i]! > 0;
       const level = this.frostLevel[i]!;
@@ -471,6 +475,7 @@ export class Crowd {
       }
       const frost = this.frostLevel[i]!;
       if (frost > 0) scale *= 1 + 0.045 * frost;
+      hop += heightAt(map, x, y, w.eLayer[i]!);
       this.put(t, px, pz, yawOut, s.a, s.b, s.m, (0.9 + ((i * 53) % 10) * 0.02) * eliteShade * (1 - 0.15 * frost) + this.flash[i]! * 1.6 + glow, scale, hop, frost);
     }
     // corpses do not pile up: after a few seconds they shrink away and only the blood stays on the floor
@@ -486,7 +491,7 @@ export class Crowd {
       c.vy *= f;
       const s = this.sample(clip, now - c.born);
       const left = this.corpseLife - (now - c.born);
-      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale * (left < CORPSE_FADE ? Math.max(0.02, left / CORPSE_FADE) : 1));
+      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale * (left < CORPSE_FADE ? Math.max(0.02, left / CORPSE_FADE) : 1), heightAt(map, c.x, c.y, c.layer));
     }
     let tris = 0;
     for (const t of this.types) {

@@ -5,19 +5,19 @@
       "seed": 1,
       "ticks": 200,
       "players": 4,
-      "hash": 1919814637
+      "hash": 1097734977
     },
     {
       "seed": 42,
       "ticks": 600,
       "players": 4,
-      "hash": 2389250137
+      "hash": 4019460950
     },
     {
       "seed": 7,
       "ticks": 900,
       "players": 8,
-      "hash": 1536283623
+      "hash": 3245165466
     },
     {
       "seed": 11,
@@ -26,7 +26,7 @@
       "map": 1,
       "difficulty": 2,
       "wave": 6,
-      "hash": 3255874870
+      "hash": 2451354538
     },
     {
       "seed": 12,
@@ -35,7 +35,7 @@
       "map": 2,
       "difficulty": 0,
       "wave": 11,
-      "hash": 1948673274
+      "hash": 266371932
     },
     {
       "seed": 13,
@@ -44,7 +44,7 @@
       "map": 3,
       "difficulty": 1,
       "wave": 9,
-      "hash": 2822828051
+      "hash": 3345536428
     },
     {
       "seed": 14,
@@ -53,7 +53,7 @@
       "map": 0,
       "difficulty": 2,
       "wave": 4,
-      "hash": 1408273027
+      "hash": 2847419857
     }
   ]
 }

@@ -37,12 +37,13 @@ export function pickTarget(w: World, slot: number, prev: AimTarget | null, shotC
   reject.fill(0);
   let best: AimTarget | null = null;
   let first: AimTarget | null = null;
-  const clear = (t: AimTarget): boolean => (shotClear ? shotClear(t) : lineClear(w, px, py, t.x, t.y));
+  const layer = w.pLayer[slot]!;
+  const clear = (t: AimTarget): boolean => (shotClear ? shotClear(t) : lineClear(w, px, py, t.x, t.y, layer));
   for (let attempt = 0; attempt <= MAX_HIDDEN; attempt++) {
     let cand: AimTarget | null = null;
     let candD = Infinity;
     for (let i = 0; i < MAX_ENEMIES; i++) {
-      if (!w.eActive[i] || reject[i]) continue;
+      if (!w.eActive[i] || reject[i] || w.eLayer[i]! > layer) continue; // what stands on a deck above cannot be shot from below
       const dx = w.eX[i]! - px;
       const dy = w.eY[i]! - py;
       const d = dx * dx + dy * dy;
@@ -154,16 +155,17 @@ export class AimSolver {
    */
   shotClear(w: World, slot: number, t: AimTarget, delayTicks: number): boolean {
     const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[slot]!]!]!;
-    if (st.melee) return lineClear(w, w.pX[slot]!, w.pY[slot]!, t.x, t.y); // a blade has no bullet to get through: only cover in the way matters
+    const layer = w.pLayer[slot]!;
+    if (st.melee) return lineClear(w, w.pX[slot]!, w.pY[slot]!, t.x, t.y, layer); // a blade has no bullet to get through: only cover in the way matters
     const a = this.angle(w, slot, t, delayTicks);
     const px = w.pX[slot]!;
     const py = w.pY[slot]!;
     const mx = px + Math.cos(a) * st.muzzleFwd + Math.sin(a) * st.muzzleSide;
     const my = py + Math.sin(a) * st.muzzleFwd - Math.cos(a) * st.muzzleSide;
     const near = Math.hypot(t.x - px, t.y - py) <= st.muzzleFwd + 0.3;
-    if (near) return lineClear(w, px, py, t.x, t.y);
+    if (near) return lineClear(w, px, py, t.x, t.y, layer);
     const dist = Math.hypot(t.x - mx, t.y - my);
-    return lineClear(w, px, py, mx, my) && lineClear(w, mx, my, mx + Math.cos(a) * dist, my + Math.sin(a) * dist);
+    return lineClear(w, px, py, mx, my, layer) && lineClear(w, mx, my, mx + Math.cos(a) * dist, my + Math.sin(a) * dist, layer);
   }
 
   /** The shot angle for `target`; `delayTicks` is how long the input takes to reach the simulation. */

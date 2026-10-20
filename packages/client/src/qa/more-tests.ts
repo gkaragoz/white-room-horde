@@ -87,11 +87,57 @@ export const moreTests: QaTest[] = [
       for (let m = 0; m < MAPS.length; m++) {
         view.setMap(m);
         if (view.boxCount !== MAPS[m]!.boxes.length) problems.push(`map ${m}: ${view.boxCount} boxes drawn, ${MAPS[m]!.boxes.length} defined`);
-        const first = view.group.children[0] as THREE.Mesh;
+        if (view.group.children.length < MAPS[m]!.boxes.length + (MAPS[m]!.decks?.length ?? 0) + (MAPS[m]!.ramps?.length ?? 0)) problems.push(`map ${m}: only ${view.group.children.length} meshes for ${MAPS[m]!.boxes.length} boxes, ${MAPS[m]!.decks?.length ?? 0} decks and ${MAPS[m]!.ramps?.length ?? 0} ramps`);
+        const first = view.group.children.find((c) => Array.isArray((c as THREE.Mesh).material)) as THREE.Mesh;
         colours.add((first.material as THREE.MeshStandardMaterial[])[0]!.color.getHexString());
       }
       if (colours.size < MAPS.length) problems.push('two arenas share the same cover colour');
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${MAPS.length} layouts, ${colours.size} colour themes` };
+    },
+  },
+  {
+    id: 'arena.layers',
+    title: 'Vertical arenas draw their decks and ramps, the roof turns thin over a character walking underneath, and the minimap shows the levels',
+    async run(ctx) {
+      const problems: string[] = [];
+      const view = new ArenaView();
+      ctx.stage.scene.add(view.group);
+      const empty = new ArenaView();
+      empty.setMap(0);
+      try {
+        ctx.stage.setZoom(1);
+        for (let m = 0; m < MAPS.length; m++) {
+          const def = MAPS[m]!;
+          if (!def.decks?.length) continue;
+          view.setMap(m);
+          // the camera looks at the deck: a ground character beneath it is hidden, one out in the open is not
+          const d = def.decks[0]!;
+          ctx.stage.follow(d.x, -d.y, 0, 0);
+          ctx.stage.render();
+          const under = view.hidesGround(ctx.stage.camera, d.x, d.y);
+          const far = view.hidesGround(ctx.stage.camera, d.x, d.y - d.h / 2 - 12);
+          if (!under) problems.push(`${def.id}: a character under the deck is not reported as hidden`);
+          if (far) problems.push(`${def.id}: a character far from the deck is reported as hidden`);
+          view.fadeRoof(0.2, 10);
+          view.fadeRoof(0.2, 10);
+          if (view.roofOpacity > 0.3) problems.push(`${def.id}: the roof does not fade (${view.roofOpacity})`);
+          view.fadeRoof(1, 10);
+          view.fadeRoof(1, 10);
+          if (view.roofOpacity < 0.95) problems.push(`${def.id}: the roof does not come back (${view.roofOpacity})`);
+          // pixels: the deck top is drawn above the ground (its colour differs from the plain floor)
+          ctx.stage.follow(d.x, -d.y, 0, 0);
+          ctx.stage.render();
+          const withDeck = grab(ctx);
+          view.setMap(0);
+          ctx.stage.render();
+          const flat = grab(ctx);
+          if (diffCount(withDeck, flat) < 3000) problems.push(`${def.id}: the deck and ramps barely show (${diffCount(withDeck, flat)} px)`);
+          view.setMap(m);
+        }
+      } finally {
+        ctx.stage.scene.remove(view.group);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'decks, ramps, roof fade' };
     },
   },
   {

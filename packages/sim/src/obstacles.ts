@@ -1,23 +1,38 @@
-import { ARENA_HALF_H, ARENA_HALF_W, MAPS, type Box } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, MAPS, deckWalkable, type Box, type MapDef } from '@wrh/shared';
 import { FF_H, FF_W, type FlowField } from './flowfield';
 import { sqrt } from './detmath';
 
-let OBSTACLES: readonly Box[] = MAPS[0]!.boxes;
+let MAP: MapDef = MAPS[0]!;
+let OBSTACLES: readonly Box[] = MAP.boxes;
 let activeMap = 0;
 
 /** Select the arena layout used by the collision helpers (called at the start of every step; cheap). */
 export function useMap(map: number): void {
   if (map !== activeMap) {
     activeMap = map;
-    OBSTACLES = MAPS[map]?.boxes ?? MAPS[0]!.boxes;
+    MAP = MAPS[map] ?? MAPS[0]!;
+    OBSTACLES = MAP.boxes;
   }
 }
 
-/** Mark the flow field cells covered by obstacles (with a small margin so paths keep clear of corners). */
-export function applyObstacles(field: FlowField, map = 0): void {
+/** The layout in use (ramps and decks live in it). */
+export function currentMap(): MapDef {
+  return MAP;
+}
+
+/** Which obstacles stop an entity of this layer: bit 1 for the ground, bit 2 for a deck. */
+const maskOf = (layer: number): number => (layer === 1 ? 2 : 1);
+
+/**
+ * Mark the flow field cells an entity of `layer` cannot enter (with a small margin so paths keep clear of corners). On the
+ * deck layer everything that is not deck or ramp is closed as well.
+ */
+export function applyObstacles(field: FlowField, map = 0, layer = 0): void {
   useMap(map);
   field.blocked.fill(0);
+  const mask = maskOf(layer);
   for (const o of OBSTACLES) {
+    if (((o.layers ?? 1) & mask) === 0) continue;
     const x0 = o.x - o.w / 2 - 0.3;
     const x1 = o.x + o.w / 2 + 0.3;
     const y0 = o.y - o.h / 2 - 0.3;
@@ -30,14 +45,23 @@ export function applyObstacles(field: FlowField, map = 0): void {
       }
     }
   }
+  if (layer === 1) {
+    for (let cy = 0; cy < FF_H; cy++) {
+      for (let cx = 0; cx < FF_W; cx++) {
+        if (!deckWalkable(MAP, cx - ARENA_HALF_W + 0.5, cy - ARENA_HALF_H + 0.5)) field.blocked[cy * FF_W + cx] = 1;
+      }
+    }
+  }
 }
 
 export const out = { x: 0, y: 0 };
 
-/** Push a circle out of every obstacle; result in `out`. Returns true if it moved. */
-export function pushOut(x: number, y: number, r: number): boolean {
+/** Push a circle out of every obstacle of its layer; result in `out`. Returns true if it moved. */
+export function pushOut(x: number, y: number, r: number, layer = 0): boolean {
   let moved = false;
+  const mask = maskOf(layer);
   for (const o of OBSTACLES) {
+    if (((o.layers ?? 1) & mask) === 0) continue;
     const hx = o.w / 2;
     const hy = o.h / 2;
     const dx = x - o.x;
@@ -66,11 +90,16 @@ export function pushOut(x: number, y: number, r: number): boolean {
   return moved;
 }
 
-/** Does the segment (x0,y0)-(x1,y1) cross an obstacle? Slab test per box. */
-export function segmentBlocked(x0: number, y0: number, x1: number, y1: number): boolean {
+/**
+ * Does the segment (x0,y0)-(x1,y1) cross cover on this layer? Slab test per box. Only what stops bullets counts (a rail is
+ * low and can be shot over), and a shot fired from a deck is stopped only by what stands on the deck.
+ */
+export function segmentBlocked(x0: number, y0: number, x1: number, y1: number, layer = 0): boolean {
   const dx = x1 - x0;
   const dy = y1 - y0;
+  const mask = maskOf(layer);
   for (const o of OBSTACLES) {
+    if (((o.layers ?? 1) & mask) === 0 || o.cover === false) continue;
     let tmin = 0;
     let tmax = 1;
     const minX = o.x - o.w / 2;
