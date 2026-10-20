@@ -426,6 +426,8 @@ export interface UiHandlers {
   onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
   onSetting(key: keyof Settings, value: number | string | boolean): void;
   onResetSettings(): void;
+  /** Download the problem report. */
+  onReport?(): void;
 }
 
 export interface Settings {
@@ -595,6 +597,7 @@ const CSS = `
 .wrh-set-keygrid{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;font-size:14px;font-weight:600}
 .wrh-ui .wrh-set-keybtn{background:#efe7d6;color:#3a352d;margin:0;padding:4px 8px;border-radius:9px}
 .wrh-ui .wrh-set-small{background:#efe7d6;color:#3a352d;font-size:12px;margin:10px 0 0}
+.wrh-ui .wrh-set-row .wrh-set-small{margin:0;justify-self:end}
 .wrh-key{display:inline-block;min-width:30px;height:30px;line-height:26px;padding:0 8px;text-align:center;font:700 14px system-ui,sans-serif;color:#3a352d;background:linear-gradient(#fffdf8,#ece3cf);border:2px solid #b9ab8e;border-bottom-width:5px;border-radius:8px;box-shadow:0 2px 0 rgba(60,45,20,.25)}
 .wrh-key.wide{padding:0 12px}
 .wrh-key.pad{border-radius:50%;min-width:34px;background:linear-gradient(#f4f8ff,#dbe6f6);border-color:#8fa3bf;color:#25324a}
@@ -1661,6 +1664,7 @@ export class Ui {
         this.renderSettings();
       },
       onReset: () => this.h.onResetSettings(),
+      onReport: () => this.h.onReport?.(),
       onClose: () => this.toggleSettings(),
       onControls: () => this.toggleControls(),
     });

@@ -243,6 +243,7 @@ const ui = new Ui(
     },
     onResume: () => setPaused(false),
     onReplay: () => downloadReplay(),
+    onReport: () => void downloadReport(),
     onResetSettings: () => {
       settings = { ...defaultSettings(), lang: settings.lang };
       autoScale = settings.scale;
@@ -600,8 +601,6 @@ function beginPlaying(w: World, slot: number): void {
   stage.setNightNow(nightFor(w));
   stage.update(0, 0, 0);
   climb.props.setNight(stage.night);
-  // build the climb's blur composer and shaders now, in a calm moment, instead of at the first climb
-  setTimeout(() => stage.warmFlight(), 4000);
   world = w;
   localSlot = slot;
   ui.clearScreen();
@@ -668,6 +667,7 @@ let reconnectTries = 0;
  */
 function connect(name: string, rawServer: string, code: string | null, password = '', rejoinToken = ''): void {
   const server = normalizeServer(rawServer);
+  lastServer = server;
   if (!server) {
     ui.showMenu(ui.tr('noServer'));
     return;
@@ -730,6 +730,41 @@ function lerpAngle(a: number, b: number, t: number): number {
   let d = b - a;
   d = Math.atan2(Math.sin(d), Math.cos(d));
   return a + d * t;
+}
+
+let lastServer = '';
+
+/** Everything a bug report needs, as one text file: versions, settings, errors, frame and network history, relay stats. */
+async function downloadReport(): Promise<void> {
+  let relay = 'not online';
+  if (lastServer) {
+    try {
+      const base = lastServer.replace(/^ws/i, 'http').replace(/\/ws$/, '');
+      relay = JSON.stringify(await (await fetch(`${base}/stats`, { cache: 'no-store' })).json());
+    } catch (e) {
+      relay = `could not read /stats: ${String(e)}`;
+    }
+  }
+  const extra = [
+    `game ${BUILD.version} (${BUILD.commit}) ${backend} language ${ui.lang}`,
+    `screen ${innerWidth}x${innerHeight} dpr ${devicePixelRatio} hidden ${document.hidden}`,
+    world ? `world tick ${world.tick} floor ${world.wave} enemies ${world.enemyCount} map ${world.map}` : 'no game running',
+    session ? `room ${session.code} slot ${session.slot} players ${session.players.length} state ${session.state} rtt ${Math.round(session.rttMs)} ms jitter ${Math.round(session.jitterMs)} ms backlog ${session.backlog} resyncs ${session.resyncs} desyncs ${session.desyncTicks.length}` : 'offline',
+    `perf ${JSON.stringify(perf)}`,
+    `server ${lastServer || '-'}`,
+    `relay stats ${relay}`,
+    `settings ${JSON.stringify(settings)}`,
+  ].join('\n');
+  const text = diag.report(extra);
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `wrh-report-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  ui.warn(ui.lang === 'tr' ? 'Rapor indirildi' : 'Report downloaded');
 }
 
 let aimTarget: AimTarget | null = null;
@@ -1159,23 +1194,6 @@ function frame(nowMs: number): void {
   requestAnimationFrame(frame);
 }
 
-// F3 shows the frame rate and network numbers, F4 copies a full network report for a bug report
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'F3') {
-    e.preventDefault();
-    settings.showFps = !settings.showFps;
-    applySettings();
-    if (!settings.showFps) ui.setDev('');
-  } else if (e.code === 'F4') {
-    e.preventDefault();
-    const text = diag.report(`${BUILD.version} ${BUILD.commit} ${backend} ${session ? `room ${session.code} slot ${session.slot} players ${session.players.length}` : 'offline'}`);
-    void navigator.clipboard?.writeText(text).then(
-      () => ui.warn(ui.lang === 'tr' ? 'Ağ raporu panoya kopyalandı' : 'Network report copied'),
-      () => console.log(text),
-    );
-  }
-});
-
 const replayUrl = params.get('replay');
 if (replayUrl) {
   void fetch(replayUrl)
@@ -1188,6 +1206,8 @@ const autoStart = !replayUrl && params.get('solo') === '1' || dev.bots > 0 || de
 if (autoStart) startSolo('dev');
 else if (!replayUrl) ui.showMenu();
 requestAnimationFrame(frame);
+// the climb's blur composer and shaders take a few hundred milliseconds to build: do it while the menu is up, not in a fight
+setTimeout(() => stage.warmFlight(), 800);
 
 (window as unknown as Record<string, unknown>).__wrh = {
   get world() {

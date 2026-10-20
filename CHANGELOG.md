@@ -7,6 +7,9 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+- Settings: "Download report" saves one text file with the game version, settings, page errors and warnings, frame and network history of the last five minutes, stalls with their likely cause and the relay's `/stats`; it replaces the F3/F4 keys (the "Show frame rate and network numbers" switch stays).
+- The climb's blur composer is warmed while the menu is up instead of in the first seconds of a game (a half second freeze there).
+
 ## v0.8.1 (2026-10-20)
 
 - The flight composer is not warmed on software renderers (it stalled CI browsers); the game smoke test holds the mouse until the simulation has really moved on (slow CI machines ran too few ticks).
@@ -25,7 +28,7 @@ minors), so a minor bump means: update the server and reload the page.
 **Online**
 - Inputs are sent from a worker timer, so a slow, hidden or covered game page no longer starves the others (the likely reason for the host looking frozen to everybody).
 - Snapshots for late joiners and resyncs come from the connection with the best round trip time, not from the host if somebody else can do it.
-- `F3` shows the frame rate and network numbers (rtt, jitter, buffer, stalls), `F4` copies a full network report; the relay and the server answer `/stats` (tick lag, messages per second).
+- The settings can show the frame rate and network numbers (rtt, jitter, buffer, stalls) and download a problem report; the relay and the server answer `/stats` (tick lag, messages per second).
 
 **Smoother**
 - The climb no longer recompiles every shader when the shaft darkens the sky (one permanent fog), its blur composer is built and warmed at the start of a game, and the next floor is built over two frames.

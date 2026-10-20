@@ -42,6 +42,8 @@ export class NetDiag {
   private steps = 0;
   private hiddenAt = -1e9;
   private lastBundleStall = -1e9;
+  /** Page errors, unhandled promise rejections and console errors/warnings, newest last. */
+  readonly errors: string[] = [];
 
   constructor() {
     try {
@@ -50,6 +52,19 @@ export class NetDiag {
       }).observe({ entryTypes: ['longtask'] });
     } catch {
       /* not supported (Firefox, Safari): the frame gaps still tell */
+    }
+    const note = (kind: string, text: string): void => {
+      this.errors.push(`${(performance.now() / 1000).toFixed(1)}s ${kind}: ${text}`.slice(0, 600));
+      if (this.errors.length > 80) this.errors.shift();
+    };
+    window.addEventListener('error', (e) => note('error', `${e.message} (${e.filename}:${e.lineno})`));
+    window.addEventListener('unhandledrejection', (e) => note('rejection', String((e.reason as Error | undefined)?.stack ?? e.reason)));
+    for (const level of ['error', 'warn'] as const) {
+      const orig = console[level].bind(console);
+      console[level] = (...args: unknown[]) => {
+        note(`console.${level}`, args.map((a) => (typeof a === 'string' ? a : a instanceof Error ? a.stack ?? a.message : JSON.stringify(a))).join(' '));
+        orig(...args);
+      };
     }
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.hiddenAt = performance.now();
@@ -132,6 +147,7 @@ export class NetDiag {
     const rows = this.samples
       .map((s) => `${s.t}\tfps ${s.fps}\tp95 ${s.frameP95}\tmax ${s.frameMax}\tlong ${s.longTasks}/${s.longTaskMax}\trtt ${s.rtt}\tjit ${s.jitter}\tbuf ${s.playout}\tback ${s.backlog}\tws ${s.bufferedBytes}\tin ${s.inputsSent}\tsteps ${s.stepsPerSecond}${s.hidden ? '\thidden' : ''}`)
       .join('\n');
-    return `${head}\nstalls (> ${STALL_MS} ms):\n${stalls}\n\nper second:\n${rows}\n`;
+    const errs = this.errors.length ? this.errors.map((e) => `  ${e}`).join('\n') : '  none';
+    return `${head}\nerrors and warnings:\n${errs}\n\nstalls (> ${STALL_MS} ms):\n${stalls}\n\nper second:\n${rows}\n`;
   }
 }

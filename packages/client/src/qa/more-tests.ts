@@ -531,6 +531,7 @@ export const moreTests: QaTest[] = [
           onReset: () => changes.push(['reset', true]),
           onClose: () => changes.push(['close', true]),
           onControls: () => changes.push(['controls', true]),
+          onReport: () => changes.push(['report', true]),
         });
       try {
         draw();
@@ -542,6 +543,12 @@ export const moreTests: QaTest[] = [
         host.querySelector<HTMLInputElement>('.wrh-range')!.dispatchEvent(new Event('change'));
         host.querySelector<HTMLElement>('.wrh-seg button:not(.on)')!.click();
         if (changes.length !== 3) problems.push(`${changes.length} changes reported for a switch, a slider and a choice`);
+        const reportBtn = [...host.querySelectorAll<HTMLElement>('.wrh-set-row button')].find((b) => /report/i.test(b.textContent ?? ''));
+        if (!reportBtn) problems.push('no problem-report button in the settings');
+        else {
+          reportBtn.click();
+          if (!changes.some((c) => c[0] === 'report')) problems.push('the report button does nothing');
+        }
         for (let i = 0; i < tabs.length; i++) {
           tab = ['graphics', 'audio', 'game', 'access', 'keys'][i]!;
           draw();

@@ -38,7 +38,9 @@ const EN = {
   gore: 'Blood and gibs',
   corpses: 'Corpses stay',
   shake: 'Screen shake',
-  showFps: 'Show frame rate and network (F3, copy report: F4)',
+  showFps: 'Show frame rate and network numbers',
+  reportLabel: 'Something wrong? Problem report',
+  reportButton: 'Download report',
   volume: 'Master volume',
   music: 'Music',
   sfx: 'Sound effects',
@@ -145,7 +147,9 @@ const TR: Partial<typeof EN> = {
   gore: 'Kan ve parçalar',
   corpses: 'Cesetler kalır',
   shake: 'Ekran sarsıntısı',
-  showFps: 'Kare hızı ve ağ bilgisini göster (F3, rapor kopyala: F4)',
+  showFps: 'Kare hızı ve ağ bilgisini göster',
+  reportLabel: 'Bir sorun mu var? Hata raporu',
+  reportButton: 'Raporu indir',
   volume: 'Ana ses',
   music: 'Müzik',
   sfx: 'Ses efektleri',
@@ -239,6 +243,8 @@ export interface PanelContext {
   onReset(): void;
   onClose(): void;
   onControls(): void;
+  /** Download the problem report (frame times, network numbers, errors, settings). */
+  onReport(): void;
 }
 
 type Choice = [value: string | number | boolean, label: string];
@@ -246,7 +252,8 @@ type Row =
   | { kind: 'slider'; key: keyof Settings; label: string; min: number; max: number; step: number; fmt: (v: number) => string }
   | { kind: 'toggle'; key: keyof Settings; label: string }
   | { kind: 'choice'; key: keyof Settings; label: string; options: Choice[]; reload?: boolean }
-  | { kind: 'keys' };
+  | { kind: 'keys' }
+  | { kind: 'report'; label: string; button: string };
 interface Group {
   title: string;
   rows: Row[];
@@ -297,6 +304,7 @@ function tabsFor(t: PanelText, c: PanelContext): { id: string; label: string; gr
             { kind: 'choice', key: 'corpseTime', label: t.corpses, options: [[0, t.short], [1, t.normal], [2, t.long]] },
             { kind: 'slider', key: 'shake', label: t.shake, min: 0, max: 1.5, step: 0.1, fmt: pct },
             { kind: 'toggle', key: 'showFps', label: t.showFps },
+            { kind: 'report', label: t.reportLabel, button: t.reportButton },
           ],
         },
       ],
@@ -432,7 +440,12 @@ function buildRow(r: Row, t: PanelText, c: PanelContext): HTMLElement {
   const row = el('div', 'wrh-set-row');
   const label = el('label', undefined, r.label);
   row.append(label);
-  if (r.kind === 'toggle') {
+  if (r.kind === 'report') {
+    const b = el('button', 'wrh-set-small', r.button);
+    b.type = 'button';
+    b.onclick = () => c.onReport();
+    row.append(b);
+  } else if (r.kind === 'toggle') {
     const sw = el('button', `wrh-switch${s[r.key] ? ' on' : ''}`);
     sw.type = 'button';
     sw.setAttribute('role', 'switch');
