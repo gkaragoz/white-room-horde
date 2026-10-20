@@ -10,6 +10,8 @@ import {
   MAX_BULLETS,
   MAX_PLAYERS,
   PlayerState,
+  STAT,
+  STATS,
   TICK_DT,
   TICK_RATE,
   WEAPON_IDS,
@@ -21,6 +23,7 @@ import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, settleLayers, spawnBo
 import { currentMap, out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { deckWalkable, nextLayer, rampAt, rampDir, rampGrade } from '@wrh/shared';
 import { Crc32 } from './hash';
+import { addStat } from './stats';
 import { updatePickups } from './pickups';
 import { KNOCK_DECAY, updateHazards } from './hazards';
 import { meleeAttack, updateAbilities } from './abilities';
@@ -92,6 +95,8 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pSpecT[slot] = 0;
   w.pRally[slot] = 0;
   w.pCharge[slot] = 0;
+  for (let k = 0; k < STATS; k++) w.pStat[slot * STATS + k] = 0;
+  for (let k = 0; k < 16; k++) w.pWpnTime[slot * 16 + k] = 0;
   w.pOver[slot] = 0;
   for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = -1;
   w.pCards.fill(0, slot * CARD_IDS.length, (slot + 1) * CARD_IDS.length);
@@ -205,6 +210,7 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
       w.pDashY[s] = len > 0.2 ? my / l : sin(angle);
       w.pDash[s] = Math.ceil(dc.seconds * 30);
       w.pDashCd[s] = (dc.cooldown * w.modDash[s]!) / perk(w, s, PERK.DashRate);
+      addStat(w, s, STAT.Dashes, 1);
       if (perk(w, s, PERK.Shock) > 0) {
         // shock card: the dash sends out a shockwave that hurts and shoves what is around
         w.events.push({ type: 'explosion', x: w.pX[s]!, y: w.pY[s]!, radius: BALANCE.perks.shockRadius * 0.6 });
@@ -246,6 +252,7 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
     }
     w.pLayer[s] = nextLayer(map, w.pX[s]!, w.pY[s]!, layer);
   }
+  addStat(w, s, STAT.Distance, sqrt((w.pX[s]! - oldX) * (w.pX[s]! - oldX) + (w.pY[s]! - oldY) * (w.pY[s]! - oldY)));
   w.pAngle[s] = angle;
   return angle;
 }
@@ -411,8 +418,10 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
       // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
       const crit = w.modCrit[s]! > 0 && w.rng.float() < w.modCrit[s]! ? 2 : 1;
+      if (crit === 2) addStat(w, s, STAT.Crits, 1);
       spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage[s]! * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce[s]! + w.pModPierce[s]! + (w.pOver[s]! > 0 ? BALANCE.abilities.ranger!.pierce! : 0));
     }
+    addStat(w, s, STAT.Shots, 1);
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
     w.pMag[s] = w.pMag[s]! - 1;
     w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate[s]! * w.pModRate[s]! * abilityRate(w, s));
@@ -446,6 +455,7 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
   for (let d = 0; d < MAX_PLAYERS; d++) {
     if (!w.pActive[d] || w.pState[d] !== PlayerState.Downed) continue;
     let helped = false;
+    let helper = -1;
     let reviveMul = 1;
     let rate = 1;
     for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -456,6 +466,7 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
       if (dx * dx + dy * dy <= range2) {
         if (!helped || perk(w, s, PERK.ReviveRate) > rate) rate = perk(w, s, PERK.ReviveRate);
         if (!helped || w.modRevive[s]! < reviveMul) reviveMul = w.modRevive[s]!;
+        if (helper < 0) helper = s;
         helped = true;
       }
     }
@@ -467,6 +478,7 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
         w.pRevive[d] = 0;
         w.pTimer[d] = 0;
         w.pIFrames[d] = BALANCE.progression.revive.iFrames;
+        addStat(w, helper, STAT.Revives, 1);
         w.events.push({ type: 'playerRevive', slot: d });
       }
     } else {
@@ -566,6 +578,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
         w.pState[s] = PlayerState.Downed;
         w.pTimer[s] = BALANCE.player.downedSeconds;
         w.pRevive[s] = 0;
+        addStat(w, s, STAT.Downs, 1);
         w.events.push({ type: 'playerDown', slot: s, x: w.pX[s]!, y: w.pY[s]! });
       } else standing++;
     }
@@ -593,7 +606,7 @@ export function hashWorld(w: World): number {
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
   c.typed(w.kActive).typed(w.kData).typed(w.kLayer).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
-  c.typed(w.pPerk).typed(w.eMod).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pLayer).typed(w.eLayer).typed(w.bLayer).typed(w.sLayer).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
+  c.typed(w.pPerk).typed(w.pStat).typed(w.pWpnTime).typed(w.eMod).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pLayer).typed(w.eLayer).typed(w.bLayer).typed(w.sLayer).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);

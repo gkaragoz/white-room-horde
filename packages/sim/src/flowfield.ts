@@ -3,6 +3,13 @@ import { ARENA_HALF_H, ARENA_HALF_W } from '@wrh/shared';
 export const FF_W = ARENA_HALF_W * 2; // 1 x 1 cells over the arena
 export const FF_H = ARENA_HALF_H * 2;
 const CELLS = FF_W * FF_H;
+/** A heap key packs the cost above the cell index: this many bits for the index (the costs stay far below what is left of 31 bits). */
+const IDX_BITS = ((): number => {
+  let b = 0;
+  while (1 << b < CELLS) b++;
+  return b;
+})();
+const IDX_MASK = (1 << IDX_BITS) - 1;
 const INF = 0x3fffffff;
 const ORTHO = 10;
 const DIAG = 14;
@@ -77,8 +84,8 @@ export class FlowField {
     }
     while (this.size > 0) {
       const key = this.pop();
-      const idx = key & 4095;
-      const c = key >> 12;
+      const idx = key & IDX_MASK;
+      const c = key >> IDX_BITS;
       if (c !== this.cost[idx]!) continue;
       const cx = idx % FF_W;
       const cy = (idx / FF_W) | 0;
@@ -92,7 +99,7 @@ export class FlowField {
         const nc = c + NC[n]!;
         if (nc < this.cost[ni]!) {
           this.cost[ni] = nc;
-          this.push((nc << 12) | ni);
+          this.push((nc << IDX_BITS) | ni);
         }
       }
     }

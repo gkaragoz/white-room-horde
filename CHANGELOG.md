@@ -7,6 +7,14 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Bigger arenas, a built and demolished floor, a game-over page full of numbers (rules change: update the server and reload the page)**
+
+- Every arena is about three times the area (104 x 70) and was redrawn for it: open ground to run in and gather a crowd, cover, lanes, choke points, bridges and tunnels. A map test checks that no pocket is sealed off, the rim is open to the crowd and every deck can be reached.
+- Moving between floors: the climb now floats through a stretch of empty sky while the next floor is made ready, and a bug is gone that rebuilt the upper floor with the wrong arena just before arrival (the old map showed for a moment, then changed).
+- During the countdown after a clear the old arena breaks up piece by piece and falls away, and after the climb the new one drops out of the sky piece by piece with a puff of dust and a sound for every piece.
+- The game-over page counts everything: damage dealt and taken, health regained, the biggest hit, crits, shots, swings, grenades, barrels, revives, pickups, dashes, abilities, distance run, boss kills, times downed, favourite weapon, kills per minute, mouse clicks, keys pressed, the longest combo and more. The cards appear one after the other with a tick and a count-up (a click shows them all), and in a squad a tab per player switches the page.
+- Fixed a flow-field limit that would have broken pathfinding on the bigger arenas.
+
 ## v0.17.0 (2026-10-20)
 
 **Juice and gore (rules change: update the server and reload the page)**

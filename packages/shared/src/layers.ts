@@ -195,45 +195,42 @@ const block = (x: number, y: number, w: number, h: number, z: number): Box => ({
 const pillar = (x: number, y: number, z: number): Box => ({ x, y, w: 1.1, h: 1.1, layers: 1, kind: 'pillar', z });
 const cover = (x: number, y: number, w: number, h: number): Box => ({ x, y, w, h });
 
-/** The vertical arenas. */
+/** The vertical arenas (104 x 70, like the flat ones). */
 function build(): MapDef[] {
   const maps: MapDef[] = [];
+  const mirrorX = (list: Box[]): Box[] => list.flatMap((b) => (b.x === 0 ? [b] : [b, { ...b, x: -b.x }]));
 
-  // OVERPASS: a long bridge across the north strip, 30 degree ramps at both ends, the ground runs under it between the pillars.
+  // OVERPASS: a long highway bridge, ramps at both ends and a steep one in the middle; under it a lane runs the whole length
+  // between two rows of pillars. South of it a wide field with cover to fight in the open.
   {
-    const deck: Deck = { x: 0, y: 11, w: 30, h: 6, z: 4 };
-    const w = ramp(-15, 11, 0, 4, 30, 6);
-    const e = ramp(15, 11, 2, 4, 30, 6);
+    const deck: Deck = { x: 0, y: 17, w: 64, h: 10, z: 4 };
+    const w = ramp(-32, 17, 0, 4, 30, 6);
+    const e = ramp(32, 17, 2, 4, 30, 6);
+    const m = ramp(-6, 12, 1, 4, 45, 4);
     maps.push({
       id: 'overpass',
       decks: [deck],
-      ramps: [w.ramp, e.ramp],
+      ramps: [w.ramp, e.ramp, m.ramp],
       boxes: [
         ...w.walls,
         ...e.walls,
-        ...rails(deck, [{ side: 'w', from: 8, to: 14 }, { side: 'e', from: 8, to: 14 }]),
-        pillar(-9, 8.4, 3.2),
-        pillar(-9, 13.6, 3.2),
-        pillar(9, 8.4, 3.2),
-        pillar(9, 13.6, 3.2),
-        block(-14.8, 11, 0.4, 6, 0.6),
-        block(14.8, 11, 0.4, 6, 0.6),
-        cover(-10, -8, 4, 1.5),
-        cover(10, -9, 4, 1.5),
-        cover(0, -14, 6, 1.5),
-        cover(-21, -2, 1.5, 6),
-        cover(21, -2, 1.5, 6),
-        cover(-6, 3.5, 2, 2),
-        cover(6, 3.5, 2, 2),
+        ...m.walls,
+        ...rails(deck, [{ side: 'w', from: 14, to: 20 }, { side: 'e', from: 14, to: 20 }, { side: 's', from: -8, to: -4 }]),
+        ...[-26, -13, 0, 13, 26].flatMap((x) => [pillar(x, 12.6, 3.2), pillar(x, 21.4, 3.2)]),
+        block(-31.8, 17, 0.4, 10, 0.6),
+        block(31.8, 17, 0.4, 10, 0.6),
+        ...mirrorX([cover(-14, -10, 6, 1.5), cover(-30, -4, 1.5, 8), cover(-8, 4, 2.5, 2.5), cover(-40, -20, 8, 1.5), cover(-24, -24, 2.5, 2.5), cover(-44, 6, 1.5, 6)]),
+        cover(0, -18, 8, 1.5),
+        cover(0, -30, 4, 3),
       ],
     });
   }
 
-  // DEPOT: a raised platform with a tunnel through it, a long ramp on one side and a steep one on the other.
+  // DEPOT: a raised platform with a tunnel straight through it, a long ramp on the west side and a steep one at the north-west corner
   {
-    const deck: Deck = { x: 15, y: -10, w: 16, h: 12, z: 4 };
-    const w = ramp(7, -8, 0, 4, 30, 5);
-    const n = ramp(20.5, -4, 3, 4, 45, 4);
+    const deck: Deck = { x: 34, y: -17, w: 24, h: 18, z: 4 };
+    const w = ramp(22, -13, 0, 4, 30, 6);
+    const n = ramp(26, -8, 3, 4, 45, 4);
     maps.push({
       id: 'depot',
       decks: [deck],
@@ -241,27 +238,32 @@ function build(): MapDef[] {
       boxes: [
         ...w.walls,
         ...n.walls,
-        ...rails(deck, [{ side: 'w', from: -10.5, to: -5.5 }, { side: 'n', from: 18.5, to: 22.5 }]),
-        block(9.75, -10, 5.5, 12, 4),
-        block(20.25, -10, 5.5, 12, 4),
-        cover(-12, 8, 5, 2),
-        cover(-20, -6, 2, 6),
-        cover(0, 14, 6, 1.5),
-        cover(-6, -12, 4, 1.5),
-        cover(8, 8, 2, 2),
-        cover(22, 10, 5, 1.5),
+        ...rails(deck, [{ side: 'w', from: -16, to: -10 }, { side: 'n', from: 24, to: 28 }]),
+        block(25.75, -17, 7.5, 18, 4),
+        block(42.25, -17, 7.5, 18, 4),
+        cover(-20, 14, 8, 2),
+        cover(-36, -8, 2, 10),
+        cover(0, 26, 8, 1.5),
+        cover(-12, -22, 6, 1.5),
+        cover(12, 14, 3, 3),
+        cover(36, 16, 8, 1.5),
+        cover(-6, 0, 3, 3),
+        cover(-44, 20, 6, 2),
+        cover(14, -6, 1.5, 6),
+        cover(-26, -28, 4, 2),
+        cover(46, 4, 2, 6),
       ],
     });
   }
 
-  // RAMP YARD: two plateaus reached by 30 and 45 degree ramps, open ground between them.
+  // RAMP YARD: two plateaus opposite each other, each reached by a 30 and a 45 degree ramp, with a sunken killing ground between them
   {
-    const a: Deck = { x: -15, y: 8, w: 12, h: 8, z: 3 };
-    const b: Deck = { x: 15, y: -8, w: 12, h: 8, z: 3 };
-    const ae = ramp(-9, 8, 2, 3, 30, 4);
-    const as = ramp(-12, 4, 1, 3, 45, 4);
-    const bw = ramp(9, -8, 0, 3, 30, 4);
-    const bn = ramp(12, -4, 3, 3, 45, 4);
+    const a: Deck = { x: -28, y: 14, w: 22, h: 14, z: 3 };
+    const b: Deck = { x: 28, y: -14, w: 22, h: 14, z: 3 };
+    const ae = ramp(-17, 14, 2, 3, 30, 5);
+    const as = ramp(-30, 7, 1, 3, 45, 4);
+    const bw = ramp(17, -14, 0, 3, 30, 5);
+    const bn = ramp(30, -7, 3, 3, 45, 4);
     maps.push({
       id: 'rampyard',
       decks: [a, b],
@@ -271,25 +273,30 @@ function build(): MapDef[] {
         ...as.walls,
         ...bw.walls,
         ...bn.walls,
-        ...rails(a, [{ side: 'e', from: 6, to: 10 }, { side: 's', from: -14, to: -10 }]),
-        ...rails(b, [{ side: 'w', from: -10, to: -6 }, { side: 'n', from: 10, to: 14 }]),
-        block(-15, 8, 12, 8, 3),
-        block(15, -8, 12, 8, 3),
-        cover(0, 12, 4, 1.5),
-        cover(0, -12, 4, 1.5),
-        cover(-24, -6, 2, 5),
-        cover(24, 6, 2, 5),
-        cover(-6, -10, 2, 2),
-        cover(6, 10, 2, 2),
+        ...rails(a, [{ side: 'e', from: 11.5, to: 16.5 }, { side: 's', from: -32, to: -28 }]),
+        ...rails(b, [{ side: 'w', from: -16.5, to: -11.5 }, { side: 'n', from: 28, to: 32 }]),
+        block(-28, 14, 22, 14, 3),
+        block(28, -14, 22, 14, 3),
+        cover(0, 26, 8, 1.5),
+        cover(0, -26, 8, 1.5),
+        cover(-46, -10, 2, 10),
+        cover(46, 10, 2, 10),
+        cover(-12, -14, 3, 3),
+        cover(12, 14, 3, 3),
+        cover(0, 8, 5, 3),
+        cover(-36, -26, 8, 1.5),
+        cover(36, 26, 8, 1.5),
+        cover(-6, 10, 1.5, 6),
+        cover(6, -10, 1.5, 6),
       ],
     });
   }
 
-  // TUNNEL HUB: a long bank across the north with three tunnels through it and ramps at both ends.
+  // TUNNEL HUB: a long bank across the north with three tunnels through it, a 30 degree ramp at one end and a 45 degree one at the other
   {
-    const deck: Deck = { x: 0, y: 14, w: 36, h: 8, z: 4 };
-    const w = ramp(-18, 14, 0, 4, 30, 4);
-    const e = ramp(18, 14, 2, 4, 45, 4);
+    const deck: Deck = { x: 0, y: 26, w: 60, h: 12, z: 4 };
+    const w = ramp(-30, 26, 0, 4, 30, 5);
+    const e = ramp(30, 26, 2, 4, 45, 5);
     maps.push({
       id: 'tunnelhub',
       decks: [deck],
@@ -297,25 +304,32 @@ function build(): MapDef[] {
       boxes: [
         ...w.walls,
         ...e.walls,
-        ...rails(deck, [{ side: 'w', from: 12, to: 16 }, { side: 'e', from: 12, to: 16 }]),
-        block(-14.5, 14, 7, 8, 4),
-        block(-4.5, 14, 5, 8, 4),
-        block(4.5, 14, 5, 8, 4),
-        block(14.5, 14, 7, 8, 4),
-        cover(-12, -4, 3, 3),
-        cover(12, -5, 3, 3),
-        cover(0, -10, 6, 1.5),
-        cover(-22, -10, 2, 5),
-        cover(22, -10, 2, 5),
+        ...rails(deck, [{ side: 'w', from: 23.5, to: 28.5 }, { side: 'e', from: 23.5, to: 28.5 }]),
+        block(-25, 26, 10, 12, 4),
+        block(-8.5, 26, 5, 12, 4),
+        block(8.5, 26, 5, 12, 4),
+        block(25, 26, 10, 12, 4),
+        cover(-24, -4, 4, 4),
+        cover(24, -6, 4, 4),
+        cover(0, -14, 10, 1.5),
+        cover(-40, -18, 2, 8),
+        cover(40, -18, 2, 8),
+        cover(-12, 10, 3, 3),
+        cover(12, 8, 3, 3),
+        cover(-44, 8, 4, 2),
+        cover(44, 6, 4, 2),
+        cover(0, -28, 6, 3),
+        cover(-30, -30, 6, 1.5),
+        cover(30, -30, 6, 1.5),
       ],
     });
   }
 
-  // MEZZANINE: a long gallery along the south wall on pillars: fight on it or run under it.
+  // MEZZANINE: a long gallery along the south wall on pillars: fight on it, or run under it and come up the ramp behind the crowd
   {
-    const deck: Deck = { x: 0, y: -13, w: 30, h: 7, z: 3.4 };
-    const e = ramp(15, -13, 2, 3.4, 30, 4.5);
-    const w = ramp(-15, -13, 0, 3.4, 45, 4);
+    const deck: Deck = { x: 0, y: -27, w: 60, h: 10, z: 3.4 };
+    const e = ramp(30, -27, 2, 3.4, 30, 5);
+    const w = ramp(-30, -27, 0, 3.4, 45, 4);
     maps.push({
       id: 'mezzanine',
       decks: [deck],
@@ -323,20 +337,20 @@ function build(): MapDef[] {
       boxes: [
         ...e.walls,
         ...w.walls,
-        ...rails(deck, [{ side: 'e', from: -15.25, to: -10.75 }, { side: 'w', from: -15, to: -11 }]),
-        pillar(-12, -11, 2.8),
-        pillar(-12, -15, 2.8),
-        pillar(0, -11, 2.8),
-        pillar(0, -15, 2.8),
-        pillar(12, -11, 2.8),
-        pillar(12, -15, 2.8),
-        block(-14.8, -13, 0.4, 7, 0.6),
-        block(14.8, -13, 0.4, 7, 0.6),
-        cover(-12, 4, 3, 3),
-        cover(12, 6, 3, 3),
-        cover(0, 12, 5, 1.5),
-        cover(-22, 8, 2, 6),
-        cover(22, 0, 2, 6),
+        ...rails(deck, [{ side: 'e', from: -29.5, to: -24.5 }, { side: 'w', from: -29, to: -25 }]),
+        ...[-24, -12, 0, 12, 24].flatMap((x) => [pillar(x, -22.4, 2.8), pillar(x, -31.6, 2.8)]),
+        block(-29.8, -27, 0.4, 10, 0.6),
+        block(29.8, -27, 0.4, 10, 0.6),
+        cover(-24, 6, 4, 4),
+        cover(24, 10, 4, 4),
+        cover(0, 22, 10, 1.5),
+        cover(-44, 16, 2, 12),
+        cover(44, 2, 2, 12),
+        cover(-10, -6, 3, 3),
+        cover(12, -8, 3, 3),
+        cover(-34, 28, 8, 1.5),
+        cover(34, 28, 8, 1.5),
+        cover(0, 8, 6, 1.5),
       ],
     });
   }

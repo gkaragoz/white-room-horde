@@ -171,6 +171,11 @@ const props = await PropsView.create();
 stage.scene.add(props.group);
 stage.scene.add(arena.group);
 const climb = new FloorClimb(stage, fx, arena, props);
+// pieces of an arena landing or breaking up: dust, a bump of the camera for the big ones, and the sound where it happens
+climb.onBuild = (kind, x, z, big) => {
+  fx.rubble(x, -z, big);
+  audio.play(kind === 'land' ? (big ? 'buildThudBig' : 'buildThud') : big ? 'crumbleBig' : 'crumble', { x, y: -z });
+};
 const vx: number[] = new Array<number>(MAX_PLAYERS).fill(0);
 /** Height of the floor under every character (ramps and decks). */
 const vz: number[] = new Array<number>(MAX_PLAYERS).fill(0);
@@ -221,6 +226,16 @@ let names: string[] = [];
 let lobbySig = '';
 let over = false;
 let paused = false;
+/** What this player did with the mouse and the keyboard during the run (the game-over page counts it). */
+let runClicks = 0;
+let runKeys = 0;
+let bestCombo = 0;
+window.addEventListener('pointerdown', () => {
+  if (world && !over) runClicks++;
+});
+window.addEventListener('keydown', (e) => {
+  if (world && !over && !e.repeat) runKeys++;
+});
 let playback: Replay | null = null;
 const dev = {
   perf: params.get('perf') === '1',
@@ -228,6 +243,8 @@ const dev = {
   auto: params.get('auto') === '1',
   god: params.get('god') === '1',
   wave: Number(params.get('wave') ?? 1),
+  /** `?zoom=0.4` pulls the camera back to look over a whole arena (map review). */
+  zoom: Math.max(0.2, Math.min(2, Number(params.get('zoom') ?? 1))),
 };
 const weaponParam = (params.get('weapon') ?? 'weapon_pistol').replace('weapon_', '');
 let startWeapon: WeaponId = (WEAPON_IDS as readonly string[]).includes(weaponParam) ? (weaponParam as WeaponId) : 'pistol';
@@ -568,6 +585,7 @@ function handleEvent(e: SimEvent): void {
       }
       if (nowSec - comboAt > 2.2) comboCount = 0;
       comboCount++;
+      if (comboCount > bestCombo) bestCombo = comboCount;
       comboAt = nowSec;
       const step = COMBO_STEPS.indexOf(comboCount);
       if (step >= 0 && settings.announcer) {
@@ -626,7 +644,7 @@ function handleEvent(e: SimEvent): void {
         const rec = world && !playback ? recordGame(world.wave, world.kills) : undefined;
         clearRejoin();
         ui.playerNames = names;
-        setTimeout(() => world && ui.showGameOver(world, rec), 1800);
+        setTimeout(() => world && ui.showGameOver(world, rec, { clicks: runClicks, keys: runKeys, bestCombo }, false, localSlot), 1800);
       }
       break;
     default:
@@ -1241,7 +1259,7 @@ function frame(nowMs: number): void {
       fx0 += (cine.x - fx0) * cineFrame.focus;
       fy0 += (cine.y - fy0) * cineFrame.focus;
     }
-    stage.setZoom(cineFrame.zoom);
+    stage.setZoom(cineFrame.zoom * dev.zoom);
     ui.setCine(cineFrame.bars, cine.by >= 0 ? names[cine.by] ?? '' : '', cine.by >= 0 ? PLAYER_COLORS[cine.by % PLAYER_COLORS.length]! : '#ffffff');
     // the roof of a bridge or gallery thins out while the local character walks under it, so it stays in sight
     const hidden = w.pActive[localSlot] === 1 && w.pLayer[localSlot] === 0 && climb.arena.hidesGround(stage.camera, vx[localSlot]!, vy[localSlot]!);
@@ -1530,6 +1548,7 @@ setTimeout(() => stage.warmFlight(), 800);
   ui,
   ragdolls,
   goreParts,
+  climb,
   spawnBoss: () => (world ? spawnBoss(world) : -1),
   hazards: { addTelegraph, addZone, launchPlayer, spawnEnemy },
   cine,

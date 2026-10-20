@@ -81,14 +81,14 @@ export class Fx {
   private readonly dummy = new THREE.Object3D();
   private readonly c = new THREE.Color();
 
-  /** Pixels per world unit on the blood canvas (12 low, 24 high). */
+  /** Pixels per world unit on the blood canvas (8 low, 14 high). */
   private readonly ppu: number;
 
   constructor(
     private readonly onExplosionShake: (amount: number) => void = () => undefined,
     decalDetail: 0 | 1 = 1,
   ) {
-    this.ppu = decalDetail === 1 ? 24 : 12;
+    this.ppu = decalDetail === 1 ? 14 : 8;
     const geo = new THREE.BoxGeometry(1, 1, 1);
     const mat = new THREE.MeshBasicMaterial({ vertexColors: false });
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX_PARTICLES);
@@ -127,8 +127,8 @@ export class Fx {
     this.fire = makeSoft(THREE.AdditiveBlending, this.fireAlpha);
 
     // persistent decal layer: transparent canvas tiles laid over the floor
-    const TX = 4;
-    const TY = 3;
+    const TX = 6;
+    const TY = 4;
     const tw = (ARENA_HALF_W * 2) / TX;
     const th = (ARENA_HALF_H * 2) / TY;
     this.decalW = tw;
@@ -387,6 +387,13 @@ export class Fx {
   /** A soft sparkle drifting up from a spot (upgrade auras). */
   sparkle(x: number, y: number, h: number, color: string, count: number, speed: number): void {
     this.burst(Kind.Spark, x, y, h, count, speed, 0, 0, 6.28, 0.7, 0.05, color);
+  }
+
+  /** Dust and chips where a piece of the arena lands or breaks up. */
+  rubble(x: number, y: number, big: boolean): void {
+    this.burst(Kind.Smoke, x, y, 0.4, big ? 7 : 3, big ? 3.2 : 2, 0, 0, 6.28, big ? 0.9 : 0.6, big ? 0.55 : 0.32, '#d2cbbd');
+    this.burst(Kind.Gib, x, y, 0.3, big ? 8 : 3, big ? 6 : 4, 0, 0, 6.28, 0.9, 0.12, '#b9b1a2');
+    if (big) this.shake = Math.min(0.5, this.shake + 0.06);
   }
 
   /** A single drop of blood shed by a flying part. */

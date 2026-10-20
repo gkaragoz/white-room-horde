@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_TELE, MAX_ZONES, PERKS, WEAPON_IDS } from '@wrh/shared';
+import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_TELE, MAX_ZONES, PERKS, STATS, WEAPON_IDS } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -173,6 +173,9 @@ export interface World {
   pSpecT: Float64Array;
   pRally: Float64Array;
   pCharge: Float64Array;
+  /** Per-player statistics (see STAT) and the ticks spent with every weapon. */
+  pStat: Float64Array;
+  pWpnTime: Float64Array;
   pOver: Int32Array;
   /** Lingering ground effects (acid, fire): kind, centre, radius, ticks left. */
   zActive: Uint8Array;
@@ -345,6 +348,8 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pSpecT: new Float64Array(MAX_PLAYERS),
     pRally: new Float64Array(MAX_PLAYERS),
     pCharge: new Float64Array(MAX_PLAYERS),
+    pStat: new Float64Array(MAX_PLAYERS * STATS),
+    pWpnTime: new Float64Array(MAX_PLAYERS * 16),
     pOver: new Int32Array(MAX_PLAYERS),
     zActive: new Uint8Array(MAX_ZONES),
     zKind: new Uint8Array(MAX_ZONES),

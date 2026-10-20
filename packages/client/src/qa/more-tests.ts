@@ -946,12 +946,12 @@ export const moreTests: QaTest[] = [
     async run() {
       const problems: string[] = [];
       const solver = new AimSolver();
-      // map 0 has a box at x 8..10, y -7.5..-2.5; the pistol's muzzle sits 1.56 ahead and 0.29 to the right
+      // map 0 has a shelf at x 21..39, y 8..10; the pistol's muzzle sits 1.56 ahead and 0.29 to the right
       const w = createWorld(7);
       w.waveTick = 1e9;
       w.countMul = 0;
-      addPlayer(w, 0, 6.8, -2.3, 'pistol');
-      const e = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 16, -2.3, false);
+      addPlayer(w, 0, 19.8, 10.2, 'pistol');
+      const e = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 44.5, 10.2, false);
       w.eCooldown[e] = 1e9;
       w.eFrost[e] = 100000; // frozen: it stays where it is
       const plain = pickTarget(w, 0, null);
@@ -964,12 +964,13 @@ export const moreTests: QaTest[] = [
       for (let t = 0; t < 40; t++) step(w, [{ moveX: 0, moveY: 0, aim: 0, buttons: Buttons.Fire }]);
       if (w.eHp[e] !== hp) problems.push('a bullet got through the corner, the setup is wrong');
       // a second target in the open is chosen instead of the hidden one
-      const open = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 6.8, 9, false);
+      const open = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 19.8, 21.5, false);
       w.eCooldown[open] = 1e9;
       w.eFrost[open] = 100000;
       const next = pickTarget(w, 0, null, (x) => solver.shotClear(w, 0, x, 1));
       if (!next || next.id !== open) problems.push('the visible enemy was not chosen over the hidden one');
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'visible targets preferred, nearest hidden one as the fallback' };
+
     },
   },
   {

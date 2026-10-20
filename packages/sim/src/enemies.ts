@@ -1,4 +1,5 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, ZoneKind, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, ZoneKind, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, STAT, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { addStat, heal, maxStat } from './stats';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
 import { ELITE, abilityTaken, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
@@ -759,6 +760,7 @@ export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number,
     damageEnemy(w, attacker, thorns, 0, 0);
     killer = prev;
   }
+  addStat(w, slot, STAT.DamageTaken, damage < w.pHp[slot]! ? damage : w.pHp[slot]!);
   const hp = w.pHp[slot]! - damage;
   w.pHp[slot] = hp > 0 ? hp : 0;
   w.pIFrames[slot] = BALANCE.player.iFrames;
@@ -785,12 +787,12 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   const type = w.eType[i]!;
   // vampire card: the player whose shot (or grenade) made the kill heals
   if (killer >= 0 && w.pLifesteal[killer]! > 0 && w.pState[killer] === PlayerState.Alive) {
-    const hp = w.pHp[killer]! + w.pLifesteal[killer]!;
-    w.pHp[killer] = hp > w.pMaxHp[killer]! ? w.pMaxHp[killer]! : hp;
+    heal(w, killer, w.pLifesteal[killer]!);
   }
   w.eActive[i] = 0;
   w.enemyCount--;
   w.kills++;
+  if (w.eBoss[i]) addStat(w, killer, STAT.BossKills, 1);
   w.events.push({ type: 'enemyDeath', id: i, etype: type, x: w.eX[i]!, y: w.eY[i]!, dx, dy, power });
   dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0, w.eLayer[i]!);
   // experience belongs to the character that made the kill; a kill nobody owns is shared by the living
@@ -872,7 +874,11 @@ export function damageEnemyBy(w: World, i: number, owner: number, damage: number
 export function damageEnemy(w: World, i: number, rawDamage: number, dx: number, dy: number): boolean {
   const damage = w.eMod[i] ? rawDamage * enemyDamageMul(w, i) : rawDamage;
   // the damage meter counts what was really taken off (no credit for overkill)
-  if (killer >= 0) addPerk(w, killer, PERK.Damage, Math.min(damage, Math.max(0, w.eHp[i]!)));
+  if (killer >= 0) {
+    addPerk(w, killer, PERK.Damage, Math.min(damage, Math.max(0, w.eHp[i]!)));
+    addStat(w, killer, STAT.Hits, 1);
+    maxStat(w, killer, STAT.MaxHit, damage);
+  }
   w.eHp[i] = w.eHp[i]! - damage;
   if (w.eHp[i]! <= 0) {
     killEnemy(w, i, dx, dy, damage);
@@ -1293,6 +1299,7 @@ export function throwGrenade(w: World, slot: number, angle: number, aimDist = 0)
     w.gFuse[i] = cfg.flight + cfg.fuse;
     w.gOwner[i] = slot;
     w.pGren[slot] = w.pGren[slot]! - 1;
+    addStat(w, slot, STAT.Grenades, 1);
     w.pGrenCd[slot] = cfg.cooldown;
     w.events.push({ type: 'grenadeThrown', owner: slot, x: w.pX[slot]!, y: w.pY[slot]! });
     return;

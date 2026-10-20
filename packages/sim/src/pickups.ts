@@ -1,4 +1,5 @@
-import { MAPS, deckWalkable, ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, TICK_DT, TICK_RATE, WEAPON_IDS } from '@wrh/shared';
+import { MAPS, deckWalkable, ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PickupType, PlayerState, STAT, TICK_DT, TICK_RATE, WEAPON_IDS } from '@wrh/shared';
+import { addStat, heal } from './stats';
 import { clamp, cos, sin, sqrt } from './detmath';
 import { PERK } from '@wrh/shared';
 import { nuke, perk, setPerk, waveModOf } from './features';
@@ -152,8 +153,7 @@ function wants(w: World, s: number, kind: number, i: number): boolean {
 function collect(w: World, s: number, i: number): void {
   const kind = w.kType[i]!;
   if (kind === PickupType.Health) {
-    const hp = w.pHp[s]! + BALANCE.pickups.healthAmount;
-    w.pHp[s] = hp > w.pMaxHp[s]! ? w.pMaxHp[s]! : hp;
+    heal(w, s, BALANCE.pickups.healthAmount);
   } else if (kind === PickupType.Grenade) {
     w.pGren[s] = w.pGren[s]! + 1;
   } else if (kind === PickupType.Shield) {
@@ -176,5 +176,6 @@ function collect(w: World, s: number, i: number): void {
     else w.pGren[s] = w.pGren[s]! + 1;
   }
   w.kActive[i] = 0;
+  addStat(w, s, STAT.Pickups, 1);
   w.events.push({ type: 'pickup', kind, slot: s, x: w.kX[i]!, y: w.kY[i]! });
 }

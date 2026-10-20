@@ -5,8 +5,8 @@ export const INPUT_DELAY_TICKS = 3;
 export const MAX_PLAYERS = 11;
 export const MAX_BULLETS = 1024;
 export const MAX_ENEMIES = 640;
-export const ARENA_HALF_W = 30;
-export const ARENA_HALF_H = 20;
+export const ARENA_HALF_W = 52;
+export const ARENA_HALF_H = 35;
 
 /** Camera (docs/DESIGN.md section 5, iso62): orthographic, elevation 28 deg, yaw 30 deg, ~17 units wide. */
 export const CAMERA = { orthoWidth: 42, elevationDeg: 28, yawDeg: 30 } as const;
@@ -18,7 +18,7 @@ export const PLAYER_COLORS = [
 ] as const;
 
 export const MAX_GRENADES = 32;
-export const MAX_BARRELS = 12;
+export const MAX_BARRELS = 20;
 export const MAX_SPIT = 160;
 /** Pools of the ground effects: lingering acid and fire, and the telegraphed attacks that are still charging. */
 export const MAX_ZONES = 96;
@@ -27,93 +27,124 @@ export const MAX_TELE = 48;
 export type { Box } from './layers';
 import { LAYERED_MAPS, type Box, type MapDef } from './layers';
 
-/** Arena layouts: axis-aligned boxes (centre x, y in sim coordinates, full width and height). Shared by sim and renderer. */
+/** Reflect a quarter of an arena across both axes (the layouts are built from one quarter, then mirrored, and a few pieces added by hand). */
+function mirror4(quarter: readonly Box[]): Box[] {
+  const out: Box[] = [];
+  for (const sx of [1, -1]) {
+    for (const sy of [1, -1]) {
+      for (const b of quarter) {
+        // pieces that sit on an axis are not doubled
+        if ((b.x === 0 && sx < 0) || (b.y === 0 && sy < 0)) continue;
+        out.push({ ...b, x: b.x * sx, y: b.y * sy });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Arena layouts: axis-aligned boxes (centre x, y in sim coordinates, full width and height). Shared by sim and renderer.
+ * The arenas are 104 x 70 units: wide open ground to run in and gather a crowd, with cover, lanes and choke points to use.
+ */
 const FLAT_MAPS: readonly { id: string; boxes: readonly Box[] }[] = [
   {
+    // shelving in four stores round an open middle: run the aisles, then come out into the middle to sweep the crowd
     id: 'warehouse',
     boxes: [
-      { x: -10, y: 6, w: 4, h: 2 },
-      { x: 9, y: -5, w: 2, h: 5 },
-      { x: 0, y: 12, w: 6, h: 1.5 },
-      { x: -18, y: -8, w: 2, h: 6 },
-      { x: 16, y: 10, w: 3, h: 3 },
-      { x: -6, y: -12, w: 5, h: 2 },
-      { x: 22, y: -14, w: 2, h: 2 },
-      { x: -24, y: 12, w: 2, h: 2 },
+      ...mirror4([
+        { x: 30, y: 9, w: 18, h: 2 },
+        { x: 30, y: 19, w: 18, h: 2 },
+        { x: 30, y: 29, w: 18, h: 2 },
+        { x: 47, y: 14, w: 2, h: 10 },
+        { x: 13, y: 22, w: 6, h: 2 },
+        { x: 14, y: 30, w: 2, h: 6 },
+      ]),
+      { x: 6, y: 3, w: 2, h: 2 },
+      { x: -6, y: -3, w: 2, h: 2 },
     ],
   },
   {
+    // a ring of pillars round the centre, a low outer wall in every corner and planters between them
     id: 'courtyard',
     boxes: [
-      { x: 9, y: 0, w: 2, h: 2 },
-      { x: 6.4, y: 6.4, w: 2, h: 2 },
-      { x: 0, y: 9, w: 2, h: 2 },
-      { x: -6.4, y: 6.4, w: 2, h: 2 },
-      { x: -9, y: 0, w: 2, h: 2 },
-      { x: -6.4, y: -6.4, w: 2, h: 2 },
-      { x: 0, y: -9, w: 2, h: 2 },
-      { x: 6.4, y: -6.4, w: 2, h: 2 },
-      { x: 20, y: 12, w: 6, h: 1.5 },
-      { x: -20, y: 12, w: 6, h: 1.5 },
-      { x: 20, y: -12, w: 6, h: 1.5 },
-      { x: -20, y: -12, w: 6, h: 1.5 },
+      ...[0, 1, 2, 3, 4, 5, 6, 7].map((k) => ({ x: Math.round(Math.cos((k * Math.PI) / 4) * 120) / 10, y: Math.round(Math.sin((k * Math.PI) / 4) * 120) / 10, w: 2.2, h: 2.2 })),
+      ...mirror4([
+        { x: 36, y: 23, w: 10, h: 1.5 },
+        { x: 41, y: 18.5, w: 1.5, h: 9 },
+        { x: 24, y: 0, w: 2, h: 8 },
+        { x: 0, y: 22, w: 8, h: 2 },
+      ]),
     ],
   },
   {
+    // long walls cut the arena into lanes with doorways: fight in a lane or run through a door and come out behind them
     id: 'corridors',
     boxes: [
-      { x: -14, y: 7, w: 16, h: 1.2 },
-      { x: 14, y: 7, w: 16, h: 1.2 },
-      { x: -14, y: -7, w: 16, h: 1.2 },
-      { x: 14, y: -7, w: 16, h: 1.2 },
-      { x: 23, y: 0, w: 1.2, h: 8 },
-      { x: -23, y: 0, w: 1.2, h: 8 },
-      { x: 0, y: 14, w: 4, h: 2 },
-      { x: 0, y: -14, w: 4, h: 2 },
+      ...mirror4([
+        { x: 36, y: 14, w: 20, h: 1.2 },
+        { x: 0, y: 14, w: 22, h: 1.2 },
+        { x: 40, y: 4, w: 1.2, h: 10 },
+        { x: 22, y: 27, w: 6, h: 1.5 },
+        { x: 10, y: 4, w: 4, h: 4 },
+      ]),
     ],
   },
   {
+    // open country: a few rocks and sheds, a lot of room to kite in circles
     id: 'field',
     boxes: [
-      { x: -14, y: -9, w: 3, h: 3 },
-      { x: 13, y: 8, w: 3, h: 3 },
-      { x: -4, y: 10, w: 2, h: 2 },
-      { x: 5, y: -11, w: 4, h: 1.5 },
-      { x: 24, y: 0, w: 2, h: 6 },
+      { x: -30, y: -18, w: 5, h: 5 },
+      { x: 28, y: 16, w: 5, h: 5 },
+      { x: -8, y: 20, w: 3, h: 3 },
+      { x: 10, y: -22, w: 6, h: 2 },
+      { x: 44, y: 0, w: 3, h: 10 },
+      { x: -44, y: 6, w: 3, h: 8 },
+      { x: -20, y: 6, w: 2, h: 2 },
+      { x: 20, y: -6, w: 2, h: 2 },
+      { x: -38, y: 28, w: 6, h: 3 },
+      { x: 36, y: -29, w: 6, h: 3 },
+      { x: 0, y: -9, w: 4, h: 4 },
+      { x: -16, y: -28, w: 3, h: 3 },
+      { x: 18, y: 28, w: 3, h: 3 },
     ],
   },
   {
+    // broken walls: L-shaped shelters with gaps to slip through
     id: 'ruins',
     boxes: [
-      { x: -18, y: 6, w: 5, h: 1.2 },
-      { x: -20.4, y: 4, w: 1.2, h: 4 },
-      { x: 18, y: -6, w: 5, h: 1.2 },
-      { x: 20.4, y: -4, w: 1.2, h: 4 },
-      { x: -8, y: -10, w: 1.2, h: 5 },
-      { x: 8, y: 10, w: 1.2, h: 5 },
-      { x: 0, y: 6, w: 4, h: 1.2 },
-      { x: 0, y: -6, w: 4, h: 1.2 },
-      { x: -24, y: -12, w: 4, h: 1.2 },
-      { x: 24, y: 12, w: 4, h: 1.2 },
-      { x: 12, y: -14, w: 1.2, h: 4 },
-      { x: -12, y: 14, w: 1.2, h: 4 },
-      { x: -4, y: 8, w: 2, h: 2 },
-      { x: 4, y: -8, w: 2, h: 2 },
+      { x: -34, y: 12, w: 8, h: 1.2 },
+      { x: -37.6, y: 9, w: 1.2, h: 6 },
+      { x: 34, y: -12, w: 8, h: 1.2 },
+      { x: 37.6, y: -9, w: 1.2, h: 6 },
+      { x: -14, y: -18, w: 1.2, h: 8 },
+      { x: 14, y: 18, w: 1.2, h: 8 },
+      { x: 0, y: 10, w: 6, h: 1.2 },
+      { x: 0, y: -10, w: 6, h: 1.2 },
+      { x: -42, y: -22, w: 7, h: 1.2 },
+      { x: 42, y: 22, w: 7, h: 1.2 },
+      { x: 22, y: -24, w: 1.2, h: 7 },
+      { x: -22, y: 24, w: 1.2, h: 7 },
+      { x: -8, y: 14, w: 3, h: 3 },
+      { x: 8, y: -14, w: 3, h: 3 },
+      { x: -26, y: -6, w: 1.2, h: 5 },
+      { x: 26, y: 6, w: 1.2, h: 5 },
+      { x: 18, y: 8, w: 4, h: 1.2 },
+      { x: -18, y: -8, w: 4, h: 1.2 },
+      { x: 46, y: -24, w: 1.2, h: 6 },
+      { x: -46, y: 24, w: 1.2, h: 6 },
     ],
   },
   {
+    // production lines: long conveyors with a gap in the middle, machines and sheds
     id: 'factory',
     boxes: [
-      { x: -12, y: 10, w: 18, h: 1.6 },
-      { x: 12, y: 10, w: 18, h: 1.6 },
-      { x: -12, y: -10, w: 18, h: 1.6 },
-      { x: 12, y: -10, w: 18, h: 1.6 },
-      { x: -6.5, y: 0, w: 4, h: 4 },
-      { x: 6.5, y: 0, w: 4, h: 4 },
-      { x: -24, y: 0, w: 2, h: 10 },
-      { x: 24, y: 0, w: 2, h: 10 },
-      { x: 0, y: 15.5, w: 3, h: 2 },
-      { x: 0, y: -15.5, w: 3, h: 2 },
+      ...mirror4([
+        { x: 22, y: 18, w: 32, h: 1.6 },
+        { x: 12, y: 0, w: 6, h: 6 },
+        { x: 46, y: 0, w: 2, h: 16 },
+        { x: 0, y: 29, w: 5, h: 3 },
+        { x: 26, y: 28, w: 4, h: 2 },
+      ]),
     ],
   },
 ];

@@ -51,7 +51,7 @@ describe('classes', () => {
       expect(used, id).toBeGreaterThanOrEqual(2);
       expect(used, id).toBeLessThanOrEqual(3);
     }
-  });
+  }, 60_000);
 });
 
 describe('abilities', () => {

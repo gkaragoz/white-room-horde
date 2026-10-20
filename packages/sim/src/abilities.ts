@@ -1,9 +1,10 @@
-import { BALANCE, Buttons, CLASS_IDS, MAX_BARRELS, MAX_ENEMIES, MAX_PLAYERS, PERK, PlayerState, TICK_DT, TeleEffect, TeleShape, WEAPON_IDS, ENEMY_TYPES, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, CLASS_IDS, STAT, MAX_BARRELS, MAX_ENEMIES, MAX_PLAYERS, PERK, PlayerState, TICK_DT, TeleEffect, TeleShape, WEAPON_IDS, ENEMY_TYPES, type PlayerInput } from '@wrh/shared';
 import type { WeaponStats } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { damageEnemyBy, shove } from './enemies';
 import { abilityRate, damageMul, explodeBarrel, perk } from './features';
 import { addTelegraph } from './hazards';
+import { addStat, heal } from './stats';
 import type { World } from './state';
 
 const T_RADIUS = ENEMY_TYPES.map((id) => BALANCE.enemies[id].radius);
@@ -34,6 +35,7 @@ function allies(w: World, s: number, radius: number, fn: (o: number) => void): v
 /** The damage of one blow of player `s` with a weapon: the weapon's own damage, every card and buff, and a roll for a critical hit. */
 function blow(w: World, s: number, base: number): number {
   const crit = w.modCrit[s]! > 0 && w.rng.float() < w.modCrit[s]! ? 2 : 1;
+  if (crit === 2) addStat(w, s, STAT.Crits, 1);
   return base * w.modDamage[s]! * w.pModDmg[s]! * damageMul(w, s) * crit;
 }
 
@@ -42,6 +44,7 @@ function sweep(w: World, s: number, angle: number, arc: number, radius: number, 
   const px = w.pX[s]!;
   const py = w.pY[s]!;
   let hits = 0;
+  addStat(w, s, STAT.Swings, 1);
   for (let i = 0; i < MAX_ENEMIES; i++) {
     if (!w.eActive[i] || w.eLayer[i] !== w.pLayer[s]) continue; // a swing only reaches the level it is made on
     const dx = w.eX[i]! - px;
@@ -127,10 +130,7 @@ function activate(w: World, s: number, inp: PlayerInput, cls: number): void {
       allies(w, s, A.soldier!.radius!, (o) => (w.pRally[o] = A.soldier!.seconds!));
       break;
     case CLS.medic:
-      allies(w, s, A.medic!.radius!, (o) => {
-        const hp = w.pHp[o]! + w.pMaxHp[o]! * A.medic!.heal!;
-        w.pHp[o] = hp > w.pMaxHp[o]! ? w.pMaxHp[o]! : hp;
-      });
+      allies(w, s, A.medic!.radius!, (o) => heal(w, o, w.pMaxHp[o]! * A.medic!.heal!));
       break;
     case CLS.heavy:
       w.pSpecT[s] = A.heavy!.seconds!;
@@ -143,12 +143,12 @@ function activate(w: World, s: number, inp: PlayerInput, cls: number): void {
     case CLS.demolisher: {
       const a = A.demolisher!;
       const reach = Math.min(a.reach!, inp.aimDist ? Math.max(5, inp.aimDist * 0.5) : a.reach!);
-      const tx = clamp(px + cos(angle) * reach, -29, 29);
-      const ty = clamp(py + sin(angle) * reach, -19, 19);
+      const tx = clamp(px + cos(angle) * reach, -ARENA_HALF_W + 1, ARENA_HALF_W - 1);
+      const ty = clamp(py + sin(angle) * reach, -ARENA_HALF_H + 1, ARENA_HALF_H - 1);
       for (let k = 0; k < a.count!; k++) {
         const ox = k === 0 ? 0 : (w.rng.float() * 2 - 1) * a.spread!;
         const oy = k === 0 ? 0 : (w.rng.float() * 2 - 1) * a.spread!;
-        const t = addTelegraph(w, TeleShape.Circle, TeleEffect.Strike, clamp(tx + ox, -29, 29), clamp(ty + oy, -19, 19), 0, a.radius!, 0, a.delay! + k * a.stagger!, blow(w, s, a.damage!));
+        const t = addTelegraph(w, TeleShape.Circle, TeleEffect.Strike, clamp(tx + ox, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(ty + oy, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), 0, a.radius!, 0, a.delay! + k * a.stagger!, blow(w, s, a.damage!));
         if (t >= 0) w.tOwner[t] = s;
       }
       break;
@@ -198,6 +198,12 @@ export function updateAbilities(w: World, inputs: ReadonlyArray<PlayerInput | un
       }
     }
     const inp = inputs[s];
-    if (inp && (inp.buttons & Buttons.Special) !== 0 && w.pSpecCd[s]! <= 0 && w.pStun[s] === 0) activate(w, s, inp, cls);
+    // time alive, and which weapon the time was spent with
+    addStat(w, s, STAT.AliveTicks, 1);
+    w.pWpnTime[s * 16 + w.pWeapon[s]!] = w.pWpnTime[s * 16 + w.pWeapon[s]!]! + 1;
+    if (inp && (inp.buttons & Buttons.Special) !== 0 && w.pSpecCd[s]! <= 0 && w.pStun[s] === 0) {
+      addStat(w, s, STAT.Abilities, 1);
+      activate(w, s, inp, cls);
+    }
   }
 }

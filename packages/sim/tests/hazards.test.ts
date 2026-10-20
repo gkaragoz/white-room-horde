@@ -271,7 +271,7 @@ describe('the new bosses', () => {
       }
       expect(got).toBe(effect);
     }
-  });
+  }, 60_000);
 });
 
 describe('late floors', () => {

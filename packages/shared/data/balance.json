@@ -408,7 +408,7 @@
   },
   "floors": {
     "clearedSeconds": 5,
-    "ascendSeconds": 3.6,
+    "ascendSeconds": 4.4,
     "chargeSeconds": 0.9,
     "arriveSeconds": 5,
     "reviveHp": 0.5,

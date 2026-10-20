@@ -45,8 +45,8 @@ describe('sim rules', () => {
     for (let i = 0; i < 30; i++) step(w, [{ moveX: 127, moveY: 0, aim: 0, buttons: 0 }]);
     expect(w.pX[0]).toBeCloseTo(BALANCE.player.speed, 5); // one second at full speed
     for (let i = 0; i < 1000; i++) step(w, [{ moveX: 127, moveY: 127, aim: 0, buttons: 0 }]);
-    expect(Math.abs(w.pX[0]!)).toBeLessThanOrEqual(30);
-    expect(Math.abs(w.pY[0]!)).toBeLessThanOrEqual(20);
+    expect(Math.abs(w.pX[0]!)).toBeLessThanOrEqual(52);
+    expect(Math.abs(w.pY[0]!)).toBeLessThanOrEqual(35);
   });
 
   it('normalises diagonal movement', () => {

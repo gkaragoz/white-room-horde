@@ -212,12 +212,12 @@ describe('maps', () => {
       // centre area is open
       for (const [x, y] of [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]] as const) expect(w.field.blocked[cellIndex(x, y)], `map ${m} blocked at ${x},${y}`).toBe(0);
       w.field.compute([cellIndex(0, 0)], 1);
-      for (let x = -29; x <= 29; x += 4) {
-        for (const y of [-19, 19]) expect(w.field.cost[cellIndex(x, y)], `map ${m} edge ${x},${y} unreachable`).toBeLessThan(0x3fffffff);
-      }
-      for (let y = -19; y <= 19; y += 4) {
-        for (const x of [-29, 29]) expect(w.field.cost[cellIndex(x, y)], `map ${m} edge ${x},${y} unreachable`).toBeLessThan(0x3fffffff);
-      }
+      const edgeOk = (x: number, y: number): void => {
+        if (w.field.blocked[cellIndex(x, y)]) return; // a wall that reaches the rim is not a gap in the crowd's way
+        expect(w.field.cost[cellIndex(x, y)], `map ${m} edge ${x},${y} unreachable`).toBeLessThan(0x3fffffff);
+      };
+      for (let x = -51; x <= 51; x += 3) for (const y of [-34, 34]) edgeOk(x, y);
+      for (let y = -34; y <= 34; y += 3) for (const x of [-51, 51]) edgeOk(x, y);
     }
   });
 

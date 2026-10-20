@@ -133,10 +133,11 @@ export class PropsView {
 
     // ground beyond the floor so the arena does not float in the sky colour
     if (!this.ground) {
-      this.ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 110), new THREE.MeshStandardMaterial({ color: theme.ground, roughness: 1 }));
+      this.ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF_W * 2 + 80, ARENA_HALF_H * 2 + 80), new THREE.MeshStandardMaterial({ color: theme.ground, roughness: 1 }));
       this.ground.rotation.x = -Math.PI / 2;
       this.ground.position.y = -0.02;
       this.ground.receiveShadow = true;
+      this.ground.userData.noBuild = true;
     }
     (this.ground.material as THREE.MeshStandardMaterial).color.set(theme.ground);
     this.group.add(this.ground);
@@ -153,7 +154,7 @@ export class PropsView {
     for (const [x, z] of [[-W + 0.4, -H + 0.4], [W - 0.4, -H + 0.4], [-W + 0.4, H - 0.4], [W - 0.4, H - 0.4], [0, -H - 0.2], [0, H + 0.2]] as const) this.place('lamp', x, z, 0, rand() * 6.28, 1.15);
 
     // themed props in a loose ring outside; big ones further out
-    const count = 46;
+    const count = Math.round(46 * ((W + H) / (30.9 + 20.9)));
     for (let i = 0; i < count; i++) {
       const side = Math.floor(rand() * 4);
       const along = rand();
@@ -195,6 +196,7 @@ export class PropsView {
       if (!m) {
         m = SkeletonUtils.clone(proto);
         m.scale.setScalar(1.1);
+        m.userData.noBuild = true; // the simulation moves the barrels: they are not part of the building show
         this.group.add(m);
         this.barrelMeshes[b] = m;
       }

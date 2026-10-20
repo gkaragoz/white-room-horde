@@ -59,7 +59,7 @@ describe('the vertical maps are well formed', () => {
       for (const [x, y] of [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]] as const) expect(w.field.blocked[cellIndex(x, y)], `${m.id} blocked at ${x},${y}`).toBe(0);
       w.field.compute([cellIndex(0, 0)], 1);
       let unreachable = 0;
-      for (let x = -28; x <= 28; x += 4) for (const y of [-18, 18]) if (!w.field.blocked[cellIndex(x, y)] && w.field.cost[cellIndex(x, y)]! > 1e8) unreachable++;
+      for (let x = -48; x <= 48; x += 4) for (const y of [-31, 31]) if (!w.field.blocked[cellIndex(x, y)] && w.field.cost[cellIndex(x, y)]! > 1e8) unreachable++;
       expect(unreachable, `${m.id}: ground cells that cannot be reached`).toBe(0);
       // the deck layer: the top of every ramp connects to the rest of its deck
       w.field1.compute(m.ramps!.map((r) => cellIndex(r.x + rampDir(r)[0] * ((r.dir === 0 || r.dir === 2 ? r.w : r.h) / 2 - 0.45), r.y + rampDir(r)[1] * ((r.dir === 0 || r.dir === 2 ? r.w : r.h) / 2 - 0.45))), m.ramps!.length);
@@ -75,8 +75,9 @@ describe('height and layers', () => {
     expect(rampT(r, r.x + r.w / 2, r.y)).toBeCloseTo(0, 5);
     expect(rampT(r, r.x - r.w / 2, r.y)).toBeCloseTo(1, 5);
     expect(heightAt(m, r.x, r.y, 0)).toBeCloseTo(2, 3); // half way up a 4 high ramp
-    expect(heightAt(m, 0, 11, 1)).toBe(4);
-    expect(heightAt(m, 0, 11, 0)).toBe(0); // underneath it is the ground
+    const dk = m.decks![0]!;
+    expect(heightAt(m, dk.x, dk.y, 1)).toBe(4);
+    expect(heightAt(m, dk.x, dk.y, 0)).toBe(0); // underneath it is the ground
     expect(heightAt(m, 0, -10, 0)).toBe(0);
     expect(nextLayer(m, r.x - r.w / 2 + 0.1, r.y, 0)).toBe(1);
     expect(nextLayer(m, r.x + r.w / 2 - 0.1, r.y, 1)).toBe(0);
@@ -167,17 +168,17 @@ describe('moving between the levels', () => {
 
   it('the ground under a deck is walkable (the overpass), pillars and tunnel walls are not', () => {
     const { w } = arena('overpass');
-    w.pX[0] = 0;
-    w.pY[0] = 6;
-    walk(w, 0, 1, 40); // north, under the bridge
+    w.pX[0] = 6.5;
+    w.pY[0] = 7;
+    walk(w, 0, 1, 40); // north, under the bridge, between two pillars
     expect(w.pLayer[0]).toBe(0);
-    expect(w.pY[0]!).toBeGreaterThan(10);
+    expect(w.pY[0]!).toBeGreaterThan(14);
     expect(heightAt(MAPS[mapIndex('overpass')]!, w.pX[0]!, w.pY[0]!, 0)).toBe(0);
     const p = arena('overpass').w;
-    p.pX[0] = 6;
-    p.pY[0] = 8.4;
-    walk(p, 1, 0, 40); // into the pillar at (9, 8.4)
-    expect(p.pX[0]!).toBeLessThan(9);
+    p.pX[0] = 8;
+    p.pY[0] = 12.6;
+    walk(p, 1, 0, 40); // into the pillar at (13, 12.6)
+    expect(p.pX[0]!).toBeLessThan(13);
   });
 });
 
@@ -196,9 +197,9 @@ describe('fighting across the levels', () => {
     const hit = (shooterLayer: number, targetLayer: number): boolean => {
       const { w } = arena('overpass');
       w.pX[0] = -5;
-      w.pY[0] = 11;
+      w.pY[0] = 17;
       w.pLayer[0] = shooterLayer;
-      const e = still(w, 5, 11, targetLayer);
+      const e = still(w, 5, 17, targetLayer);
       const hp = w.eHp[e]!;
       for (let t = 0; t < 40; t++) step(w, [{ ...NONE, buttons: Buttons.Fire, aim: 0 }]);
       void m;
@@ -221,20 +222,20 @@ describe('fighting across the levels', () => {
       for (let t = 0; t < 40; t++) step(w, [{ ...NONE, buttons: Buttons.Fire, aim: 0 }]);
       return w.eHp[e]! < hp;
     };
-    expect(shotsReach(0, 8.4, 5, 14)).toBe(false); // the pillar at (9, 8.4) is in the way
-    expect(shotsReach(0, 11, 5, 12)).toBe(true); // along the middle of the bridge underside: nothing there
-    expect(shotsReach(1, 11, -10, 10)).toBe(true);
+    expect(shotsReach(0, 12.6, 8, 20)).toBe(false); // the pillar at (13, 12.6) is in the way
+    expect(shotsReach(0, 17, 5, 12)).toBe(true); // along the middle of the bridge underside: nothing there
+    expect(shotsReach(1, 17, -10, 10)).toBe(true);
   });
 
   it('enemies cannot hurt a player on the other level, but do walk the ramps to reach one', () => {
     const { w } = arena('overpass', 3);
     w.pX[0] = 0;
-    w.pY[0] = 11; // on the bridge
+    w.pY[0] = 17; // on the bridge
     w.pLayer[0] = 1;
     w.pHp[0] = w.pMaxHp[0] = 1000;
-    const e = spawnEnemy(w, GRUNT, 0, 5, false); // right under it, on the ground
+    const e = spawnEnemy(w, GRUNT, 0, 16, false); // right under it, on the ground
     w.eCooldown[e] = 0;
-    for (let t = 0; t < 120; t++) step(w, [NONE]);
+    for (let t = 0; t < 40; t++) step(w, [NONE]);
     expect(w.pHp[0]).toBe(1000); // it stood below and could not reach
     // given time it takes the ramp
     let climbed = false;
@@ -250,8 +251,8 @@ describe('fighting across the levels', () => {
   it('enemies on a deck come down for a player on the ground', () => {
     const { w } = arena('overpass', 4);
     w.pX[0] = 0;
-    w.pY[0] = -2;
-    const e = spawnEnemy(w, GRUNT, 0, 11, false);
+    w.pY[0] = 2;
+    const e = spawnEnemy(w, GRUNT, 0, 17, false);
     w.eLayer[e] = 1;
     w.eCooldown[e] = 0;
     let down = false;
@@ -268,11 +269,11 @@ describe('fighting across the levels', () => {
     const v = createWorld(1, mapIndex('overpass'));
     v.waveTick = 1e9;
     v.countMul = 0;
-    addPlayer(v, 0, 0, 11, 'pistol', 7);
+    addPlayer(v, 0, 0, 17, 'pistol', 7);
     v.pLayer[0] = 1; // on the bridge
     v.pHp[0] = v.pMaxHp[0] = 1e9;
-    const ground = still(v, 2, 11, 0); // right below the blade
-    const deck = still(v, 2, 11.5, 1);
+    const ground = still(v, 2, 17, 0); // right below the blade
+    const deck = still(v, 2, 17.5, 1);
     const hp = [v.eHp[ground]!, v.eHp[deck]!];
     for (let t = 0; t < 20; t++) step(v, [{ ...NONE, buttons: Buttons.Fire }]);
     expect(v.eHp[deck]!).toBeLessThan(hp[1]!);
@@ -286,11 +287,11 @@ describe('loot on the levels', () => {
     const grab = (pickupLayer: number, playerLayer: number): boolean => {
       const { w } = arena('overpass');
       w.pX[0] = 4;
-      w.pY[0] = 11;
+      w.pY[0] = 17;
       w.pLayer[0] = playerLayer;
       w.pHp[0] = 10;
       w.pMaxHp[0] = 1e9;
-      spawnPickup(w, 1, 4, 11, 0, pickupLayer); // health
+      spawnPickup(w, 1, 4, 17, 0, pickupLayer); // health
       for (let t = 0; t < 10; t++) step(w, [NONE]);
       return w.pHp[0]! > 12;
     };
@@ -304,7 +305,7 @@ describe('loot on the levels', () => {
     const { w } = arena('overpass');
     spawnPickup(w, 1, 0, 3, 0, 1); // (0, 3) is nowhere near the bridge
     expect(w.kLayer[0]).toBe(0);
-    spawnPickup(w, 1, 0, 11, 0, 1);
+    spawnPickup(w, 1, 0, 17, 0, 1);
     expect(w.kLayer[1]).toBe(1);
   });
 });
@@ -341,8 +342,8 @@ describe('prediction and state on the vertical maps', () => {
   it('layers survive a snapshot and are part of the hash', () => {
     const { w } = arena('depot', 6);
     w.pLayer[0] = 1;
-    w.pX[0] = 15;
-    w.pY[0] = -10;
+    w.pX[0] = 34;
+    w.pY[0] = -17;
     const e = spawnEnemy(w, GRUNT, 3, 3, false);
     w.eLayer[e] = 1;
     for (let t = 0; t < 30; t++) step(w, [NONE]);

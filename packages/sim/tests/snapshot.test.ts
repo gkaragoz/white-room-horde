@@ -15,6 +15,6 @@ describe('snapshot', () => {
       step(b, [scriptedInput(t, 0), scriptedInput(t, 1)]);
     }
     expect(hashWorld(b)).toBe(hashWorld(a));
-    expect(snap.length).toBeLessThan(400_000);
+    expect(snap.length).toBeLessThan(700_000);
   });
 });

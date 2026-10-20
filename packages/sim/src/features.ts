@@ -1,4 +1,5 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_BARRELS, MAX_ENEMIES, MAX_PLAYERS, PERK, PERKS, PlayerState, TICK_DT } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_BARRELS, MAX_ENEMIES, MAX_PLAYERS, PERK, PERKS, PlayerState, STAT, TICK_DT } from '@wrh/shared';
+import { addStat, heal } from './stats';
 import { sqrt } from './detmath';
 import { out, pushOut } from './obstacles';
 import type { World } from './state';
@@ -142,14 +143,14 @@ export function updatePlayerPerks(w: World): void {
     }
     let regen = p[b + PERK.Regen]!;
     if (p[b + PERK.HurtT]! >= cfg.outOfCombatSeconds) regen += cfg.baseRegen;
-    if (regen > 0 && w.pHp[s]! > 0 && w.pHp[s]! < w.pMaxHp[s]!) w.pHp[s] = Math.min(w.pMaxHp[s]!, w.pHp[s]! + regen * TICK_DT);
+    if (regen > 0 && w.pHp[s]! > 0 && w.pHp[s]! < w.pMaxHp[s]!) heal(w, s, regen * TICK_DT);
     const aura = p[b + PERK.Aura]!;
     if (aura > 0) {
       for (let t = 0; t < MAX_PLAYERS; t++) {
         if (t === s || !w.pActive[t] || w.pState[t] !== PlayerState.Alive || w.pHp[t]! >= w.pMaxHp[t]!) continue;
         const dx = w.pX[t]! - w.pX[s]!;
         const dy = w.pY[t]! - w.pY[s]!;
-        if (dx * dx + dy * dy <= r2) w.pHp[t] = Math.min(w.pMaxHp[t]!, w.pHp[t]! + aura * TICK_DT);
+        if (dx * dx + dy * dy <= r2) heal(w, t, aura * TICK_DT);
       }
     }
   }
@@ -205,7 +206,8 @@ export function enemyDamageMul(w: World, i: number): number {
 // ---- explosive barrels ----
 
 const BARREL_SPOTS: readonly (readonly [number, number])[] = [
-  [-14, -9], [14, 9], [-14, 9], [14, -9], [0, -14], [0, 14], [-24, 0], [24, 0], [-7, 0], [7, 0], [-22, -14], [22, 14],
+  [-24, -15], [24, 15], [-24, 15], [24, -15], [0, -24], [0, 24], [-42, 0], [42, 0], [-12, 0], [12, 0], [-38, -26], [38, 26],
+  [-14, 28], [14, -28], [-48, -12], [48, 12], [-30, 4], [30, -4], [-8, -14], [8, 14],
 ];
 
 /** Stand the barrels of this arena up (positions are nudged out of the cover). */
@@ -239,6 +241,7 @@ export function explodeBarrel(w: World, b: number, owner: number): void {
   const x = w.brX[b]!;
   const y = w.brY[b]!;
   w.brActive[b] = 0;
+  addStat(w, owner, STAT.Barrels, 1);
   w.brT[b] = c.respawn;
   w.events.push({ type: 'explosion', x, y, radius: c.radius });
   hooks.blast(w, owner, x, y, c.radius, c.damage);

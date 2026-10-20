@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { BALANCE, CAMERA, FloorPhase, MAP_COUNT, MAX_PLAYERS, MISC, PlayerState, TICK_RATE } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CAMERA, FloorPhase, MAP_COUNT, MAX_PLAYERS, MISC, PlayerState, TICK_RATE } from '@wrh/shared';
 import type { World } from '@wrh/sim';
 import { ArenaView } from './arena';
+import { BuildAnim, type BuildEvent } from './buildFx';
 import type { Fx } from './fx';
 import { PropsView } from './props';
 import type { Stage } from './stage';
@@ -12,11 +13,12 @@ import type { Stage } from './stage';
  * at this distance (with a ground plane of 140 x 110) the view can only ever hold one floor: the old one leaves the bottom of the frame whole before the new
  * one shows up at the top.
  */
-export const FLOOR_GAP = 150;
+export const FLOOR_GAP = 200;
 /** World size of everything a floor draws (the ground plane is the widest): half width, half depth, height. */
-export const FLOOR_HALF = { x: 70, z: 55, y: 10 };
+export const FLOOR_HALF = { x: ARENA_HALF_W + 40, z: ARENA_HALF_H + 40, y: 10 };
 
 interface FloorSet {
+  anim: BuildAnim;
   arena: ArenaView;
   props: PropsView;
   floor: THREE.Mesh;
@@ -34,10 +36,31 @@ const smooth = (x: number): number => {
   const t = Math.max(0, Math.min(1, x));
   return t * t * (3 - 2 * t);
 };
-const easeInOut = (x: number): number => {
-  const t = Math.max(0, Math.min(1, x));
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-};
+
+/** Sky between two floors, beyond the least needed (world units). */
+const VOID_EXTRA = 40;
+
+/** Monotone cubic interpolation through the points (flat at both ends): smooth, never overshoots. */
+function pchip(x: number, xs: number[], ys: number[]): number {
+  const n = xs.length;
+  if (x <= xs[0]!) return ys[0]!;
+  if (x >= xs[n - 1]!) return ys[n - 1]!;
+  const d: number[] = [];
+  const h: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    h.push(xs[i + 1]! - xs[i]!);
+    d.push((ys[i + 1]! - ys[i]!) / h[i]!);
+  }
+  const m: number[] = [0];
+  for (let i = 1; i < n - 1; i++) m.push(d[i - 1]! * d[i]! <= 0 ? 0 : (2 * d[i - 1]! * d[i]!) / (d[i - 1]! + d[i]!));
+  m.push(0);
+  let i = 0;
+  while (x > xs[i + 1]!) i++;
+  const t = (x - xs[i]!) / h[i]!;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * ys[i]! + (t3 - 2 * t2 + t) * h[i]! * m[i]! + (-2 * t3 + 3 * t2) * ys[i + 1]! + (t3 - t2) * h[i]! * m[i + 1]!;
+}
 
 function runeTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -128,6 +151,8 @@ export class FloorClimb {
   private readonly dummy = new THREE.Object3D();
   private lampsSwitched = false;
   private lastMap = -1;
+  /** Dust and sound for the pieces of a floor that land or crumble (set by main). */
+  onBuild: BuildEvent | null = null;
   /** Seconds into the flight (for the sound and the tests). */
   flightTime = 0;
   /** 0..1 progress of the lift (after the charge) and of the charge. */
@@ -140,8 +165,9 @@ export class FloorClimb {
     arena: ArenaView,
     props: PropsView,
   ) {
-    const second: FloorSet = { arena: new ArenaView(), props: props.fork(), floor: stage.floor.clone() };
-    this.sets = [{ arena, props, floor: stage.floor }, second];
+    const second: FloorSet = { anim: new BuildAnim(), arena: new ArenaView(), props: props.fork(), floor: stage.floor.clone() };
+    this.sets = [{ anim: new BuildAnim(), arena, props, floor: stage.floor }, second];
+    for (const s of this.sets) s.anim.onEvent = (k, x, z, big) => this.onBuild?.(k, x, z, big);
     for (const o of [second.arena.group, second.props.group, second.floor, this.group]) stage.scene.add(o);
     second.arena.group.visible = second.props.group.visible = second.floor.visible = false;
 
@@ -226,14 +252,43 @@ export class FloorClimb {
     nx.props.setNight(this.stage.night);
     this.preparedMap = map;
     this.building = -1;
-    if (!this.warmed) {
-      this.warmed = true;
-      // warm the shaders and textures of the new floor once, while the countdown runs
-      nx.arena.group.visible = nx.props.group.visible = nx.floor.visible = true;
-      const warm = (this.stage.renderer as unknown as { compileAsync?: (s: THREE.Object3D, c: THREE.Camera) => Promise<void> }).compileAsync;
-      if (warm) void warm.call(this.stage.renderer, this.stage.scene, this.stage.camera).catch(() => undefined);
-      nx.arena.group.visible = nx.props.group.visible = nx.floor.visible = false;
+    // the next floor is drawn for the very first time while the countdown runs: its textures go to the graphics card and its
+    // shaders are compiled now, not in the middle of the flight
+    this.warmFloor(nx);
+    // from here on the next floor's pieces wait in the sky: it is built piece by piece once the party has arrived
+    nx.anim.arm([nx.arena.group, nx.props.group], 'in', map + 3);
+  }
+
+  /** Upload every texture of a floor and compile its shaders (it is shown for the moment this takes, then hidden again). */
+  private warmFloor(set: FloorSet): void {
+    const r = this.stage.renderer;
+    set.arena.group.visible = set.props.group.visible = set.floor.visible = true;
+    const seen = new Set<THREE.Texture>();
+    const visit = (o: THREE.Object3D): void => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+        for (const v of Object.values(mat as unknown as Record<string, unknown>)) {
+          if (v && (v as THREE.Texture).isTexture && !seen.has(v as THREE.Texture)) {
+            seen.add(v as THREE.Texture);
+            try {
+              r.initTexture(v as THREE.Texture);
+            } catch {
+              /* a texture that cannot be uploaded early is uploaded when it is first drawn */
+            }
+          }
+        }
+      }
+    };
+    set.arena.group.traverse(visit);
+    set.props.group.traverse(visit);
+    visit(set.floor);
+    try {
+      r.compile(this.stage.scene, this.stage.camera);
+    } catch {
+      /* the first draw compiles it instead */
     }
+    set.arena.group.visible = set.props.group.visible = set.floor.visible = false;
+    this.warmed = true;
   }
 
   private building = -1;
@@ -241,13 +296,30 @@ export class FloorClimb {
   /** Distance between the floors for the view in use (a tall portrait window needs more than a wide one). */
   gap = FLOOR_GAP;
 
-  /** The least distance at which the view never holds both floors, for the camera as it is now, with some margin. */
-  requiredGap(): number {
+  /** Height (on screen) of a whole floor plus the view: the distance the camera must rise for one floor to leave the frame and the next to arrive. */
+  private floorSpan(): number {
     const cam = this.stage.camera;
     const el = (CAMERA.elevationDeg * Math.PI) / 180;
     const yaw = (CAMERA.yawDeg * Math.PI) / 180;
     const span = 2 * (FLOOR_HALF.x * Math.sin(el) * Math.sin(yaw) + FLOOR_HALF.z * Math.sin(el) * Math.cos(yaw)) + FLOOR_HALF.y * Math.cos(el);
-    return Math.max(FLOOR_GAP, (span + (cam.top - cam.bottom) + 4) / Math.cos(el));
+    return (span + (cam.top - cam.bottom)) / Math.cos(el);
+  }
+
+  /** The least distance at which the view never holds both floors, plus a stretch of empty sky to float through while the next one is made ready. */
+  requiredGap(): number {
+    return Math.max(FLOOR_GAP, this.floorSpan() + 4 / Math.cos((CAMERA.elevationDeg * Math.PI) / 180) + VOID_EXTRA);
+  }
+
+  /**
+   * How high the camera has risen at progress `p` of the lift: quickly while the old floor scrolls out of the frame, then a
+   * slow drift through the empty sky (the next floor is drawn for the first time in there, behind the dark), then a gentle
+   * arrival. The empty stretch lasts about a third of the lift.
+   */
+  private liftAt(p: number): number {
+    const half = this.floorSpan() / 2;
+    const l1 = Math.min(this.gap * 0.45, half); // the old floor has left the frame
+    const l2 = Math.max(this.gap * 0.55, this.gap - half); // the new floor is about to enter
+    return pchip(p, [0, 0.3, 0.72, 1], [0, l1, l2, this.gap]);
   }
 
   private rebase(w: World): void {
@@ -257,6 +329,7 @@ export class FloorClimb {
     now.arena.group.position.y = now.props.group.position.y = now.floor.position.y = 0;
     old.arena.group.visible = old.props.group.visible = old.floor.visible = false;
     old.props.hideBarrels();
+    old.anim.restore();
     now.arena.group.visible = now.props.group.visible = now.floor.visible = true;
     this.flying = false;
     this.entered = false;
@@ -272,6 +345,36 @@ export class FloorClimb {
     this.stage.setDark(0);
     this.stage.setFlightBlur(0);
     this.lift01 = this.charge01 = this.flightTime = 0;
+  }
+
+  /** QA: the state of the building show of the floor in play. */
+  buildStats(other = false): { mode: string; total: number; shown: number; done: number } {
+    return this.sets[other ? 1 - this.cur : this.cur]!.anim.stats();
+  }
+
+  /** The demolition of the floor that was cleared (during the countdown) and the building of the new one (during the next). */
+  private playBuild(w: World, phase: number, alpha: number): void {
+    const fl = BALANCE.floors;
+    const set = this.sets[this.cur]!;
+    const remaining = (w.misc[MISC.PhaseEnd]! - w.tick - alpha) / TICK_RATE;
+    if (phase === FloorPhase.Cleared) {
+      const elapsed = fl.clearedSeconds - remaining;
+      const start = 1.2;
+      const end = fl.clearedSeconds - 0.1;
+      if (elapsed > start - 0.35 && set.anim.armed !== 'in') {
+        if (set.anim.armed !== 'out') set.anim.arm([set.arena.group, set.props.group], 'out', w.wave + 11);
+        set.anim.update(Math.max(0, Math.min(1, (elapsed - start) / (end - start))), end - start);
+      }
+    } else if (phase === FloorPhase.Arrive && set.anim.armed === 'in') {
+      const elapsed = fl.arriveSeconds - remaining;
+      const start = 0.1;
+      const end = fl.arriveSeconds - 0.8;
+      const t = Math.max(0, Math.min(1, (elapsed - start) / (end - start)));
+      set.anim.update(t, end - start);
+      if (t >= 1 && set.anim.complete) set.anim.finish();
+    } else if (set.anim.armed === 'in' && phase === FloorPhase.Fight) {
+      set.anim.finish(); // never leave a floor half built
+    }
   }
 
   private readonly frustum = new THREE.Frustum();
@@ -310,9 +413,12 @@ export class FloorClimb {
   update(w: World, alpha: number, now: number, dt: number, px: number[], py: number[]): ClimbInfo {
     const phase = w.misc[MISC.Phase]!;
     const fl = BALANCE.floors;
-    const nextMap = w.wave % MAP_COUNT;
+    // the map of the next floor: from the wave, until the simulation has built it half way through the climb (it counts the wave up
+    // then, so from that moment the world's own map is the one; asking the wave again would rebuild the upper floor with the wrong arena)
+    const nextMap = phase === FloorPhase.Ascend && w.misc[MISC.Entered] === 1 ? w.map : w.wave % MAP_COUNT;
     // whatever happened (a resync, a late join), the floor in play must show the world's map
     if (!this.flying && this.arena.map !== w.map) {
+      this.sets[this.cur]!.anim.restore();
       this.arena.setMap(w.map);
       this.props.setMap(w.map);
       this.stage.setLamps(this.props.lamps);
@@ -326,8 +432,11 @@ export class FloorClimb {
 
     if (phase !== FloorPhase.Ascend) {
       if (this.flying) this.rebase(w);
+      this.playBuild(w, phase, alpha);
       return { active: false, lift: 0 };
     }
+    // (the old floor stays crumbled through the climb)
+    this.sets[this.cur]!.anim.finish();
 
     // ---- the flight ----
     const total = fl.ascendSeconds;
@@ -388,7 +497,7 @@ export class FloorClimb {
       cx /= n;
       cy /= n;
     }
-    const lift = this.gap * easeInOut(p);
+    const lift = this.liftAt(p);
     this.centre.set(cx, 0, -cy);
 
     // each floor is drawn only while some of it is in the view: the old one stays whole and scrolls out below, the new one

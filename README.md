@@ -21,7 +21,8 @@ Nothing has to run on your computer: the room server is a Cloudflare Worker (`pa
 - **Classes (9).** Each has an ability on F that recharges: soldier (rally), medic (heal pulse), heavy (fortify), scout (burst), demolisher (airstrike), ranger (overcharge), berserker (rampage), and two melee classes with no guns: the swordsman (blade arc, blade storm) and the hammerer (hold to charge a full spin, ground slam).
 - **Levels are per character.** Every kill gives experience to whoever made it; each level opens a choice of three cards for that character. Four cards help the whole squad and show on the info bar.
 - **Enemies.** 21 types, from grunts to acid sprayers, rammers that throw you into the air, mortar crews, marksmen with laser lines, blinkers, magnetars and flamers; six bosses with telegraphed attacks (slams, meteors, acid, sweeping lines and a purge that paints most of the arena red). Frozen enemies are coated in ice.
-- **Arenas (11).** Six flat ones and five with two levels: bridges, platforms, 30 and 45 degree ramps and tunnels. A shot from a deck reaches the ground, not the other way round; the roof of a bridge turns thin while you stand under it.
+- **Arenas (11).** Six flat ones and five with two levels (bridges, platforms, 30 and 45 degree ramps and tunnels), all 104 x 70 units: room to run and to gather a crowd. A shot from a deck reaches the ground, not the other way round; the roof of a bridge turns thin while you stand under it.
+- **After the run.** The game-over page counts the run in about thirty numbers, per player.
 - **Sound.** Recorded and synthesised effects, music, and an announcer (English).
 
 ## Run it yourself

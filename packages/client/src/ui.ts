@@ -5,6 +5,7 @@ import { asset } from './assets';
 import { ACTIONS } from './input';
 import { THEMES } from './render/arena';
 import { EXTRA } from './i18n';
+import { renderGameOver, type RunExtras } from './gameOver';
 import { renderControlsSheet, renderSettingsPanel } from './settingsPanel';
 import { discoverRelay } from './relay';
 import { Preview } from './render/preview';
@@ -765,6 +766,23 @@ const CSS = `
 .wrh-inv b{font-variant-numeric:tabular-nums;font-size:11px}
 .wrh-inv .row.cur{border-color:#ffd21f;background:rgba(255,248,214,.97);box-shadow:0 0 0 1px rgba(255,210,31,.55),0 0 10px rgba(255,210,31,.5)}
 .wrh-inv .row.dry{opacity:.4}
+.wrh-go{width:min(860px,94vw);max-height:92vh;overflow:auto}
+.wrh-go-title{margin:12px 0 6px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;font-size:13px;opacity:.7}
+.wrh-go-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;text-align:left}
+.wrh-go-card{display:grid;grid-template-columns:34px 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:9px 12px;border-radius:12px;background:#fffaf0;border:2px solid #e4d9c3;box-shadow:0 2px 6px rgba(20,28,44,.12);opacity:0;transform:translateY(14px) scale(.9)}
+.wrh-go-card.in{opacity:1;transform:none;animation:wrh-go-pop .38s cubic-bezier(.2,1.5,.4,1)}
+.wrh-go-card i{grid-row:1 / 3;width:34px;height:34px;border-radius:10px;background:#2b3a52;display:flex;align-items:center;justify-content:center}
+.wrh-go-card i svg{width:22px;height:22px;fill:#ffd21f}
+.wrh-go-card b{font-size:11px;font-weight:700;letter-spacing:.03em;opacity:.7;line-height:1.15}
+.wrh-go-card .v{font-size:21px;font-weight:900;font-variant-numeric:tabular-nums;color:#2b3a52;line-height:1.1}
+.wrh-go-card.hot{border-color:#ffb000;background:#fff6d6;box-shadow:0 0 0 1px #ffb00066,0 2px 10px #ffb00055}
+.wrh-go-card.hot .v{color:#c77700}
+@keyframes wrh-go-pop{0%{transform:scale(.7) translateY(10px);opacity:0}60%{transform:scale(1.07)}100%{transform:none;opacity:1}}
+.wrh-go-tabs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0 2px}
+.wrh-go-tab{border:2px solid var(--c);background:#fffaf0;color:#2b3a52;border-radius:999px;padding:4px 12px;font-weight:700;font-size:13px;cursor:pointer}
+.wrh-go-tab.on{background:var(--c);color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.wrh-go-taunt{margin-top:10px;font-style:italic;opacity:.65;font-size:13px}
+.wrh-go-skip{margin-top:4px;font-size:11px;opacity:.5;transition:opacity .3s}.wrh-go-skip.gone{opacity:0}
 .wrh-inv{pointer-events:none}.wrh-inv .row{pointer-events:auto;cursor:pointer;transition:transform .08s,box-shadow .08s}
 .wrh-inv .row:hover{transform:translateX(-3px);box-shadow:0 2px 8px rgba(20,28,44,.28)}
 .wrh-ui .wrh-me{display:flex;gap:6px;right:14px;bottom:8px;width:236px;padding:0;background:none;border:0;box-shadow:none;text-align:left;pointer-events:none}
@@ -1954,21 +1972,41 @@ export class Ui {
       .join('');
   }
 
-  showGameOver(world: World, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }): void {
-    this.redraw = () => this.showGameOver(world, rec);
+  private goStop: (() => void) | null = null;
+
+  /** The game-over page: the run in numbers, revealed one card at a time (a click shows them all). */
+  showGameOver(world: World, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }, extras: RunExtras = { clicks: 0, keys: 0, bestCombo: 0 }, instant = false, slot = 0): void {
+    this.redraw = () => this.showGameOver(world, rec, extras, true, slot);
     this.lobbyCode = '';
+    this.goStop?.();
     const t = this.t;
     const names = t.weapons as Record<string, string>;
     const extra = rec
       ? `${rec.newWave || rec.newKills ? `<p style="color:#d8862e;font-weight:800">${t.newBest}</p>` : ''}${rec.unlocked.length ? `<p>&#128275; ${t.unlockedWeapon}: <b>${rec.unlocked.map((w) => names[w]).join(', ')}</b></p>` : ''}`
       : '';
-    this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center">
-      <h1>${t.over}</h1>
-      <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${Math.max(1, ...Array.from(world.pLevel).filter((_, i) => world.pActive[i]))}</b></p>${extra}
-      ${this.squadStats(world)}
-      <button id="wrh-again">${t.again}</button>
-    </div>`;
-    this.screen.querySelector<HTMLElement>('#wrh-again')!.onclick = () => this.h.onAgain();
+    const head = `<h1>${t.over}</h1>
+      <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${Math.max(1, ...Array.from(world.pLevel).filter((_, i) => world.pActive[i]))}</b></p>${extra}${this.squadStats(world)}`;
+    const r = renderGameOver({
+      world,
+      screen: this.screen,
+      lang: this.lang,
+      slot,
+      playerNames: this.playerNames,
+      slotColor: this.slotColor,
+      weaponName: (id) => names[WEAPON_IDS[id]!] ?? '',
+      head,
+      foot: `<button id="wrh-again">${t.again}</button>`,
+      tick: (_i, last) => this.h.onUiSound(last ? 'confirm' : 'click'),
+      instant,
+      extras: { ...extras, slot },
+    });
+    this.goStop = r.stop;
+    const again = (): void => {
+      this.screen.querySelector<HTMLElement>('#wrh-again')!.onclick = () => this.h.onAgain();
+    };
+    again();
+    // the page is rebuilt when a player tab is chosen: the button needs its handler again
+    new MutationObserver(again).observe(this.screen, { childList: true });
   }
 
   private buildHud(): void {

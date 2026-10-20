@@ -210,6 +210,24 @@ def build():
     c["gore_tear"] = mix((ripple, 0.9, 0.0), (snapp, 0.9, 0.12), (snapp, 0.7, 0.3), (lowpass_env(noise(0.3), 1500, 150) * env(int(0.3 * SR), 0.002, 0.3, 2.5), 0.9, 0.35))
     burst = lowpass_env(noise(0.7), 2800, 120) * env(int(0.7 * SR), 0.002, 0.7, 2)
     c["gib_burst"] = mix((burst, 1.0, 0.0), (tone(sweep(100, 38, 0.4), 0.4, release=0.36), 0.9, 0.0), (drips, 0.5, 0.2), (fft_filter(noise(0.1), lo=1200, hi=5000) * env(int(0.1 * SR), 0.0005, 0.1, 3), 0.6, 0.0))
+    # building and demolition: a heavy thud with dust for a prop landing (three takes), and rubble breaking up (three takes)
+    for k, (f0, body) in enumerate(((95, 0.55), (120, 0.5), (80, 0.65)), 1):
+        thud = tone(sweep(f0 * 1.6, f0 * 0.55, 0.28, 0.6), 0.28, release=0.25, curve=2)
+        hit = lowpass_env(noise(0.3), 900 + k * 200, 120) * env(int(0.3 * SR), 0.001, 0.3, 2.6)
+        clack = fft_filter(noise(0.05), lo=1200, hi=6000) * env(int(0.05 * SR), 0.0004, 0.05, 3)
+        dust = lowpass_env(fft_filter(noise(0.5), lo=300), 4000, 400) * env(int(0.5 * SR), 0.02, 0.45, 1.6) * 0.35
+        c["build_thud_%d" % k] = mix((thud, 0.9, 0.0), (hit, 1.0, 0.0), (clack, 0.45, 0.0), (dust, body, 0.03))
+    for k in range(1, 4):
+        n = int(0.7 * SR)
+        grind = lowpass_env(fft_filter(noise(0.7), lo=150), 3000, 250) * env(n, 0.02, 0.5, 1.4) * (0.6 + 0.4 * np.sin(t_(0.7) * 2 * np.pi * (14 + k * 5)))
+        parts = np.zeros(n)
+        for j in range(9):
+            i = int((0.04 + j * 0.06 + rng.random() * 0.05) * SR)
+            if i + int(0.04 * SR) >= n:
+                break
+            ck = fft_filter(noise(0.04), lo=900 + j * 120, hi=5000) * env(int(0.04 * SR), 0.0004, 0.04, 3)
+            parts[i:i + len(ck)] += ck * (0.8 - j * 0.06)
+        c["crumble_%d" % k] = mix((grind, 0.8, 0.0), (parts, 0.9, 0.0), (tone(sweep(90, 40, 0.4), 0.4, release=0.36), 0.6, 0.15))
     return {k: normalise(v) for k, v in c.items()}
 
 

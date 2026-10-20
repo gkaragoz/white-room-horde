@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAMERA } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, CAMERA } from '@wrh/shared';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -501,9 +501,9 @@ function makeFloor(quality: 0 | 1): THREE.Mesh {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = quality === 1 ? 8 : 1;
-  tex.repeat.set(2.5, 1.8);
+  tex.repeat.set((2.5 * ARENA_HALF_W) / 30, (1.8 * ARENA_HALF_H) / 20); // the tile keeps its size on a bigger floor
   const floorMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), floorMat);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF_W * 2, ARENA_HALF_H * 2), floorMat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.receiveShadow = true;
   return mesh;

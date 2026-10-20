@@ -30,7 +30,7 @@ describe('flow field', () => {
       y += f.dirY[k]! * 0.5;
     }
     expect(cellIndex(x, y)).toBe(src);
-    expect(FF_W).toBe(60);
+    expect(FF_W).toBe(104);
   });
 });
 

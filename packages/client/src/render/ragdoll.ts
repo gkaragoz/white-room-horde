@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { ARENA_HALF_H, ARENA_HALF_W } from '@wrh/shared';
 import { loadGLB } from './character';
 import { asset } from '../assets';
 
@@ -328,10 +329,10 @@ export class RagdollPool {
           prev[k + 1] = pos[k + 1]! + (pos[k + 1]! - prev[k + 1]!) * 0.2;
         }
         // arena walls (three space: x +-30, z +-20)
-        if (pos[k]! < -29.5) pos[k] = -29.5;
-        if (pos[k]! > 29.5) pos[k] = 29.5;
-        if (pos[k + 2]! < -19.5) pos[k + 2] = -19.5;
-        if (pos[k + 2]! > 19.5) pos[k + 2] = 19.5;
+        if (pos[k]! < -(ARENA_HALF_W - 0.5)) pos[k] = -(ARENA_HALF_W - 0.5);
+        if (pos[k]! > (ARENA_HALF_W - 0.5)) pos[k] = (ARENA_HALF_W - 0.5);
+        if (pos[k + 2]! < -(ARENA_HALF_H - 0.5)) pos[k + 2] = -(ARENA_HALF_H - 0.5);
+        if (pos[k + 2]! > (ARENA_HALF_H - 0.5)) pos[k + 2] = (ARENA_HALF_H - 0.5);
       }
     }
   }
