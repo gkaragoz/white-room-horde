@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+- Your teammates' hits print their damage too: smaller, in their own colour. Yours stay white (gold when big).
+
 ## v0.9.0 (2026-10-20)
 
 **Characters (rules change: update the server and reload the page)**

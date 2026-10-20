@@ -445,14 +445,16 @@ function handleEvent(e: SimEvent): void {
   switch (e.type) {
     case 'enemyHit':
       crowd.hit(e.id);
-      // every hit of the local player counts: hits on the same enemy inside one frame (shotgun pellets) are one number
-      if (e.by === localSlot) {
-        const a = hitAcc.get(e.id);
+      // every hit counts: yours in white (gold when big), your teammates' smaller in their own colour; hits of one enemy
+      // inside one frame (shotgun pellets) are added into one number
+      if (e.by >= 0) {
+        const key = e.by * 4096 + e.id;
+        const a = hitAcc.get(key);
         if (a) {
           a.dmg += e.damage;
           a.x = e.x;
           a.y = e.y;
-        } else hitAcc.set(e.id, { x: e.x, y: e.y, dmg: e.damage });
+        } else hitAcc.set(key, { x: e.x, y: e.y, dmg: e.damage, by: e.by });
       }
       break;
     case 'waveStart': {
@@ -553,20 +555,20 @@ window.addEventListener('blur', () => {
 
 const _p = new THREE.Vector3();
 /** Damage of the local player's hits since the last frame, per enemy; shown (and cleared) once per frame. */
-const hitAcc = new Map<number, { x: number; y: number; dmg: number }>();
+const hitAcc = new Map<number, { x: number; y: number; dmg: number; by: number }>();
 
 function flushHits(): void {
-  for (const h of hitAcc.values()) damageNumber(h.x, h.y, h.dmg);
+  for (const h of hitAcc.values()) damageNumber(h.x, h.y, h.dmg, h.by === localSlot ? null : colorFor(h.by));
   hitAcc.clear();
 }
 /** Floating damage numbers for hits (thinned out when the screen is full of them). */
-function damageNumber(x: number, y: number, damage: number): void {
+function damageNumber(x: number, y: number, damage: number, teammate: string | null = null): void {
   if (damage < 1 || !settings.damageNumbers) return;
   _p.set(x, 1.7, -y).project(stage.camera);
   const px = ((_p.x + 1) / 2) * app.clientWidth;
   const py = ((1 - _p.y) / 2) * app.clientHeight;
   if (px < 0 || py < 0 || px > app.clientWidth || py > app.clientHeight) return;
-  ui.popNumber(px, py, String(Math.round(damage)), damage >= 25);
+  ui.popNumber(px, py, String(Math.round(damage)), damage >= 25, teammate);
 }
 
 // ---- hit feel: a short freeze on heavy kills, slow motion on big moments ----

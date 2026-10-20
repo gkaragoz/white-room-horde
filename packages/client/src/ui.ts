@@ -1470,7 +1470,7 @@ export class Ui {
   private floaters = 0;
 
   /** A damage number that rises from a screen position and fades out. */
-  popNumber(px: number, py: number, text: string, big: boolean): void {
+  popNumber(px: number, py: number, text: string, big: boolean, teammate: string | null = null): void {
     if (this.floaters >= 60) return;
     this.floaters++;
     const el = document.createElement('div');
@@ -1478,8 +1478,10 @@ export class Ui {
     el.textContent = text;
     el.style.left = `${px}px`;
     el.style.top = `${py}px`;
-    el.style.fontSize = big ? '22px' : '15px';
-    el.style.color = big ? '#ffd23a' : '#fff';
+    // your own numbers are white (gold when big); a teammate's are smaller, in their colour and a little see-through
+    el.style.fontSize = teammate ? (big ? '16px' : '12px') : big ? '22px' : '15px';
+    el.style.color = teammate ?? (big ? '#ffd23a' : '#fff');
+    if (teammate) el.style.opacity = '0.85';
     this.root.appendChild(el);
     const dx = (Math.random() - 0.5) * 30;
     const a = el.animate([{ transform: 'translate(-50%,0) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px),-46px) scale(${big ? 1.25 : 0.9})`, opacity: 0 }], { duration: 650, easing: 'ease-out' });
