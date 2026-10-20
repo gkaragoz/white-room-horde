@@ -7,6 +7,10 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Loot**
+- Drops spin on the spot and carry a name tag; weapon drops show the actual gun.
+- Rarity glow like the cards: white (ammo, grenade), blue (health, shield, haste, light weapons), purple (quad, freeze, heavy weapons), red (nuke, minigun): coloured outline, floor ring and tag.
+
 ## v0.5.2 (2026-10-20)
 
 **Models**

@@ -523,7 +523,7 @@ const CSS = `
 .wrh-hostpause small{display:block;font-size:14px;font-weight:600;opacity:.85;margin-top:4px}
 .wrh-ui.no-minimap .wrh-mini{display:none}
 /* layers: labels that follow things in the world sit under the HUD, the HUD under menus, menus under settings */
-.wrh-ammo,.wrh-tag,.wrh-ring,.wrh-arrow-off,.wrh-dmg,.wrh-combo{z-index:1}
+.wrh-plabel,.wrh-ammo,.wrh-tag,.wrh-ring,.wrh-arrow-off,.wrh-dmg,.wrh-combo{z-index:1}
 .wrh-top,.wrh-me,.wrh-squad,.wrh-mini,.wrh-cards,.wrh-banner,.wrh-gear,.wrh-warn,.wrh-hint{z-index:5}
 .wrh-hostpause{z-index:8}
 .wrh-center{z-index:20}
@@ -611,6 +611,7 @@ const CSS = `
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
 .wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{color:#e9effa;text-shadow:0 1px 2px #000}
 .wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
+.wrh-plabel{position:absolute;left:0;top:0;pointer-events:none;display:none;white-space:nowrap;font:700 12px/1 system-ui,sans-serif;color:#fff;background:rgba(20,26,38,.62);padding:3px 7px;border-radius:9px;border:1.5px solid #fff;text-shadow:0 1px 1px rgba(0,0,0,.5)}
 .wrh-ammo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none}
 /* the ring itself is a 3D object on the floor (render/ammoRing.ts); this element only carries the count */
 .wrh-ammo i{display:none;position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--c) calc(var(--f)*1%),rgba(30,36,48,.28) 0);-webkit-mask:radial-gradient(closest-side,transparent 76%,#000 79%);mask:radial-gradient(closest-side,transparent 76%,#000 79%);filter:drop-shadow(0 0 3px rgba(0,0,0,.35))}
@@ -1146,6 +1147,39 @@ export class Ui {
   }
 
   private ammoEl: HTMLElement | null = null;
+  private pickupLabels: HTMLElement[] = [];
+
+  /** Name tags over the loot lying on the floor (screen positions in pixels). */
+  setPickupLabels(items: { px: number; py: number; text: string; color: string }[]): void {
+    while (this.pickupLabels.length < items.length) {
+      const el = document.createElement('div');
+      el.className = 'wrh-plabel';
+      this.root.appendChild(el);
+      this.pickupLabels.push(el);
+    }
+    for (let i = 0; i < this.pickupLabels.length; i++) {
+      const el = this.pickupLabels[i]!;
+      const it = items[i];
+      if (!it) {
+        if (el.style.display !== 'none') el.style.display = 'none';
+        continue;
+      }
+      el.style.display = 'block';
+      if (el.textContent !== it.text) el.textContent = it.text;
+      el.style.borderColor = it.color;
+      el.style.color = it.color;
+      el.style.transform = `translate(${Math.round(it.px)}px,${Math.round(it.py)}px) translate(-50%,-100%)`;
+    }
+  }
+
+  get powerupNames(): string[] {
+    return this.t.powerups as unknown as string[];
+  }
+
+  weaponName(id: string): string {
+    return (this.t.weapons as Record<string, string>)[id] ?? id;
+  }
+
 
   /** The ring around the player's feet: green when the magazine is full, red when it runs out, with the rounds left beside it. */
   /** Light text on the HUD while it is night. */

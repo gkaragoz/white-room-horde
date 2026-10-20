@@ -8,7 +8,7 @@ import { ArenaView } from './render/arena';
 import { Character } from './render/character';
 import { PlayerAnimator } from './render/playerAnim';
 import { Crowd } from './render/crowd';
-import { PickupView } from './render/pickups';
+import { PickupView, TIER_COLORS } from './render/pickups';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
 import { AmmoRing } from './render/ammoRing';
@@ -99,6 +99,7 @@ stage.scene.add(ragdolls.group);
 const pickups = new PickupView();
 stage.scene.add(pickups.group);
 void pickups.load();
+void pickups.loadWeapons();
 
 const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.06, 0.8), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), MAX_BULLETS);
 // a soft additive halo around every round so it reads at any distance and glows at night
@@ -956,6 +957,16 @@ function frame(nowMs: number): void {
     fx.update(dt);
     ragdolls.update(dt);
     pickups.update(w, nowSec);
+    {
+      const tags: { px: number; py: number; text: string; color: string }[] = [];
+      const names = ui.powerupNames;
+      for (const dr of pickups.drops) {
+        _p.set(dr.x, 1.35, dr.z).project(stage.camera);
+        if (Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
+        tags.push({ px: ((_p.x + 1) / 2) * app.clientWidth, py: ((1 - _p.y) / 2) * app.clientHeight, text: dr.kind === 3 ? ui.weaponName(WEAPON_IDS[dr.data] ?? '') : (names[dr.kind] ?? ''), color: TIER_COLORS[dr.tier]! });
+      }
+      ui.setPickupLabels(tags);
+    }
 
     let n = 0;
     strength.length = 0;

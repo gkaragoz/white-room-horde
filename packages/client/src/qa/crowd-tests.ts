@@ -486,6 +486,7 @@ export const crowdTests: QaTest[] = [
       addPlayer(w, 0, 0, 0);
       const view = new PickupView();
       await view.load();
+      await view.loadWeapons();
       ctx.stage.scene.add(view.group);
       const problems: string[] = [];
       try {
@@ -494,7 +495,7 @@ export const crowdTests: QaTest[] = [
         ctx.stage.render();
         const bg = grab(ctx);
         const sizes: number[] = [];
-        for (const kind of [0, 1, 2]) {
+        for (const kind of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
           w.kActive.fill(0);
           w.kActive[0] = 1;
           w.kType[0] = kind;
@@ -507,6 +508,20 @@ export const crowdTests: QaTest[] = [
           sizes.push(px);
           if (px < 50) problems.push(`pickup kind ${kind} barely visible (${px} px)`);
         }
+        // a row with every kind and some weapons, for the eye (the page keeps the picture in window.__lootShot)
+        w.kActive.fill(0);
+        const row: [number, number][] = [[0, 0], [1, 0], [2, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [3, 0], [3, 3], [3, 5], [3, 6], [3, 12]];
+        row.forEach(([kind, data], n) => {
+          w.kActive[n] = 1;
+          w.kType[n] = kind;
+          w.kData[n] = data;
+          w.kX[n] = -13 + n * 2.2;
+          w.kY[n] = 0;
+          w.kLife[n] = 15;
+        });
+        view.update(w, 0.3);
+        ctx.stage.render();
+        (window as unknown as { __lootShot?: string }).__lootShot = ctx.stage.renderer.domElement.toDataURL();
         w.kActive.fill(0);
         view.update(w, 0.3);
         ctx.stage.render();
@@ -515,7 +530,7 @@ export const crowdTests: QaTest[] = [
       } finally {
         ctx.stage.scene.remove(view.group);
       }
-      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'ammo, health and grenade crates visible and removed cleanly' };
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'all nine loot models and the spinning weapons are visible and removed cleanly' };
     },
   },
 ];
