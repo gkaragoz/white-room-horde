@@ -1,5 +1,5 @@
 import { BALANCE, FloorPhase, MISC, type PlayerInput } from '@wrh/shared';
-import { hashWorld, scriptedInput } from '@wrh/sim';
+import { hashWorld, predictPlayer, scriptedInput } from '@wrh/sim';
 import { describe, expect, it } from 'vitest';
 import { NetSession, RoomManager, type Conn, type ManagerOptions } from '../src';
 
@@ -354,6 +354,57 @@ describe('robustness of the room server', () => {
     bad.session.rejoin(net.clients[0]!.session.code, 'NOPE');
     net.advance(500);
     expect(bad.session.error).toBe('cannot rejoin');
+  });
+
+  it('the host who dropped gets the host role back on rejoining', () => {
+    const net = lobby([30, 30, 30], 10);
+    net.clients[0]!.session.start();
+    net.advance(3000);
+    const host = net.clients[0]!;
+    const { token } = host.session;
+    net.manager.close(host.serverConn);
+    net.advance(1000);
+    expect(net.clients[1]!.session.players.find((p) => p.host)?.slot).not.toBe(0); // somebody else carries the role meanwhile
+    const back = net.addClient(30, 10);
+    back.session.rejoin(net.clients[1]!.session.code, token);
+    net.advance(2000);
+    expect(back.session.players.filter((p) => p.host).map((p) => p.slot)).toEqual([0]);
+    expect(net.clients[1]!.session.players.filter((p) => p.host).map((p) => p.slot)).toEqual([0]);
+  });
+
+  it('the pending inputs predict the local character: where the replay says it will be is where the simulation puts it', () => {
+    const net = lobby([70, 70], 10);
+    const me = net.clients[1]!;
+    me.useDrive = true;
+    net.clients[0]!.useDrive = true;
+    net.clients[0]!.session.start();
+    net.advance(1500);
+    const asked = new Map<number, { x: number; y: number; lead: number }>();
+    let checked = 0;
+    let exact = 0;
+    let maxLead = 0;
+    for (let ms = 0; ms < 6000; ms++) {
+      net.advance(1);
+      const w = me.session.world;
+      if (!w || me.session.catchingUp) continue;
+      const slot = me.session.slot;
+      const done = asked.get(w.tick);
+      if (done && w.pState[slot] === 0) {
+        checked++;
+        if (Math.abs(done.x - w.pX[slot]!) < 1e-9 && Math.abs(done.y - w.pY[slot]!) < 1e-9) exact++;
+        asked.delete(w.tick);
+      }
+      const list = me.session.pendingInputs();
+      if (list.length) {
+        const p = predictPlayer(w, slot, list);
+        const at = w.tick + list.length;
+        asked.set(at, { x: p.x, y: p.y, lead: list.length });
+        maxLead = Math.max(maxLead, list.length);
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
+    expect(maxLead).toBeGreaterThanOrEqual(3); // there is a delay to hide
+    expect(exact / checked).toBeGreaterThan(0.9);
   });
 
   it('a late joiner into a long game gets a snapshot instead of the whole history, and converges', () => {

@@ -92,6 +92,12 @@ export class NetDiag {
     if (this.stalls.length > 60) this.stalls.shift();
   }
 
+  /** A network event worth keeping in the report (socket opened/closed, reconnect, host change). */
+  event(text: string): void {
+    this.errors.push(`${(performance.now() / 1000).toFixed(1)}s net: ${text}`.slice(0, 600));
+    if (this.errors.length > 80) this.errors.shift();
+  }
+
   /** The local input went out. */
   input(): void {
     this.inputs++;

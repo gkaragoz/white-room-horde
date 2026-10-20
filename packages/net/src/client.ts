@@ -30,6 +30,7 @@ export class NetSession {
   /** Slots reported as diverged by the server (desync detection). */
   desyncTicks: number[] = [];
   rttMs = 60;
+  private rttSamples = 0;
   /** Last confirmed tick applied to the world. */
   applied = -1;
   /** Highest tick whose bundle has arrived. */
@@ -127,6 +128,7 @@ export class NetSession {
     const m = JSON.parse(data) as ServerMsg;
     switch (m.t) {
       case 'room':
+        this.ping(); // measure the line while still in the lobby
         this.code = m.code;
         this.slot = m.slot;
         this.players = m.players;
@@ -159,7 +161,12 @@ export class NetSession {
         this.paused = m.on === true;
         break;
       case 'pong':
-        this.rttMs = this.rttMs * 0.8 + (this.clock() - m.ts) * 0.2;
+        {
+          // the first answers set the estimate outright: the input lead depends on it from the very first tick
+          const sample = this.clock() - m.ts;
+          this.rttMs = this.rttSamples === 0 ? sample : this.rttMs * (this.rttSamples < 4 ? 0.6 : 0.8) + sample * (this.rttSamples < 4 ? 0.4 : 0.2);
+          this.rttSamples++;
+        }
         break;
       case 'error':
         this.error = m.message;
@@ -175,7 +182,34 @@ export class NetSession {
 
   sendInput(input: PlayerInput): void {
     if (this.state !== 'playing') return;
-    this.transport.send(encodeInputMsg(this.inputTick(), input));
+    const tick = this.inputTick();
+    this.transport.send(encodeInputMsg(tick, input));
+    this.sent.set(tick, input);
+    this.maxSent = Math.max(this.maxSent, tick);
+    if (this.sent.size > 64) for (const t of this.sent.keys()) if (t < this.applied) this.sent.delete(t);
+  }
+
+  private readonly sent = new Map<number, PlayerInput>();
+  private maxSent = -1;
+  private readonly pendingList: PlayerInput[] = [];
+
+  /**
+   * The local inputs the confirmed world has not consumed yet, one per upcoming tick (a tick without its own input repeats
+   * the one before, as the server does). The client replays them on top of the confirmed state to show its own character
+   * without the network delay.
+   */
+  pendingInputs(): readonly PlayerInput[] {
+    const list = this.pendingList;
+    list.length = 0;
+    const from = this.applied + 1;
+    if (this.maxSent < from) return list;
+    let carry: PlayerInput | undefined;
+    for (let t = from; t <= this.maxSent && !carry; t++) carry = this.sent.get(t); // the window may start before our first tag
+    for (let t = from; t <= this.maxSent; t++) {
+      carry = this.sent.get(t) ?? carry;
+      if (carry) list.push(carry);
+    }
+    return list;
   }
 
   private applySnapshot(buf: Uint8Array): void {
@@ -206,7 +240,7 @@ export class NetSession {
   private ping(): void {
     const now = this.clock();
     if (now >= this.nextPing) {
-      this.nextPing = now + 2000;
+      this.nextPing = now + (this.rttSamples < 5 ? 400 : 2000);
       this.sendJson({ t: 'ping', ts: now, rtt: Math.round(this.rttMs) });
     }
   }

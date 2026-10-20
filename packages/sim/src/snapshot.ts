@@ -4,7 +4,7 @@ import type { World } from './state';
 /** Every typed array that is part of the simulated state, in a fixed order (flow field included: it is cached across ticks). */
 function arrays(w: World): ArrayBufferView[] {
   return [
-    w.pXp, w.pLevel, w.pPending, w.pOffer, w.pCardTimer, w.pCards,
+    w.pXp, w.pLevel, w.pPending, w.pOffer, w.pCardTimer, w.pCardLock, w.pCardPrev, w.pCards,
     w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modRevive, w.modMagnet, w.modXp, w.modBlast, w.modReload, w.modDash, w.modArmor, w.modCrit,
     w.pActive, w.pX, w.pY, w.pAngle, w.pHp, w.pMaxHp, w.pState, w.pTimer, w.pRevive, w.pCooldown, w.pIFrames, w.pWeapon, w.pAmmo, w.pOwned, w.pInvMag, w.pInvAmmo, w.pMoving, w.pMag, w.pReload, w.pDash, w.pDashCd, w.pDashX, w.pDashY, w.pModDmg, w.pModSpeed, w.pModRate, w.pModPierce, w.pModArmor, w.pLifesteal, w.pPerk, w.pGren, w.pGrenCharge, w.pGrenCd,
     w.eActive, w.eType, w.eBoss, w.eAux, w.eState, w.eStateTick, w.eX, w.eY, w.eAngle, w.eHp, w.eCooldown, w.eMod,

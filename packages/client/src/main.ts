@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { BALANCE, Buttons, CAMERA, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { createGame, decodeReplay, encodeReplay, hashWorld, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
+import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { createGame, decodeReplay, encodeReplay, hashWorld, predictPlayer, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
 import { Input, type Action } from './input';
@@ -355,6 +355,7 @@ let catchingUp = false;
 let catchupPeak = 0;
 let joinedLate = false;
 let reconnecting = false;
+let predSmX = 0, predSmY = 0, predReady = false;
 
 function beforeStep(w: World): void {
   for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -691,6 +692,7 @@ function normalizeServer(raw: string): string {
 }
 
 let reconnectTries = 0;
+let watchdogFired = false;
 
 /**
  * Open an online session: host (code null), join with a code, or rejoin a slot with its token. When the socket drops in
@@ -715,7 +717,9 @@ function connect(name: string, rawServer: string, code: string | null, password 
   ws = sock;
   const sess = new NetSession({ send: (d) => sock.readyState === WebSocket.OPEN && sock.send(d) });
   session = sess;
+  watchdogFired = false;
   sock.onopen = () => {
+    diag.event(`socket open${rejoinToken ? ' (rejoin)' : ''}`);
     reconnectTries = 0;
     if (code) joinedLate = true;
     if (rejoinToken && code) sess.rejoin(code, rejoinToken);
@@ -726,7 +730,8 @@ function connect(name: string, rawServer: string, code: string | null, password 
     sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
     if (sess.token && sess.code) saveRejoin({ server, code: sess.code, token: sess.token });
   };
-  sock.onclose = () => {
+  sock.onclose = (ev) => {
+    diag.event(`socket closed code ${ev?.code ?? '?'}${ev?.reason ? ` ${ev.reason}` : ''}`);
     if (over || session !== sess) return;
     if (world && sess.token && reconnectTries < 6) {
       reconnectTries++;
@@ -923,6 +928,17 @@ function frame(nowMs: number): void {
       ui.showMenu(session.error);
       session.error = '';
       mode = 'menu';
+    } else if (session.error && world && reconnecting) {
+      // the room does not take us back (gone, or the slot was released): leave instead of freezing under the overlay
+      diag.event(`rejoin refused: ${session.error}`);
+      clearRejoin();
+      mode = 'menu';
+      session = null;
+      world = null;
+      reconnecting = false;
+      ui.setLoading(null);
+      ui.clearHud();
+      ui.showMenu(ui.tr('connLost'));
     }
   }
 
@@ -991,13 +1007,41 @@ function frame(nowMs: number): void {
       vx[s] = prevX[s]! + (curX[s]! - prevX[s]!) * alpha;
       vy[s] = prevY[s]! + (curY[s]! - prevY[s]!) * alpha;
     }
+    // client-side prediction: online, the local character is drawn where its own pending inputs take it, not where the
+    // confirmed simulation (some tens of milliseconds behind) has it
+    let predictedAngle: number | null = null;
+    let predictedSpeed = -1;
+    if (mode === 'online' && session && session.state === 'playing' && !session.catchingUp && w.pActive[localSlot] && w.pState[localSlot] !== PlayerState.Dead && w.misc[MISC.Phase] !== FloorPhase.Ascend) {
+      const list = session.pendingInputs();
+      if (list.length) {
+        const p = predictPlayer(w, localSlot, list);
+        const tx = p.prevX + (p.x - p.prevX) * alpha;
+        const ty = p.prevY + (p.y - p.prevY) * alpha;
+        const jump = Math.hypot(tx - predSmX, ty - predSmY);
+        if (!predReady || jump > 3) {
+          predSmX = tx;
+          predSmY = ty;
+          predReady = true;
+        } else {
+          // a misprediction (a shove, a late input) is eased out instead of popping
+          const k = 1 - Math.exp(-dt * 70);
+          predSmX += (tx - predSmX) * k;
+          predSmY += (ty - predSmY) * k;
+        }
+        vx[localSlot] = predSmX;
+        vy[localSlot] = predSmY;
+        predictedAngle = p.angle;
+        predictedSpeed = Math.hypot(p.x - p.prevX, p.y - p.prevY) / TICK_DT;
+        if (predictedSpeed > 0.5) moveAngle[localSlot] = Math.atan2(p.y - p.prevY, p.x - p.prevX);
+      } else predReady = false;
+    } else predReady = false;
     const lifted = climb.update(w, alpha, nowSec, dt, vx, vy);
     // the local character turns the instant the aim does (no wait for the simulation or the network)
     let localFacing: number | null = null;
     if (settings.autoAim && w.pActive[localSlot] && w.pState[localSlot] === PlayerState.Alive) {
       const locked = lockOn();
       localFacing = input.stickAiming ? input.lastShot : locked ?? input.lastShot;
-    }
+    } else if (predictedAngle !== null && w.pState[localSlot] === PlayerState.Alive) localFacing = predictedAngle;
     // sounds that follow the climb: the thrusters when the lift begins, a tick for every countdown second
     if (lifted.active && climb.lift01 > 0 && !liftSounded) {
       liftSounded = true;
@@ -1023,7 +1067,7 @@ function frame(nowMs: number): void {
       c.root.scale.setScalar(PowerView.bodyScale(w, s) * (cls === 2 ? 1.18 : cls === 3 ? 0.92 : 1));
       power.slot(w, s, x, y, nowSec, dt, s === localSlot, lifted.lift);
       if (w.pState[s] === PlayerState.Alive && nowSec - lastDust[s]! > 0.1) {
-        const sp = Math.hypot(curX[s]! - prevX[s]!, curY[s]! - prevY[s]!) / TICK_DT;
+        const sp = s === localSlot && predictedSpeed >= 0 ? predictedSpeed : Math.hypot(curX[s]! - prevX[s]!, curY[s]! - prevY[s]!) / TICK_DT;
         if (sp > 7) {
           lastDust[s] = nowSec;
           fx.dust(x, y);
@@ -1053,8 +1097,8 @@ function frame(nowMs: number): void {
     ui.setCombo(settings.announcer && nowSec - comboAt < 2.2 ? comboCount : 0, '');
     {
       const me = localSlot;
-      const lx = prevX[me]! + (curX[me]! - prevX[me]!) * alpha;
-      const ly = prevY[me]! + (curY[me]! - prevY[me]!) * alpha;
+      const lx = vx[me]!;
+      const ly = vy[me]!;
       const a = localFacing !== null ? localFacing : lerpAngle(prevA[me]!, curA[me]!, alpha);
       stage.setFlashlight(lx, -ly, Math.cos(a), -Math.sin(a), w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive);
       // ammo ring around the feet: green full, red empty, rounds left beside it
@@ -1124,7 +1168,7 @@ function frame(nowMs: number): void {
         ui.setArrow(s, '', '#000', 0, 0, 0, false);
         continue;
       }
-      _p.set(prevX[s]! + (curX[s]! - prevX[s]!) * alpha, 1.0, -(prevY[s]! + (curY[s]! - prevY[s]!) * alpha)).project(stage.camera);
+      _p.set(vx[s]!, 1.0, -vy[s]!).project(stage.camera);
       const out = Math.abs(_p.x) > 0.96 || Math.abs(_p.y) > 0.94;
       if (!out) {
         ui.setArrow(s, '', '#000', 0, 0, 0, false);
@@ -1236,7 +1280,23 @@ function frame(nowMs: number): void {
     const tickNow = world?.tick ?? 0;
     diag.frame(nowMs, Math.max(0, tickNow - diagLastTick));
     diagLastTick = tickNow;
-    if (mode === 'online' && session && session.state === 'playing' && !session.paused) diag.bundleGap(session.sinceBundleMs, nowMs);
+    if (mode === 'online' && session && session.state === 'playing' && !session.paused) {
+      diag.bundleGap(session.sinceBundleMs, nowMs);
+      // a socket that went silent without ever closing (half-open) is cut and re-established like a dropped one
+      if (session.sinceBundleMs > 4000 && !watchdogFired && ws) {
+        watchdogFired = true;
+        diag.event(`watchdog: no server tick for ${Math.round(session.sinceBundleMs)} ms, reconnecting`);
+        const dead = ws;
+        const handler = dead.onclose;
+        dead.onclose = null;
+        try {
+          dead.close();
+        } catch {
+          /* already gone */
+        }
+        handler?.call(dead, new CloseEvent('close', { code: 4000, reason: 'watchdog' }));
+      }
+    }
     if (nowMs - diagLastSample >= 1000) {
       diagLastSample = nowMs;
       diag.sample(nowMs, { rtt: session?.rttMs ?? 0, jitter: session?.jitterMs ?? 0, backlog: session?.backlog ?? 0, playout: session?.playoutTicks ?? 0, bufferedBytes: ws?.bufferedAmount ?? 0 });

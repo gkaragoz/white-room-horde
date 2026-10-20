@@ -469,6 +469,8 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
 /** Apply bullet damage; returns true when the enemy died. */
 export function damageEnemy(w: World, i: number, rawDamage: number, dx: number, dy: number): boolean {
   const damage = w.eMod[i] ? rawDamage * enemyDamageMul(w, i) : rawDamage;
+  // the damage meter counts what was really taken off (no credit for overkill)
+  if (killer >= 0) addPerk(w, killer, PERK.Damage, Math.min(damage, Math.max(0, w.eHp[i]!)));
   w.eHp[i] = w.eHp[i]! - damage;
   if (w.eHp[i]! <= 0) {
     killEnemy(w, i, dx, dy, damage);

@@ -11,7 +11,8 @@ export type Sfx =
   | 'shot' | 'midShot' | 'bigShot' | 'cannonShot' | 'heavyShot' | 'throw' | 'hit' | 'death' | 'boom' | 'hurt' | 'down' | 'revive'
   | 'level' | 'pick' | 'wave' | 'boss' | 'over' | 'zGroan' | 'zAttack' | 'zHit' | 'zDeath' | 'zScream' | 'step' | 'pickup' | 'pickupDrop' | 'spit'
   | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart'
-  | 'floorCleared' | 'countTick' | 'countGo' | 'floorCharge' | 'floorLift' | 'floorArrive' | 'floorStart';
+  | 'floorCleared' | 'countTick' | 'countGo' | 'floorCharge' | 'floorLift' | 'floorArrive' | 'floorStart'
+  | 'cardOffer' | 'iceFreeze' | 'iceThaw' | 'nuke' | 'secondWind' | 'weaponGet' | 'dead' | 'floorEnter' | 'slowIn' | 'slowOut' | 'impactWall' | 'barrelHit';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
 const GUN_GAP = 0.02;
@@ -22,6 +23,7 @@ const GAP: Record<Sfx, number> = {
   level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1, zGroan: 0.25, zAttack: 0.12, zHit: 0.05, zDeath: 0.06, zScream: 0.4, step: 0.12, pickup: 0.06, pickupDrop: 0.15, spit: 0.15,
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
   floorCleared: 0.5, countTick: 0.2, countGo: 0.2, floorCharge: 0.5, floorLift: 1, floorArrive: 0.5, floorStart: 0.5,
+  cardOffer: 0.3, iceFreeze: 0.5, iceThaw: 0.3, nuke: 2, secondWind: 1, weaponGet: 0.2, dead: 0.5, floorEnter: 1, slowIn: 1, slowOut: 1, impactWall: 0.05, barrelHit: 0.1,
 };
 
 type Entry = { files: string[]; gain: number; rate: [number, number] };
@@ -97,10 +99,22 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   uiError: { files: ['ui_error_001'], gain: 0.5, rate: [1, 1] },
   uiOpen: { files: ['ui_maximize_001'], gain: 0.5, rate: [1, 1] },
   uiClose: { files: ['ui_close_001'], gain: 0.5, rate: [1, 1] },
+  cardOffer: { files: ['card_offer'], gain: 0.5, rate: [1, 1] },
+  iceFreeze: { files: ['ice_freeze'], gain: 0.7, rate: [1, 1] },
+  iceThaw: { files: ['ice_thaw'], gain: 0.6, rate: [0.95, 1.05] },
+  nuke: { files: ['nuke_boom'], gain: 1, rate: [1, 1] },
+  secondWind: { files: ['second_wind'], gain: 0.8, rate: [1, 1] },
+  weaponGet: { files: ['weapon_get'], gain: 0.6, rate: [0.97, 1.03] },
+  dead: { files: ['player_dead'], gain: 0.8, rate: [1, 1] },
+  floorEnter: { files: ['floor_enter'], gain: 0.4, rate: [1, 1] },
+  slowIn: { files: ['slowmo_in'], gain: 0.8, rate: [1, 1] },
+  slowOut: { files: ['slowmo_out'], gain: 0.7, rate: [1, 1] },
+  impactWall: { files: n3('impactMetal_light'), gain: 0.22, rate: [1.3, 1.7] },
+  barrelHit: { files: n3('impactMetal_heavy'), gain: 0.5, rate: [0.9, 1.1] },
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
-const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit']);
+const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit']);
 
 const VOICE_SFX = new Set<Sfx>(['zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
 
@@ -611,7 +625,7 @@ export class Audio {
         this.play('pickup', e.slot === localSlot ? undefined : e);
         break;
       case 'levelUp':
-        this.play('level');
+        if (e.slot === localSlot) this.play('level');
         break;
       case 'cardPicked':
         this.play('pick');
@@ -632,6 +646,34 @@ export class Audio {
           this.play('zScream');
           this.duckMusic(0.45, 4);
         }
+        break;
+      case 'cardOffer':
+        if (e.slot === localSlot) this.play('cardOffer');
+        break;
+      case 'freeze':
+        this.play('iceFreeze');
+        break;
+      case 'nuke':
+        this.play('nuke');
+        this.duckMusic(0.35, 3.5);
+        break;
+      case 'secondWind':
+        this.play('secondWind');
+        break;
+      case 'barrelHit':
+        this.play('barrelHit', e);
+        break;
+      case 'weaponGet':
+        if (e.slot === localSlot) this.play('weaponGet');
+        break;
+      case 'playerDead':
+        this.play('dead');
+        break;
+      case 'floorEnter':
+        this.play('floorEnter');
+        break;
+      case 'bulletGone':
+        if (e.reason === 1) this.play('impactWall', e);
         break;
       case 'gameOver':
         this.play('over');

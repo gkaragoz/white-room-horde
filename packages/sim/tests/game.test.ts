@@ -55,7 +55,7 @@ describe('cards', () => {
     const id = CARD_IDS[offered]!;
     if (id === 'damage') expect(w.modDamage[0]).toBeGreaterThan(1);
     awardXp(w, 0, xpForNext(w, 0));
-    for (let t = 0; t < BALANCE.progression.cardSeconds * 30 + 2; t++) step(w, [NONE]);
+    for (let t = 0; t < BALANCE.progression.cardSeconds * 30 + 20; t++) step(w, [NONE]);
     expect(w.pOffer[0]).toBe(-1);
   });
 });

@@ -21,6 +21,7 @@ function pick(w: World, id: CardId, by = 0): void {
   w.pOffer[by * 3 + 1] = CARD_IDS.indexOf('damage');
   w.pOffer[by * 3 + 2] = CARD_IDS.indexOf('rate');
   w.pCardTimer[by] = 100;
+  w.pCardPrev[by] = 0; // a fresh press
   const inputs: PlayerInput[] = [];
   for (let s = 0; s < 4; s++) inputs[s] = s === by ? { ...NONE, buttons: CARD_BUTTON[0]! } : NONE;
   step(w, inputs);
@@ -212,8 +213,13 @@ describe('every character levels on its own', () => {
     expect(w.pPending[0]!).toBeGreaterThanOrEqual(1);
     const levels = w.pLevel[0]!;
     step(w, [{ ...NONE, buttons: Buttons.Card1 }]);
+    expect(offerOf(w, 0).every((x) => x < 0)).toBe(true); // picked; the next one waits out the pick lock
+    for (let t = 0; t < 4; t++) step(w, [{ ...NONE, buttons: Buttons.Card1 }]); // a key still held does not pick for the next offer
+    expect(offerOf(w, 0).every((x) => x < 0)).toBe(true);
+    for (let t = 0; t < 12; t++) step(w, [NONE]);
     expect(offerOf(w, 0).every((x) => x >= 0)).toBe(true); // the next one opened
     expect(w.pLevel[0]).toBe(levels);
+    expect(w.pCardTimer[0]).toBeGreaterThan(BALANCE.progression.cardSeconds * 30 - 15); // its clock only started when it opened
   });
 
   it('digits choose cards while the character has an offer, and pick weapons otherwise', () => {

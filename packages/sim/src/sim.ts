@@ -11,6 +11,7 @@ import {
   MAX_PLAYERS,
   PlayerState,
   TICK_DT,
+  TICK_RATE,
   WEAPON_IDS,
   type PlayerInput,
   type WeaponId,
@@ -75,6 +76,8 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pLevel[slot] = 1;
   w.pPending[slot] = 0;
   w.pCardTimer[slot] = 0;
+  w.pCardLock[slot] = 0;
+  w.pCardPrev[slot] = 0;
   for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = -1;
   w.pCards.fill(0, slot * CARD_IDS.length, (slot + 1) * CARD_IDS.length);
   w.modDamage[slot] = w.modRate[slot] = w.modSpeed[slot] = w.modRevive[slot] = w.modMagnet[slot] = w.modXp[slot] = 1;
@@ -193,6 +196,100 @@ function movePlayer(w: World, s: number, inp: PlayerInput, speed: number, canDas
   }
   w.pAngle[s] = angle;
   return angle;
+}
+
+/** Where a player will be after the given (not yet simulated) inputs: the client's prediction of its own character. */
+export interface Predicted {
+  x: number;
+  y: number;
+  /** The position one input earlier, for drawing between two predicted ticks. */
+  prevX: number;
+  prevY: number;
+  angle: number;
+  moving: boolean;
+}
+
+const predicted: Predicted = { x: 0, y: 0, prevX: 0, prevY: 0, angle: 0, moving: false };
+
+/**
+ * Replays `inputs` (one per upcoming tick) for the local character on top of the confirmed state, with exactly the movement
+ * rules of `movePlayer` (steering, dash, arena edge, cover) but without touching the world. Enemies and other players do
+ * not push a player around, so for a character that is up and not being shoved this equals what the simulation will do.
+ * The returned object is reused between calls.
+ */
+export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerInput>): Predicted {
+  useMap(w.map);
+  let x = w.pX[s]!;
+  let y = w.pY[s]!;
+  let dash = w.pDash[s]!;
+  let dashCd = w.pDashCd[s]!;
+  let dashX = w.pDashX[s]!;
+  let dashY = w.pDashY[s]!;
+  let angle = w.pAngle[s]!;
+  let moving = w.pMoving[s]! === 1;
+  const alive = w.pState[s] === PlayerState.Alive;
+  const downed = w.pState[s] === PlayerState.Downed;
+  const dc = BALANCE.dash;
+  const r = BALANCE.player.radius;
+  const base = alive ? BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]! * speedMul(w, s) : BALANCE.player.crawlSpeed;
+  const dashFull = (dc.cooldown * w.modDash[s]!) / perk(w, s, PERK.DashRate);
+  const busyNear = alive && downedNear(w, s);
+  let prevX = x;
+  let prevY = y;
+  // while the squad is lifted to the next floor the simulation ignores steering and buttons
+  const phase = w.misc[MISC.Phase]!;
+  const phaseEnd = w.misc[MISC.PhaseEnd]!;
+  const ascendTicks = Math.round(BALANCE.floors.ascendSeconds * TICK_RATE);
+  let t = w.tick;
+  for (const inpIn of inputs) {
+    const locked = (phase === FloorPhase.Ascend && t <= phaseEnd) || (phase === FloorPhase.Cleared && t > phaseEnd && t <= phaseEnd + ascendTicks);
+    t++;
+    const inp = locked ? { moveX: 0, moveY: 0, aim: inpIn.aim, buttons: 0 } : inpIn;
+    prevX = x;
+    prevY = y;
+    let mx = inp.moveX / 127;
+    let my = inp.moveY / 127;
+    const len = sqrt(mx * mx + my * my);
+    if (len > 1) {
+      mx /= len;
+      my /= len;
+    }
+    angle = inp.aim * AIM_TO_RAD;
+    const busy = busyNear && (inp.buttons & Buttons.Revive) !== 0;
+    const canDash = alive && !busy;
+    if (canDash) {
+      if (dashCd > 0) dashCd -= TICK_DT;
+      if ((inp.buttons & Buttons.Dash) !== 0 && dashCd <= 0 && dash === 0) {
+        const l = len > 0.2 ? len : 1;
+        dashX = len > 0.2 ? mx / l : cos(angle);
+        dashY = len > 0.2 ? my / l : sin(angle);
+        dash = Math.ceil(dc.seconds * 30);
+        dashCd = dashFull;
+      }
+    }
+    if (dash > 0) {
+      mx = dashX * dc.speedMul;
+      my = dashY * dc.speedMul;
+      dash--;
+      moving = true;
+    } else {
+      moving = len > 0.05;
+    }
+    const speed = downed ? BALANCE.player.crawlSpeed : base * (busy ? BALANCE.player.reviveMoveMul : 1);
+    x = clamp(x + mx * speed * TICK_DT, -ARENA_HALF_W + r, ARENA_HALF_W - r);
+    y = clamp(y + my * speed * TICK_DT, -ARENA_HALF_H + r, ARENA_HALF_H - r);
+    if (pushOut(x, y, r)) {
+      x = out.x;
+      y = out.y;
+    }
+  }
+  predicted.x = x;
+  predicted.y = y;
+  predicted.prevX = prevX;
+  predicted.prevY = prevY;
+  predicted.angle = angle;
+  predicted.moving = moving;
+  return predicted;
 }
 
 function startReload(w: World, s: number, stats: { reload: number }): void {
@@ -403,7 +500,7 @@ export function hashWorld(w: World): number {
   for (const v of w.rng.getState()) c.u32(v);
   c.u32(w.difficulty).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver);
   c.typed(new Float64Array([w.modLoot]));
-  c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer).typed(w.pCards);
+  c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer).typed(w.pCardLock).typed(w.pCardPrev).typed(w.pCards);
   c.typed(w.modDamage).typed(w.modRate).typed(w.modSpeed).typed(w.modPierce).typed(w.modRevive).typed(w.modMagnet).typed(w.modXp).typed(w.modBlast).typed(w.modReload).typed(w.modDash).typed(w.modArmor).typed(w.modCrit);
   c.typed(w.pModRate).typed(w.pModPierce).typed(w.pModArmor).typed(w.pLifesteal);
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);

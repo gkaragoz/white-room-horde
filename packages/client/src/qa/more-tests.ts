@@ -417,6 +417,44 @@ export const moreTests: QaTest[] = [
     },
   },
   {
+    id: 'cards.queue',
+    title: 'Several levels at once open their card offers one after the other, a held key never skips one, queued clocks wait',
+    async run() {
+      const problems: string[] = [];
+      const w = createWorld(7);
+      w.waveTick = 1e9;
+      w.countMul = 0;
+      addPlayer(w, 0, 0, 0);
+      // three levels reached in one go
+      w.pLevel[0] = 4;
+      w.pPending[0] = 3;
+      if (w.pPending[0]! < 1) problems.push(`expected queued levels, pending ${w.pPending[0]}`);
+      const open = (): boolean => w.pOffer[0]! >= 0;
+      const idle = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
+      const picks: number[] = [];
+      let timerWhileQueued = 0;
+      for (let round = 0; round < 6 && (open() || w.pPending[0]! > 0); round++) {
+        if (!open()) for (let t = 0; t < 30 && !open(); t++) step(w, [idle]);
+        if (!open()) {
+          problems.push('queued offer never opened');
+          break;
+        }
+        if (round > 0 && w.pCardTimer[0]! < 295) problems.push(`offer ${round} opened with a running clock (${w.pCardTimer[0]})`);
+        step(w, [{ ...idle, buttons: Buttons.Card1 }]);
+        picks.push(w.pLevel[0]!);
+        // the same key kept down for 10 ticks must not pick the next offer
+        for (let t = 0; t < 10; t++) {
+          step(w, [{ ...idle, buttons: Buttons.Card1 }]);
+          if (open()) timerWhileQueued++;
+        }
+        step(w, [idle]);
+      }
+      if (timerWhileQueued > 0) problems.push(`next offer opened while the key was still held (${timerWhileQueued} ticks)`);
+      if (w.pPending[0] !== 0 || open()) problems.push(`not all offers were taken one by one (pending ${w.pPending[0]})`);
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : `${picks.length} offers taken one by one` };
+    },
+  },
+  {
     id: 'menu.preview',
     title: 'The menu shows a 3D preview: arrows change accessory and weapon, swatches the colour, and the choices reach the handlers',
     async run() {
@@ -1066,6 +1104,50 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'icons, counts, hover text at the pointer' };
+    },
+  },
+  {
+    id: 'ui.squadstats',
+    title: 'Squad cards show each character DPS and kills; hovering one opens its class, level, kills and damage',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:0;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+      }, settings);
+      const w = createWorld(3);
+      addPlayer(w, 0, 0, 0, 'pistol', 1);
+      addPlayer(w, 1, 2, 0, 'pistol', 2);
+      try {
+        ui.update(w, 0, 0, 1000, ['Ann', 'Bob']);
+        // slot 0 deals 100 damage per second for a while, slot 1 nothing
+        for (let k = 1; k <= 20; k++) {
+          w.pPerk[0 * 24 + 21] = k * 25;
+          w.pPerk[0 * 24 + 17] = Math.floor(k / 4);
+          ui.update(w, 0, 0, 1000 + k * 250, ['Ann', 'Bob']);
+        }
+        const cards = [...host.querySelectorAll<HTMLElement>('.wrh-pc')];
+        if (cards.length !== 2) problems.push(`${cards.length} cards`);
+        const dps = cards.map((c) => Number(c.querySelector('.stats b')?.textContent));
+        if (!(dps[0]! > 80 && dps[0]! < 120)) problems.push(`DPS of the shooter is ${dps[0]}, expected about 100`);
+        if (dps[1] !== 0) problems.push(`DPS of the idle character is ${dps[1]}`);
+        if (!/5/.test(cards[0]!.querySelectorAll('.stats b')[1]?.textContent ?? '')) problems.push('kills missing');
+        cards[0]!.querySelector('.top')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: 120, clientY: 600 }));
+        const tip = host.querySelector<HTMLElement>('.wrh-tip');
+        if (!tip || tip.style.display !== 'block') problems.push('no text opens on hover');
+        else if (!/Medic/.test(tip.textContent ?? '') || !/Kills: 5/.test(tip.textContent ?? '') || !/Damage dealt: 500/.test(tip.textContent ?? '')) problems.push(`hover text lacks class, kills or damage (${tip.textContent})`);
+        cards[0]!.querySelector('.top')!.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+        if (tip && tip.style.display !== 'none') problems.push('the text stays after the pointer left');
+      } finally {
+        ui.clearHud();
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'dps, kills and the hover text' };
     },
   },
 ];

@@ -217,6 +217,11 @@ const BASE_STRINGS = {
     secondWind: 'Second wind!',
     mvp: 'MVP',
     squadKills: 'Kills',
+    dpsLabel: 'DPS',
+    dmgTotal: 'Damage dealt',
+    killsTip: 'Kills',
+    xpTip: 'Experience',
+    avgDps: 'Average DPS',
     weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper', revolver: 'Revolver', mp: 'Machine pistol', dbl: 'Double barrel', dmr: 'Marksman rifle', flamer: 'Flamethrower', gl: 'Grenade launcher' },
   },
   tr: {
@@ -407,6 +412,11 @@ const BASE_STRINGS = {
     secondWind: 'İkinci nefes!',
     mvp: 'MVP',
     squadKills: 'Öldürme',
+    dpsLabel: 'DPS',
+    dmgTotal: 'Verilen hasar',
+    killsTip: 'Öldürme',
+    xpTip: 'Deneyim',
+    avgDps: 'Ortalama DPS',
     weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı', revolver: 'Revolver', mp: 'Makineli tabanca', dbl: 'Çift namlulu', dmr: 'Nişancı tüfeği', flamer: 'Alev makinesi', gl: 'Bombaatar' },
   },
 } as const;
@@ -548,6 +558,10 @@ const CSS = `
 .wrh-pc .bar s{position:absolute;left:0;top:0;height:35%;border-radius:inherit;background:linear-gradient(180deg,#bfe4ff,#5aa6ff);box-shadow:0 0 0 .5px rgba(20,60,120,.5);transition:width .18s}
 .wrh-pc.low .bar i{animation:wrh-lowhp .7s ease-in-out infinite alternate}
 @keyframes wrh-lowhp{to{filter:brightness(1.35)}}
+.wrh-squad{pointer-events:auto}
+.wrh-pc .stats{display:flex;gap:10px;margin-top:4px;font-size:.88em;font-weight:700;opacity:.85}
+.wrh-pc .stats b{font-variant-numeric:tabular-nums}
+.wrh-pc .top,.wrh-pc .stats,.wrh-pc .chip{cursor:help}
 .wrh-pc .chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
 .wrh-pc .chip{display:inline-flex;align-items:center;gap:3px;padding:1px 6px 1px 2px;border-radius:9px;background:rgba(43,58,82,.1);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent);font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;line-height:15px}
 .wrh-pc .chip i{display:inline-block;min-width:15px;height:15px;border-radius:50%;background:var(--c);color:#12202f;font-style:normal;text-align:center;font-size:10px;line-height:15px;text-shadow:0 0 1px rgba(255,255,255,.5)}
@@ -561,6 +575,10 @@ const CSS = `
 .wrh-cards{position:absolute;left:50%;bottom:84px;transform:translateX(-50%);text-align:center;pointer-events:none;width:max-content;max-width:98vw;white-space:nowrap}
 @media (max-width:640px){.wrh-card{width:29vw!important;margin:0 3px!important}.wrh-card .art{height:70px!important}.wrh-card span{font-size:10px!important}}
 .wrh-cards h3{margin:0 0 8px;text-shadow:0 1px 0 #fff}
+.wrh-more{display:inline-block;margin-left:6px;padding:0 8px;border-radius:10px;background:#ffd54a;color:#3a2a00;font-size:.8em;vertical-align:middle}
+.wrh-cards .wrh-card{animation:wrh-cardin .28s cubic-bezier(.2,1.4,.4,1) both}
+.wrh-cards .wrh-card:nth-child(3){animation-delay:.05s}.wrh-cards .wrh-card:nth-child(4){animation-delay:.1s}
+@keyframes wrh-cardin{from{opacity:0;transform:translateY(24px) scale(.9)}to{opacity:1;transform:none}}
 .wrh-card{white-space:normal;pointer-events:auto;cursor:pointer;display:inline-block;position:relative;width:176px;vertical-align:top;margin:0 6px;padding:8px 10px 10px;background:#fffaf0;border:3px solid #8aa0b6;border-radius:14px;box-shadow:0 6px 18px rgba(60,45,20,.3);text-align:left;transition:transform .12s}
 .wrh-card:hover{transform:translateY(-6px) scale(1.03)}
 .wrh-card .art{height:104px;margin:0 -2px 6px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,#fdf6e6,#dfe6ee)}
@@ -897,6 +915,53 @@ export class Ui {
     parent.appendChild(this.root);
   }
 
+  /** Damage dealt per character over the last seconds, for the live DPS in the squad cards. */
+  private readonly dmgHist: { t: number; v: number }[][] = Array.from({ length: MAX_PLAYERS }, () => []);
+  private lastWorld: World | null = null;
+  private squadTip: { kind: 'pc' | 'chip'; slot: number; k: number } | null = null;
+  private lastNow = 0;
+  private startNow = -1;
+
+  private dpsOf(world: World, s: number, now: number): number {
+    const total = world.pPerk[s * PERKS + PERK.Damage]!;
+    const h = this.dmgHist[s]!;
+    const last = h[h.length - 1];
+    if (!last || now - last.t >= 250 || total < last.v) {
+      if (last && total < last.v) h.length = 0; // a new game in the same page
+      h.push({ t: now, v: total });
+      while (h.length > 2 && now - h[1]!.t > 5000) h.shift();
+    }
+    const first = h[0]!;
+    const span = Math.max(1000, Math.min(5000, now - first.t));
+    return Math.max(0, (total - first.v) / (span / 1000));
+  }
+
+  private squadTipHtml(world: World): string {
+    const tip = this.squadTip;
+    if (!tip || !world.pActive[tip.slot]) return '';
+    const t = this.t;
+    const s = tip.slot;
+    if (tip.kind === 'chip') {
+      const p = POWERS[tip.k];
+      if (!p) return '';
+      const name = (t.powerNames as readonly string[])[tip.k] ?? p.id;
+      return `<b>${esc(name)}</b><span>+${Math.round(p.level(world, s) * 100)}%</span>`;
+    }
+    const cls = world.pPerk[s * PERKS + PERK.Class]!;
+    const className = (t.classNames as readonly string[])[cls] ?? '';
+    const classTip = (t.classTips as readonly string[])[cls] ?? '';
+    const dmg = world.pPerk[s * PERKS + PERK.Damage]!;
+    const kills = world.pPerk[s * PERKS + PERK.Kills]!;
+    const secs = Math.max(1, (this.lastNow - Math.max(0, this.startNow)) / 1000);
+    this.tipEl.style.setProperty('--rc', this.slotColor(s));
+    return (
+      `<b>${esc(this.playerNames[s] ?? 'P' + (s + 1))} &middot; ${esc(className)}</b><span>${esc(classTip)}</span>` +
+      `<span>${t.lvShort} ${world.pLevel[s]} &middot; ${t.xpTip} ${Math.floor(world.pXp[s]!)}/${Math.floor(xpForNext(world, s))}</span>` +
+      `<span>${t.killsTip}: ${Math.round(kills)} &middot; ${t.dmgTotal}: ${Math.round(dmg).toLocaleString()}</span>` +
+      `<span>${t.avgDps}: ${Math.round(dmg / secs)}</span>`
+    );
+  }
+
   private readonly relicEl = document.createElement('div');
   private readonly tipEl = document.createElement('div');
   private lastRelics = '';
@@ -934,7 +999,27 @@ export class Ui {
       this.tipEl.style.left = `${Math.max(6, Math.min(innerWidth - w - 6, e.clientX + 16))}px`;
       this.tipEl.style.top = `${Math.max(6, Math.min(innerHeight - h - 6, e.clientY - h - 14))}px`;
     };
+    // the squad cards: class, level, kills, damage; a chip shows what it is
+    this.hud.addEventListener('mouseover', (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('[data-tip]');
+      if (!el || !this.hud.querySelector('#h-squad')?.contains(el)) return;
+      this.squadTip = el.dataset.tip === 'chip' ? { kind: 'chip', slot: Number(el.dataset.s), k: Number(el.dataset.k) } : { kind: 'pc', slot: Number(el.dataset.s), k: 0 };
+      if (this.lastWorld) this.tipEl.innerHTML = this.squadTipHtml(this.lastWorld);
+      this.tipEl.style.display = 'block';
+      place(e);
+    });
+    this.hud.addEventListener('mousemove', (e) => {
+      if (this.squadTip && this.tipEl.style.display === 'block') place(e);
+    });
+    this.hud.addEventListener('mouseout', (e) => {
+      const to = e.relatedTarget as HTMLElement | null;
+      if (this.squadTip && !(to?.closest?.('[data-tip]') && this.hud.contains(to))) {
+        this.squadTip = null;
+        this.tipEl.style.display = 'none';
+      }
+    });
     this.relicEl.addEventListener('mouseover', (e) => {
+      this.squadTip = null;
       const el = (e.target as HTMLElement).closest<HTMLElement>('.wrh-relic');
       if (!el) return;
       const i = Number(el.dataset.i);
@@ -1996,6 +2081,7 @@ export class Ui {
 
   /** Update the HUD from the world (throttled to ~12 Hz; cheap DOM writes only). */
   update(world: World, slot: number, hurt: number, now: number, names: string[]): void {
+    this.lastWorld = world;
     if (!this.hudBuilt) this.buildHud();
     const hurtEl = this.hud.querySelector<HTMLElement>('#h-hurt')!;
     const myHp = world.pActive[slot] && world.pState[slot] === PlayerState.Alive ? world.pHp[slot]! / world.pMaxHp[slot]! : 1;
@@ -2007,6 +2093,8 @@ export class Ui {
     }
     if (now - this.lastHud < 80) return;
     this.lastHud = now;
+    if (this.startNow < 0 || now < this.startNow) this.startNow = now;
+    this.lastNow = now;
     const t = this.t;
     const set = (id: string, html: string): void => {
       const el = this.hud.querySelector<HTMLElement>('#' + id)!;
@@ -2044,7 +2132,6 @@ export class Ui {
     // squad: one card per player with a smooth health bar (and its number), shield and the upgrades they carry
     let squad = '';
     const glyph: Record<string, string> = { damage: '⚔', rate: '»', pierce: '↠', crit: '✦', blast: '✹', speed: '➤', hp: '♥', armor: '◈', magnet: '⊛', luck: '♣', scholar: '✎', medic: '✚', quick: '↻', roll: '↺', vampire: 'V' };
-    const powerNames = t.powerNames as readonly string[];
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (!world.pActive[s]) continue;
       const st = world.pState[s]!;
@@ -2059,19 +2146,21 @@ export class Ui {
       for (let k = 0; k < POWERS.length; k++) {
         const lv = POWERS[k]!.level(world, s);
         if (lv < 0.005) continue;
-        chips += `<span class="chip" style="--c:${POWERS[k]!.color}" title="${esc(powerNames[k] ?? POWERS[k]!.id)}"><i>${glyph[POWERS[k]!.id] ?? '+'}</i>${Math.round(lv * 100)}%</span>`;
+        chips += `<span class="chip" data-tip="chip" data-s="${s}" data-k="${k}" style="--c:${POWERS[k]!.color}"><i>${glyph[POWERS[k]!.id] ?? '+'}</i>${Math.round(lv * 100)}%</span>`;
       }
       const haste = world.pPerk[s * PERKS + PERK.Haste]!;
       const quad = world.pPerk[s * PERKS + PERK.Quad]!;
       if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>&#9889;</i>${Math.ceil(haste)}s</span>`;
       if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>&#10006;4</i>${Math.ceil(quad)}s</span>`;
       squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${frac < 0.3 && st === PlayerState.Alive ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
-        `<div class="top"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' &#9760;' : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
+        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' &#9760;' : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
         `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
+        `<div class="stats" data-tip="pc" data-s="${s}"><span>${t.dpsLabel} <b>${Math.round(this.dpsOf(world, s, now))}</b></span><span>&#9760; <b>${Math.round(world.pPerk[s * PERKS + PERK.Kills]!)}</b></span></div>` +
         (chips ? `<div class="chips">${chips}</div>` : '') +
         '</div>';
     }
     set('h-squad', squad);
+    if (this.squadTip && this.tipEl.style.display === 'block') this.tipEl.innerHTML = this.squadTipHtml(world);
 
     // local player
     if (world.pActive[slot]) {
@@ -2123,12 +2212,13 @@ export class Ui {
     const cardsEl = this.hud.querySelector<HTMLElement>('#h-cards')!;
     if (world.pOffer[slot * 3]! >= 0 && !world.gameOver && world.pState[slot] === PlayerState.Alive) {
       const offer = [world.pOffer[slot * 3]!, world.pOffer[slot * 3 + 1]!, world.pOffer[slot * 3 + 2]!];
-      const key = offer.join(',') + this.lang;
+      const more = world.pPending[slot]!;
+      const key = offer.join(',') + this.lang + more;
       if (key !== this.lastCards) {
         this.lastCards = key;
         const cards = t.cards as Record<string, readonly [string, string]>;
         cardsEl.innerHTML =
-          `<h3>${t.pick}</h3>` +
+          `<h3>${t.pick}${more > 0 ? ` <span class="wrh-more">+${more}</span>` : ''}</h3>` +
           offer
             .map((c, i) => {
               const id = CARD_IDS[c]!;

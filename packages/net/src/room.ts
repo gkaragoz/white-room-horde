@@ -11,6 +11,8 @@ interface Member {
   slot: number;
   name: string;
   host: boolean;
+  /** Was the host when the connection dropped: gets the role back on returning. */
+  lostHost?: boolean;
   conn: Conn | null;
   weapon: WeaponId;
   acc: number;
@@ -114,6 +116,12 @@ export class Room {
     if (m.conn && m.conn !== conn) m.conn.close?.();
     m.conn = conn;
     m.pending.clear();
+    if (m.lostHost) {
+      // the host who dropped comes back: the temporary host hands the role back
+      m.lostHost = false;
+      for (const x of this.members) if (x && x !== m) x.host = false;
+      m.host = true;
+    }
     if (this.started) {
       this.sendStart(conn);
       this.catchUp(m);
@@ -195,6 +203,7 @@ export class Room {
       const next = this.members.find((x) => x?.conn);
       if (next) {
         m.host = false;
+        m.lostHost = true;
         next.host = true;
       }
     }

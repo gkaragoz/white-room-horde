@@ -7,6 +7,14 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Feel and fixes (rules change: update the server and reload the page)**
+- Client-side prediction: online, your own character, the camera, flashlight and ammo ring follow your steering and dashes at once (the pending inputs are replayed on top of the confirmed state, mispredictions are eased out), and with auto aim off the character turns with the mouse immediately. Your shots and everybody else still come from the confirmed simulation.
+- The input lead is measured from the first second (the first pings set the estimate): until now the first seconds of a game could lose inputs to "too late" on a slow line.
+- Several level-ups at once now queue properly: a card is picked with a fresh press only (a held key or a repeated input no longer skips the next offer), the next offer opens after a short pause, the clock of a waiting offer starts when it is shown, offers wait while the squad climbs, and the card screen shows "+N" for the offers still waiting.
+- Connection: a watchdog reconnects when the server has been silent for 4 seconds; a host who dropped and comes back gets the host role back; a refused rejoin leaves for the menu instead of freezing; the report (settings) logs socket open/close, watchdog and rejoin events.
+- Squad cards (bottom left) show each character's live DPS and kills; hover a card for class, level, experience, kills, damage dealt and average DPS, hover a chip for what it is.
+- Sound: card offer, freeze, nuke, second wind, weapon pickup, a player falling, arriving on a floor, wall impacts and barrel hits now have sounds (synthesised, CC0); the level-up bell is only for your own level.
+
 ## v0.10.0 (2026-10-20)
 
 **Relics, range, aim (rules change: update the server and reload the page)**

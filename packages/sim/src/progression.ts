@@ -1,10 +1,21 @@
-import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, MAX_PLAYERS, PlayerState, RARITY_WEIGHT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, FloorPhase, MAX_PLAYERS, MISC, PlayerState, RARITY_WEIGHT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { PERK } from '@wrh/shared';
 import { addPerk, perk, setPerk } from './features';
 import { giveWeapon, nextMissing, refillAll, selectWeapon } from './loadout';
 import type { World } from './state';
 
 const CARDS = CARD_IDS.length;
+
+/** After a pick the next queued offer waits this long, so a key still held (or repeated by the server) cannot pick for the next one. */
+const PICK_LOCK_TICKS = 12;
+const CARD_BUTTONS = Buttons.Card1 | Buttons.Card2 | Buttons.Card3;
+
+/** Offers open one at a time, never while the squad is climbing between floors, and not right after a pick. */
+function tryOpen(w: World, slot: number): void {
+  if (w.pOffer[slot * 3]! >= 0 || w.pPending[slot]! <= 0 || w.pCardLock[slot]! > 0) return;
+  if (w.misc[MISC.Phase] === FloorPhase.Ascend) return;
+  openOffer(w, slot);
+}
 
 /** Experience belongs to the character that made the kill; every level opens a 3-card offer for that character only (docs/DESIGN.md section 9). */
 export function awardXp(w: World, slot: number, amount: number): void {
@@ -19,7 +30,7 @@ export function awardXp(w: World, slot: number, amount: number): void {
     w.pPending[slot] = w.pPending[slot]! + 1;
     w.events.push({ type: 'levelUp', slot, level: w.pLevel[slot]! });
   }
-  if (w.pOffer[slot * 3]! < 0 && w.pPending[slot]! > 0) openOffer(w, slot);
+  tryOpen(w, slot);
 }
 
 export function xpForNext(w: World, slot: number): number {
@@ -181,13 +192,23 @@ function applyCard(w: World, card: number, by: number): void {
  * or dead character's offer waits for them (the clock stops). One character's offer never blocks another's.
  */
 export function updateCards(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): void {
+  const climbing = w.misc[MISC.Phase] === FloorPhase.Ascend;
   for (let s = 0; s < MAX_PLAYERS; s++) {
-    if (!w.pActive[s] || w.pOffer[s * 3]! < 0 || w.pState[s] !== PlayerState.Alive) continue;
-    const b = inputs[s]?.buttons ?? 0;
+    if (!w.pActive[s]) continue;
+    const held = (inputs[s]?.buttons ?? 0) & CARD_BUTTONS;
+    const fresh = held & ~w.pCardPrev[s]!;
+    w.pCardPrev[s] = held;
+    if (w.pState[s] !== PlayerState.Alive) continue;
+    if (w.pCardLock[s]! > 0) w.pCardLock[s] = w.pCardLock[s]! - 1;
+    if (w.pOffer[s * 3]! < 0) {
+      tryOpen(w, s);
+      continue;
+    }
+    if (climbing) continue; // the clock of an open offer waits while the floor is being climbed
     let choice = -1;
-    if (b & Buttons.Card1) choice = 0;
-    else if (b & Buttons.Card2) choice = 1;
-    else if (b & Buttons.Card3) choice = 2;
+    if (fresh & Buttons.Card1) choice = 0;
+    else if (fresh & Buttons.Card2) choice = 1;
+    else if (fresh & Buttons.Card3) choice = 2;
     w.pCardTimer[s] = w.pCardTimer[s]! - 1;
     if (choice < 0 && w.pCardTimer[s]! <= 0) choice = w.rng.int(3);
     if (choice < 0) continue;
@@ -197,6 +218,6 @@ export function updateCards(w: World, inputs: ReadonlyArray<PlayerInput | undefi
     const at = s * CARDS + card;
     if (w.pCards[at]! < 255) w.pCards[at] = w.pCards[at]! + 1;
     w.events.push({ type: 'cardPicked', card, by: s });
-    if (w.pPending[s]! > 0) openOffer(w, s);
+    w.pCardLock[s] = PICK_LOCK_TICKS;
   }
 }

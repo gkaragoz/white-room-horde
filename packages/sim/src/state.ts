@@ -63,6 +63,9 @@ export interface World {
   pPending: Int32Array;
   pOffer: Int32Array;
   pCardTimer: Int32Array;
+  /** Ticks after a pick during which no further offer opens, and the card buttons held on the previous tick (a pick needs a fresh press). */
+  pCardLock: Int32Array;
+  pCardPrev: Int32Array;
   /** How many times each character took each card (card id index), for the relic bar. */
   pCards: Uint8Array;
   /** Per player upgrades from cards (multipliers start at 1, pierce and crit chance at 0). */
@@ -200,6 +203,8 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pPending: new Int32Array(MAX_PLAYERS),
     pOffer: new Int32Array(MAX_PLAYERS * 3).fill(-1),
     pCardTimer: new Int32Array(MAX_PLAYERS),
+    pCardLock: new Int32Array(MAX_PLAYERS),
+    pCardPrev: new Int32Array(MAX_PLAYERS),
     pCards: new Uint8Array(MAX_PLAYERS * CARD_IDS.length),
     modDamage: new Float64Array(MAX_PLAYERS).fill(1),
     modRate: new Float64Array(MAX_PLAYERS).fill(1),
