@@ -1,22 +1,23 @@
 import type { PlayerInput } from './types';
 
 /** Bytes per player input on the wire (docs/DESIGN.md section 8). */
-export const INPUT_BYTES = 5;
+export const INPUT_BYTES = 6;
 
 export function writeInput(dv: DataView, off: number, i: PlayerInput): void {
   dv.setInt8(off, i.moveX);
   dv.setInt8(off + 1, i.moveY);
   dv.setUint16(off + 2, i.aim, true);
   dv.setUint8(off + 4, i.buttons);
+  dv.setUint8(off + 5, Math.max(0, Math.min(255, Math.round(i.aimDist ?? 0))));
 }
 
 export function readInput(dv: DataView, off: number): PlayerInput {
-  return { moveX: dv.getInt8(off), moveY: dv.getInt8(off + 1), aim: dv.getUint16(off + 2, true), buttons: dv.getUint8(off + 4) };
+  return { moveX: dv.getInt8(off), moveY: dv.getInt8(off + 1), aim: dv.getUint16(off + 2, true), buttons: dv.getUint8(off + 4), aimDist: dv.getUint8(off + 5) };
 }
 
 export function clampInput(i: PlayerInput): PlayerInput {
   const c = (v: number): number => (v < -127 ? -127 : v > 127 ? 127 : Math.round(v));
-  return { moveX: c(i.moveX), moveY: c(i.moveY), aim: i.aim & 0xffff, buttons: i.buttons & 0xff };
+  return { moveX: c(i.moveX), moveY: c(i.moveY), aim: i.aim & 0xffff, buttons: i.buttons & 0xff, aimDist: Math.max(0, Math.min(255, Math.round(i.aimDist ?? 0))) };
 }
 
 /** One tick of confirmed inputs: u16 slot mask followed by the present inputs in slot order. */

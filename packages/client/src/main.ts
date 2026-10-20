@@ -11,6 +11,8 @@ import { Crowd } from './render/crowd';
 import { PickupView } from './render/pickups';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
+import { AmmoRing } from './render/ammoRing';
+import { TargetMarker } from './render/targetMarker';
 import { PropsView } from './render/props';
 import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
@@ -27,8 +29,13 @@ await preloadAssets();
 const params = new URLSearchParams(location.search);
 
 // ---- settings (persisted) ----
+let worldReady = false;
+function defaultSettings(): Settings {
+  return { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, time: 'cycle', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0.6, shadows: 2, scale: 1, lang: ((['tr', 'de', 'es', 'fr', 'ru'] as const).find((l) => navigator.language.toLowerCase().startsWith(l)) ?? 'en') as Settings['lang'] };
+}
+
 function loadSettings(): Settings {
-  const def: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'msaa', bounce: true, time: 'cycle', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0.6, shadows: 2, scale: 1, lang: ((['tr', 'de', 'es', 'fr', 'ru'] as const).find((l) => navigator.language.toLowerCase().startsWith(l)) ?? 'en') as Settings['lang'] };
+  const def = defaultSettings();
   try {
     return { ...def, ...(JSON.parse(localStorage.getItem('wrh.settings') ?? '{}') as Partial<Settings>) };
   } catch {
@@ -85,6 +92,9 @@ const crowd = await Crowd.create(150, backend);
 stage.scene.add(crowd.group);
 const ragdolls = await RagdollPool.create(40);
 await ragdolls.preload([...ENEMY_TYPES]);
+worldReady = true;
+crowd.corpseLife = [2.5, 5, 14][settings.corpseTime]!;
+ragdolls.restLife = [1.2, 3.2, 10][settings.corpseTime]!;
 stage.scene.add(ragdolls.group);
 const pickups = new PickupView();
 stage.scene.add(pickups.group);
@@ -125,6 +135,10 @@ bulletMesh.count = 0;
 stage.scene.add(bulletMesh);
 stage.scene.add(bulletGlow);
 stage.scene.add(power.group);
+const ammoRing = new AmmoRing();
+stage.scene.add(ammoRing.group);
+const targetMarker = new TargetMarker();
+stage.scene.add(targetMarker.group);
 
 // cover boxes of the current layout (rebuilt per game)
 const arena = new ArenaView();
@@ -148,6 +162,15 @@ function applySettings(): void {
   stage.setScale(settings.autoScale ? Math.min(autoScale, settings.scale) : settings.scale);
   stage.setBounce(settings.bounce);
   stage.setDynamicLights(settings.dynLights);
+  fx.density = [0.5, 1, 1.6][settings.particles]!;
+  fx.gore = [0.4, 1, 1.8][settings.gore]!;
+  audio.sfxVolume = settings.sfxVolume;
+  audio.voiceVolume = settings.voiceVolume;
+  audio.uiSounds = settings.uiSounds;
+  if (worldReady) {
+    crowd.corpseLife = [2.5, 5, 14][settings.corpseTime]!;
+    ragdolls.restLife = [1.2, 3.2, 10][settings.corpseTime]!;
+  }
   ui.applySettings(settings);
   try {
     localStorage.setItem('wrh.settings', JSON.stringify(settings));
@@ -206,9 +229,16 @@ const ui = new Ui(
     onLeave: () => location.reload(),
     onCard: (i) => input.queueButton([Buttons.Card1, Buttons.Card2, Buttons.Card3][i]!),
     onAgain: () => location.reload(),
-    onUiSound: (n) => audio.ui(n),
+    onUiSound: (n) => {
+      if (settings.uiSounds) audio.ui(n);
+    },
     onResume: () => setPaused(false),
     onReplay: () => downloadReplay(),
+    onResetSettings: () => {
+      settings = { ...defaultSettings(), lang: settings.lang };
+      autoScale = settings.scale;
+      applySettings();
+    },
     onSetting: (key, value) => {
       if (key === 'volume') settings = { ...settings, volume: value as number };
       else if (key === 'music') settings = { ...settings, music: value as number };
@@ -244,7 +274,7 @@ const ui = new Ui(
       }
       else if (key === 'colorblind') settings = { ...settings, colorblind: value as boolean };
       else if (key === 'textSize') settings = { ...settings, textSize: value as 0 | 1 | 2 };
-      else settings = { ...settings, lang: value as Settings['lang'] };
+      else settings = { ...settings, [key]: value } as Settings;
       applySettings();
     },
   },
@@ -357,6 +387,7 @@ function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boo
 function handleEvent(e: SimEvent): void {
   if (e.type === 'shot') {
     lastShot[e.slot] = nowSec;
+    if (e.slot === localSlot) cursorPulse();
     // recoil: the weapon kicks back by an amount that grows with the round's punch
     const st = BALANCE.weapons[WEAPON_IDS[e.weapon]!];
     chars[e.slot]?.kick(Math.min(0.32, 0.05 + st.damage * st.pellets * 0.0016));
@@ -400,6 +431,9 @@ function handleEvent(e: SimEvent): void {
       ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${ui.lang === 'tr' ? 'Dalga' : 'Wave'} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
       break;
     }
+    case 'waveCleared':
+      ui.banner(UI_STRINGS[ui.lang].waveCleared, UI_STRINGS[ui.lang].breather, 1800);
+      break;
     case 'secondWind':
       ui.banner(UI_STRINGS[ui.lang].secondWind, names[e.slot] ?? '', 1600);
       break;
@@ -422,7 +456,7 @@ function handleEvent(e: SimEvent): void {
       comboCount++;
       comboAt = nowSec;
       const step = COMBO_STEPS.indexOf(comboCount);
-      if (step >= 0) {
+      if (step >= 0 && settings.announcer) {
         ui.banner(UI_STRINGS[ui.lang].combos[step]!, `x${comboCount}`, 1100);
         audio.play('level');
       }
@@ -480,7 +514,7 @@ window.addEventListener('blur', () => {
 const _p = new THREE.Vector3();
 /** Floating damage numbers for hits (thinned out when the screen is full of them). */
 function damageNumber(x: number, y: number, damage: number): void {
-  if (damage < 1) return;
+  if (damage < 1 || !settings.damageNumbers) return;
   _p.set(x, 1.7, -y).project(stage.camera);
   const px = ((_p.x + 1) / 2) * app.clientWidth;
   const py = ((1 - _p.y) / 2) * app.clientHeight;
@@ -494,10 +528,44 @@ let slowT = 0;
 /** 1 normally; tiny during a hit-stop, 0.35 in slow motion. Solo games slow the simulation too, online only the visuals. */
 let timeScale = 1;
 function hitStop(seconds: number): void {
+  if (!settings.hitStop) return;
   if (seconds > stopT) stopT = seconds;
 }
 function slowMo(seconds: number): void {
   if (seconds > slowT) slowT = seconds;
+}
+
+// ---- cursor: the system pointer is hidden over the game and a soft ring takes its place ----
+const cursorEl = document.createElement('div');
+cursorEl.style.cssText = 'position:fixed;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;box-sizing:border-box;border:5px solid rgba(0,0,0,.42);border-radius:50%;background:rgba(0,0,0,.07);pointer-events:none;z-index:60;display:none;will-change:transform';
+document.body.appendChild(cursorEl);
+let cursorOnCanvas = false;
+let cursorTouch = false;
+window.addEventListener('pointermove', (e) => {
+  cursorTouch = e.pointerType === 'touch';
+  cursorEl.style.left = `${e.clientX}px`;
+  cursorEl.style.top = `${e.clientY}px`;
+  cursorOnCanvas = e.target === stage.renderer.domElement;
+});
+window.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' && e.target === stage.renderer.domElement) cursorPulse();
+});
+/** The ring swells and settles again with an ease-out-back overshoot; it fires on every shot and click. */
+function cursorPulse(): void {
+  cursorEl.animate(
+    [
+      { transform: 'scale(1)', easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+      { transform: 'scale(1.38)', offset: 0.35, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+      { transform: 'scale(1)' },
+    ],
+    { duration: 240 },
+  );
+}
+function updateCursor(): void {
+  const playing = !!world && !over && !paused && mode !== 'menu' && !ui.overlayOpen;
+  const show = playing && cursorOnCanvas && !cursorTouch;
+  cursorEl.style.display = show ? 'block' : 'none';
+  stage.renderer.domElement.style.cursor = playing && !cursorTouch ? 'none' : '';
 }
 
 // ---- kill streaks ----
@@ -687,6 +755,12 @@ function frame(nowMs: number): void {
   lastDrawn = nowMs;
   const t0 = performance.now();
   if (input.consumePause()) setPaused(!paused);
+  if (input.consumeHostPause()) {
+    if (mode === 'online' && session && session.state === 'playing') {
+      if (session.players.find((p) => p.slot === session!.slot)?.host) session.setPause(!session.paused);
+    } else if (mode === 'solo') setPaused(!paused);
+  }
+  ui.setHostPause(mode === 'online' && !!session?.paused, !!session?.players.find((p) => p.slot === session!.slot)?.host);
   const realDt = Math.min(0.1, (nowMs - last) / 1000);
   last = nowMs;
   stopT = Math.max(0, stopT - realDt);
@@ -800,7 +874,7 @@ function frame(nowMs: number): void {
     }
     const fx0 = prevX[target]! + (curX[target]! - prevX[target]!) * alpha;
     const fy0 = prevY[target]! + (curY[target]! - prevY[target]!) * alpha;
-    stage.follow(fx0, -fy0, fx.shake);
+    stage.follow(fx0, -fy0, fx.shake * settings.shake);
     fx.faceCamera(stage.camera.quaternion);
     // time of day, real-time lights and the flashlight of the local player
     stage.nightTarget = nightFor(w);
@@ -809,7 +883,7 @@ function frame(nowMs: number): void {
     stage.update(dt, fx0, -fy0);
     props.setNight(stage.night);
     ui.setNightHud(stage.night > 0.5);
-    ui.setCombo(nowSec - comboAt < 2.2 ? comboCount : 0, '');
+    ui.setCombo(settings.announcer && nowSec - comboAt < 2.2 ? comboCount : 0, '');
     {
       const me = localSlot;
       const lx = prevX[me]! + (curX[me]! - prevX[me]!) * alpha;
@@ -823,7 +897,16 @@ function frame(nowMs: number): void {
       _p.set(lx, 0.02, -ly).project(stage.camera);
       const ppu = app.clientWidth / CAMERA.orthoWidth;
       const frac = reloading ? 1 - w.pReload[me]! / (st.reload * w.modReload) : w.pMag[me]! / st.mag;
-      ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, alive && !w.gameOver, reloading);
+      // where the next grenade lands
+      {
+        const gc = BALANCE.grenade;
+        const dist = input.grenadeDistance(lx, ly, gc.range, gc.minRange, gc.maxRange);
+        const bm = w.modBlast * w.pPerk[me * PERKS + PERK.Blast]!;
+        targetMarker.update(lx + Math.cos(a) * dist, -(ly + Math.sin(a) * dist), gc.radius * bm, nowSec, alive && !w.gameOver && w.pGren[me]! > 0 && !paused, (input.sample as unknown) !== undefined && w.pGrenCd[me]! > 0);
+      }
+      const show = alive && !w.gameOver && settings.ammoRing;
+      ammoRing.update(lx, -ly, frac, reloading, nowSec, show);
+      ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, show, reloading);
     }
 
     // name tags over the other players
@@ -938,6 +1021,7 @@ function frame(nowMs: number): void {
     stage.follow(0, 0);
   }
 
+  updateCursor();
   stage.render();
   frameMs += performance.now() - t0;
   frameN++;
@@ -955,7 +1039,7 @@ function frame(nowMs: number): void {
     perf.corpses = crowd.corpseCount;
     perf.particles = fx.particleCount;
     frames = 0; fpsT = 0; stepMs = 0; stepN = 0; frameMs = 0; frameN = 0;
-    if (dev.perf) {
+    if (dev.perf || settings.showFps) {
       ui.setDev(
         `${fps} fps &middot; frame ${perf.frameMs.toFixed(2)} ms &middot; sim ${perf.simMs.toFixed(2)} ms &middot; calls ${perf.calls} &middot; tris ${(perf.triangles / 1000).toFixed(0)}k<br>` +
           `enemies ${perf.enemies} &middot; corpses ${perf.corpses} &middot; particles ${perf.particles}` +

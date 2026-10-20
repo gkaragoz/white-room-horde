@@ -215,7 +215,7 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
       // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
       const crit = w.modCrit > 0 && w.rng.float() < w.modCrit ? 2 : 1;
-      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * damageMul(w, s) * crit, stats.pierce + w.modPierce + w.pModPierce[s]!);
+      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce + w.pModPierce[s]!);
     }
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
     w.pMag[s] = w.pMag[s]! - 1;

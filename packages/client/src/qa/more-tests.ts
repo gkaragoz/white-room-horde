@@ -1,16 +1,19 @@
 import * as THREE from 'three';
 import { Buttons, CARD_IDS, CARD_RARITY, MAPS, PERSONAL_CARDS, WEAPON_IDS } from '@wrh/shared';
 import { addPlayer, createWorld } from '@wrh/sim';
-import { DEFAULT_BINDINGS, Input } from '../input';
+import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
 import { ArenaView } from '../render/arena';
+import { renderControlsSheet, renderSettingsPanel } from '../settingsPanel';
 import { Fx } from '../render/fx';
+import { AmmoRing } from '../render/ammoRing';
+import { RagdollPool } from '../render/ragdoll';
 import { PowerView, strengthOf } from '../render/power';
 import { Character } from '../render/character';
 import { PlayerAnimator } from '../render/playerAnim';
 import { asset } from '../assets';
 import { BANK_FILES, MUSIC_FILES } from '../audio';
-import { Ui, UI_STRINGS, type Settings } from '../ui';
+import { LANGS, Ui, UI_STRINGS, type Settings } from '../ui';
 import { diffCount, grab } from './crowd-tests';
 import type { QaTest } from './tests';
 
@@ -352,11 +355,11 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const w = createWorld(1);
       addPlayer(w, 0, 0, 0);
@@ -414,11 +417,11 @@ export const moreTests: QaTest[] = [
       document.body.appendChild(host);
       const looks: [number, number][] = [];
       const weapons: string[] = [];
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: (w) => weapons.push(w), onLook: (a, c) => looks.push([a, c]), getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const problems: string[] = [];
       try {
@@ -464,6 +467,133 @@ export const moreTests: QaTest[] = [
       const r = el.getBoundingClientRect();
       if (r.width < 10 || r.right < 0 || r.bottom < 0 || r.left > innerWidth) return { status: 'fail', detail: 'badge is not visible' };
       return { status: 'pass', detail: text };
+    },
+  },
+  {
+    id: 'corpses.cleanup',
+    title: 'Dead enemies do not pile up: ragdolls and death animations shrink away after a few seconds',
+    async run(ctx) {
+      const pool = await RagdollPool.create(4);
+      await pool.preload(['grunt']);
+      ctx.stage.scene.add(pool.group);
+      try {
+        pool.spawn('grunt', 0, 0, 0, 'z_walk', 0.3, { x: 0, z: 0 }, { x: 1, z: 0, power: 30 });
+        if (pool.activeCount !== 1) return { status: 'fail', detail: 'the ragdoll did not spawn' };
+        for (let i = 0; i < 60 * 2; i++) pool.update(1 / 60);
+        const early: number = pool.activeCount;
+        for (let i = 0; i < 60 * 12; i++) pool.update(1 / 60);
+        const late: number = pool.activeCount;
+        const problems: string[] = [];
+        if (early !== 1) problems.push('the body vanished within two seconds');
+        if (late !== 0) problems.push(`${late} bodies still lying around after 14 seconds`);
+        return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'a ragdoll stays a few seconds, then shrinks away' };
+      } finally {
+        ctx.stage.scene.remove(pool.group);
+      }
+    },
+  },
+  {
+    id: 'ui.settings-panel',
+    title: 'The settings window has tabs, grouped rows, switches and sliders that report changes, and the controls sheet shows keycaps',
+    async run() {
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:800px';
+      document.body.appendChild(host);
+      const problems: string[] = [];
+      const changes: [string, unknown][] = [];
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0.5, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0.6, shadows: 2, scale: 1, lang: 'en' };
+      let tab = 'graphics';
+      const draw = (): void =>
+        renderSettingsPanel(host, {
+          settings,
+          lang: 'en',
+          langs: LANGS,
+          tab,
+          scroll: 0,
+          actionNames: UI_STRINGS.en.actions as Record<string, string>,
+          actions: ACTIONS,
+          bindings: Object.fromEntries(ACTIONS.map((a) => [a, [DEFAULT_BINDINGS[a][0]!]])),
+          onSetting: (k, v) => changes.push([k, v]),
+          onTab: (t) => {
+            tab = t;
+            draw();
+          },
+          onRebind: () => undefined,
+          onResetKeys: () => undefined,
+          onReset: () => changes.push(['reset', true]),
+          onClose: () => changes.push(['close', true]),
+          onControls: () => changes.push(['controls', true]),
+        });
+      try {
+        draw();
+        const tabs = [...host.querySelectorAll<HTMLElement>('.wrh-set-tabs button')];
+        if (tabs.length !== 5) problems.push(`${tabs.length} tabs, expected 5`);
+        if (host.querySelectorAll('.wrh-set-group').length < 3) problems.push('the graphics tab has fewer than three groups');
+        host.querySelector<HTMLElement>('.wrh-switch')!.click();
+        host.querySelector<HTMLInputElement>('.wrh-range')!.value = '0.7';
+        host.querySelector<HTMLInputElement>('.wrh-range')!.dispatchEvent(new Event('change'));
+        host.querySelector<HTMLElement>('.wrh-seg button:not(.on)')!.click();
+        if (changes.length !== 3) problems.push(`${changes.length} changes reported for a switch, a slider and a choice`);
+        for (let i = 0; i < tabs.length; i++) {
+          tab = ['graphics', 'audio', 'game', 'access', 'keys'][i]!;
+          draw();
+          if (!host.querySelector('.wrh-set-row, .wrh-set-keygrid')) problems.push(`tab ${tab} is empty`);
+        }
+        if (host.querySelectorAll('.wrh-set-keybtn .wrh-key').length < 10) problems.push('the keys tab does not draw keycaps');
+        renderControlsSheet(host, { lang: 'en', bindings: Object.fromEntries(ACTIONS.map((a) => [a, [DEFAULT_BINDINGS[a][0]!]])), onClose: () => undefined, onSetting: () => undefined });
+        const rows = host.querySelectorAll('.wrh-ctl-row').length;
+        const caps = host.querySelectorAll('.wrh-key').length;
+        if (rows < 10) problems.push(`controls sheet lists ${rows} controls`);
+        if (caps < 15) problems.push(`controls sheet draws ${caps} keycaps`);
+        if (!host.querySelector('.wrh-mouse')) problems.push('no mouse drawing on the controls sheet');
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'tabs, rows, switches, sliders, choices, keycaps and the controls sheet work' };
+    },
+  },
+  {
+    id: 'ammo.ring-3d',
+    title: 'The ammo ring is a real object on the floor: it fills with the magazine, and a body in front of it hides the part behind',
+    async run(ctx) {
+      const ring = new AmmoRing();
+      ctx.stage.scene.add(ring.group);
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.2, 1.1), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
+      body.position.set(0, 1.1, 0);
+      body.visible = false;
+      ctx.stage.scene.add(body);
+      const problems: string[] = [];
+      const greens = (): number => {
+        const px = grab(ctx, 480);
+        let n = 0;
+        for (let i = 0; i < px.length; i += 4) if (px[i + 1]! > px[i + 2]! + 60 && px[i + 1]! >= px[i]! - 10) n++; // green to yellow
+        return n;
+      };
+      try {
+        ctx.stage.follow(0, 0);
+        ring.update(0, 0, 1, false, 0, false);
+        ctx.stage.render();
+        const none = greens();
+        ring.update(0, 0, 1, false, 0, true);
+        ctx.stage.render();
+        const full = greens();
+        ring.update(0, 0, 0.5, false, 0, true);
+        ctx.stage.render();
+        const half = greens();
+        body.visible = true;
+        ring.update(0, 0, 1, false, 0, true);
+        ctx.stage.render();
+        const covered = greens();
+        if (full < 150) problems.push(`a full ring shows only ${full} green pixels`);
+        if (none > full * 0.1) problems.push('the ring is drawn while it should be hidden');
+        if (!(half > full * 0.3 && half < full * 0.75)) problems.push(`half a magazine draws ${half} px against ${full} for a full one`);
+        if (!(covered < full * 0.92)) problems.push(`a body in the middle hides nothing of the ring (${covered} of ${full} px)`);
+      } finally {
+        ctx.stage.scene.remove(ring.group);
+        ctx.stage.scene.remove(body);
+        ring.dispose();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'the ring fills with the magazine and passes behind a body' };
     },
   },
   {
@@ -546,11 +676,11 @@ export const moreTests: QaTest[] = [
       const host = document.createElement('div');
       host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
       document.body.appendChild(host);
-      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const problems: string[] = [];
       try {

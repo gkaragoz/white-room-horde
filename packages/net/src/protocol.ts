@@ -44,6 +44,8 @@ export type ClientMsg =
   | { t: 'weapon'; weapon: WeaponId }
   | { t: 'options'; map: number; difficulty: number }
   | { t: 'look'; acc: number; color?: number; cls?: number }
+  /** Host only: stop or resume the game for everybody. */
+  | { t: 'pause'; on: boolean }
   | { t: 'leave' };
 
 export type ServerMsg =
@@ -51,6 +53,7 @@ export type ServerMsg =
   | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId; cls: number }[]; map: number; difficulty: number }
   | { t: 'desync'; tick: number; slots: number[] }
   | { t: 'pong'; ts: number }
+  | { t: 'paused'; on: boolean }
   | { t: 'snapshotRequest' }
   | { t: 'error'; message: string };
 
@@ -68,10 +71,10 @@ export interface Bundle {
 /** Client to server: the input a player wants applied at `tick`. */
 export function encodeInputMsg(tick: number, input: PlayerInput): Uint8Array {
   const body = encodeTick([input]);
-  const out = new Uint8Array(5 + 5);
+  const out = new Uint8Array(5 + 6);
   out[0] = Bin.Input;
   new DataView(out.buffer).setUint32(1, tick, true);
-  // single-input wire form: skip the slot mask, five bytes of input
+  // single-input wire form: skip the slot mask, six bytes of input
   out.set(body.subarray(2), 5);
   return out;
 }
@@ -79,9 +82,9 @@ export function encodeInputMsg(tick: number, input: PlayerInput): Uint8Array {
 export function decodeInputMsg(buf: Uint8Array): { tick: number; input: PlayerInput } {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const tick = dv.getUint32(1, true);
-  const mask = new Uint8Array(2 + 5);
+  const mask = new Uint8Array(2 + 6);
   mask[0] = 1;
-  mask.set(buf.subarray(5, 10), 2);
+  mask.set(buf.subarray(5, 11), 2);
   const d = decodeTick(mask, 1);
   return { tick, input: d.inputs[0]! };
 }

@@ -56,6 +56,24 @@ function rad(w: World, i: number): number {
 }
 
 /** Recompute the wave multipliers (repeated multiplication, no pow) and restart the wave clock. */
+/** How many enemies the current wave brings in total (fixed when the wave starts). */
+function waveTotal(w: World): number {
+  const cfg = BALANCE.waves;
+  let players = 0;
+  for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) players++;
+  const mod = waveModOf(w.wave);
+  return Math.floor((cfg.baseCount + cfg.perPlayer * players) * w.countMul * cfg.waveSizeMul * BALANCE.difficulty.count[w.difficulty]! * (mod === 1 ? 1.5 : 1));
+}
+
+/** Start of a wave: its size is fixed now and the "cleared" marker is reset (misc[1] still to arrive, misc[2] cleared at tick, misc[3] total). */
+function beginWave(w: World): void {
+  const total = waveTotal(w);
+  w.misc[1] = total;
+  w.misc[2] = 0;
+  w.misc[3] = total;
+}
+
+/** Recompute the wave multipliers (repeated multiplication, no pow) and restart the wave clock. */
 export function setWave(w: World, wave: number): void {
   w.wave = wave;
   w.waveTick = w.tick;
@@ -67,6 +85,7 @@ export function setWave(w: World, wave: number): void {
   }
   w.countMul = c;
   w.hpMul = h;
+  beginWave(w);
 }
 
 export function livingPlayers(w: World): number {
@@ -234,6 +253,8 @@ function farFromPlayers(w: World, x: number, y: number): boolean {
 
 function runWaves(w: World, playerCount: number): void {
   const cfg = BALANCE.waves;
+  // the first wave sizes itself on the first tick, when everybody is in
+  if (w.tick === 0 && w.misc[3] === 0) beginWave(w);
   if (w.tick - w.waveTick >= cfg.periodSeconds * TICK_RATE) {
     setWave(w, w.wave + 1);
     const boss = w.wave % BALANCE.progression.boss.everyWaves === 0;
@@ -242,20 +263,35 @@ function runWaves(w: World, playerCount: number): void {
   }
   if (playerCount === 0) return;
   const mod = waveModOf(w.wave);
-  let target = Math.floor((cfg.baseCount + cfg.perPlayer * playerCount) * w.countMul * BALANCE.difficulty.count[w.difficulty]! * (mod === 1 ? 1.5 : 1));
-  if (target > cfg.cap) target = cfg.cap;
-  for (let n = 0; n < cfg.spawnPerTick && w.enemyCount < target; n++) {
-    let ok = false;
-    for (let attempt = 0; attempt < 4 && !ok; attempt++) {
-      edgePoint(w);
-      ok = farFromPlayers(w, spawnX, spawnY);
+  const total = w.misc[3]!;
+  let remaining = w.misc[1]!;
+  if (remaining > 0) {
+    // the wave arrives in a rush and then as a stream, never more than the wave's own number
+    const t = Math.min(1, (w.tick - w.waveTick) / (cfg.spawnSeconds * TICK_RATE));
+    const due = Math.min(total, Math.ceil(total * (cfg.spawnBurst + (1 - cfg.spawnBurst) * t)));
+    let spawned = total - remaining;
+    for (let n = 0; n < cfg.spawnPerTick && spawned < due && w.enemyCount < cfg.cap; n++) {
+      let ok = false;
+      for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+        edgePoint(w);
+        ok = farFromPlayers(w, spawnX, spawnY);
+      }
+      const e = spawnEnemy(w, pickType(w), spawnX, spawnY);
+      if (e >= 0) {
+        if (mod === 1) w.eHp[e] = w.eHp[e]! * 0.7;
+        else if (mod === 2) w.eHp[e] = w.eHp[e]! * 1.6;
+        rollElite(w, e);
+      }
+      spawned++;
+      remaining--;
     }
-    const e = spawnEnemy(w, pickType(w), spawnX, spawnY);
-    if (e >= 0) {
-      if (mod === 1) w.eHp[e] = w.eHp[e]! * 0.7;
-      else if (mod === 2) w.eHp[e] = w.eHp[e]! * 1.6;
-      rollElite(w, e);
-    }
+    w.misc[1] = remaining;
+  } else if (total > 0 && w.enemyCount === 0 && w.misc[2] === 0) {
+    // the wave is cleared: a breather, then the next one comes early if the clock still has a long way to go
+    w.misc[2] = w.tick + 1;
+    const left = cfg.periodSeconds * TICK_RATE - (w.tick - w.waveTick);
+    if (left > cfg.breatherSeconds * TICK_RATE) w.waveTick = w.tick - (cfg.periodSeconds - cfg.breatherSeconds) * TICK_RATE;
+    w.events.push({ type: 'waveCleared', wave: w.wave });
   }
 }
 
@@ -676,11 +712,20 @@ function spawnSpit(w: World, x: number, y: number, dx: number, dy: number): void
 }
 
 /** Throw a grenade along the aim direction (called from the player step). */
-export function throwGrenade(w: World, slot: number, angle: number): void {
+export function throwGrenade(w: World, slot: number, angle: number, aimDist = 0): void {
   const cfg = BALANCE.grenade;
+  const range = aimDist > 0 ? clamp(aimDist / 4, cfg.minRange, cfg.maxRange) : cfg.range;
   for (let i = 0; i < MAX_GRENADES; i++) {
     if (w.gActive[i]) continue;
-    const speed = cfg.range / cfg.flight;
+    // the grenade flies for as many ticks as the fuse countdown below lets it move, and lands exactly on the target
+    let countdown = cfg.flight + cfg.fuse;
+    let flightTicks = 0;
+    for (;;) {
+      countdown -= TICK_DT;
+      if (countdown > cfg.fuse) flightTicks++;
+      else break;
+    }
+    const speed = range / (flightTicks * TICK_DT);
     w.gActive[i] = 1;
     w.gX[i] = w.pX[slot]!;
     w.gY[i] = w.pY[slot]!;
@@ -709,7 +754,7 @@ export function updateGrenades(w: World, inputs: ReadonlyArray<PlayerInput | und
       }
     }
     const inp = inputs[s];
-    if (inp && (inp.buttons & Buttons.Grenade) !== 0 && w.pGren[s]! > 0 && w.pGrenCd[s]! <= 0) throwGrenade(w, s, w.pAngle[s]!);
+    if (inp && (inp.buttons & Buttons.Grenade) !== 0 && w.pGren[s]! > 0 && w.pGrenCd[s]! <= 0) throwGrenade(w, s, w.pAngle[s]!, inp.aimDist ?? 0);
   }
 }
 

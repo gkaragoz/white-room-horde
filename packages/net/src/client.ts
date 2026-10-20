@@ -43,6 +43,8 @@ export class NetSession {
   /** Number of snapshots this client restored (diagnostics). */
   resyncs = 0;
   private weapon: WeaponId = 'pistol';
+  /** True while the host has the game paused. */
+  paused = false;
   private pendingStart: { seed: number; players: { slot: number; weapon: WeaponId; cls: number }[] } | null = null;
   private nextPing = 0;
 
@@ -83,6 +85,11 @@ export class NetSession {
     this.sendJson({ t: 'start' });
   }
 
+  /** Host only: pause or resume the game for everybody. */
+  setPause(on: boolean): void {
+    this.sendJson({ t: 'pause', on });
+  }
+
   /** Pick the starting weapon while in the lobby. */
   setWeapon(weapon: WeaponId): void {
     this.weapon = weapon;
@@ -118,6 +125,7 @@ export class NetSession {
         if (this.state === 'idle') this.state = m.started ? 'playing' : 'lobby';
         break;
       case 'start':
+        this.paused = false;
         this.pendingStart = { seed: m.seed, players: m.players };
         this.world = createGame({ seed: m.seed, players: m.players, map: m.map, difficulty: m.difficulty });
         this.history.clear();
@@ -135,6 +143,9 @@ export class NetSession {
         break;
       case 'snapshotRequest':
         if (this.world && this.state === 'playing') this.transport.send(encodeSnapshot(Bin.Snapshot, this.world.tick, serializeWorld(this.world)));
+        break;
+      case 'paused':
+        this.paused = m.on === true;
         break;
       case 'pong':
         this.rttMs = this.rttMs * 0.8 + (this.clock() - m.ts) * 0.2;

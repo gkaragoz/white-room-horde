@@ -32,6 +32,8 @@ const AIMS: { bone: string; from: number; to: number; side: 'up' | 'low' }[] = [
 const RADIUS = [0.18, 0.18, 0.34, 0.12, 0.12, 0.12, 0.12, 0.14, 0.14, 0.12, 0.12];
 const GRAVITY = -20;
 const STEP = 1 / 60;
+/** Seconds a resting body stays, and how long it takes to shrink away. */
+const REST_FADE = 1.0;
 
 interface Body {
   root: THREE.Group;
@@ -48,6 +50,8 @@ interface Body {
   pos: Float32Array;
   prev: Float32Array;
   age: number;
+  /** Seconds a resting body has been lying there (it shrinks away after a while). */
+  rested: number;
   asleep: boolean;
   quiet: number;
   active: boolean;
@@ -141,7 +145,7 @@ export class RagdollPool {
     }
     root.visible = false;
     this.group.add(root);
-    return { root, model, mixer, bones, parentOf, restQ, restWorldQ, restPos, restDir, restSide, lens, pos: new Float32Array(N * 3), prev: new Float32Array(N * 3), age: 0, asleep: true, quiet: 0, active: false, type, actions, born: 0 };
+    return { root, model, mixer, bones, parentOf, restQ, restWorldQ, restPos, restDir, restSide, lens, pos: new Float32Array(N * 3), prev: new Float32Array(N * 3), age: 0, rested: 0, asleep: true, quiet: 0, active: false, type, actions, born: 0 };
   }
 
   private acquire(type: string): Body | null {
@@ -221,6 +225,8 @@ export class RagdollPool {
       b.prev[i * 3 + 2] = b.pos[i * 3 + 2]! - vz * STEP;
     }
     b.asleep = false;
+    b.rested = 0;
+    b.root.scale.setScalar(1);
     b.quiet = 0;
     b.active = true;
     b.age = 0;
@@ -323,6 +329,11 @@ export class RagdollPool {
     b.model.updateMatrixWorld(true);
   }
 
+  /** Resting bodies shrink away after a few seconds (QA switches it off to measure them). */
+  fadeAway = true;
+  /** Seconds a resting body lies there before it shrinks away (a setting). */
+  restLife = 3.2;
+
   update(dt: number): void {
     this.acc += Math.min(dt, 0.1);
     let steps = 0;
@@ -340,7 +351,25 @@ export class RagdollPool {
         if (b.quiet > 0.4 || b.age > 5) b.asleep = true;
       }
     }
-    for (const b of this.bodies) if (b.active && !b.asleep) this.apply(b);
+    for (const b of this.bodies) {
+      if (!b.active) continue;
+      if (!b.asleep) {
+        this.apply(b);
+        continue;
+      }
+      // a body that has come to rest lies there for a moment, then shrinks away (only the blood stays)
+      b.rested += dt;
+      if (this.fadeAway && b.rested > this.restLife) {
+        const k = 1 - (b.rested - this.restLife) / REST_FADE;
+        if (k <= 0) {
+          b.active = false;
+          b.root.visible = false;
+          b.root.scale.setScalar(1);
+        } else {
+          b.root.scale.setScalar(k);
+        }
+      }
+    }
   }
 
   get activeCount(): number {

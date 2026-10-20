@@ -1,4 +1,4 @@
-import { BALANCE, Buttons, ENEMY_TYPES, PickupType, PlayerState, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, Buttons, decodeTick, encodeTick, ENEMY_TYPES, PickupType, PlayerState, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createWorld, hashWorld, restoreWorld, serializeWorld, spawnEnemy, step } from '../src';
 import { spawnPickup } from '../src/pickups';
@@ -236,5 +236,46 @@ describe('weapon balance', () => {
     expect(range('flamer')).toBeLessThan(6);
     expect(BALANCE.weapons.minigun.spinUp ?? 0).toBeGreaterThan(0);
     expect(BALANCE.weapons.shotgun.pellets).toBeGreaterThan(5);
+  });
+});
+
+describe('thrown grenades', () => {
+  it('a grenade lands where the cursor was: the distance travels with the input and is limited to the throwing range', () => {
+    const land = (aimDist: number | undefined): number => {
+      const w = quiet(31);
+      addPlayer(w, 0, -20, 0);
+      w.pGren[0] = 3;
+      step(w, [{ ...NONE, buttons: Buttons.Grenade, aimDist }]);
+      for (let i = 0; i < 40; i++) step(w, [NONE]);
+      // the grenade stops moving when its fuse starts: read where it ended up
+      return w.gActive.indexOf(1) >= 0 ? w.gX[w.gActive.indexOf(1)]! + 20 : NaN;
+    };
+    expect(land(40)).toBeCloseTo(10, 1); // 40 quarter units = 10 units away
+    expect(land(8)).toBeCloseTo(2, 1);
+    expect(land(255)).toBeCloseTo(BALANCE.grenade.maxRange, 1); // far cursor: the longest throw
+    expect(land(undefined)).toBeCloseTo(BALANCE.grenade.range, 1); // no cursor (gamepad): the normal throw
+  });
+
+  it('the aim distance survives the wire format', () => {
+    const buf = encodeTick([{ moveX: 1, moveY: -2, aim: 1234, buttons: 3, aimDist: 77 }]);
+    expect(decodeTick(buf, 1).inputs[0]!.aimDist).toBe(77);
+  });
+});
+
+describe('explosive rounds', () => {
+  it('a rocket bursts on the first enemy even with piercing upgrades', () => {
+    const w = quiet(32);
+    addPlayer(w, 0, -10, 0, 'gl');
+    w.modPierce = 3;
+    const a = spawnEnemy(w, T('grunt'), -4, 0, false);
+    const b = spawnEnemy(w, T('grunt'), 3, 0, false);
+    for (const e of [a, b]) w.eCooldown[e] = 1e9;
+    const x: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      step(w, [i === 0 ? FIRE : NONE]);
+      for (const ev of w.events) if (ev.type === 'explosion') x.push(ev.x);
+    }
+    expect(x.length).toBe(1);
+    expect(x[0]!).toBeLessThan(0); // at the first enemy, not beyond it
   });
 });

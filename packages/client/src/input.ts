@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { Buttons, type PlayerInput } from '@wrh/shared';
 import { SCREEN_RIGHT, SCREEN_UP, encodeAim, keysToMove } from './controls';
 
-export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'card1' | 'card2' | 'card3' | 'switch' | 'pause';
-export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'switch', 'card1', 'card2', 'card3', 'pause'];
+export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'card1' | 'card2' | 'card3' | 'switch' | 'hostpause' | 'pause';
+export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'switch', 'hostpause', 'card1', 'card2', 'card3', 'pause'];
 
 export type Bindings = Record<Action, string[]>;
 
@@ -21,6 +21,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   card1: ['Digit1'],
   card2: ['Digit2'],
   card3: ['Digit3'],
+  hostpause: ['KeyP'],
   pause: ['Escape'],
 };
 
@@ -178,11 +179,28 @@ export class Input {
     return this.bindings[action].some((c) => this.keys.has(c));
   }
 
+  private hostPausePrev = false;
+
+  /** True once per press of the host-pause key (P). */
+  consumeHostPause(): boolean {
+    const now = this.held('hostpause');
+    const hit = now && !this.hostPausePrev;
+    this.hostPausePrev = now;
+    return hit;
+  }
+
   /** True once per press of the pause key or the pad's Start button. */
   consumePause(): boolean {
     const pad = this.padPause && !this.padPausePrev;
     this.padPausePrev = this.padPause;
     return pad;
+  }
+
+  /** Distance (sim units) a grenade thrown now would fly: to the cursor with the mouse, the normal range otherwise. */
+  grenadeDistance(playerX: number, playerY: number, normal: number, min: number, max: number): number {
+    if (this.aimDevice !== 'mouse' || this.touchAim) return normal;
+    const a = this.aimPoint();
+    return Math.max(min, Math.min(max, Math.hypot(a.x - playerX, a.y - playerY)));
   }
 
   /** Aim point on the floor in sim coordinates. */
@@ -271,11 +289,13 @@ export class Input {
     buttons |= this.touchButtons;
 
     let aimAngle: number;
+    let aimDist = 0;
     if (touchAim) aimAngle = Math.atan2(touchAim.y, touchAim.x);
     else if (padAim) aimAngle = Math.atan2(padAim.y, padAim.x);
     else if (this.aimDevice === 'mouse') {
       const aim = this.aimPoint();
       aimAngle = Math.atan2(aim.y - playerY, aim.x - playerX);
+      aimDist = Math.min(255, Math.round(Math.hypot(aim.x - playerX, aim.y - playerY) * 4));
     } else aimAngle = this.lastAim;
     this.lastAim = aimAngle;
 
@@ -284,6 +304,7 @@ export class Input {
       moveY: Math.round(m.y * 127),
       aim: encodeAim(aimAngle),
       buttons: buttons | this.queued,
+      aimDist,
     };
     this.queued = 0;
     return { input, moveAngle: Math.atan2(m.y, m.x), aimAngle };

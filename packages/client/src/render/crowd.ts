@@ -105,6 +105,10 @@ interface TypeRenderer {
   scale: number;
 }
 
+/** Seconds a baked death animation stays on screen, and how long the last stretch of shrinking takes. */
+const CORPSE_DEFAULT = 5;
+const CORPSE_FADE = 1.2;
+
 interface Corpse {
   type: number;
   x: number;
@@ -134,6 +138,8 @@ export class Crowd {
   private readonly prevY = new Float32Array(MAX_ENEMIES);
   private readonly prevActive = new Uint8Array(MAX_ENEMIES);
   private corpses: Corpse[] = [];
+  /** Seconds a death animation stays on screen (a setting). */
+  corpseLife = CORPSE_DEFAULT;
   private readonly flash = new Float32Array(MAX_ENEMIES);
   private lastNow = 0;
   /** Walk/run phase in cycles, advanced by distance travelled so feet do not slide. */
@@ -356,6 +362,8 @@ export class Crowd {
       const eliteShade = mod === 6 ? 0.55 : mod === 4 ? 1.9 : mod === 2 ? 1.35 : mod === 3 ? 1.25 : mod === 5 ? 1.15 : 1;
       this.put(t, x, -y, this.yaw[i]!, s.a, s.b, s.m, (0.9 + ((i * 53) % 10) * 0.02) * eliteShade + this.flash[i]! * 1.6, mod === 1 ? 1.55 : mod === 2 ? 0.88 : mod === 3 ? 1.12 : 1);
     }
+    // corpses do not pile up: after a few seconds they shrink away and only the blood stays on the floor
+    for (let k = this.corpses.length - 1; k >= 0; k--) if (now - this.corpses[k]!.born > this.corpseLife) this.corpses.splice(k, 1);
     for (const c of this.corpses) {
       const t = this.types[c.render]!;
       const clip = t.clips.get(c.clip) ?? t.clips.get(this.specFor(c.render).death)!;
@@ -366,7 +374,8 @@ export class Crowd {
       c.vx *= f;
       c.vy *= f;
       const s = this.sample(clip, now - c.born);
-      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale);
+      const left = this.corpseLife - (now - c.born);
+      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale * (left < CORPSE_FADE ? Math.max(0.02, left / CORPSE_FADE) : 1));
     }
     let tris = 0;
     for (const t of this.types) {

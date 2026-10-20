@@ -329,7 +329,11 @@
       "leaper": 15,
       "bloater": 6,
       "screamer": 5
-    }
+    },
+    "waveSizeMul": 1.4,
+    "spawnSeconds": 25,
+    "spawnBurst": 0.3,
+    "breatherSeconds": 15
   },
   "progression": {
     "xpBase": 15,
@@ -411,7 +415,9 @@
     "fuse": 0.9,
     "radius": 3.2,
     "damage": 70,
-    "cooldown": 0.5
+    "cooldown": 0.5,
+    "maxRange": 14,
+    "minRange": 2
   },
   "spit": {
     "speed": 9,

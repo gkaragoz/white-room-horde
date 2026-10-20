@@ -293,7 +293,13 @@ export class Fx {
     this.burst(Kind.Spark, x, y, h, count, speed, 0, 0, 6.28, 0.7, 0.05, color);
   }
 
+  /** Particle amount and blood/gib amount multipliers (settings). */
+  density = 1;
+  gore = 1;
+
   private burst(kind: Kind, sx: number, sy: number, h: number, count: number, speed: number, dirX: number, dirY: number, spread: number, life: number, size: number, color: string): void {
+    const want = count * this.density * (kind === Kind.Blood || kind === Kind.Gib ? this.gore : 1);
+    count = Math.floor(want) + (Math.random() < want - Math.floor(want) ? 1 : 0);
     for (let n = 0; n < count; n++) {
       // sim (x, y) -> three (x, h, -y)
       const a = Math.atan2(dirY, dirX) + (Math.random() - 0.5) * spread;

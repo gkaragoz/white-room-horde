@@ -93,6 +93,8 @@ const BANK: Partial<Record<Sfx, Entry>> = {
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
 const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit']);
 
+const VOICE_SFX = new Set<Sfx>(['zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
+
 /** Every file the bank refers to (QA checks they all decode). */
 export const BANK_FILES: string[] = [...new Set(Object.values(BANK).flatMap((b) => b.files))];
 export const MUSIC_FILES = ['determined_pursuit'];
@@ -233,6 +235,10 @@ export class Audio {
   private intensity = 0;
   /** Extra music energy at night (set by main). */
   nightBias = 0;
+  /** Mixer settings: effects, zombie voices and menu sounds. */
+  sfxVolume = 1;
+  voiceVolume = 1;
+  uiSounds = true;
 
   private applyMusicGain(): void {
     if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(this.musicVolume * (0.38 + 0.22 * this.intensity) * this.duck, this.ctx.currentTime, 0.3);
@@ -492,6 +498,11 @@ export class Audio {
       gainMul = s.gain;
       if (gainMul < 0.05) return;
     }
+    if (name.startsWith('ui')) {
+      if (!this.uiSounds) return;
+    } else if (VOICE_SFX.has(name)) gainMul *= this.voiceVolume;
+    else gainMul *= this.sfxVolume;
+    if (gainMul <= 0.001) return;
     const now = this.ctx.currentTime;
     if (now - (this.last.get(name) ?? -1) < GAP[name]) return;
     this.last.set(name, now);

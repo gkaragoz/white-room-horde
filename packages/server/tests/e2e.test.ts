@@ -181,4 +181,30 @@ describe('real server, real sockets, real simulation', () => {
     b.session.setLook(2, 7);
     await until(() => a.session.players.find((p) => p.slot === b.session.slot)!.color === 7, 3000, 'look update');
   });
+  it('the host can pause the game for the whole room and resume it; guests cannot', async () => {
+    const host = await newBot('pause-host');
+    host.session.create('host', 'smg');
+    await until(() => host.session.code !== '', 3000, 'room code');
+    const guest = await newBot('pause-guest');
+    guest.session.join(host.session.code, 'guest', 'ar');
+    await until(() => host.session.players.length === 2, 3000, 'guest in lobby');
+    host.run();
+    guest.run();
+    host.session.start();
+    await until(() => host.session.state === 'playing' && guest.session.state === 'playing' && host.session.applied > 10, 4000, 'game running');
+
+    guest.session.setPause(true); // not the host: ignored
+    await sleep(400);
+    expect(guest.session.paused).toBe(false);
+
+    host.session.setPause(true);
+    await until(() => guest.session.paused && host.session.paused, 2000, 'pause notice');
+    await sleep(300); // let in-flight ticks arrive
+    const frozen = [host.session.applied, guest.session.applied];
+    await sleep(800);
+    expect([host.session.applied, guest.session.applied]).toEqual(frozen);
+
+    host.session.setPause(false);
+    await until(() => !guest.session.paused && guest.session.applied > frozen[1]! + 10, 3000, 'game continues');
+  }, 30_000);
 });

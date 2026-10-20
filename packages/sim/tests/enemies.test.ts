@@ -34,12 +34,86 @@ describe('flow field', () => {
   });
 });
 
+describe('waves', () => {
+  /** Kill everything alive right now (the way a good player clears a wave). */
+  const wipe = (w: ReturnType<typeof createWorld>): void => {
+    for (let i = 0; i < w.eActive.length; i++) {
+      if (!w.eActive[i]) continue;
+      w.eActive[i] = 0;
+      w.enemyCount--;
+    }
+  };
+
+  it('killing enemies does not make new ones appear: a wave brings its own number and no more', () => {
+    const w = createWorld(21);
+    addPlayer(w, 0, 0, 0);
+    const total = (): number => w.misc[3]!;
+    let spawned = 0;
+    for (let t = 0; t < 30 * 40; t++) {
+      step(w, [NONE]);
+      spawned = total() - w.misc[1]!;
+      wipe(w); // the player kills everything instantly, over and over
+      if (w.misc[1] === 0) break;
+    }
+    expect(w.misc[1]).toBe(0);
+    expect(spawned).toBe(total());
+    // nothing more arrives until the next wave
+    const wave = w.wave;
+    for (let t = 0; t < 30 * 8; t++) step(w, [NONE]);
+    expect(w.wave).toBe(wave);
+    expect(w.enemyCount).toBe(0);
+  });
+
+  it('a cleared wave gives a breather and then the next wave starts early', () => {
+    const w = createWorld(22);
+    addPlayer(w, 0, 0, 0);
+    let cleared = -1;
+    for (let t = 0; t < 30 * 40 && cleared < 0; t++) {
+      step(w, [NONE]);
+      wipe(w);
+      if (w.events.some((e) => e.type === 'waveCleared')) cleared = w.tick;
+    }
+    expect(cleared).toBeGreaterThan(0);
+    const startedAt = w.wave;
+    let nextStart = -1;
+    for (let t = 0; t < 30 * 30 && nextStart < 0; t++) {
+      step(w, [NONE]);
+      if (w.events.some((e) => e.type === 'waveStart')) nextStart = w.tick;
+    }
+    expect(w.wave).toBe(startedAt + 1);
+    const breather = (nextStart - cleared) / 30;
+    expect(breather).toBeGreaterThan(BALANCE.waves.breatherSeconds - 1);
+    expect(breather).toBeLessThan(BALANCE.waves.breatherSeconds + 2);
+    expect(breather).toBeLessThan(BALANCE.waves.periodSeconds);
+  });
+
+  it('a wave that is not cleared simply continues until the clock runs out, and every wave is bigger', () => {
+    const w = createWorld(23);
+    addPlayer(w, 0, 0, 0);
+    w.pHp[0] = 1e9;
+    w.pMaxHp[0] = 1e9;
+    const sizes: number[] = [w.misc[3]!];
+    let last = 1;
+    for (let t = 0; t < 30 * 130; t++) {
+      step(w, [NONE]);
+      if (t === 0) sizes[0] = w.misc[3]!;
+      if (w.wave !== last) {
+        last = w.wave;
+        sizes.push(w.misc[3]!);
+      }
+    }
+    expect(sizes.length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]!).toBeGreaterThan(sizes[i - 1]!);
+  });
+});
+
 describe('enemies', () => {
-  it('waves spawn up to the target from the arena edge, away from players', () => {
+  it('a wave arrives in a rush from the arena edge, away from players, and has a fixed size', () => {
     const w = createWorld(3);
     addPlayer(w, 0, 0, 0);
     for (let t = 0; t < 90; t++) step(w, [NONE]);
-    expect(w.enemyCount).toBeGreaterThanOrEqual(BALANCE.waves.baseCount);
+    expect(w.misc[3]!).toBeGreaterThanOrEqual(BALANCE.waves.baseCount);
+    expect(w.enemyCount).toBeGreaterThanOrEqual(w.misc[3]! * BALANCE.waves.spawnBurst - 1);
     for (let i = 0; i < w.eActive.length; i++) {
       if (!w.eActive[i]) continue;
       expect(Math.hypot(w.eX[i]!, w.eY[i]!)).toBeGreaterThan(0);

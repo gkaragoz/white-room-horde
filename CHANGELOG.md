@@ -7,6 +7,21 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Waves**
+- A wave now has a fixed number of enemies: they arrive in a rush (30%) and then as a stream over 25 seconds, and killing them does not make new ones appear. Clear the wave and you get a breather: the next wave starts at most 15 seconds later (or when the clock runs out if you are slower). The HUD shows how many enemies are left, and a "Wave cleared!" banner appears.
+
+**Aiming**
+- Grenades land where your cursor is (up to 14 units; with a gamepad they fly their normal range) and a ring the size of the blast marks the spot on the floor. The cursor distance travels with the input (one extra byte), so everybody in the room sees the same throw.
+- Rockets and grenade launcher shells burst on the first enemy they hit; piercing upgrades no longer carry them through.
+- The ammo ring is a real object on the floor now: it passes behind the character and the enemies. The rounds-left label no longer floats above menus and cards.
+- The system pointer is hidden over the game and replaced by a soft, thick ring that swells and settles (ease-out-back) on every shot and click.
+
+**Settings and controls**
+- The settings window is rebuilt: tabs (Graphics, Audio, Gameplay, Accessibility, Keys), grouped rows with switches, sliders and segmented choices, a reset button, and many more options (screen shake, hit-stop, damage numbers, kill streak announcer, ammo ring, name tags, minimap, frame rate display, particle and blood amount, how long corpses stay, separate sound effect and zombie voice volume, menu sounds).
+- A controls button next to the settings button opens a sheet with every control drawn as keycaps (and the mouse) with what it does, following your key bindings, plus the gamepad layout.
+- P pauses the game for the whole room (host only), P again resumes; in a solo game it pauses too.
+- Dead enemies disappear after a few seconds (you can change how long); only the blood stays.
+
 ## v0.4.0 (2026-10-20)
 
 **Feel**

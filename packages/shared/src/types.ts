@@ -10,6 +10,8 @@ export interface PlayerInput {
   aim: number;
   /** Bit flags, see Buttons. */
   buttons: number;
+  /** Distance to the cursor in quarter units (0 = not given: grenades fly their normal range). */
+  aimDist?: number;
 }
 
 export const Buttons = {

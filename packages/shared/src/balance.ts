@@ -35,6 +35,12 @@ export interface EnemyStats {
 }
 
 export interface WaveConfig {
+  /** A wave has a fixed number of enemies: base count times this. They arrive over `spawnSeconds` (a `spawnBurst` share at once). */
+  waveSizeMul: number;
+  spawnSeconds: number;
+  spawnBurst: number;
+  /** Once a wave is cleared the next one starts after at most this many seconds. */
+  breatherSeconds: number;
   periodSeconds: number;
   baseCount: number;
   perPlayer: number;
@@ -73,7 +79,7 @@ export const BALANCE = data as unknown as {
   dash: { seconds: number; speedMul: number; cooldown: number; iFrames: number };
   difficulty: { hp: number[]; count: number[]; damage: number[] };
   pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; hasteSeconds: number; quadSeconds: number; shieldAmount: number; freezeSeconds: number; nukeDamage: number; chance: { ammo: number; health: number; grenade: number; weapon: number; shield: number; haste: number; quad: number; nuke: number; freeze: number }; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number } };
-  grenade: { max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
+  grenade: { maxRange: number; minRange: number; max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
   spit: { speed: number; life: number; radius: number };
   shielder: { frontDot: number; frontMul: number };
   progression: ProgressionConfig;

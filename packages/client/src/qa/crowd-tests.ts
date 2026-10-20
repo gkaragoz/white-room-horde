@@ -263,6 +263,7 @@ export const crowdTests: QaTest[] = [
       const pool = await RagdollPool.create(6);
       await pool.preload(['grunt', 'tank']);
       ctx.stage.scene.add(pool.group);
+      pool.fadeAway = false;
       const problems: string[] = [];
       const notes: string[] = [];
       try {

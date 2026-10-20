@@ -83,6 +83,7 @@ export class Room {
 
   private sendStart(conn: Conn): void {
     send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, difficulty: this.options.difficulty });
+    if (this.paused) send(conn, { t: 'paused', on: true });
   }
 
   add(conn: Conn, name: string, weapon: WeaponId, acc = 0, color = -1, cls = 0): Member | null {
@@ -238,8 +239,17 @@ export class Room {
   }
 
   /** Produce and broadcast the confirmed inputs for the current tick. Called at the tick rate. */
+  /** The host stopped the game: no ticks are produced until it is resumed. */
+  paused = false;
+
+  setPaused(on: boolean): void {
+    if (!this.started || this.paused === on) return;
+    this.paused = on;
+    for (const m of this.members) if (m?.conn) send(m.conn, { t: 'paused', on });
+  }
+
   advance(): void {
-    if (!this.started) return;
+    if (!this.started || this.paused) return;
     const inputs: (PlayerInput | undefined)[] = [];
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const m = this.members[s];
@@ -347,7 +357,7 @@ export class RoomManager {
     if (a) a.room.lastActive = this.now;
     if (typeof data !== 'string') {
       if (!a) return;
-      if (data[0] === Bin.Input && data.length === 10) {
+      if (data[0] === Bin.Input && data.length === 11) {
         const { tick, input } = decodeInputMsg(data);
         if (Number.isFinite(tick)) a.room.input(a.slot, tick, input);
       } else if (data[0] === Bin.Snapshot) {
@@ -420,6 +430,9 @@ export class RoomManager {
         break;
       case 'resync':
         if (a) a.room.resync(a.slot);
+        break;
+      case 'pause':
+        if (a && a.room.started && a.room.members[a.slot]?.host) a.room.setPaused(msg.on === true);
         break;
       case 'weapon':
         if (a && !a.room.started && (WEAPON_IDS as readonly string[]).includes(msg.weapon)) {

@@ -1,9 +1,10 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CARD_IDS, CARD_RARITY, PERSONAL_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
-import { ACTIONS, keyLabel } from './input';
+import { ACTIONS } from './input';
 import { THEMES } from './render/arena';
 import { EXTRA } from './i18n';
+import { renderControlsSheet, renderSettingsPanel } from './settingsPanel';
 import { discoverRelay } from './relay';
 import { Preview } from './render/preview';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
@@ -43,6 +44,9 @@ const BASE_STRINGS = {
     host_tag: 'host',
     wave: 'Wave',
     nextWave: 'Next wave in',
+    enemiesLeft: 'left',
+    waveCleared: 'Wave cleared!',
+    breather: 'Catch your breath',
     kills: 'Kills',
     level: 'Level',
     boss: 'BOSS',
@@ -73,6 +77,8 @@ const BASE_STRINGS = {
     cycle: 'Day and night',
     dynLights: 'Real-time lights (flashes, explosions, lamps)',
     weather: 'Rain',
+    hostPaused: 'Paused by the host',
+    hostResume: 'Press P to resume',
     colorblind: 'Colour-blind mode',
     textSize: 'Text size',
     on: 'On',
@@ -125,7 +131,7 @@ const BASE_STRINGS = {
     controlsTitle: 'Controls',
     pressKey: 'press a key...',
     resetKeys: 'Reset keys',
-    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', switch: 'Switch weapon', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
+    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', switch: 'Switch weapon', hostpause: 'Pause (host)', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
     fpsCap: 'Frame limit',
     unlimited: 'Display rate',
     texture: 'Texture detail',
@@ -211,6 +217,9 @@ const BASE_STRINGS = {
     host_tag: 'host',
     wave: 'Dalga',
     nextWave: 'Sonraki dalga',
+    enemiesLeft: 'kaldı',
+    waveCleared: 'Dalga temizlendi!',
+    breather: 'Nefes al',
     kills: 'Öldürme',
     level: 'Seviye',
     boss: 'BOSS',
@@ -241,6 +250,8 @@ const BASE_STRINGS = {
     cycle: 'Gece gündüz döngüsü',
     dynLights: 'Gerçek zamanlı ışıklar (namlu, patlama, lamba)',
     weather: 'Yağmur',
+    hostPaused: 'Oyun host tarafından durduruldu',
+    hostResume: 'Devam etmek için P',
     colorblind: 'Renk körü modu',
     textSize: 'Yazı boyutu',
     on: 'Açık',
@@ -293,7 +304,7 @@ const BASE_STRINGS = {
     controlsTitle: 'Kontroller',
     pressKey: 'bir tuşa bas...',
     resetKeys: 'Tuşları sıfırla',
-    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', switch: 'Silah değiştir', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
+    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', switch: 'Silah değiştir', hostpause: 'Duraklat (host)', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
     fpsCap: 'Kare sınırı',
     unlimited: 'Ekran hızı',
     texture: 'Doku detayı',
@@ -394,7 +405,8 @@ export interface UiHandlers {
   onResume(): void;
   onReplay(): void;
   onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
-  onSetting(key: 'volume' | 'music' | 'shadows' | 'scale' | 'lang' | 'aa' | 'bounce' | 'time' | 'dynLights' | 'weather' | 'colorblind' | 'textSize' | 'renderer' | 'fpsCap' | 'texture' | 'autoScale', value: number | string | boolean): void;
+  onSetting(key: keyof Settings, value: number | string | boolean): void;
+  onResetSettings(): void;
 }
 
 export interface Settings {
@@ -416,6 +428,22 @@ export interface Settings {
   colorblind: boolean;
   /** Menu and HUD text size: 0 normal, 1 larger, 2 largest. */
   textSize: 0 | 1 | 2;
+  /** Screen shake strength (1 = default). */
+  shake: number;
+  hitStop: boolean;
+  damageNumbers: boolean;
+  announcer: boolean;
+  ammoRing: boolean;
+  nameTags: boolean;
+  minimap: boolean;
+  showFps: boolean;
+  /** Particle amount, blood and gibs, and how long corpses stay: 0 low, 1 normal, 2 high. */
+  particles: 0 | 1 | 2;
+  gore: 0 | 1 | 2;
+  corpseTime: 0 | 1 | 2;
+  sfxVolume: number;
+  voiceVolume: number;
+  uiSounds: boolean;
   volume: number;
   shadows: 0 | 1 | 2;
   scale: number;
@@ -491,6 +519,60 @@ const CSS = `
 .wrh-card kbd{position:absolute;right:8px;top:8px;z-index:1;background:#1fa2ff;color:#fff;border-radius:5px;padding:0 6px;font-size:12px}
 .wrh-cardtime{width:200px;height:6px;background:rgba(60,45,20,.2);border-radius:4px;margin:8px auto 0;overflow:hidden}
 .wrh-cardtime>i{display:block;height:100%;background:#ff9a3a}
+.wrh-hostpause{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);display:none;text-align:center;font-size:30px;font-weight:900;color:#fff;background:rgba(25,30,42,.72);padding:14px 30px;border-radius:16px;pointer-events:none;text-shadow:0 2px 0 #000}
+.wrh-hostpause small{display:block;font-size:14px;font-weight:600;opacity:.85;margin-top:4px}
+.wrh-ui.no-minimap .wrh-mini{display:none}
+/* layers: labels that follow things in the world sit under the HUD, the HUD under menus, menus under settings */
+.wrh-ammo,.wrh-tag,.wrh-ring,.wrh-arrow-off,.wrh-dmg,.wrh-combo{z-index:1}
+.wrh-top,.wrh-me,.wrh-squad,.wrh-mini,.wrh-cards,.wrh-banner,.wrh-gear,.wrh-warn,.wrh-hint{z-index:5}
+.wrh-hostpause{z-index:8}
+.wrh-center{z-index:20}
+.wrh-ui.no-tags .wrh-tag{display:none}
+.wrh-set{position:absolute;inset:0;z-index:40;pointer-events:auto;display:flex;align-items:center;justify-content:center;background:rgba(20,26,38,.45);backdrop-filter:blur(2px)}
+.wrh-set-panel{width:min(640px,94vw);max-height:90vh;display:flex;flex-direction:column;background:#faf4e8;border:2px solid #cdbfa5;border-radius:16px;box-shadow:0 14px 50px rgba(30,24,10,.4);color:#3a352d;overflow:hidden}
+.wrh-set-panel.wide{width:min(760px,95vw)}
+.wrh-set-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px 6px}
+.wrh-set-head h2{margin:0;font-size:22px}
+.wrh-set-x{background:none!important;color:#3a352d!important;font-size:30px!important;line-height:26px;padding:0 6px!important;margin:0!important}
+.wrh-set-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px;border-bottom:2px solid #e6dcc8}
+.wrh-ui .wrh-set-tabs button{background:none;color:#7a7060;border:0;border-bottom:3px solid transparent;border-radius:0;margin:0 0 -2px;padding:8px 12px;font-size:14px;font-weight:700}
+.wrh-ui .wrh-set-tabs button.on{color:#1488e6;border-bottom-color:#1fa2ff}
+.wrh-set-body{padding:6px 18px 12px;overflow-y:auto;min-height:220px}
+.wrh-set-group{margin:14px 0 4px;padding-bottom:3px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7f6a;border-bottom:1px solid #e6dcc8}
+.wrh-set-row{display:grid;grid-template-columns:1fr 1.25fr;gap:10px;align-items:center;padding:7px 0;border-bottom:1px dashed rgba(205,191,165,.45)}
+.wrh-set-row label{font-size:14px;font-weight:600}
+.wrh-set-row label small{opacity:.6;font-weight:700}
+.wrh-set-val{min-width:44px;text-align:right;font-size:13px;opacity:.75}
+.wrh-set-row:has(.wrh-range){grid-template-columns:1fr 1.25fr 48px}
+.wrh-range{width:100%;accent-color:#1fa2ff}
+.wrh-seg{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+.wrh-ui .wrh-seg button{background:#efe7d6;color:#3a352d;font-size:12px;font-weight:700;padding:5px 10px;margin:0;border:2px solid transparent;border-radius:8px}
+.wrh-ui .wrh-seg button.on{background:#fff;border-color:#1fa2ff;color:#0e6fba}
+.wrh-ui .wrh-switch{justify-self:end;position:relative;width:46px;height:26px;padding:0;margin:0;border-radius:13px;background:#cdbfa5;transition:background .15s}
+.wrh-ui .wrh-switch i{position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .15s}
+.wrh-ui .wrh-switch.on{background:#1fa2ff}
+.wrh-ui .wrh-switch.on i{left:23px}
+.wrh-set-foot{display:flex;gap:8px;justify-content:flex-end;padding:10px 18px 14px;border-top:2px solid #e6dcc8}
+.wrh-ui .wrh-set-foot button{background:#efe7d6;color:#3a352d;margin:0}
+.wrh-ui .wrh-set-foot button.primary{background:#1fa2ff;color:#fff}
+.wrh-set-note{margin:8px 0;font-size:13px;opacity:.75}
+.wrh-set-keygrid{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;font-size:14px;font-weight:600}
+.wrh-ui .wrh-set-keybtn{background:#efe7d6;color:#3a352d;margin:0;padding:4px 8px;border-radius:9px}
+.wrh-ui .wrh-set-small{background:#efe7d6;color:#3a352d;font-size:12px;margin:10px 0 0}
+.wrh-key{display:inline-block;min-width:30px;height:30px;line-height:26px;padding:0 8px;text-align:center;font:700 14px system-ui,sans-serif;color:#3a352d;background:linear-gradient(#fffdf8,#ece3cf);border:2px solid #b9ab8e;border-bottom-width:5px;border-radius:8px;box-shadow:0 2px 0 rgba(60,45,20,.25)}
+.wrh-key.wide{padding:0 12px}
+.wrh-key.pad{border-radius:50%;min-width:34px;background:linear-gradient(#f4f8ff,#dbe6f6);border-color:#8fa3bf;color:#25324a}
+.wrh-keys-row{display:inline-flex;gap:4px;align-items:center}
+.wrh-keys-row em,.wrh-ctl-mouse em{font-style:normal;opacity:.5;margin:0 4px}
+.wrh-ctl-row{display:grid;grid-template-columns:minmax(200px,1fr) 1.3fr;gap:14px;align-items:center;padding:8px 0;border-bottom:1px dashed rgba(205,191,165,.5)}
+.wrh-ctl-keys{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.wrh-ctl-desc b{display:block;font-size:15px}
+.wrh-ctl-desc span{font-size:13px;opacity:.75}
+.wrh-ctl-mouse{display:inline-flex;align-items:center;gap:6px}
+.wrh-ctl-mouse small{font-size:11px;opacity:.7}
+.wrh-padgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px;padding:6px 0}
+.wrh-padcell{display:flex;align-items:center;gap:10px;font-size:14px}
+@media (max-width:560px){.wrh-set-row,.wrh-ctl-row{grid-template-columns:1fr}.wrh-set-row:has(.wrh-range){grid-template-columns:1fr 48px}.wrh-set-row:has(.wrh-range) label{grid-column:1/-1}}
 .wrh-gear{position:absolute;right:12px;top:10px;pointer-events:auto;cursor:pointer;width:34px;height:34px;border-radius:50%;background:rgba(250,244,232,.9);border:2px solid #cdbfa5;text-align:center;line-height:30px;font-size:18px}
 .wrh-hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;opacity:.7;text-shadow:0 1px 0 #fff}
 .wrh-warn{position:absolute;left:50%;top:60px;transform:translateX(-50%);color:#fff;background:#d8362e;padding:4px 12px;border-radius:8px;font-weight:700}
@@ -530,7 +612,8 @@ const CSS = `
 .wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{color:#e9effa;text-shadow:0 1px 2px #000}
 .wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
 .wrh-ammo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none}
-.wrh-ammo i{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--c) calc(var(--f)*1%),rgba(30,36,48,.28) 0);-webkit-mask:radial-gradient(closest-side,transparent 76%,#000 79%);mask:radial-gradient(closest-side,transparent 76%,#000 79%);filter:drop-shadow(0 0 3px rgba(0,0,0,.35))}
+/* the ring itself is a 3D object on the floor (render/ammoRing.ts); this element only carries the count */
+.wrh-ammo i{display:none;position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--c) calc(var(--f)*1%),rgba(30,36,48,.28) 0);-webkit-mask:radial-gradient(closest-side,transparent 76%,#000 79%);mask:radial-gradient(closest-side,transparent 76%,#000 79%);filter:drop-shadow(0 0 3px rgba(0,0,0,.35))}
 .wrh-ammo b{position:absolute;left:100%;top:50%;transform:translate(8px,-50%);font-size:14px;font-weight:800;color:#fff;white-space:nowrap;padding:0 7px;border-radius:9px;background:rgba(25,30,42,.62);text-shadow:0 1px 0 rgba(0,0,0,.6)}
 .wrh-ammo.low b{background:rgba(190,30,30,.8);animation:wrhblink .4s infinite alternate}
 .wrh-ammo.reload i{animation:wrhspin 0.9s linear infinite}
@@ -1268,8 +1351,9 @@ export class Ui {
       <div class="wrh-cards" id="h-cards" style="display:none"></div>
       <div class="wrh-warn" id="h-warn" style="display:none"></div>
       <div class="wrh-hint" id="h-hint"></div>
-      <div class="wrh-gear" id="h-gear">&#9881;</div>`;
+      <div class="wrh-gear" id="h-gear" title="Settings">&#9881;</div><div class="wrh-gear" id="h-ctl" style="right:54px" title="Controls">&#9000;</div><div class="wrh-hostpause" id="h-hostpause"></div>`;
     this.hud.querySelector<HTMLElement>('#h-gear')!.onclick = () => this.toggleSettings();
+    this.hud.querySelector<HTMLElement>('#h-ctl')!.onclick = () => this.toggleControls();
     this.hudBuilt = true;
   }
 
@@ -1309,6 +1393,14 @@ export class Ui {
     this.hurtDirTimer = performance.now();
   }
 
+  /** The "paused by the host" notice (online). */
+  setHostPause(on: boolean, canResume: boolean): void {
+    const el = this.hud.querySelector<HTMLElement>('#h-hostpause');
+    if (!el) return;
+    el.style.display = on ? 'block' : 'none';
+    if (on) el.innerHTML = `&#9208; ${this.t.hostPaused}${canResume ? `<small>${this.t.hostResume}</small>` : ''}`;
+  }
+
   /** A full-screen flash of a colour that fades out (nukes, freezes). */
   screenFlash(color: string, ms: number): void {
     const el = document.createElement('div');
@@ -1328,97 +1420,73 @@ export class Ui {
 
   toggleSettings(): void {
     this.settingsOpen = !this.settingsOpen;
+    if (this.settingsOpen) this.controlsOpen = false;
     this.renderSettings();
   }
 
-  private keyRows(): string {
-    const b = this.h.getBindings();
-    const names = this.t.actions as Record<string, string>;
-    return ACTIONS.map((a) => `<span>${names[a]}</span><button type="button" data-act="${a}">${esc((b[a] ?? []).map(keyLabel).join(' / '))}</button>`).join('');
+  private settingsTab = 'graphics';
+  private settingsScroll = 0;
+  private controlsOpen = false;
+
+  /** True while the settings window or the controls sheet is open. */
+  get overlayOpen(): boolean {
+    return this.settingsOpen || this.controlsOpen;
+  }
+
+  /** The controls sheet: every control as keycaps with what it does. */
+  toggleControls(): void {
+    this.controlsOpen = !this.controlsOpen;
+    if (this.controlsOpen) this.settingsOpen = false;
+    this.renderSettings();
   }
 
   private renderSettings(): void {
+    if (this.controlsOpen) {
+      renderControlsSheet(this.settingsEl, {
+        lang: this.lang,
+        bindings: this.h.getBindings(),
+        onClose: () => this.toggleControls(),
+        onSetting: () => undefined,
+      });
+      return;
+    }
     if (!this.settingsOpen) {
       this.settingsEl.innerHTML = '';
       return;
     }
-    const t = this.t;
-    const s = this.settings;
-    this.settingsEl.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll">
-      <h1 style="font-size:22px">${t.settings}</h1>
-      <label>${t.volume}</label><input id="s-vol" type="range" min="0" max="100" value="${Math.round(s.volume * 100)}">
-      <label>${t.music}</label><input id="s-mus" type="range" min="0" max="100" value="${Math.round(s.music * 100)}">
-      <label>${t.shadows}</label><input id="s-sh" type="range" min="0" max="2" step="1" value="${s.shadows}">
-      <label>${t.quality} (${s.scale.toFixed(2)})</label><input id="s-sc" type="range" min="50" max="100" step="5" value="${Math.round(s.scale * 100)}">
-      <label>${t.renderer} <small>(${t.reloads})</small></label><div class="wrh-row">${(['webgl', 'webgpu'] as const).map((m) => `<button class="wrh-wp${s.renderer === m ? ' on' : ''}" data-rd="${m}">${m === 'webgl' ? 'WebGL2' : 'WebGPU'}</button>`).join('')}</div>
-      <label>${t.aa} <small>(${t.reloads})</small></label><div class="wrh-row">${(['off', 'msaa', 'smaa'] as const).map((m) => `<button class="wrh-wp${s.aa === m ? ' on' : ''}" data-aa="${m}">${m === 'off' ? t.off : m.toUpperCase()}</button>`).join('')}</div>
-      <label>${t.timeOfDay}</label><div class="wrh-row">${(['day', 'night', 'cycle'] as const).map((m) => `<button class="wrh-wp${s.time === m ? ' on' : ''}" data-tod="${m}">${t[m]}</button>`).join('')}</div>
-      <label>${t.dynLights}</label><div class="wrh-row"><button class="wrh-wp${s.dynLights ? ' on' : ''}" id="s-dl1">${t.on}</button><button class="wrh-wp${!s.dynLights ? ' on' : ''}" id="s-dl0">${t.off}</button></div>
-      <label>${t.weather}</label><div class="wrh-row"><button class="wrh-wp${s.weather ? ' on' : ''}" id="s-wx1">${t.on}</button><button class="wrh-wp${!s.weather ? ' on' : ''}" id="s-wx0">${t.off}</button></div>
-      <label>${t.bounce}</label><div class="wrh-row"><button class="wrh-wp${s.bounce ? ' on' : ''}" id="s-bn1">${t.on}</button><button class="wrh-wp${!s.bounce ? ' on' : ''}" id="s-bn0">${t.off}</button></div>
-      <label>${t.controlsTitle}</label><div class="wrh-keys" id="s-keys">${this.keyRows()}</div><button class="alt" id="s-resetkeys">${t.resetKeys}</button>
-      <label>${t.fpsCap}</label><div class="wrh-row">${([0, 30, 60, 120] as const).map((v) => `<button class="wrh-wp${s.fpsCap === v ? ' on' : ''}" data-fps="${v}">${v === 0 ? t.unlimited : v}</button>`).join('')}</div>
-      <label>${t.texture} <small>(${t.reloads})</small></label><div class="wrh-row"><button class="wrh-wp${s.texture === 0 ? ' on' : ''}" data-tex="0">${t.low}</button><button class="wrh-wp${s.texture === 1 ? ' on' : ''}" data-tex="1">${t.high}</button></div>
-      <label>${t.autoScale}</label><div class="wrh-row"><button class="wrh-wp${s.autoScale ? ' on' : ''}" id="s-as1">${t.on}</button><button class="wrh-wp${!s.autoScale ? ' on' : ''}" id="s-as0">${t.off}</button></div>
-      <label>${t.language}</label><div class="wrh-row">${LANGS.map((l) => `<button class="wrh-wp${s.lang === l.id ? ' on' : ''}" data-lang="${l.id}">${l.label}</button>`).join('')}</div>
-      <label>${t.colorblind}</label><div class="wrh-row"><button class="wrh-wp${s.colorblind ? ' on' : ''}" id="s-cb1">${t.on}</button><button class="wrh-wp${!s.colorblind ? ' on' : ''}" id="s-cb0">${t.off}</button></div>
-      <label>${t.textSize}</label><div class="wrh-row">${([0, 1, 2] as const).map((v) => `<button class="wrh-wp${s.textSize === v ? ' on' : ''}" data-ts="${v}">${['A', 'A+', 'A++'][v]}</button>`).join('')}</div>
-      <button id="s-close">${t.close}</button>
-    </div>`;
-    const q = <E extends HTMLInputElement>(id: string): E => this.settingsEl.querySelector<E>('#' + id)!;
-    q('s-vol').oninput = (e) => this.h.onSetting('volume', Number((e.target as HTMLInputElement).value) / 100);
-    q('s-mus').oninput = (e) => this.h.onSetting('music', Number((e.target as HTMLInputElement).value) / 100);
-    q('s-sh').oninput = (e) => this.h.onSetting('shadows', Number((e.target as HTMLInputElement).value));
-    q('s-sc').oninput = (e) => this.h.onSetting('scale', Number((e.target as HTMLInputElement).value) / 100);
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-aa]').forEach((el) => {
-      el.onclick = () => this.h.onSetting('aa', el.dataset.aa!);
+    renderSettingsPanel(this.settingsEl, {
+      settings: this.settings,
+      lang: this.lang,
+      langs: LANGS,
+      tab: this.settingsTab,
+      scroll: this.settingsScroll,
+      actionNames: this.t.actions as Record<string, string>,
+      actions: ACTIONS,
+      bindings: this.h.getBindings(),
+      onSetting: (key, value) => this.h.onSetting(key, value),
+      onTab: (tab) => {
+        this.settingsTab = tab;
+        this.settingsScroll = 0;
+        this.renderSettings();
+      },
+      onRebind: (action) => this.h.onRebind(action, () => this.renderSettings()),
+      onResetKeys: () => {
+        this.h.onResetKeys();
+        this.renderSettings();
+      },
+      onReset: () => this.h.onResetSettings(),
+      onClose: () => this.toggleSettings(),
+      onControls: () => this.toggleControls(),
     });
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-rd]').forEach((el) => {
-      el.onclick = () => this.h.onSetting('renderer', el.dataset.rd!);
-    });
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-tod]').forEach((el) => {
-      el.onclick = () => this.h.onSetting('time', el.dataset.tod!);
-    });
-    q('s-wx1').onclick = () => this.h.onSetting('weather', true);
-    q('s-wx0').onclick = () => this.h.onSetting('weather', false);
-    q('s-dl1').onclick = () => this.h.onSetting('dynLights', true);
-    q('s-dl0').onclick = () => this.h.onSetting('dynLights', false);
-    q('s-bn1').onclick = () => this.h.onSetting('bounce', true);
-    q('s-bn0').onclick = () => this.h.onSetting('bounce', false);
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-act]').forEach((el) => {
-      el.onclick = () => {
-        el.textContent = this.t.pressKey;
-        this.h.onRebind(el.dataset.act!, () => this.renderSettings());
-      };
-    });
-    this.settingsEl.querySelector<HTMLElement>('#s-resetkeys')!.onclick = () => {
-      this.h.onResetKeys();
-      this.renderSettings();
-    };
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-fps]').forEach((el) => {
-      el.onclick = () => this.h.onSetting('fpsCap', Number(el.dataset.fps));
-    });
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-tex]').forEach((el) => {
-      el.onclick = () => this.h.onSetting('texture', Number(el.dataset.tex));
-    });
-    q('s-as1').onclick = () => this.h.onSetting('autoScale', true);
-    q('s-as0').onclick = () => this.h.onSetting('autoScale', false);
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-lang]').forEach((el) => {
-      el.onclick = () => this.h.onSetting('lang', el.dataset.lang!);
-    });
-    this.settingsEl.querySelectorAll<HTMLElement>('[data-ts]').forEach((el) => {
-      el.onclick = () => this.h.onSetting('textSize', Number(el.dataset.ts));
-    });
-    q('s-cb1').onclick = () => this.h.onSetting('colorblind', true);
-    q('s-cb0').onclick = () => this.h.onSetting('colorblind', false);
-    q('s-close').onclick = () => this.toggleSettings();
   }
 
   applySettings(s: Settings): void {
     this.settings = s;
+    this.root.classList.toggle('no-minimap', !s.minimap);
+    this.root.classList.toggle('no-tags', !s.nameTags);
     this.root.style.setProperty('--wrh-zoom', String([1, 1.18, 1.38][s.textSize] ?? 1));
     this.lang = s.lang;
-    if (this.settingsOpen) this.renderSettings();
+    if (this.settingsOpen || this.controlsOpen) this.renderSettings();
     this.lastCards = '';
   }
 
@@ -1488,7 +1556,7 @@ export class Ui {
     };
     const nextIn = Math.max(0, Math.ceil(BALANCE.waves.periodSeconds - (world.tick - world.waveTick) / TICK_RATE));
     const bossNext = (world.wave + 1) % BALANCE.progression.boss.everyWaves === 0;
-    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.level}<br><small style="font-weight:600;opacity:.75">${t.nextWave} ${nextIn}s${bossNext ? ` &middot; <span class="wrh-low">${t.boss}!</span>` : ''}</small>`);
+    set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.level}<br><small style="font-weight:600;opacity:.75">${world.enemyCount + world.misc[1]! > 0 ? `${world.enemyCount + world.misc[1]!} ${t.enemiesLeft} &middot; ` : `${t.breather} &middot; `}${t.nextWave} ${nextIn}s${bossNext ? ` &middot; <span class="wrh-low">${t.boss}!</span>` : ''}</small>`);
     (this.hud.querySelector('#h-xp') as HTMLElement).style.width = `${Math.min(100, (world.xp / xpForNext(world)) * 100)}%`;
 
     // boss bar

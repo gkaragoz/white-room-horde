@@ -29,6 +29,7 @@ export type SimEvent =
   | { type: 'playerDown'; slot: number; x: number; y: number }
   | { type: 'playerDead'; slot: number }
   | { type: 'playerRevive'; slot: number }
+  | { type: 'waveCleared'; wave: number }
   | { type: 'waveStart'; wave: number; boss: boolean; mod: number }
   | { type: 'levelUp'; level: number }
   | { type: 'cardOffer'; cards: number[] }
@@ -133,7 +134,7 @@ export interface World {
   brY: Float64Array;
   brHp: Float64Array;
   brT: Float64Array;
-  /** Misc world timers: [0] enemies frozen for this many seconds. */
+  /** Misc world numbers: [0] seconds enemies stay frozen, [1] enemies of this wave still to arrive, [2] tick the wave was cleared (0 = not yet), [3] size of this wave. */
   misc: Float64Array;
   // grenades
   gActive: Uint8Array;
