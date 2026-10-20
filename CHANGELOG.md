@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.6.0 (2026-10-20)
+
 **Speed (rules change: update the server and reload the page)**
 - Everyone walks twice as fast (players 6 to 12, every enemy speed doubled), bullets and spit fly twice as fast (ranges unchanged, so a shot lives half as long); the dash is a shorter, sharper burst (x2.4).
 - Enemies bounce with every stride, leapers jump in a real arc and a hit pops the body up; running players kick up dust; bullets are drawn between ticks so fast rounds do not jump.
