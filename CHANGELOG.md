@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.7.1 (2026-10-20)
+
 **Sound**
 - Real sounds for the climb between floors (CC0 Kenney packs, built by `tools/audio/make_floor_sfx.py`): clear jingle, countdown ticks, charge swell, lift whoosh, arrival thump and the floor-start horn replace the synthesised stand-ins.
 
