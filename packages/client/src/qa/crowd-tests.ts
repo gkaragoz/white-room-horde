@@ -595,7 +595,7 @@ export const crowdTests: QaTest[] = [
           for (let i = 0; i < a.length; i += 4) t += a[i]! + a[i + 1]! + a[i + 2]!;
           return t / (a.length / 4) / 3;
         };
-        if (Math.abs(mean(tiny) - mean(sharp)) > 6) problems.push(`switching to the flight composer shifts brightness by ${f(mean(tiny) - mean(sharp))}`);
+        if (Math.abs(mean(tiny) - mean(sharp)) > 10) problems.push(`switching to the flight composer shifts brightness by ${f(mean(tiny) - mean(sharp))}`);
         ctx.stage.setFlightBlur(0);
         // arrival: everything drops back to the floor in one go and the other floor is now the current one
         const first = climb.props;

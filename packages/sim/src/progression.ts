@@ -194,6 +194,8 @@ export function updateCards(w: World, inputs: ReadonlyArray<PlayerInput | undefi
     const card = w.pOffer[s * 3 + choice]!;
     for (let i = 0; i < 3; i++) w.pOffer[s * 3 + i] = -1;
     applyCard(w, card, s);
+    const at = s * CARDS + card;
+    if (w.pCards[at]! < 255) w.pCards[at] = w.pCards[at]! + 1;
     w.events.push({ type: 'cardPicked', card, by: s });
     if (w.pPending[s]! > 0) openOffer(w, s);
   }

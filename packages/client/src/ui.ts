@@ -681,6 +681,17 @@ const CSS = `
 .wrh-invite{background:#e7f6e9;border:2px solid #7ccf8a;border-radius:9px;padding:6px 10px;margin:0 0 10px;font-size:13px}
 .wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint,.wrh-ui.night .wrh-squad div{text-shadow:none}
 .wrh-ui.night .wrh-bar{background:rgba(255,255,255,.18)}
+.wrh-relics{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:65;display:none;flex-wrap:wrap;justify-content:center;gap:6px;max-width:min(62vw,720px);pointer-events:none}
+.wrh-relics.on{display:flex}
+.wrh-relic{position:relative;width:42px;height:42px;border-radius:10px;border:2px solid var(--rc,#9aa5b4);background:#fffaf0;box-shadow:0 2px 6px rgba(20,28,44,.28);cursor:help;pointer-events:auto;transition:transform .12s,outline-color .12s;outline:3px solid transparent}
+.wrh-relic img{display:block;width:100%;height:100%;object-fit:cover;border-radius:7px}
+.wrh-relic:hover{transform:translateY(-5px);outline-color:#ffd21f}
+.wrh-relic b{position:absolute;right:-5px;bottom:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#2b3a52;color:#fff;font:800 11px/17px system-ui,sans-serif;text-align:center}
+.wrh-tip{position:fixed;left:0;top:0;z-index:90;max-width:260px;padding:9px 12px;border-radius:11px;background:rgba(27,36,54,.96);color:#fff;pointer-events:none;display:none;box-shadow:0 8px 22px rgba(0,0,0,.4);border:2px solid var(--rc,#ffd21f)}
+.wrh-tip b{display:block;font-size:15px;margin-bottom:2px}
+.wrh-tip span{display:block;font-size:13px;line-height:1.35;opacity:.92}
+.wrh-tip em{display:block;margin-top:5px;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.75}
+.wrh-ui.has-relics .wrh-hint{bottom:62px}
 .wrh-info{position:absolute;left:12px;top:30px;z-index:8;max-width:300px;pointer-events:none;display:flex;flex-direction:column;gap:6px}
 .wrh-info .it{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 10px;border-radius:12px;border-left:5px solid var(--c,#1fa2ff);background:rgba(251,246,234,.96);box-shadow:0 4px 14px rgba(20,28,44,.28);color:#2b3a52;transform:translateX(-120%);opacity:0}
 .wrh-info .it.in{animation:wrh-info-in .42s cubic-bezier(.2,1.5,.4,1) forwards}
@@ -871,7 +882,8 @@ export class Ui {
     this.hud.style.cssText = 'position:absolute;inset:0;pointer-events:none';
     this.dev.className = 'wrh-hud-dev';
     this.infoEl.className = 'wrh-info';
-    this.root.append(this.hud, this.dev, this.screen, this.settingsEl, this.toolbar, this.infoEl);
+    this.bindRelicTips();
+    this.root.append(this.hud, this.dev, this.screen, this.settingsEl, this.toolbar, this.infoEl, this.relicEl, this.tipEl);
     this.buildToolbar();
     // every button gets a click sound; the important ones a confirmation
     this.root.addEventListener('click', (e) => {
@@ -883,6 +895,68 @@ export class Ui {
       else this.h.onUiSound('click');
     });
     parent.appendChild(this.root);
+  }
+
+  private readonly relicEl = document.createElement('div');
+  private readonly tipEl = document.createElement('div');
+  private lastRelics = '';
+
+  /** The cards the local character took, as small icons bottom centre (stacked with a count); hover shows what each does. */
+  private updateRelics(world: World, slot: number): void {
+    const n = CARD_IDS.length;
+    const counts: number[] = [];
+    for (let i = 0; i < n; i++) counts.push(world.pCards[slot * n + i]!);
+    const key = counts.join(',') + this.lang;
+    if (key === this.lastRelics) return;
+    this.lastRelics = key;
+    const t = this.t;
+    const cards = t.cards as Record<string, readonly [string, string]>;
+    const rarityColor = ['#9aa5b4', '#4aa8ff', '#b45cff'];
+    let html = '';
+    for (let i = 0; i < n; i++) {
+      if (!counts[i]) continue;
+      const id = CARD_IDS[i]!;
+      const rarity = CARD_RARITY[id];
+      html += `<div class="wrh-relic" data-i="${i}" style="--rc:${rarityColor[rarity]}"><img src="${asset(`cards/${id}.png`)}" alt="" draggable="false">${counts[i]! > 1 ? `<b>x${counts[i]}</b>` : ''}</div>`;
+    }
+    this.relicEl.innerHTML = html;
+    this.relicEl.classList.toggle('on', html !== '');
+    this.root.classList.toggle('has-relics', html !== '');
+    void cards;
+  }
+
+  private bindRelicTips(): void {
+    this.relicEl.className = 'wrh-relics';
+    this.tipEl.className = 'wrh-tip';
+    const place = (e: MouseEvent): void => {
+      const w = this.tipEl.offsetWidth;
+      const h = this.tipEl.offsetHeight;
+      this.tipEl.style.left = `${Math.max(6, Math.min(innerWidth - w - 6, e.clientX + 16))}px`;
+      this.tipEl.style.top = `${Math.max(6, Math.min(innerHeight - h - 6, e.clientY - h - 14))}px`;
+    };
+    this.relicEl.addEventListener('mouseover', (e) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>('.wrh-relic');
+      if (!el) return;
+      const i = Number(el.dataset.i);
+      const id = CARD_IDS[i]!;
+      const t = this.t;
+      const info = (t.cards as Record<string, readonly [string, string]>)[id] ?? [id, ''];
+      const count = this.lastRelicsCounts(i);
+      this.tipEl.style.setProperty('--rc', ['#9aa5b4', '#4aa8ff', '#b45cff'][CARD_RARITY[id]]!);
+      this.tipEl.innerHTML = `<b>${esc(info[0])}${count > 1 ? ` x${count}` : ''}</b><span>${esc(info[1])}</span><em>${(t.rarity as readonly string[])[CARD_RARITY[id]]}${TEAM_CARDS.includes(id) ? ` &middot; ${t.teamTag}` : ''}</em>`;
+      this.tipEl.style.display = 'block';
+      place(e);
+    });
+    this.relicEl.addEventListener('mousemove', (e) => {
+      if (this.tipEl.style.display === 'block') place(e);
+    });
+    this.relicEl.addEventListener('mouseout', (e) => {
+      if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.wrh-relic')) this.tipEl.style.display = 'none';
+    });
+  }
+
+  private lastRelicsCounts(i: number): number {
+    return Number(this.lastRelics.split(',')[i] ?? 0) || 0;
   }
 
   private readonly infoEl = document.createElement('div');
@@ -1731,6 +1805,10 @@ export class Ui {
   }
 
   clearHud(): void {
+    this.relicEl.classList.remove('on');
+    this.root.classList.remove('has-relics');
+    this.lastRelics = '';
+    this.tipEl.style.display = 'none';
     this.hud.innerHTML = '';
     this.hudBuilt = false;
     this.lastCards = '';
@@ -2011,6 +2089,7 @@ export class Ui {
           ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>`,
       );
       set('h-inv', this.inventoryHtml(world, slot));
+      this.updateRelics(world, slot);
       const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
       bar.style.display = reloading ? 'block' : 'none';
       if (reloading) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (1 - world.pReload[slot]! / stats.reload) * 100))}%`;

@@ -1,4 +1,4 @@
-import { BALANCE, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, PERKS, WEAPON_IDS } from '@wrh/shared';
+import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, PERKS, WEAPON_IDS } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -63,6 +63,8 @@ export interface World {
   pPending: Int32Array;
   pOffer: Int32Array;
   pCardTimer: Int32Array;
+  /** How many times each character took each card (card id index), for the relic bar. */
+  pCards: Uint8Array;
   /** Per player upgrades from cards (multipliers start at 1, pierce and crit chance at 0). */
   modDamage: Float64Array;
   modRate: Float64Array;
@@ -198,6 +200,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pPending: new Int32Array(MAX_PLAYERS),
     pOffer: new Int32Array(MAX_PLAYERS * 3).fill(-1),
     pCardTimer: new Int32Array(MAX_PLAYERS),
+    pCards: new Uint8Array(MAX_PLAYERS * CARD_IDS.length),
     modDamage: new Float64Array(MAX_PLAYERS).fill(1),
     modRate: new Float64Array(MAX_PLAYERS).fill(1),
     modSpeed: new Float64Array(MAX_PLAYERS).fill(1),

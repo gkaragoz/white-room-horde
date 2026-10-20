@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Relics, range, aim (rules change: update the server and reload the page)**
+- The cards you took sit bottom centre as small icons like relics (same card stacked with a count, a border in the rarity colour). Hover one: it gets a yellow outline and a text opens at the pointer with what it does; it works in the pause menu too.
+- Every weapon shoots much further (pistol 14 to 26, AR 18 to 32, shotgun 7 to 16, SMG 10 to 20, sniper 40 to 70, ...; the flamethrower stays short).
+- Auto aim never goes without a target while any enemy or barrel is left: it prefers the nearest one it can hit, but when all of them are behind cover it takes the nearest anyway (the bullets then hit the cover); the weapon's range no longer limits the choice, so the shotgun stops dropping its target. Only an empty arena (the floor-cleared countdown) leaves the character free.
+
 ## v0.9.1 (2026-10-20)
 
 - Your teammates' hits print their damage too: smaller, in their own colour. Yours stay white (gold when big).

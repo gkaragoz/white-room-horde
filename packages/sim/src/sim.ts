@@ -1,5 +1,6 @@
 import {
   PERK,
+  CARD_IDS,
   FloorPhase,
   MISC,
   ARENA_HALF_H,
@@ -75,6 +76,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pPending[slot] = 0;
   w.pCardTimer[slot] = 0;
   for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = -1;
+  w.pCards.fill(0, slot * CARD_IDS.length, (slot + 1) * CARD_IDS.length);
   w.modDamage[slot] = w.modRate[slot] = w.modSpeed[slot] = w.modRevive[slot] = w.modMagnet[slot] = w.modXp[slot] = 1;
   w.modBlast[slot] = w.modReload[slot] = w.modDash[slot] = w.modArmor[slot] = 1;
   w.modPierce[slot] = w.modCrit[slot] = 0;
@@ -401,7 +403,7 @@ export function hashWorld(w: World): number {
   for (const v of w.rng.getState()) c.u32(v);
   c.u32(w.difficulty).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver);
   c.typed(new Float64Array([w.modLoot]));
-  c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer);
+  c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer).typed(w.pCards);
   c.typed(w.modDamage).typed(w.modRate).typed(w.modSpeed).typed(w.modPierce).typed(w.modRevive).typed(w.modMagnet).typed(w.modXp).typed(w.modBlast).typed(w.modReload).typed(w.modDash).typed(w.modArmor).typed(w.modCrit);
   c.typed(w.pModRate).typed(w.pModPierce).typed(w.pModArmor).typed(w.pLifesteal);
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);

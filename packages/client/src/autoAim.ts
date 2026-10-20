@@ -11,8 +11,6 @@ export interface AimTarget {
 
 /** A new target has to be this much closer than the one we are on before we let go of it (no flicker between two equals). */
 const STICKY = 0.8;
-/** Targets farther than the weapon's range times this are ignored. */
-const REACH = 1.25;
 /** How many nearer targets hidden behind cover are skipped before giving up. */
 const MAX_HIDDEN = 8;
 
@@ -23,25 +21,28 @@ function position(w: World, kind: 0 | 1, id: number): { x: number; y: number } {
 }
 
 /**
- * The nearest enemy or barrel the player can actually shoot: within reach of the weapon in the hands and not hidden
- * behind cover (a wall in the way would just eat the bullets). Barrels inside their blast of the shooter are skipped:
- * shooting one at your feet would hurt you. `shotClear` (from AimSolver.shotClear) tests the real bullet path; without
- * it only the line from the player's middle is checked. Null when there is nothing (then the character keeps looking where it was).
+ * Who to aim at. Enemies and barrels are tried nearest first; the first one with a free bullet path wins (the weapon's
+ * range does not matter: a target out of reach is still better than shooting at nothing). When every one of them is
+ * behind cover, the nearest overall is chosen anyway, so there is always a target while any enemy or barrel is left; the
+ * bullets then hit the cover and that is that. Barrels inside their blast of the shooter are skipped (they would hurt
+ * the shooter), enemies that are still spawning count as nearest-overall candidates only. `shotClear` (from
+ * AimSolver.shotClear) tests the real bullet path; without it only the line from the player's middle is checked.
+ * Null only when nothing is left.
  */
 export function pickTarget(w: World, slot: number, prev: AimTarget | null, shotClear?: (t: AimTarget) => boolean): AimTarget | null {
   if (!w.pActive[slot]) return null;
   const px = w.pX[slot]!;
   const py = w.pY[slot]!;
-  const range = BALANCE.weapons[WEAPON_IDS[w.pWeapon[slot]!]!]!.range * REACH;
-  const limit = range * range;
   const safe = BALANCE.barrels.radius + 1.2;
   reject.fill(0);
   let best: AimTarget | null = null;
+  let first: AimTarget | null = null;
+  const clear = (t: AimTarget): boolean => (shotClear ? shotClear(t) : lineClear(w, px, py, t.x, t.y));
   for (let attempt = 0; attempt <= MAX_HIDDEN; attempt++) {
     let cand: AimTarget | null = null;
-    let candD = limit;
+    let candD = Infinity;
     for (let i = 0; i < MAX_ENEMIES; i++) {
-      if (!w.eActive[i] || w.eState[i] === EnemyState.Spawn || reject[i]) continue;
+      if (!w.eActive[i] || reject[i]) continue;
       const dx = w.eX[i]! - px;
       const dy = w.eY[i]! - py;
       const d = dx * dx + dy * dy;
@@ -62,23 +63,26 @@ export function pickTarget(w: World, slot: number, prev: AimTarget | null, shotC
       }
     }
     if (!cand) break;
-    if (shotClear ? shotClear(cand) : lineClear(w, px, py, cand.x, cand.y)) {
+    first ??= cand;
+    const spawning = cand.kind === 0 && w.eState[cand.id] === EnemyState.Spawn;
+    if (!spawning && clear(cand)) {
       best = cand;
       break;
     }
     reject[cand.kind === 0 ? cand.id : MAX_ENEMIES + cand.id] = 1;
   }
+  const shootable = best !== null;
+  best ??= first; // everything is behind cover: still the nearest one, the character never stands there aimless
   if (!best || !prev || (prev.kind === best.kind && prev.id === best.id)) return best;
   // stay on the current target unless something else is clearly nearer
-  const alive = prev.kind === 0 ? !!w.eActive[prev.id] && w.eState[prev.id] !== EnemyState.Spawn : !!w.brActive[prev.id];
+  const alive = prev.kind === 0 ? !!w.eActive[prev.id] : !!w.brActive[prev.id];
   if (!alive) return best;
   const p = position(w, prev.kind, prev.id);
-  const dpx = p.x - px;
-  const dpy = p.y - py;
-  const dp = dpx * dpx + dpy * dpy;
+  const dp = (p.x - px) ** 2 + (p.y - py) ** 2;
   const db = (best.x - px) ** 2 + (best.y - py) ** 2;
   const prevTarget: AimTarget = { kind: prev.kind, id: prev.id, x: p.x, y: p.y };
-  if (dp <= limit && (shotClear ? shotClear(prevTarget) : lineClear(w, px, py, p.x, p.y)) && db > dp * STICKY * STICKY) return { kind: prev.kind, id: prev.id, x: p.x, y: p.y };
+  const spawning = prev.kind === 0 && w.eState[prev.id] === EnemyState.Spawn;
+  if ((!shootable || (!spawning && clear(prevTarget))) && db > dp * STICKY * STICKY) return prevTarget;
   return best;
 }
 

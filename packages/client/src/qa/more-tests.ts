@@ -754,12 +754,15 @@ export const moreTests: QaTest[] = [
       if (!t || t.kind !== 1) problems.push('a barrel in reach was ignored');
       w.brX[0] = 1;
       if (pickTarget(w, 0, null)) problems.push('a barrel at the shooter\'s feet was targeted');
-      // out of reach
+      // far away is still a target (the weapon's range does not matter), and only an empty arena leaves it without one
       w.brX[0] = 200;
+      w.brActive[0] = 1;
+      const farOne = pickTarget(w, 0, null);
+      if (!farOne) problems.push('a far target was not chosen: the character would stand there aimless');
       w.brActive[0] = 0;
-      if (pickTarget(w, 0, null)) problems.push('a target far out of reach was chosen');
+      if (pickTarget(w, 0, null)) problems.push('a target appeared with nothing left on the floor');
       void far;
-      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'nearest, sticky, barrel-safe and range-limited' };
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'nearest, sticky, barrel-safe, never aimless' };
     },
   },
   {
@@ -853,7 +856,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'aim.cover',
-    title: 'Auto-aim never picks a target behind cover, not even one that is visible from the middle of the player but not from the muzzle',
+    title: 'Auto-aim prefers a target it can hit over one behind cover (also one hidden from the muzzle only), and falls back to the nearest when all are hidden',
     async run() {
       const problems: string[] = [];
       const solver = new AimSolver();
@@ -868,17 +871,18 @@ export const moreTests: QaTest[] = [
       const plain = pickTarget(w, 0, null);
       if (!plain) problems.push('the setup is wrong: the target is not visible from the middle of the player');
       const aimed = pickTarget(w, 0, null, (x) => solver.shotClear(w, 0, x, 1));
-      if (aimed) problems.push('the target whose muzzle is behind the box corner was chosen');
+      // the only enemy is behind the corner: it is still the target (never aimless), the bullets just hit the cover
+      if (!aimed || aimed.id !== e) problems.push('with only a hidden enemy left the character has no target');
       // and the simulation agrees: shooting straight at it never reaches it
       const hp = w.eHp[e]!;
       for (let t = 0; t < 40; t++) step(w, [{ moveX: 0, moveY: 0, aim: 0, buttons: Buttons.Fire }]);
-      if (w.eHp[e] !== hp) problems.push('a bullet got through the corner, the check is too strict');
+      if (w.eHp[e] !== hp) problems.push('a bullet got through the corner, the setup is wrong');
       // a second target in the open is chosen instead of the hidden one
       const open = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 6.8, 9, false);
       w.eCooldown[open] = 1e9;
       const next = pickTarget(w, 0, null, (x) => solver.shotClear(w, 0, x, 1));
       if (!next || next.id !== open) problems.push('the visible enemy was not chosen over the hidden one');
-      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'hidden targets are skipped, visible ones chosen' };
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'visible targets preferred, nearest hidden one as the fallback' };
     },
   },
   {
@@ -1011,6 +1015,57 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'one at a time, queued, names the card and the player' };
+    },
+  },
+  {
+    id: 'ui.relics',
+    title: 'The cards a character took sit bottom centre as icons (stacked with a count); hovering one outlines it in yellow and opens a text at the pointer',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+      }, settings);
+      const w = createWorld(3);
+      addPlayer(w, 0, 0, 0);
+      try {
+        ui.update(w, 0, 0, 1000, ['p']);
+        if (host.querySelectorAll('.wrh-relic').length !== 0) problems.push('relics shown before any card was taken');
+        const n = CARD_IDS.length;
+        w.pCards[CARD_IDS.indexOf('damage')] = 2;
+        w.pCards[CARD_IDS.indexOf('heal')] = 1;
+        w.pCards[n + CARD_IDS.indexOf('crit')] = 3; // another character's: not shown
+        ui.update(w, 0, 0, 1200, ['p']);
+        const relics = [...host.querySelectorAll<HTMLElement>('.wrh-relic')];
+        if (relics.length !== 2) problems.push(`${relics.length} relics, expected the 2 kinds this character took`);
+        if (!relics.some((r) => r.textContent?.includes('x2'))) problems.push('the stack count (x2) is missing');
+        if (!host.querySelector('.wrh-relics.on')) problems.push('the bar is not shown');
+        const bar = host.querySelector<HTMLElement>('.wrh-relics')!;
+        host.style.left = '0px';
+        host.style.top = '0px';
+        const r = relics[0]!;
+        r.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: 300, clientY: 400 }));
+        const tip = host.querySelector<HTMLElement>('.wrh-tip');
+        if (!tip || tip.style.display !== 'block') problems.push('no text opens on hover');
+        else {
+          if (!/damage/i.test(tip.textContent ?? '')) problems.push(`the hover text does not say what the card does (${tip.textContent})`);
+          if (!/Common|Rare|Epic/.test(tip.textContent ?? '')) problems.push('the hover text has no rarity');
+          if (parseFloat(tip.style.left) < 300) problems.push('the text is not at the pointer');
+        }
+        r.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+        if (tip && tip.style.display !== 'none') problems.push('the text stays after the pointer left');
+        void bar;
+        ui.clearHud();
+        if (host.querySelector('.wrh-relics.on')) problems.push('the bar stays after the HUD is cleared');
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'icons, counts, hover text at the pointer' };
     },
   },
 ];
