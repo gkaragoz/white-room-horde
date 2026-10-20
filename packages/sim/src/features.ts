@@ -232,7 +232,7 @@ export function placeBarrels(w: World): void {
 
 let barrelDepth = 0;
 
-function explodeBarrel(w: World, b: number, owner: number): void {
+export function explodeBarrel(w: World, b: number, owner: number): void {
   if (barrelDepth > 6) return;
   barrelDepth++;
   const c = BALANCE.barrels;

@@ -415,7 +415,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const w = createWorld(1);
       addPlayer(w, 0, 0, 0);
@@ -515,7 +515,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: (w) => weapons.push(w), onLook: (a, c) => looks.push([a, c]), getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const problems: string[] = [];
       try {
@@ -781,7 +781,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const problems: string[] = [];
       try {
@@ -863,7 +863,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const w = createWorld(4);
       w.waveTick = 1e9;
@@ -985,7 +985,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: (k, v) => picked.push([k, v]), onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: (k, v) => picked.push([k, v]), onResetSettings: noop,
       }, settings);
       try {
         const check = (where: string): void => {
@@ -1042,7 +1042,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const p = (slot: number, name: string, weapon: (typeof WEAPON_IDS)[number] = 'pistol') => ({ slot, name, host: slot === 0, connected: true, weapon, acc: 0, color: slot });
       try {
@@ -1082,7 +1082,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
       try {
@@ -1116,7 +1116,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const w = createWorld(3);
       addPlayer(w, 0, 0, 0);
@@ -1167,7 +1167,7 @@ export const moreTests: QaTest[] = [
       const noop = (): void => undefined;
       const ui = new Ui(host, {
         onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: noop,
-        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onReplay: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
       }, settings);
       const w = createWorld(3);
       addPlayer(w, 0, 0, 0, 'pistol', 1);

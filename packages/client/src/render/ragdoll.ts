@@ -63,9 +63,19 @@ interface Body {
 const _v = new THREE.Vector3();
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
-const _q = new THREE.Quaternion();
-const _q2 = new THREE.Quaternion();
 const _m = new THREE.Matrix4();
+// scratch objects of apply(): it runs for every awake body on every frame and must not allocate
+const _loc = NAMES.map(() => new THREE.Vector3());
+const _sideUp = new THREE.Vector3();
+const _sideLow = new THREE.Vector3();
+const _s0 = new THREE.Vector3();
+const _hp = new THREE.Vector3();
+const _swing = new THREE.Quaternion();
+const _twist = new THREE.Quaternion();
+const _pq = new THREE.Quaternion();
+const ORDER = ['root', 'hips', 'spine', 'head', 'armL', 'armR', 'handL', 'handR', 'thighL', 'thighR', 'footL', 'footR'];
+const _wq = new Map<string, THREE.Quaternion>(ORDER.map((n) => [n, new THREE.Quaternion()]));
+const AIM_OF = new Map<string, (typeof AIMS)[number]>(AIMS.map((a) => [a.bone, a]));
 
 /**
  * Physical corpses: a pool of skinned enemies driven by a small verlet rig (11 joints, distance links, ground and
@@ -102,6 +112,22 @@ export class RagdollPool {
   /** Pre-load every enemy model so spawning is synchronous. */
   async preload(types: string[]): Promise<void> {
     for (const t of types) await this.template(t);
+  }
+
+  /**
+   * Build the bodies of the most common types now and let the renderer compile their shaders, so the first kills of a
+   * game do not hitch (cloning a skeleton and compiling a skinned program in the middle of a fight is a visible stall).
+   */
+  warm(types: string[], renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): void {
+    for (const t of types) {
+      if (this.bodies.length >= this.capacity || !this.templates.has(t)) break;
+      if (this.bodies.some((b) => b.type === t)) continue;
+      this.bodies.push(this.makeBody(t));
+    }
+    const shown = this.bodies.map((b) => b.root.visible);
+    for (const b of this.bodies) b.root.visible = true;
+    renderer.compile(scene, camera);
+    this.bodies.forEach((b, i) => (b.root.visible = shown[i]!));
   }
 
   private makeBody(type: string): Body {
@@ -287,45 +313,43 @@ export class RagdollPool {
 
   /** Turn the particle skeleton back into bone rotations (swing from the rest direction plus a twist from the side axis). */
   private apply(b: Body): void {
-    const p = (i: number, out: THREE.Vector3): THREE.Vector3 => out.set(b.pos[i * 3]!, b.pos[i * 3 + 1]!, b.pos[i * 3 + 2]!);
     // work in model space: undo the root transform
     b.root.updateMatrixWorld(true);
     _m.copy(b.root.matrixWorld).invert();
-    const local = NAMES.map((_, i) => p(i, new THREE.Vector3()).applyMatrix4(_m));
-    const sideUp = local[P.armL]!.clone().sub(local[P.armR]!).normalize();
-    const sideLow = local[P.thighL]!.clone().sub(local[P.thighR]!).normalize();
-    const worldQ = new Map<string, THREE.Quaternion>();
-    const order = ['root', 'hips', 'spine', 'head', 'armL', 'armR', 'handL', 'handR', 'thighL', 'thighR', 'footL', 'footR'];
-    for (const name of order) {
+    for (let i = 0; i < N; i++) _loc[i]!.set(b.pos[i * 3]!, b.pos[i * 3 + 1]!, b.pos[i * 3 + 2]!).applyMatrix4(_m);
+    const sideUp = _sideUp.copy(_loc[P.armL]!).sub(_loc[P.armR]!).normalize();
+    const sideLow = _sideLow.copy(_loc[P.thighL]!).sub(_loc[P.thighR]!).normalize();
+    for (const name of ORDER) {
       const bone = b.bones.get(name);
       if (!bone) continue;
       const parentName = b.parentOf.get(name);
-      const parentQ = parentName ? worldQ.get(parentName)! : _q2.identity().clone();
-      const aim = AIMS.find((a) => a.bone === name);
-      let wq: THREE.Quaternion;
+      const wq = _wq.get(name)!;
+      const aim = AIM_OF.get(name);
       if (!aim) {
-        wq = b.restWorldQ.get(name)!.clone();
+        wq.copy(b.restWorldQ.get(name)!);
       } else {
-        const d = _a.copy(local[aim.to]!).sub(local[aim.from]!).normalize();
+        const d = _a.copy(_loc[aim.to]!).sub(_loc[aim.from]!).normalize();
         const d0 = b.restDir.get(name)!;
-        const swing = _q.setFromUnitVectors(d0, d).clone();
-        const s0 = (aim.side === 'up' ? b.restSide.up : b.restSide.low).clone().applyQuaternion(swing);
+        const swing = _swing.setFromUnitVectors(d0, d);
+        const s0 = _s0.copy(aim.side === 'up' ? b.restSide.up : b.restSide.low).applyQuaternion(swing);
         const sT = aim.side === 'up' ? sideUp : sideLow;
         s0.addScaledVector(d, -s0.dot(d)).normalize();
         _b.copy(sT).addScaledVector(d, -sT.dot(d)).normalize();
         const ang = Math.atan2(_v.crossVectors(s0, _b).dot(d), s0.dot(_b));
-        const twist = Number.isFinite(ang) ? new THREE.Quaternion().setFromAxisAngle(d, ang) : new THREE.Quaternion();
-        wq = twist.multiply(swing).multiply(b.restWorldQ.get(name)!);
+        if (Number.isFinite(ang)) _twist.setFromAxisAngle(d, ang);
+        else _twist.identity();
+        wq.copy(_twist).multiply(swing).multiply(b.restWorldQ.get(name)!);
       }
-      worldQ.set(name, wq);
-      bone.quaternion.copy(parentQ.clone().invert().multiply(wq));
+      if (parentName) _pq.copy(_wq.get(parentName)!);
+      else _pq.identity();
+      bone.quaternion.copy(_pq.invert().multiply(wq));
     }
     // the hips carry the body: place them where the hips particle is
     const hips = b.bones.get('hips')!;
     const parent = hips.parent!;
     b.model.updateMatrixWorld(true);
     parent.updateWorldMatrix(true, false);
-    hips.position.copy(parent.worldToLocal(p(P.hips, new THREE.Vector3())));
+    hips.position.copy(parent.worldToLocal(_hp.set(b.pos[P.hips * 3]!, b.pos[P.hips * 3 + 1]!, b.pos[P.hips * 3 + 2]!)));
     b.model.updateMatrixWorld(true);
   }
 

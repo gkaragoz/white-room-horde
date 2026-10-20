@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, ENEMY_TYPES, MAX_ENEMIES, MAX_TELE, MAX_ZONES, TeleEffect, TeleShape, ZoneKind } from '@wrh/shared';
+import { BALANCE, ENEMY_TYPES, MAX_ENEMIES, MAX_PLAYERS, MAX_TELE, MAX_ZONES, WEAPON_IDS, TeleEffect, TeleShape, ZoneKind } from '@wrh/shared';
 import type { World } from '@wrh/sim';
 import type { Fx } from './fx';
 
@@ -80,8 +80,22 @@ export class GroundFx {
   private readonly barBack = new THREE.MeshBasicMaterial({ color: '#10141c', transparent: true, opacity: 0.7, depthTest: false, depthWrite: false, toneMapped: false });
   private readonly barFill = new THREE.MeshBasicMaterial({ color: '#ffb000', transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, toneMapped: false });
 
+  /** The charge bar over a character who is charging a swing (only while charging). */
+  private readonly pBars: { back: THREE.Mesh; fill: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
+  private readonly right = new THREE.Vector3();
+
   constructor() {
     this.group.renderOrder = 3;
+    for (let k = 0; k < MAX_PLAYERS; k++) {
+      const mat = new THREE.MeshBasicMaterial({ color: '#7fd8ff', transparent: true, opacity: 0.97, depthTest: false, depthWrite: false, toneMapped: false });
+      const back = new THREE.Mesh(this.quad, this.barBack);
+      const fill = new THREE.Mesh(this.quad, mat);
+      back.renderOrder = 31;
+      fill.renderOrder = 32;
+      back.visible = fill.visible = false;
+      this.group.add(back, fill);
+      this.pBars.push({ back, fill, mat });
+    }
     for (let i = 0; i < MAX_TELE; i++) {
       const fillMat = new THREE.MeshBasicMaterial({ color: '#ff4a3a', map: this.stripes, transparent: true, opacity: 0.4, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, toneMapped: false, side: THREE.DoubleSide });
       const lineMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, toneMapped: false, side: THREE.DoubleSide });
@@ -126,6 +140,7 @@ export class GroundFx {
   /** Charge bars over winding-up enemies; they face the camera. */
   updateBars(w: World, camQuat: THREE.Quaternion, nowSec: number): void {
     let n = 0;
+    this.right.set(1, 0, 0).applyQuaternion(camQuat);
     for (let i = 0; i < MAX_ENEMIES && n < this.bars.length; i++) {
       if (!w.eActive[i] || w.eAct[i] !== 1 || w.eAux[i]! <= 0) continue;
       const p = Math.max(0, Math.min(1, 1 - w.eActT[i]! / w.eAux[i]!));
@@ -140,12 +155,39 @@ export class GroundFx {
       b.back.position.set(w.eX[i]!, y, -w.eY[i]!);
       b.back.scale.set(width + 0.16, 0.42, 1);
       // the fill grows from the left edge of the bar (in screen space)
-      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camQuat);
+      const right = this.right;
       b.fill.position.set(w.eX[i]! + right.x * (-width / 2 + (width * p) / 2), y + right.y * (-width / 2 + (width * p) / 2), -w.eY[i]! + right.z * (-width / 2 + (width * p) / 2));
       b.fill.scale.set(Math.max(0.001, width * p), 0.28, 1);
     }
     this.barFill.color.set(this.colorblind ? '#2f7bff' : n > 0 && Math.sin(nowSec * 18) > 0.4 ? '#ff5a3c' : '#ffb000');
     for (let k = n; k < this.bars.length; k++) this.bars[k]!.back.visible = this.bars[k]!.fill.visible = false;
+  }
+
+  /** Charge bars over the characters who are charging a swing: they fill, and flash white when full. */
+  updatePlayerBars(w: World, camQuat: THREE.Quaternion, nowSec: number, px: ArrayLike<number>, py: ArrayLike<number>, pz: ArrayLike<number>, lift: number): void {
+    this.right.set(1, 0, 0).applyQuaternion(camQuat);
+    for (let s = 0; s < MAX_PLAYERS; s++) {
+      const b = this.pBars[s]!;
+      const charge = w.pActive[s] ? w.pCharge[s]! : 0;
+      const m = charge > 0 ? BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!]?.melee?.charge ?? 0 : 0;
+      if (m <= 0 || charge <= 0.05) {
+        b.back.visible = b.fill.visible = false;
+        continue;
+      }
+      const p = Math.max(0, Math.min(1, charge / m));
+      const width = 2.4;
+      const y = 3.0 + lift + pz[s]!;
+      b.back.visible = b.fill.visible = true;
+      b.back.quaternion.copy(camQuat);
+      b.fill.quaternion.copy(camQuat);
+      b.back.position.set(px[s]!, y, -py[s]!);
+      b.back.scale.set(width + 0.16, 0.42, 1);
+      const off = -width / 2 + (width * p) / 2;
+      b.fill.position.set(px[s]! + this.right.x * off, y + this.right.y * off, -py[s]! + this.right.z * off);
+      b.fill.scale.set(Math.max(0.001, width * p), 0.28, 1);
+      const full = p >= 0.999;
+      b.mat.color.set(this.colorblind ? '#2f7bff' : full ? (Math.sin(nowSec * 30) > 0 ? '#ffffff' : '#ffe27a') : '#7fd8ff');
+    }
   }
 
   /** Sync with the world (call once per frame, `lift` is the height of the floor during the climb). */

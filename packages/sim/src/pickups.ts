@@ -30,6 +30,12 @@ function ammoStarved(w: World): boolean {
   return false;
 }
 
+/** Does anybody alive in the squad carry guns? */
+function gunsInSquad(w: World): boolean {
+  for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pState[s] !== PlayerState.Dead && !isMelee(w, s)) return true;
+  return false;
+}
+
 /** The weapon of a crate: one somebody in the squad does not own yet, so drops widen the arsenal first. */
 export function pickWeapon(w: World): number {
   const missing: number[] = [];
@@ -61,13 +67,15 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 
     });
     return;
   }
+  // a squad of blades alone has no use for guns or bullets: those drops would only be wasted
+  const guns = gunsInSquad(w);
   const r = w.rng.float();
   const luck = w.modLoot * (waveModOf(w.wave) === 4 ? 2 : 1);
-  const ammoChance = (cfg.chance.ammo + (ammoStarved(w) ? cfg.lowAmmoBonus : 0)) * luck;
+  const ammoChance = guns ? (cfg.chance.ammo + (ammoStarved(w) ? cfg.lowAmmoBonus : 0)) * luck : 0;
   if (r < ammoChance) spawnPickup(w, PickupType.Ammo, x, y, 0, layer);
   else if (r < ammoChance + cfg.chance.health * luck) spawnPickup(w, PickupType.Health, x, y, 0, layer);
   else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade) * luck) spawnPickup(w, PickupType.Grenade, x, y, 0, layer);
-  else if (r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, pickWeapon(w), layer);
+  else if (guns && r < ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, pickWeapon(w), layer);
   else {
     // the rarer power-ups
     let edge = ammoChance + (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck;
@@ -132,6 +140,8 @@ export function updatePickups(w: World): void {
 function wants(w: World, s: number, kind: number, i: number): boolean {
   if (kind === PickupType.Health) return w.pHp[s]! < w.pMaxHp[s]!;
   if (kind === PickupType.Grenade) return w.pGren[s]! < BALANCE.grenade.max;
+  // blades and hammers have no use for guns or bullets: that loot stays for the others
+  if (isMelee(w, s) && (kind === PickupType.Weapon || kind === PickupType.Ammo)) return false;
   if (kind === PickupType.Weapon) return !owns(w, s, w.kData[i]!) || ammoNeeded(w, s);
   if (kind === PickupType.Shield) return perk(w, s, PERK.Shield) < 100;
   if (kind >= PickupType.Haste) return true;
@@ -159,11 +169,7 @@ function collect(w: World, s: number, i: number): void {
     for (let e = 0; e < MAX_ENEMIES; e++) if (w.eActive[e]) w.eFrost[e] = Math.round(BALANCE.pickups.freezeSeconds * TICK_RATE);
     w.events.push({ type: 'freeze', seconds: BALANCE.pickups.freezeSeconds });
   } else if (kind === PickupType.Weapon) {
-    if (isMelee(w, s)) {
-      // a gun is no use to a blade: it is turned into some health
-      const hp = w.pHp[s]! + w.pMaxHp[s]! * 0.25;
-      w.pHp[s] = hp > w.pMaxHp[s]! ? w.pMaxHp[s]! : hp;
-    } else giveWeapon(w, s, w.kData[i]!);
+    giveWeapon(w, s, w.kData[i]!);
   } else {
     // an ammo crate fills every weapon of the inventory; with everything full it is a grenade instead
     if (ammoNeeded(w, s)) refillAll(w, s);

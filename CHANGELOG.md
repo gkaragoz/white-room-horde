@@ -7,6 +7,14 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Melee fixes, a cleaner HUD and fewer frame spikes (rules change: update the server and reload the page)**
+
+- Blades and hammers set barrels off. They can no longer take guns or ammo (the loot stays for the others, and a squad of only melee classes stops getting gun and ammo drops). The swordsman and the hammerer regenerate much faster and take less damage.
+- A charging swing shows a bar over the character (and only while charging).
+- Bottom right is tidier: grenades, dash and the class ability (with its own name, no longer labelled "Dash") sit under the weapon list, each with a hover tip. The weapon list can be clicked. The controls line at the bottom is gone, the round buttons at the top right say what they are when hovered.
+- The save-replay button is gone.
+- Fewer frame spikes in fights: pooled flashes, rings and slashes, a tiled blood layer, ragdolls compiled at load, less garbage per frame. New `tools/ci/perf-spikes.mjs` and `docs/PERF.md`.
+
 ## v0.15.1 (2026-10-20)
 
 **Test pass and a fix**

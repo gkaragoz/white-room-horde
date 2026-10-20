@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { addPlayer, createWorld, spawnEnemy, step, type World } from '../src';
 import { launchPlayer } from '../src/hazards';
 import { owns } from '../src/loadout';
-import { spawnPickup } from '../src/pickups';
+import { dropLoot, spawnPickup } from '../src/pickups';
 
 const NONE: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 const SPECIAL: PlayerInput = { ...NONE, buttons: Buttons.Special };
@@ -163,18 +163,56 @@ describe('melee classes', () => {
     }
   });
 
-  it('a gun crate is some health for a blade, not a gun; an ammo crate is a grenade', () => {
+  it('gun and ammo crates stay on the floor for a blade: it cannot take them, so the others can', () => {
     const w = arena(cid('swordsman'), 10);
     w.pHp[0] = 40;
+    w.pGren[0] = 0;
     spawnPickup(w, PickupType.Weapon, w.pX[0]!, w.pY[0]!, WEAPON_IDS.indexOf('ar'));
-    run(w, 6);
-    expect(w.pHp[0]).toBeGreaterThan(55);
-    expect(owns(w, 0, WEAPON_IDS.indexOf('ar'))).toBe(false);
-    const g = w.pGren[0]!;
-    w.pGren[0] = g - 1;
     spawnPickup(w, PickupType.Ammo, w.pX[0]!, w.pY[0]!);
-    run(w, 6);
-    expect(w.pGren[0]).toBe(g);
+    run(w, 10);
+    expect(w.pHp[0]).toBeLessThan(60);
+    expect(owns(w, 0, WEAPON_IDS.indexOf('ar'))).toBe(false);
+    expect(w.pGren[0]).toBe(0);
+    expect(w.kActive.reduce((n, a) => n + a, 0)).toBe(2);
+  });
+
+  it('a squad of blades alone never drops guns or bullets', () => {
+    const w = arena(cid('hammerer'), 14);
+    for (let i = 0; i < 400; i++) dropLoot(w, 5, 5, false);
+    for (let k = 0; k < w.kActive.length; k++) {
+      if (!w.kActive[k]) continue;
+      expect(w.kType[k]).not.toBe(PickupType.Weapon);
+      expect(w.kType[k]).not.toBe(PickupType.Ammo);
+    }
+  });
+
+  it('the blade and the hammer set barrels off', () => {
+    for (const name of ['swordsman', 'hammerer']) {
+      const w = arena(cid(name), 15);
+      const b = 0;
+      w.brActive[b] = 1;
+      w.brHp[b] = BALANCE.barrels.hp;
+      w.brX[b] = w.pX[0]! + 1.4;
+      w.brY[b] = w.pY[0]!;
+      let boom = false;
+      for (let t = 0; t < 60 && !boom; t++) {
+        step(w, [t < 15 || name === 'swordsman' ? FIRE : NONE]); // the hammer is charged, then let go
+        boom = w.events.some((e) => e.type === 'explosion');
+      }
+      expect(boom, name).toBe(true);
+      expect(w.brActive[b]).toBe(0);
+    }
+  });
+
+  it('they are the sturdiest classes: more regeneration and less damage taken than any gun class', () => {
+    for (const name of ['swordsman', 'hammerer']) {
+      const c = BALANCE.classes.find((x) => x.id === name)!;
+      for (const o of BALANCE.classes) {
+        if (o.id === 'swordsman' || o.id === 'hammerer') continue;
+        expect(c.regen, name).toBeGreaterThan(o.regen);
+        expect(c.armor, name).toBeLessThan(o.armor);
+      }
+    }
   });
 
   it('the sword hits what is in front of it inside its arc and reach, and nothing behind or far away', () => {

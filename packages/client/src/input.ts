@@ -94,6 +94,10 @@ export class Input {
   private touchSwitch = false;
   /** Weapon choice of the last key press (1-9 = rank, 14 = next), sent once with the next sample. */
   private queuedWeapon = 0;
+  /** Select a weapon by the key number it has in the list (1-9), or 14 for the next one (the in-game list is clickable). */
+  queueWeapon(rank: number): void {
+    if (this.enabled) this.queuedWeapon = rank;
+  }
   /** The shot direction of the last sample, and whether a stick (pad, phone) is aiming. */
   lastShot = 0;
   stickAiming = false;

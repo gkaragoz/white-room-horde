@@ -64,7 +64,6 @@ const BASE_STRINGS = {
     again: 'Play again',
     paused: 'Paused',
     resume: 'Resume',
-    replay: 'Save replay',
     pick: 'Level up! Pick a card',
     rarity: ['Common', 'Rare', 'Epic'],
     onlyYou: 'Only you',
@@ -160,6 +159,13 @@ const BASE_STRINGS = {
     ammo: 'Ammo',
     reloading: 'Reloading...',
     dashReady: 'Dash',
+    abilityReady: 'Ready',
+    gearGren: ['Grenades', 'Right mouse / G throws one'],
+    gearDash: ['Dash', 'Shift: a short burst of speed that dodges hits'],
+    gearAbility: 'Class ability (key F)',
+    abilityNames: ['Rally', 'Heal pulse', 'Fortify', 'Burst', 'Airstrike', 'Overcharge', 'Rampage', 'Blade storm', 'Ground slam'],
+    ready: 'ready',
+    tbHint: { lang: 'Language', ctl: 'Controls', set: 'Settings' },
     grenades: 'Grenades',
     cards: {
       damage: ['Heavy rounds', '+15% damage for you'],
@@ -263,7 +269,6 @@ const BASE_STRINGS = {
     again: 'Tekrar oyna',
     paused: 'Duraklatıldı',
     resume: 'Devam et',
-    replay: 'Tekrarı kaydet',
     pick: 'Seviye atladın! Bir kart seç',
     rarity: ['Yaygın', 'Nadir', 'Efsanevi'],
     onlyYou: 'Sadece sen',
@@ -359,6 +364,13 @@ const BASE_STRINGS = {
     ammo: 'Mermi',
     reloading: 'Dolduruyor...',
     dashReady: 'Atılma',
+    abilityReady: 'Hazır',
+    gearGren: ['Bombalar', 'Sağ tık / G ile bir tane atar'],
+    gearDash: ['Atılma', 'Shift: vuruşlardan kaçıran kısa bir hız patlaması'],
+    gearAbility: 'Sınıf yeteneği (F tuşu)',
+    abilityNames: ['Toplanma', 'Şifa darbesi', 'Tahkim', 'Hamle', 'Hava saldırısı', 'Aşırı yük', 'Çılgınlık', 'Kılıç fırtınası', 'Yer darbesi'],
+    ready: 'hazır',
+    tbHint: { lang: 'Dil', ctl: 'Kontroller', set: 'Ayarlar' },
     grenades: 'Bomba',
     cards: {
       damage: ['Ağır mermiler', 'Sana +%15 hasar'],
@@ -446,6 +458,8 @@ export interface UiHandlers {
   onJoin(name: string, code: string, server: string, password: string): void;
   onRejoin(): void;
   onWeapon(weapon: WeaponId): void;
+  /** A weapon of the in-game list was clicked (its key number, 1-9, or 14 for the next one). */
+  onSlot(rank: number): void;
   onLook(acc: number, color: number, cls: number): void;
   getBindings(): Record<string, string[]>;
   onRebind(action: string, done: () => void): void;
@@ -456,7 +470,6 @@ export interface UiHandlers {
   onCard(index: number): void;
   onAgain(): void;
   onResume(): void;
-  onReplay(): void;
   onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
   onSetting(key: keyof Settings, value: number | string | boolean): void;
   onResetSettings(): void;
@@ -752,6 +765,18 @@ const CSS = `
 .wrh-inv b{font-variant-numeric:tabular-nums;font-size:11px}
 .wrh-inv .row.cur{border-color:#ffd21f;background:rgba(255,248,214,.97);box-shadow:0 0 0 1px rgba(255,210,31,.55),0 0 10px rgba(255,210,31,.5)}
 .wrh-inv .row.dry{opacity:.4}
+.wrh-inv{pointer-events:none}.wrh-inv .row{pointer-events:auto;cursor:pointer;transition:transform .08s,box-shadow .08s}
+.wrh-inv .row:hover{transform:translateX(-3px);box-shadow:0 2px 8px rgba(20,28,44,.28)}
+.wrh-ui .wrh-me{display:flex;gap:6px;right:14px;bottom:8px;width:236px;padding:0;background:none;border:0;box-shadow:none;text-align:left;pointer-events:none}
+.wrh-me .g{pointer-events:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;min-width:0;height:36px;padding:0 8px;border-radius:10px;background:rgba(251,246,234,.86);border:1.5px solid rgba(43,58,82,.18);box-shadow:0 1px 4px rgba(20,28,44,.14);font-size:13px;font-weight:800;color:#2b3a52}
+.wrh-me .g i{font-style:normal;font-size:16px}
+.wrh-me .g span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.wrh-me .g b{font-variant-numeric:tabular-nums}
+.wrh-me .g.cd{opacity:.55}
+.wrh-me .g.on{border-color:rgba(255,210,31,.8)}
+.wrh-me .g:last-child{flex:1 1 0}
+.wrh-me .g:nth-child(1){width:54px}.wrh-me .g:nth-child(2){width:60px}
+.wrh-ui .wrh-reload{bottom:46px}
 .wrh-plabel{position:absolute;left:0;top:0;pointer-events:none;display:none;white-space:nowrap;font:700 12px/1 system-ui,sans-serif;color:#fff;background:rgba(20,26,38,.62);padding:3px 7px;border-radius:9px;border:1.5px solid #fff;text-shadow:0 1px 1px rgba(0,0,0,.5)}
 .wrh-ammo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none}
 /* the ring itself is a 3D object on the floor (render/ammoRing.ts); this element only carries the count */
@@ -933,6 +958,10 @@ export class Ui {
   private readonly dmgHist: { t: number; v: number }[][] = Array.from({ length: MAX_PLAYERS }, () => []);
   private lastWorld: World | null = null;
   private squadTip: { kind: 'pc' | 'chip'; slot: number; k: number } | null = null;
+  private gearInfo = { abName: '', cls: 0 };
+  private readonly hudHtml = new Map<string, string>();
+  /** A one-off tooltip (gear, toolbar): its html while it is shown by the hover handlers below. */
+  private hoverTip: (() => string) | null = null;
   private lastNow = 0;
   private startNow = -1;
 
@@ -1013,24 +1042,62 @@ export class Ui {
       this.tipEl.style.left = `${Math.max(6, Math.min(innerWidth - w - 6, e.clientX + 16))}px`;
       this.tipEl.style.top = `${Math.max(6, Math.min(innerHeight - h - 6, e.clientY - h - 14))}px`;
     };
-    // the squad cards: class, level, kills, damage; a chip shows what it is
+    // the squad cards: class, level, kills, damage; a chip shows what it is; the gear panel explains itself
     this.hud.addEventListener('mouseover', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-tip]');
-      if (!el || !this.hud.querySelector('#h-squad')?.contains(el)) return;
+      if (!el) return;
+      if (el.dataset.tip === 'gear') {
+        this.squadTip = null;
+        const g = el.dataset.g;
+        this.hoverTip = () => this.gearTipHtml(g!);
+        this.tipEl.style.setProperty('--rc', '#9aa5b4');
+        this.tipEl.innerHTML = this.hoverTip();
+        this.tipEl.style.display = 'block';
+        place(e);
+        return;
+      }
+      if (!this.hud.querySelector('#h-squad')?.contains(el)) return;
+      this.hoverTip = null;
       this.squadTip = el.dataset.tip === 'chip' ? { kind: 'chip', slot: Number(el.dataset.s), k: Number(el.dataset.k) } : { kind: 'pc', slot: Number(el.dataset.s), k: 0 };
       if (this.lastWorld) this.tipEl.innerHTML = this.squadTipHtml(this.lastWorld);
       this.tipEl.style.display = 'block';
       place(e);
     });
     this.hud.addEventListener('mousemove', (e) => {
-      if (this.squadTip && this.tipEl.style.display === 'block') place(e);
+      if ((this.squadTip || this.hoverTip) && this.tipEl.style.display === 'block') place(e);
     });
     this.hud.addEventListener('mouseout', (e) => {
       const to = e.relatedTarget as HTMLElement | null;
-      if (this.squadTip && !(to?.closest?.('[data-tip]') && this.hud.contains(to))) {
+      if ((this.squadTip || this.hoverTip) && !(to?.closest?.('[data-tip]') && this.hud.contains(to))) {
         this.squadTip = null;
+        this.hoverTip = null;
         this.tipEl.style.display = 'none';
       }
+    });
+    // the weapon list: a click picks the weapon, and never fires a shot behind it
+    this.hud.addEventListener('pointerdown', (e) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>('.wrh-inv [data-rank]');
+      if (!row) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.h.onSlot(Number(row.dataset.rank));
+    });
+    // the round buttons at the top right say what they are in one word
+    this.toolbar.addEventListener('mouseover', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('.wrh-tbtn');
+      if (!b) return;
+      const hint = (this.t.tbHint as Record<string, string>)[b.id.slice(3)] ?? '';
+      this.squadTip = null;
+      this.hoverTip = null;
+      this.tipEl.style.setProperty('--rc', '#9aa5b4');
+      this.tipEl.innerHTML = `<b>${esc(hint)}</b>`;
+      this.tipEl.style.display = 'block';
+      const r = b.getBoundingClientRect();
+      this.tipEl.style.left = `${Math.max(6, Math.min(innerWidth - this.tipEl.offsetWidth - 6, r.right - this.tipEl.offsetWidth))}px`;
+      this.tipEl.style.top = `${r.bottom + 8}px`;
+    });
+    this.toolbar.addEventListener('mouseout', (e) => {
+      if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.wrh-tbtn')) this.tipEl.style.display = 'none';
     });
     this.relicEl.addEventListener('mouseover', (e) => {
       this.squadTip = null;
@@ -1052,6 +1119,14 @@ export class Ui {
     this.relicEl.addEventListener('mouseout', (e) => {
       if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.wrh-relic')) this.tipEl.style.display = 'none';
     });
+  }
+
+  private gearTipHtml(g: string): string {
+    const t = this.t;
+    if (g === 'gren') return `<b>${esc(t.gearGren[0])}</b><span>${esc(t.gearGren[1])}</span>`;
+    if (g === 'dash') return `<b>${esc(t.gearDash[0])}</b><span>${esc(t.gearDash[1])}</span>`;
+    const tipTxt = (t.classTips as readonly string[])[this.gearInfo.cls] ?? '';
+    return `<b>${esc(this.gearInfo.abName)}</b><span>${esc(tipTxt)}</span><em>${esc(t.gearAbility)}</em>`;
   }
 
   private lastRelicsCounts(i: number): number {
@@ -1116,7 +1191,6 @@ export class Ui {
     const set = (id: string, text: string): void => {
       const b = this.toolbar.querySelector<HTMLElement>(id);
       if (b) {
-        b.title = text;
         b.setAttribute('aria-label', text);
       }
     };
@@ -1648,8 +1722,10 @@ export class Ui {
   popNumber(px: number, py: number, text: string, big: boolean, teammate: string | null = null): void {
     if (this.floaters >= 60) return;
     this.floaters++;
-    const el = document.createElement('div');
+    const el = this.dmgFree.pop() ?? document.createElement('div');
     el.className = 'wrh-dmg';
+    el.style.display = '';
+    el.style.opacity = '';
     el.textContent = text;
     el.style.left = `${px}px`;
     el.style.top = `${py}px`;
@@ -1661,10 +1737,13 @@ export class Ui {
     const dx = (Math.random() - 0.5) * 30;
     const a = el.animate([{ transform: 'translate(-50%,0) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px),-46px) scale(${big ? 1.25 : 0.9})`, opacity: 0 }], { duration: 650, easing: 'ease-out' });
     a.onfinish = () => {
-      el.remove();
+      el.style.display = 'none'; // kept for the next number: no element is created or removed per hit
+      this.dmgFree.push(el);
       this.floaters--;
     };
   }
+
+  private readonly dmgFree: HTMLElement[] = [];
 
   private weaponButtons(): string {
     const names = this.t.weapons as Record<string, string>;
@@ -1705,7 +1784,7 @@ export class Ui {
       const reserve = live ? world.pAmmo[slot]! : world.pInvAmmo[slot * WEAPON_IDS.length + idx]!;
       const dry = st.ammo >= 0 && mag <= 0 && reserve <= 0;
       const key = rank < 9 ? String(rank + 1) : 'Q';
-      rows += `<div class="row${live ? ' cur' : ''}${dry ? ' dry' : ''}"><kbd>${key}</kbd><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${st.melee ? '&infin;' : `${mag}/${st.ammo < 0 ? '&infin;' : reserve}`}</b></div>`;
+      rows += `<div class="row${live ? ' cur' : ''}${dry ? ' dry' : ''}" data-rank="${rank < 9 ? rank + 1 : 14}"><kbd>${key}</kbd><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${st.melee ? '&infin;' : `${mag}/${st.ammo < 0 ? '&infin;' : reserve}`}</b></div>`;
     });
     return rows;
   }
@@ -1875,8 +1954,8 @@ export class Ui {
       .join('');
   }
 
-  showGameOver(world: World, canReplay = false, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }): void {
-    this.redraw = () => this.showGameOver(world, canReplay, rec);
+  showGameOver(world: World, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }): void {
+    this.redraw = () => this.showGameOver(world, rec);
     this.lobbyCode = '';
     const t = this.t;
     const names = t.weapons as Record<string, string>;
@@ -1887,14 +1966,13 @@ export class Ui {
       <h1>${t.over}</h1>
       <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${Math.max(1, ...Array.from(world.pLevel).filter((_, i) => world.pActive[i]))}</b></p>${extra}
       ${this.squadStats(world)}
-      <button id="wrh-again">${t.again}</button>${canReplay ? `<button id="wrh-replay" class="alt">${t.replay}</button>` : ''}
+      <button id="wrh-again">${t.again}</button>
     </div>`;
-    const rb = this.screen.querySelector<HTMLElement>('#wrh-replay');
-    if (rb) rb.onclick = () => this.h.onReplay();
     this.screen.querySelector<HTMLElement>('#wrh-again')!.onclick = () => this.h.onAgain();
   }
 
   private buildHud(): void {
+    this.hudHtml.clear();
     this.hud.innerHTML = `
       <div class="wrh-hurt" id="h-hurt"></div>
       <div class="wrh-top"><div class="big" id="h-wave"></div><div class="wrh-bar"><i id="h-xp"></i></div><div class="wrh-bar boss" id="h-bossbar" style="display:none"><i id="h-boss"></i></div><div id="h-bosslabel" style="display:none;color:#d8362e"></div></div>
@@ -1917,6 +1995,7 @@ export class Ui {
     this.lastRelics = '';
     this.tipEl.style.display = 'none';
     this.hud.innerHTML = '';
+    this.hudHtml.clear();
     this.hudBuilt = false;
     this.lastCards = '';
   }
@@ -2168,8 +2247,12 @@ export class Ui {
     this.lastNow = now;
     const t = this.t;
     const set = (id: string, html: string): void => {
+      // compare with what was written last time: the browser re-serialises innerHTML (entities become characters), so
+      // reading it back never matches and every frame would rebuild the element (and eat a click on it)
+      if (this.hudHtml.get(id) === html) return;
       const el = this.hud.querySelector<HTMLElement>('#' + id)!;
-      if (el.innerHTML !== html) el.innerHTML = html;
+      this.hudHtml.set(id, html);
+      el.innerHTML = html;
     };
     const phase = world.misc[MISC.Phase]!;
     const left = world.enemyCount + world.misc[MISC.Remaining]!;
@@ -2239,28 +2322,28 @@ export class Ui {
     if (world.pActive[slot]) {
       const wid = WEAPON_IDS[world.pWeapon[slot]!]!;
       const stats = BALANCE.weapons[wid];
-      const mag = world.pMag[slot]!;
-      const reserve = world.pAmmo[slot]!;
       const reloading = world.pReload[slot]! > 0;
-      const low = reserve >= 0 && mag + reserve < stats.ammo * 0.2;
       const dashReady = world.pDashCd[slot]! <= 0;
-      const dashText = dashReady ? t.dashReady : `${Math.ceil(world.pDashCd[slot]!)}s`;
+      const dashText = dashReady ? '' : `${Math.ceil(world.pDashCd[slot]!)}s`;
       const specReady = world.pSpecCd[slot]! <= 0;
-      const specText = world.pSpecT[slot]! > 0 ? `${world.pSpecT[slot]!.toFixed(1)}s` : specReady ? t.dashReady : `${Math.ceil(world.pSpecCd[slot]!)}s`;
-      const ammoText = stats.melee ? '' : ` &middot; <span class="${low || (mag === 0 && reserve === 0) ? 'wrh-low' : ''}">${reloading ? t.reloading : `${mag}/${reserve < 0 ? '&infin;' : reserve}`}${low ? ' !' : ''}</span>`;
+      const specOn = world.pSpecT[slot]! > 0;
+      const specText = specOn ? `${world.pSpecT[slot]!.toFixed(1)}s` : specReady ? '&#10003;' : `${Math.ceil(world.pSpecCd[slot]!)}s`;
+      const cls = Math.round(world.pPerk[slot * PERKS + PERK.Class]!);
+      const abName = (t.abilityNames as readonly string[])[cls] ?? '';
+      const gear = (kind: string, icon: string, label: string, val: string, on: boolean, cd: boolean): string =>
+        `<div class="g${on ? ' on' : ''}${cd ? ' cd' : ''}" data-tip="gear" data-g="${kind}"><i>${icon}</i><span>${label}</span><b>${val}</b></div>`;
       set(
         'h-me',
-        `${(t.weapons as Record<string, string>)[wid]}${ammoText}` +
-          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>` +
-          ` &middot; <span style="opacity:${specReady || world.pSpecT[slot]! > 0 ? 1 : 0.5}" title="${esc(t.abilityTip as string)}">&#9733; ${specText}</span>`,
+        gear('gren', '&#128163;', '', String(world.pGren[slot]), world.pGren[slot]! > 0, world.pGren[slot]! <= 0) +
+          gear('dash', '&#9889;', '', dashText || '&#10003;', dashReady, !dashReady) +
+          gear('spec', '&#9733;', esc(abName), specText, specReady || specOn, !specReady && !specOn),
       );
+      this.gearInfo = { abName, cls };
       set('h-inv', this.inventoryHtml(world, slot));
       this.updateRelics(world, slot);
       const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
-      const charging = !!stats.melee && stats.melee.charge > 0 && world.pCharge[slot]! > 0;
-      bar.style.display = reloading || charging ? 'block' : 'none';
+      bar.style.display = reloading ? 'block' : 'none'; // a charge shows over the character instead
       if (reloading) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (1 - world.pReload[slot]! / stats.reload) * 100))}%`;
-      else if (charging) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (world.pCharge[slot]! / stats.melee!.charge) * 100))}%`;
       const st = world.pState[slot]!;
       if (st === PlayerState.Downed) {
         const sec = Math.ceil(world.pTimer[slot]!);
@@ -2279,7 +2362,7 @@ export class Ui {
           if (dx * dx + dy * dy < 9) near = true;
         }
         this.warn(near ? t.revive : '');
-        set('h-hint', t.controls);
+        set('h-hint', '');
       }
     }
 

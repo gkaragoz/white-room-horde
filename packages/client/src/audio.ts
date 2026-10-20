@@ -505,10 +505,17 @@ export class Audio {
   }
 
   // ---- playback ----
+  private readonly availCache = new Map<string, string[]>();
+
   private playBank(name: Sfx, pan: number, gainMul: number): boolean {
     const b = BANK[name];
     if (!b || !this.ctx || !this.master) return false;
-    const avail = b.files.filter((f) => this.buffers.has(f));
+    let avail = this.availCache.get(name);
+    if (!avail || avail.length !== b.files.length) {
+      // the files of a sound that are decoded (a sound is looked up on every play, so the list is kept)
+      avail = b.files.filter((f) => this.buffers.has(f));
+      if (avail.length === b.files.length) this.availCache.set(name, avail);
+    }
     if (!avail.length) return false;
     if (this.voices >= MAX_VOICES && !name.startsWith('ui') && name !== 'boom' && name !== 'hurt') return true; // dropped, but handled
     const file = avail[Math.floor(Math.random() * avail.length)]!;

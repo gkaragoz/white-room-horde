@@ -1,8 +1,8 @@
-import { BALANCE, Buttons, CLASS_IDS, MAX_ENEMIES, MAX_PLAYERS, PERK, PlayerState, TICK_DT, TeleEffect, TeleShape, WEAPON_IDS, ENEMY_TYPES, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, CLASS_IDS, MAX_BARRELS, MAX_ENEMIES, MAX_PLAYERS, PERK, PlayerState, TICK_DT, TeleEffect, TeleShape, WEAPON_IDS, ENEMY_TYPES, type PlayerInput } from '@wrh/shared';
 import type { WeaponStats } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { damageEnemyBy, shove } from './enemies';
-import { abilityRate, damageMul, perk } from './features';
+import { abilityRate, damageMul, explodeBarrel, perk } from './features';
 import { addTelegraph } from './hazards';
 import type { World } from './state';
 
@@ -62,6 +62,27 @@ function sweep(w: World, s: number, angle: number, arc: number, radius: number, 
     damageEnemyBy(w, i, s, blow(w, s, damage), nx, ny);
     if (w.eActive[i]) shove(w, i, nx * knock * (w.eBoss[i] ? 0.15 : 1) * 0.35, ny * knock * (w.eBoss[i] ? 0.15 : 1) * 0.35);
     hits++;
+  }
+  // barrels stand in the way of a blade as well: one blow sets them off
+  if (w.pLayer[s] === 0) {
+    const bd = BALANCE.barrels;
+    for (let b = 0; b < MAX_BARRELS; b++) {
+      if (!w.brActive[b]) continue;
+      const dx = w.brX[b]! - px;
+      const dy = w.brY[b]! - py;
+      const reach = radius + bd.hitRadius;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > reach * reach) continue;
+      if (!circle && d2 > 0.36) {
+        let da = atan2(dy, dx) - angle;
+        da = atan2(sin(da), cos(da));
+        if (Math.abs(da) > arc / 2 + atan2(bd.hitRadius, sqrt(d2))) continue;
+      }
+      w.brHp[b] = w.brHp[b]! - blow(w, s, damage);
+      if (w.brHp[b]! <= 0) explodeBarrel(w, b, s);
+      else w.events.push({ type: 'barrelHit', x: w.brX[b]!, y: w.brY[b]! });
+      hits++;
+    }
   }
   w.events.push({ type: 'swing', slot: s, weapon: weaponIndex, x: px, y: py, angle, arc: circle ? 6.2832 : arc, radius, hits, charge });
 }

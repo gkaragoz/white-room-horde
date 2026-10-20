@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
 import { heightAt } from '@wrh/shared';
 import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, encodeReplay, hashWorld, predictPlayer, Recorder, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
+import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession } from '@wrh/net';
 import { Audio } from './audio';
 import { Input, type Action } from './input';
@@ -107,6 +107,7 @@ worldReady = true;
 crowd.corpseLife = [2.5, 5, 14][settings.corpseTime]!;
 ragdolls.restLife = [1.2, 3.2, 10][settings.corpseTime]!;
 stage.scene.add(ragdolls.group);
+if (stage.backend === 'webgl') ragdolls.warm(['grunt', 'runner', 'crawler', 'tank', 'spitter', 'shielder', 'leaper', 'exploder'], stage.renderer, stage.scene, stage.camera);
 const pickups = new PickupView();
 stage.scene.add(pickups.group);
 void pickups.load();
@@ -214,7 +215,6 @@ let names: string[] = [];
 let lobbySig = '';
 let over = false;
 let paused = false;
-let recorder: Recorder | null = null;
 let playback: Replay | null = null;
 const dev = {
   perf: params.get('perf') === '1',
@@ -257,7 +257,7 @@ const ui = new Ui(
       if (settings.uiSounds) audio.ui(n);
     },
     onResume: () => setPaused(false),
-    onReplay: () => downloadReplay(),
+    onSlot: (rank) => input.queueWeapon(rank),
     onReport: () => void downloadReport(),
     onResetSettings: () => {
       settings = { ...defaultSettings(), lang: settings.lang };
@@ -586,7 +586,7 @@ function handleEvent(e: SimEvent): void {
         const rec = world && !playback ? recordGame(world.wave, world.kills) : undefined;
         clearRejoin();
         ui.playerNames = names;
-        setTimeout(() => world && ui.showGameOver(world, recorder !== null, rec), 1800);
+        setTimeout(() => world && ui.showGameOver(world, rec), 1800);
       }
       break;
     default:
@@ -734,8 +734,6 @@ function startSolo(name: string): void {
   const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map, difficulty: params.has('difficulty') ? Number(params.get('difficulty')) : ui.difficulty };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
-  // a replay of a game that started on a later wave cannot be reproduced from the setup alone
-  if (dev.wave <= 1) recorder = new Recorder(setup);
   beginPlaying(w, 0);
 }
 
@@ -744,16 +742,6 @@ function startPlayback(r: Replay): void {
   playback = r;
   names = r.setup.players.map((p) => 'P' + (p.slot + 1));
   beginPlaying(createGame(r.setup), r.setup.players[0]?.slot ?? 0);
-}
-
-function downloadReplay(): void {
-  if (!recorder) return;
-  const blob = new Blob([encodeReplay(recorder.replay) as BlobPart], { type: 'application/octet-stream' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `white-room-horde-${Date.now()}.wrh`;
-  a.click();
-  URL.revokeObjectURL(a.href);
 }
 
 /** Accept a pasted tunnel address in any form: https://host, wss://host or host/ws. */
@@ -1052,7 +1040,6 @@ function frame(nowMs: number): void {
       beforeStep(world);
       const s0 = performance.now();
       step(world, inputs);
-      recorder?.record(world, inputs);
       stepMs += performance.now() - s0;
       stepN++;
       afterStep(world);
@@ -1302,6 +1289,7 @@ function frame(nowMs: number): void {
     ground.colorblind = settings.colorblind;
     ground.update(w, nowSec, catchingUp ? null : fx, dt);
     ground.updateBars(w, stage.camera.quaternion, nowSec);
+    ground.updatePlayerBars(w, stage.camera.quaternion, nowSec, vx, vy, vz, lifted.lift);
     iceShards.update(w, crowd.frostLevel, nowSec, (i) => crowd.drawnPos(i), (i) => Math.min(2.4, Math.max(0.8, BALANCE.enemies[ENEMY_TYPES[w.eType[i]!]!].radius * 2.2 * (w.eBoss[i] ? 1.7 : 1))));
     if (!catchingUp) {
       for (const t of crowd.thawed) {

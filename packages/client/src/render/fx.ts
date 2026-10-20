@@ -71,13 +71,12 @@ export class Fx {
   /** Real-time light at a spot (muzzle flashes, explosions); wired to the stage's light pool by main. */
   light: (x: number, y: number, z: number, color: string, intensity: number, life: number, distance?: number) => void = () => undefined;
 
-  private readonly decalCanvas: HTMLCanvasElement;
-  private readonly decalCtx: CanvasRenderingContext2D;
-  private readonly decalTex: THREE.CanvasTexture;
-  private decalDirty = false;
-  private decalPlane: THREE.Mesh | null = null;
+  /** The blood layer is cut into tiles: a splat only re-uploads the one or two small textures it touches. */
+  private readonly decalTiles: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; mat: THREE.MeshBasicMaterial; x0: number; y0: number; dirty: boolean }[] = [];
+  private decalW = 0;
+  private decalH = 0;
   private decalAge = 0;
-  private readonly flashes: { mesh: THREE.Mesh; life: number; max: number; grow: number }[] = [];
+  private readonly flashes: { mesh: THREE.Mesh; life: number; max: number; grow: number; ring: boolean }[] = [];
   private readonly flashGeo = new THREE.SphereGeometry(1, 10, 8);
   private readonly dummy = new THREE.Object3D();
   private readonly c = new THREE.Color();
@@ -127,22 +126,31 @@ export class Fx {
     this.smoke = makeSoft(THREE.NormalBlending, this.smokeAlpha);
     this.fire = makeSoft(THREE.AdditiveBlending, this.fireAlpha);
 
-    // persistent decal layer: a transparent canvas laid over the floor
-    this.decalCanvas = document.createElement('canvas');
-    this.decalCanvas.width = ARENA_HALF_W * 2 * this.ppu;
-    this.decalCanvas.height = ARENA_HALF_H * 2 * this.ppu;
-    this.decalCtx = this.decalCanvas.getContext('2d')!;
-    this.decalTex = new THREE.CanvasTexture(this.decalCanvas);
-    this.decalTex.colorSpace = THREE.SRGBColorSpace;
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(ARENA_HALF_W * 2, ARENA_HALF_H * 2),
-      new THREE.MeshBasicMaterial({ map: this.decalTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
-    );
-    this.decalPlane = plane;
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.y = 0.012;
-    plane.renderOrder = 1;
-    this.group.add(plane);
+    // persistent decal layer: transparent canvas tiles laid over the floor
+    const TX = 4;
+    const TY = 3;
+    const tw = (ARENA_HALF_W * 2) / TX;
+    const th = (ARENA_HALF_H * 2) / TY;
+    this.decalW = tw;
+    this.decalH = th;
+    for (let j = 0; j < TY; j++) {
+      for (let i = 0; i < TX; i++) {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(tw * this.ppu);
+        canvas.height = Math.round(th * this.ppu);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(tw, th), mat);
+        const x0 = -ARENA_HALF_W + i * tw;
+        const y0 = ARENA_HALF_H - j * th; // the top edge of the tile in sim y
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(x0 + tw / 2, 0.012, -(y0 - th / 2));
+        mesh.renderOrder = 1;
+        this.group.add(mesh);
+        this.decalTiles.push({ canvas, ctx: canvas.getContext('2d')!, tex, mat, x0, y0, dirty: false });
+      }
+    }
 
     const hc = document.createElement('canvas');
     hc.width = hc.height = 64;
@@ -183,8 +191,11 @@ export class Fx {
 
   /** Wipe the blood and the bullet holes: a new floor starts clean. */
   clearFloor(): void {
-    this.decalCtx.clearRect(0, 0, this.decalCanvas.width, this.decalCanvas.height);
-    this.decalTex.needsUpdate = true;
+    for (const t of this.decalTiles) {
+      t.ctx.clearRect(0, 0, t.canvas.width, t.canvas.height);
+      t.tex.needsUpdate = true;
+      t.dirty = false;
+    }
     this.holeCount = 0;
     this.holeNext = 0;
     this.holes.count = 0;
@@ -193,7 +204,7 @@ export class Fx {
 
   /** Fade the floor's blood and holes (the old floor dissolves during the climb). */
   setFloorFade(f: number): void {
-    if (this.decalPlane) (this.decalPlane.material as THREE.MeshBasicMaterial).opacity = f;
+    for (const t of this.decalTiles) t.mat.opacity = f;
     this.holes.visible = f > 0.35;
   }
 
@@ -249,22 +260,41 @@ export class Fx {
     return { nx: bnx, ny: bny, hx, hy };
   }
 
+  private readonly splatBlobs = new Float32Array(3 * 8);
+
   private splat(x: number, y: number, radius: number, color: string, alpha = 0.7): void {
-    const ctx = this.decalCtx;
-    const cx = (x + ARENA_HALF_W) * this.ppu;
-    const cy = (ARENA_HALF_H - y) * this.ppu;
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = color;
     const blobs = 3 + Math.floor(Math.random() * 4);
+    const bl = this.splatBlobs;
+    let minX = 1e9;
+    let maxX = -1e9;
+    let minY = 1e9;
+    let maxY = -1e9;
     for (let i = 0; i < blobs; i++) {
       const a = Math.random() * Math.PI * 2;
-      const d = Math.random() * radius * 0.7 * this.ppu;
-      const r = (0.25 + Math.random() * 0.6) * radius * this.ppu;
-      ctx.beginPath();
-      ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r, 0, Math.PI * 2);
-      ctx.fill();
+      const d = Math.random() * radius * 0.7;
+      const r = (0.25 + Math.random() * 0.6) * radius;
+      const bx = x + Math.cos(a) * d;
+      const by = y + Math.sin(a) * d;
+      bl[i * 3] = bx;
+      bl[i * 3 + 1] = by;
+      bl[i * 3 + 2] = r;
+      minX = Math.min(minX, bx - r);
+      maxX = Math.max(maxX, bx + r);
+      minY = Math.min(minY, by - r);
+      maxY = Math.max(maxY, by + r);
     }
-    this.decalDirty = true;
+    for (const t of this.decalTiles) {
+      if (maxX < t.x0 || minX > t.x0 + this.decalW || maxY < t.y0 - this.decalH || minY > t.y0) continue;
+      const ctx = t.ctx;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      for (let i = 0; i < blobs; i++) {
+        ctx.beginPath();
+        ctx.arc((bl[i * 3]! - t.x0) * this.ppu, (t.y0 - bl[i * 3 + 1]!) * this.ppu, bl[i * 3 + 2]! * this.ppu, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      t.dirty = true;
+    }
   }
 
   private emit(kind: Kind, x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, size: number, color: string): void {
@@ -293,32 +323,52 @@ export class Fx {
 
   /** An expanding ring on the floor under a heavy hit. */
   shockRing(x: number, y: number, color: string, size: number): void {
-    const m = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 28), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
-    m.rotation.x = -Math.PI / 2;
+    let m = this.ringFree.pop();
+    if (!m) {
+      m = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      m.rotation.x = -Math.PI / 2;
+    }
+    const mat = m.material as THREE.MeshBasicMaterial;
+    mat.color.set(color);
+    mat.opacity = 0.75;
     m.position.set(x, 0.06, -y);
     m.scale.setScalar(0.5);
     this.group.add(m);
-    this.flashes.push({ mesh: m, life: 0.28, max: 0.28, grow: size * 2.2 });
+    this.flashes.push({ mesh: m, life: 0.28, max: 0.28, grow: size * 2.2, ring: true });
   }
 
   /** The streak of a melee swing: a ring segment (the whole ring for a spin) that sweeps and fades in a moment. */
   slash(x: number, y: number, angle: number, arc: number, radius: number, color: string, spin: boolean): void {
-    const g = new THREE.Group();
     const full = arc > 6;
-    const mesh = new THREE.Mesh(
-      new THREE.RingGeometry(radius * 0.5, radius, full ? 40 : 24, 1, full ? 0 : -arc / 2, full ? Math.PI * 2 : arc),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
-    );
-    mesh.rotation.x = -Math.PI / 2;
-    g.add(mesh);
-    g.position.set(x, 0.55, -y);
-    g.rotation.y = angle;
-    g.scale.setScalar(spin ? 0.5 : 0.85);
-    this.group.add(g);
-    this.slashes.push({ group: g, mesh, life: 0.2, max: 0.2, spin });
+    const key = full ? -1 : Math.round(arc * 20);
+    let geo = this.slashGeo.get(key);
+    if (!geo) {
+      geo = new THREE.RingGeometry(0.5, 1, full ? 40 : 24, 1, full ? 0 : -arc / 2, full ? Math.PI * 2 : arc);
+      this.slashGeo.set(key, geo);
+    }
+    const sl = this.slashFree.pop() ?? (() => {
+      const g = new THREE.Group();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      mesh.rotation.x = -Math.PI / 2;
+      g.add(mesh);
+      return { group: g, mesh, life: 0, max: 0.2, spin: false, radius: 1 };
+    })();
+    sl.mesh.geometry = geo;
+    (sl.mesh.material as THREE.MeshBasicMaterial).color.set(color);
+    (sl.mesh.material as THREE.MeshBasicMaterial).opacity = 0.8;
+    sl.group.position.set(x, 0.55, -y);
+    sl.group.rotation.y = angle;
+    sl.radius = radius;
+    sl.spin = spin;
+    sl.life = sl.max = 0.2;
+    sl.group.scale.setScalar(radius * (spin ? 0.5 : 0.85));
+    this.group.add(sl.group);
+    this.slashes.push(sl);
   }
 
-  private readonly slashes: { group: THREE.Group; mesh: THREE.Mesh; life: number; max: number; spin: boolean }[] = [];
+  private readonly slashGeo = new Map<number, THREE.RingGeometry>();
+  private readonly slashFree: { group: THREE.Group; mesh: THREE.Mesh; life: number; max: number; spin: boolean; radius: number }[] = [];
+  private readonly slashes: { group: THREE.Group; mesh: THREE.Mesh; life: number; max: number; spin: boolean; radius: number }[] = [];
 
   /** A small kick of dust under a running character's feet. */
   dust(x: number, y: number): void {
@@ -350,12 +400,19 @@ export class Fx {
     }
   }
 
+  /** Meshes of finished flashes and rings, kept for the next one (no allocation, no new material per hit). */
+  private readonly flashFree: THREE.Mesh[] = [];
+  private readonly ringFree: THREE.Mesh[] = [];
+  private readonly ringGeo = new THREE.RingGeometry(0.42, 0.55, 28);
+
   private flash(x: number, y: number, z: number, radius: number, color: string, life: number, grow: number): void {
-    const m = new THREE.Mesh(this.flashGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
+    const m = this.flashFree.pop() ?? new THREE.Mesh(this.flashGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false }));
+    (m.material as THREE.MeshBasicMaterial).color.set(color);
+    (m.material as THREE.MeshBasicMaterial).opacity = 0.9;
     m.position.set(x, y, z);
     m.scale.setScalar(radius);
     this.group.add(m);
-    this.flashes.push({ mesh: m, life, max: life, grow });
+    this.flashes.push({ mesh: m, life, max: life, grow, ring: false });
   }
 
   /** React to one sim event. */
@@ -517,28 +574,32 @@ export class Fx {
       sl.life -= dt;
       if (sl.life <= 0) {
         this.group.remove(sl.group);
-        sl.mesh.geometry.dispose();
-        (sl.mesh.material as THREE.Material).dispose();
+        this.slashFree.push(sl);
         this.slashes.splice(k, 1);
         continue;
       }
       const t = 1 - sl.life / sl.max;
-      sl.group.scale.setScalar(sl.spin ? 0.5 + 0.6 * t : 0.85 + 0.25 * t);
+      sl.group.scale.setScalar(sl.radius * (sl.spin ? 0.5 + 0.6 * t : 0.85 + 0.25 * t));
       (sl.mesh.material as THREE.MeshBasicMaterial).opacity = 0.8 * (1 - t) * (1 - t * 0.4);
     }
     this.hurt = Math.max(0, this.hurt - dt * 2.2);
     this.decalAge += dt;
-    if (this.decalDirty && this.decalAge > 0.2) {
-      this.decalTex.needsUpdate = true;
-      this.decalDirty = false;
-      this.decalAge = 0;
+    if (this.decalAge > 0.12) {
+      // one small tile per interval: a fight never uploads the whole floor at once
+      for (const t of this.decalTiles) {
+        if (!t.dirty) continue;
+        t.tex.needsUpdate = true;
+        t.dirty = false;
+        this.decalAge = 0;
+        break;
+      }
     }
     for (let k = this.flashes.length - 1; k >= 0; k--) {
       const f = this.flashes[k]!;
       f.life -= dt;
       if (f.life <= 0) {
         this.group.remove(f.mesh);
-        (f.mesh.material as THREE.Material).dispose();
+        (f.ring ? this.ringFree : this.flashFree).push(f.mesh);
         this.flashes.splice(k, 1);
         continue;
       }
