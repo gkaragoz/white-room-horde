@@ -89,8 +89,10 @@ try {
 
   // mouse fire consumes the magazine
   await page.mouse.move(900, 300);
+  const m0 = (await state()).tick;
   await page.mouse.down();
-  await sleep(900);
+  // software rendering in CI runs only a few ticks per second: hold the button until the simulation has really moved on
+  for (let i = 0; i < 400 && (await state()).tick < m0 + 10; i++) await sleep(25);
   await page.mouse.up();
   const d = await state();
   check('mouse click fires (magazine shrinks)', d.mag < 12 || d.reload > 0, `mag ${d.mag}`);

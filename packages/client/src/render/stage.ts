@@ -397,6 +397,15 @@ export class Stage {
   warmFlight(): void {
     if (this.backend !== 'webgl' || this.blurWarm) return;
     this.blurWarm = true;
+    // a software renderer (CI browsers, machines without a GPU) would stall for seconds on this: not worth warming there
+    try {
+      const gl = this.renderer.getContext();
+      const info = gl.getExtension('WEBGL_debug_renderer_info');
+      const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+      if (/swiftshader|llvmpipe|software|basic render/i.test(name)) return;
+    } catch {
+      /* no way to tell: go ahead */
+    }
     const saved = this.blur;
     this.blur = 0.0006;
     this.render();

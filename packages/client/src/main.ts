@@ -601,7 +601,7 @@ function beginPlaying(w: World, slot: number): void {
   stage.update(0, 0, 0);
   climb.props.setNight(stage.night);
   // build the climb's blur composer and shaders now, in a calm moment, instead of at the first climb
-  setTimeout(() => stage.warmFlight(), 1200);
+  setTimeout(() => stage.warmFlight(), 4000);
   world = w;
   localSlot = slot;
   ui.clearScreen();
