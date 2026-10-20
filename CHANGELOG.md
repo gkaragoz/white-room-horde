@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.8.0 (2026-10-20)
+
 **Weapons (rules change: update the server and reload the page)**
 - A real inventory: every weapon you pick up is yours for the rest of the run, with its own magazine and reserve. Ammo crates refill every weapon you own; a weapon crate you already have refills that weapon. New weapons go into the bag, not into your hands.
 - Fixed keys, weakest to strongest: `1`-`9` take the first nine weapons, `Q` takes the next stronger weapon with ammo (and wraps from the strongest to the weakest); the last four weapons are reached with `Q`. A weapon without ammo cannot be selected and never stays in your hands: when it runs dry the nearest weapon by rank takes over.
