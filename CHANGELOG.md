@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.13.0 (2026-10-20)
+
 **Ten new enemies, ice, two new bosses (rules change: update the server and reload the page)**
 - Ten new enemy types, each with its own model, carried prop and way of fighting, joining the waves from floor 8 up to floor 24: the *acid sprayer* (a tank on its back, leaves acid behind it and spits puddles), the *rammer* (a bull: stops, trembles and swells with a charge bar, then runs dead straight and throws everything it meets into the air, players stunned, enemies tossed as ragdolls), the *mortar grenadier* (keeps its distance and lobs a salvo of marked shells), the *sledge brute* (a giant hammer: marked slam, shockwave throw), the *lamp spinner* (winds a street lamp up and sweeps a 360 degree circle), the *reviver* (a shaman that keeps away and calls crawlers), the *marksman* (a long thin laser line, then a very hard hit), the *blinker* (teleports behind you), the *magnetar* (pulls everybody toward itself) and the *flamer* (a stream of fire on the ground).
 - Frozen enemies are covered in ice: a blue-white coat creeps up from the feet (noise-broken, a little sparkle), crystal shards (modelled in Blender) grow out of the body, and when the freeze ends the ice melts away and shatters with a sound.
