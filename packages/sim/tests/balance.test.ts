@@ -11,6 +11,14 @@ describe('balance', () => {
     }
   }, 600000);
 
+  it('the same seed plays out identically twice, with bots using classes, abilities and melee (soak)', () => {
+    const run = (): string => {
+      const r = playBots(7, 3);
+      return `${r.floor}/${r.ticks}`;
+    };
+    expect(run()).toBe(run());
+  }, 600000);
+
   it('past the early floors every floor hits harder than the last', () => {
     expect(BALANCE.late.damagePerFloor).toBeGreaterThan(0.03);
     expect(BALANCE.late.hpPerFloor).toBeGreaterThan(0.01);

@@ -27,18 +27,22 @@ export const Buttons = {
   Card1: 1 << 5,
   Card2: 1 << 6,
   Card3: 1 << 7,
+  /** The class ability (see abilities.ts in the sim). */
+  Special: 1 << 8,
 } as const;
 
 export const NO_INPUT: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 
-export type WeaponId = 'pistol' | 'smg' | 'ar' | 'shotgun' | 'hmg' | 'minigun' | 'sniper' | 'revolver' | 'mp' | 'dbl' | 'dmr' | 'flamer' | 'gl';
-export const WEAPON_IDS: readonly WeaponId[] = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper', 'revolver', 'mp', 'dbl', 'dmr', 'flamer', 'gl'];
+export type WeaponId = 'pistol' | 'smg' | 'ar' | 'shotgun' | 'hmg' | 'minigun' | 'sniper' | 'revolver' | 'mp' | 'dbl' | 'dmr' | 'flamer' | 'gl' | 'sword' | 'hammer';
+export const WEAPON_IDS: readonly WeaponId[] = ['pistol', 'smg', 'ar', 'shotgun', 'hmg', 'minigun', 'sniper', 'revolver', 'mp', 'dbl', 'dmr', 'flamer', 'gl', 'sword', 'hammer'];
+/** Classes that fight with a blade or a hammer and use no guns (class id index). */
+export const MELEE_CLASSES: readonly number[] = [7, 8];
 
 /**
  * Fixed order of the weapons from the weakest to the strongest (sustained damage and area, see balance.json). The number
  * keys 1-9 pick the first nine of them, Q walks up the list; the order never changes, so a key always means the same gun.
  */
-export const WEAPON_RANK: readonly WeaponId[] = ['pistol', 'mp', 'shotgun', 'revolver', 'dbl', 'smg', 'ar', 'flamer', 'sniper', 'dmr', 'hmg', 'gl', 'minigun'];
+export const WEAPON_RANK: readonly WeaponId[] = ['pistol', 'mp', 'shotgun', 'revolver', 'dbl', 'smg', 'ar', 'flamer', 'sniper', 'dmr', 'hmg', 'gl', 'minigun', 'sword', 'hammer'];
 /** WEAPON_RANK as indices into WEAPON_IDS. */
 export const RANK_INDEX: readonly number[] = WEAPON_RANK.map((id) => WEAPON_IDS.indexOf(id));
 /** Position of a weapon (index into WEAPON_IDS) in the ranking, 0 = weakest. */
@@ -91,5 +95,5 @@ export const PERK = {
 export const PERKS = 24;
 
 /** Classes a player can pick in the lobby (index = class id in the sim and on the wire). */
-export const CLASS_IDS = ['soldier', 'medic', 'heavy', 'scout', 'demolisher', 'ranger', 'berserker'] as const;
+export const CLASS_IDS = ['soldier', 'medic', 'heavy', 'scout', 'demolisher', 'ranger', 'berserker', 'swordsman', 'hammerer'] as const;
 export type ClassId = (typeof CLASS_IDS)[number];

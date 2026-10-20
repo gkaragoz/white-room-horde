@@ -1,7 +1,7 @@
 import { BALANCE, MAX_PLAYERS, MAX_TELE, MAX_ZONES, PlayerState, TICK_DT, TICK_RATE, TeleEffect, TeleShape, ZoneKind } from '@wrh/shared';
 import { atan2, cos, sin, sqrt } from './detmath';
-import { absorb } from './features';
-import { hurtPlayer } from './enemies';
+import { absorb, stunImmune } from './features';
+import { blastFrom, hurtPlayer } from './enemies';
 import type { World } from './state';
 
 /** Slowing of a knocked-back player's push per tick. */
@@ -40,6 +40,7 @@ export function addTelegraph(w: World, shape: number, effect: number, x: number,
     w.tL[i] = length;
     w.tAmt[i] = amount;
     w.tLeft[i] = w.tTotal[i] = Math.max(1, Math.round(delay * TICK_RATE));
+    w.tOwner[i] = -1;
     w.events.push({ type: 'telegraph', shape, x, y });
     return i;
   }
@@ -48,6 +49,7 @@ export function addTelegraph(w: World, shape: number, effect: number, x: number,
 
 /** Throw a player: a push velocity (units per second), a stun (no steering or shooting) and a toss in the air for the show. */
 export function launchPlayer(w: World, s: number, kx: number, ky: number, stunSeconds: number, airTicks = 14): void {
+  if (stunImmune(w, s)) return; // a fortified heavy and a berserker in a rampage stand their ground
   w.pKnockX[s] = kx;
   w.pKnockY[s] = ky;
   const stun = Math.round(stunSeconds * TICK_RATE);
@@ -83,6 +85,12 @@ function land(w: World, t: number): void {
   const radius = w.tShape[t] === TeleShape.Circle ? w.tW[t]! : Math.max(w.tW[t]!, w.tL[t]!);
   w.events.push({ type: 'teleHit', shape: w.tShape[t]!, effect, x: w.tX[t]!, y: w.tY[t]!, radius });
   if (effect === TeleEffect.None) return; // only shows where something is about to happen
+  if (effect === TeleEffect.Strike) {
+    // a friendly strike (the demolisher's airstrike): it hurts enemies in the circle, never the squad
+    w.events.push({ type: 'explosion', x: w.tX[t]!, y: w.tY[t]!, radius: w.tW[t]! });
+    blastFrom(w, w.tOwner[t]!, w.tX[t]!, w.tY[t]!, w.tW[t]!, w.tAmt[t]!);
+    return;
+  }
   if (effect === TeleEffect.Acid) {
     addZone(w, w.tX[t]!, w.tY[t]!, w.tAmt[t]! > 0 ? w.tAmt[t]! : BALANCE.hazards.acid.radius, BALANCE.hazards.acid.seconds, ZoneKind.Acid);
     return;

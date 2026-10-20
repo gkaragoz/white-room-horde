@@ -3,7 +3,7 @@ import { BALANCE, ENEMY_TYPES, MAX_ENEMIES, MAX_TELE, MAX_ZONES, TeleEffect, Tel
 import type { World } from '@wrh/sim';
 import type { Fx } from './fx';
 
-const DANGER = { hurt: '#ff4a3a', deadly: '#c4006e', acid: '#8fd13a', safeHurt: '#ffb000', safeDeadly: '#2f7bff' };
+const DANGER = { friendly: '#3fd0ff', hurt: '#ff4a3a', deadly: '#c4006e', acid: '#8fd13a', safeHurt: '#ffb000', safeDeadly: '#2f7bff' };
 
 function blotchTexture(a: string, b: string): THREE.CanvasTexture {
   const c = document.createElement('canvas');
@@ -186,7 +186,8 @@ export class GroundFx {
       const effect = w.tEffect[i]!;
       const deadly = effect === TeleEffect.Half || effect === TeleEffect.Kill;
       const acid = effect === TeleEffect.Acid;
-      const col = acid ? DANGER.acid : deadly ? (this.colorblind ? DANGER.safeDeadly : DANGER.deadly) : this.colorblind ? DANGER.safeHurt : DANGER.hurt;
+      const friendly = effect === TeleEffect.Strike;
+      const col = friendly ? DANGER.friendly : acid ? DANGER.acid : deadly ? (this.colorblind ? DANGER.safeDeadly : DANGER.deadly) : this.colorblind ? DANGER.safeHurt : DANGER.hurt;
       v.fillMat.color.set(col);
       const pulse = 0.5 + 0.5 * Math.sin(nowSec * (6 + p * 14));
       v.fillMat.opacity = 0.28 + 0.3 * p + pulse * 0.08 * p;

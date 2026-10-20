@@ -13,7 +13,8 @@ export type Sfx =
   | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart'
   | 'floorCleared' | 'countTick' | 'countGo' | 'floorCharge' | 'floorLift' | 'floorArrive' | 'floorStart'
   | 'cardOffer' | 'iceFreeze' | 'iceThaw' | 'nuke' | 'secondWind' | 'weaponGet' | 'dead' | 'floorEnter' | 'slowIn' | 'slowOut' | 'impactWall' | 'barrelHit'
-  | 'warnCircle' | 'warnLine' | 'slamHit' | 'purge' | 'acidSplash' | 'launch' | 'chargeUp' | 'pullHum' | 'blinkZap';
+  | 'warnCircle' | 'warnLine' | 'slamHit' | 'purge' | 'acidSplash' | 'launch' | 'chargeUp' | 'pullHum' | 'blinkZap' | 'abilityBuff' | 'abilityPower' | 'abilityWhoosh' | 'airstrikeCall'
+  | 'vo_firstblood' | 'vo_doublekill' | 'vo_triplekill' | 'vo_megakill' | 'vo_killingspree' | 'vo_rampage' | 'vo_dominating' | 'vo_massacre' | 'vo_godlike' | 'vo_mayhem' | 'vo_ownage' | 'vo_carnage';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
 const GUN_GAP = 0.02;
@@ -25,7 +26,8 @@ const GAP: Record<Sfx, number> = {
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
   floorCleared: 0.5, countTick: 0.2, countGo: 0.2, floorCharge: 0.5, floorLift: 1, floorArrive: 0.5, floorStart: 0.5,
   cardOffer: 0.3, iceFreeze: 0.5, iceThaw: 0.3, nuke: 2, secondWind: 1, weaponGet: 0.2, dead: 0.5, floorEnter: 1, slowIn: 1, slowOut: 1, impactWall: 0.05, barrelHit: 0.1,
-  warnCircle: 0.25, warnLine: 0.4, slamHit: 0.1, purge: 1, acidSplash: 0.15, launch: 0.2, chargeUp: 0.25, pullHum: 0.8, blinkZap: 0.1,
+  warnCircle: 0.25, warnLine: 0.4, slamHit: 0.1, purge: 1, acidSplash: 0.15, launch: 0.2, chargeUp: 0.25, pullHum: 0.8, blinkZap: 0.1, abilityBuff: 0.2, abilityPower: 0.2, abilityWhoosh: 0.2, airstrikeCall: 0.5,
+  vo_firstblood: 0, vo_doublekill: 0, vo_triplekill: 0, vo_megakill: 0, vo_killingspree: 0, vo_rampage: 0, vo_dominating: 0, vo_massacre: 0, vo_godlike: 0, vo_mayhem: 0, vo_ownage: 0, vo_carnage: 0,
 };
 
 type Entry = { files: string[]; gain: number; rate: [number, number] };
@@ -47,6 +49,8 @@ const GUNS: Record<WeaponId, { takes: number; gain: number; rate: [number, numbe
   dmr: { takes: 3, gain: 0.95, rate: [0.97, 1.03] },
   flamer: { takes: 3, gain: 0.9, rate: [0.95, 1.1] },
   gl: { takes: 3, gain: 1.0, rate: [0.95, 1.0] },
+  sword: { takes: 3, gain: 0.9, rate: [0.95, 1.08] },
+  hammer: { takes: 2, gain: 1.0, rate: [0.92, 1.0] },
 };
 
 /** Recorded effects (CC0, see public/sfx/CREDITS.md). Each name picks a random file and varies the pitch a little. */
@@ -122,12 +126,28 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   chargeUp: { files: ['charge_up'], gain: 0.5, rate: [0.9, 1.15] },
   pullHum: { files: ['pull_hum'], gain: 0.7, rate: [1, 1] },
   blinkZap: { files: ['blink_zap'], gain: 0.5, rate: [0.9, 1.2] },
+  abilityBuff: { files: ['ability_buff'], gain: 0.7, rate: [1, 1] },
+  abilityPower: { files: ['ability_power'], gain: 0.8, rate: [1, 1] },
+  abilityWhoosh: { files: ['ability_whoosh'], gain: 0.7, rate: [1, 1] },
+  airstrikeCall: { files: ['airstrike_call'], gain: 0.7, rate: [1, 1] },
+  vo_firstblood: { files: ['vo_firstblood'], gain: 0.95, rate: [1, 1] },
+  vo_doublekill: { files: ['vo_doublekill'], gain: 0.95, rate: [1, 1] },
+  vo_triplekill: { files: ['vo_triplekill'], gain: 0.95, rate: [1, 1] },
+  vo_megakill: { files: ['vo_megakill'], gain: 0.95, rate: [1, 1] },
+  vo_killingspree: { files: ['vo_killingspree'], gain: 0.95, rate: [1, 1] },
+  vo_rampage: { files: ['vo_rampage'], gain: 0.95, rate: [1, 1] },
+  vo_dominating: { files: ['vo_dominating'], gain: 0.95, rate: [1, 1] },
+  vo_massacre: { files: ['vo_massacre'], gain: 0.95, rate: [1, 1] },
+  vo_godlike: { files: ['vo_godlike'], gain: 0.95, rate: [1, 1] },
+  vo_mayhem: { files: ['vo_mayhem'], gain: 0.95, rate: [1, 1] },
+  vo_ownage: { files: ['vo_ownage'], gain: 0.95, rate: [1, 1] },
+  vo_carnage: { files: ['vo_carnage'], gain: 0.95, rate: [1, 1] },
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
 const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
 
-const VOICE_SFX = new Set<Sfx>(['zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
+const VOICE_SFX = new Set<Sfx>(['vo_firstblood', 'vo_doublekill', 'vo_triplekill', 'vo_megakill', 'vo_killingspree', 'vo_rampage', 'vo_dominating', 'vo_massacre', 'vo_godlike', 'vo_mayhem', 'vo_ownage', 'vo_carnage', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
 
 /** Every file the bank refers to (QA checks they all decode). */
 export const BANK_FILES: string[] = [...new Set(Object.values(BANK).flatMap((b) => b.files))];
@@ -571,6 +591,25 @@ export class Audio {
     this.synth(name);
   }
 
+  /** Seconds each announcer line lasts (so a lesser line does not talk over a bigger one). */
+  private static readonly VO_LENGTH: Record<string, number> = { firstblood: 1.63, doublekill: 1.52, triplekill: 1.66, megakill: 1.93, killingspree: 2.07, rampage: 1.75, dominating: 1.62, massacre: 1.72, godlike: 2.01, mayhem: 1.16, ownage: 1.75, carnage: 1.49 };
+  private voiceUntil = 0;
+  private voicePriority = 0;
+
+  /**
+   * The announcer: one voice at a time. A line plays unless another is still talking with the same or a higher priority;
+   * a higher priority line speaks over it. Returns whether it was spoken.
+   */
+  announce(line: string, priority: number): boolean {
+    if (!this.ctx || this.muted) return false;
+    const now = this.ctx.currentTime;
+    if (now < this.voiceUntil && priority <= this.voicePriority) return false;
+    this.voiceUntil = now + (Audio.VO_LENGTH[line] ?? 1.5);
+    this.voicePriority = priority;
+    this.play(`vo_${line}` as Sfx);
+    return true;
+  }
+
   /** UI feedback (clicks, confirmations, errors). */
   ui(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void {
     this.play(('ui' + name[0]!.toUpperCase() + name.slice(1)) as Sfx);
@@ -627,6 +666,17 @@ export class Audio {
       case 'blink':
         this.play('blinkZap', e);
         break;
+      case 'ability': {
+        const cls = e.cls;
+        const kind: Sfx = cls === 0 || cls === 1 || cls === 5 ? 'abilityBuff' : cls === 3 || cls === 7 ? 'abilityWhoosh' : cls === 4 ? 'airstrikeCall' : 'abilityPower';
+        this.play(kind, e.slot === localSlot ? undefined : e);
+        break;
+      }
+      case 'swing': {
+        const w = WEAPON_IDS[e.weapon];
+        this.play(`gun_${w!}`, e.slot === localSlot ? undefined : e);
+        break;
+      }
       case 'thaw':
         this.play('iceThaw');
         break;

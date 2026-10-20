@@ -79,6 +79,7 @@ export function botInput(w: World, s: number): PlayerInput {
   let buttons = nearest >= 0 ? Buttons.Fire : 0;
   if (crowd > 14 && w.tick % 45 === s * 5) buttons |= Buttons.Grenade;
   if (revive) buttons |= Buttons.Revive;
+  if (crowd > 6) buttons |= Buttons.Special;
   if (crowd > 8 && w.tick % 60 === s * 7) buttons |= Buttons.Dash;
   if (w.pMag[s]! === 0 && w.tick % 30 === 0) buttons |= Buttons.Reload;
   // cards: a fresh press every other tick
@@ -93,7 +94,7 @@ export interface BotRun {
 
 /** Play a squad of bots until everybody is dead (or `maxTicks`). Returns the floor reached. */
 export function playBots(seed: number, players = 3, maxTicks = 30 * 60 * 40): BotRun {
-  const w = createGame({ seed, players: Array.from({ length: players }, (_, i) => ({ slot: i, weapon: 'pistol' as const, cls: i % 3 })) });
+  const w = createGame({ seed, players: Array.from({ length: players }, (_, i) => ({ slot: i, weapon: 'pistol' as const, cls: (seed + i * 4) % 9 })) });
   while (!w.gameOver && w.tick < maxTicks) {
     const inputs: PlayerInput[] = [];
     for (let s = 0; s < players; s++) inputs.push(botInput(w, s));

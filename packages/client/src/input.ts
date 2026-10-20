@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { Buttons, type PlayerInput } from '@wrh/shared';
 import { SCREEN_RIGHT, SCREEN_UP, encodeAim, keysToMove } from './controls';
 
-export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'card1' | 'card2' | 'card3' | 'switch' | 'hostpause' | 'pause';
-export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'switch', 'hostpause', 'card1', 'card2', 'card3', 'pause'];
+export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'special' | 'card1' | 'card2' | 'card3' | 'switch' | 'hostpause' | 'pause';
+export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'special', 'switch', 'hostpause', 'card1', 'card2', 'card3', 'pause'];
 
 export type Bindings = Record<Action, string[]>;
 
@@ -17,6 +17,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   revive: ['KeyE'],
   reload: ['KeyR'],
   dash: ['ShiftLeft', 'ShiftRight'],
+  special: ['KeyF'],
   switch: ['KeyQ'],
   card1: ['Digit1'],
   card2: ['Digit2'],
@@ -235,6 +236,7 @@ export class Input {
     if (this.held('revive')) buttons |= Buttons.Revive;
     if (this.held('reload')) buttons |= Buttons.Reload;
     if (this.held('dash')) buttons |= Buttons.Dash;
+    if (this.held('special')) buttons |= Buttons.Special;
     // weapon choice: 1-9 and Q (next) are one-shot presses queued by the key handler; the pad's Y and the touch button too
     const padSwitch = !!this.pad()?.buttons[3]?.pressed;
     if (padSwitch && !this.padSwitchHeld) this.queuedWeapon = 14;
@@ -269,6 +271,7 @@ export class Input {
       if (b(2)) buttons |= Buttons.Revive;
       if (b(1)) buttons |= Buttons.Reload;
       if (b(0)) buttons |= Buttons.Dash;
+      if (b(3)) buttons |= Buttons.Special;
       if (b(14)) buttons |= Buttons.Card1;
       if (b(12)) buttons |= Buttons.Card2;
       if (b(15)) buttons |= Buttons.Card3;
@@ -411,6 +414,7 @@ export class Input {
     };
     button('\u{1F4A3}', Buttons.Grenade, 18, 200);
     button('⚡', Buttons.Dash, 90, 200);
+    button('★', Buttons.Special, 162, 200);
     button('↻', Buttons.Reload, 18, 130);
     button('+', Buttons.Revive, 90, 130);
     const sw = document.createElement('div');

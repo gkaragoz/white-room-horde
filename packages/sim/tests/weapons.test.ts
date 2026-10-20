@@ -33,6 +33,12 @@ describe('weapons are distinct', () => {
       expect(s.damage, id).toBeGreaterThan(0);
       expect(s.rate, id).toBeGreaterThan(0);
       expect(s.mag, id).toBeGreaterThan(0);
+      if (s.melee) {
+        // blades and hammers swing instead of shooting
+        expect(s.melee.arc, id).toBeGreaterThan(1);
+        expect(s.melee.radius, id).toBeGreaterThan(2);
+        continue;
+      }
       expect(s.reload, id).toBeGreaterThan(0);
       expect(s.range, id).toBeGreaterThan(2);
       expect(s.muzzleFwd, id).toBeGreaterThan(0.5);
@@ -101,7 +107,8 @@ describe('weapon inventory', () => {
   it('the ranking is a permutation of the weapons, weakest first', () => {
     expect([...WEAPON_RANK].sort()).toEqual([...WEAPON_IDS].sort());
     expect(WEAPON_RANK[0]).toBe('pistol');
-    expect(WEAPON_RANK[WEAPON_RANK.length - 1]).toBe('minigun');
+    expect(WEAPON_RANK[WEAPON_RANK.length - 3]).toBe('minigun'); // the two melee weapons come last
+    expect(WEAPON_RANK.slice(-2)).toEqual(['sword', 'hammer']);
   });
 
   it('a player starts with the chosen weapon and a pistol; a pistol player owns only the pistol', () => {
@@ -297,7 +304,7 @@ describe('weapon balance', () => {
   };
 
   it('no weapon is hopeless or dominant: sustained damage per second stays in one band', () => {
-    const all = WEAPON_IDS.map((id) => [id, sustained(id)] as const);
+    const all = WEAPON_IDS.filter((id) => !BALANCE.weapons[id].melee).map((id) => [id, sustained(id)] as const);
     for (const [id, dps] of all) {
       expect(dps, id).toBeGreaterThan(38);
       expect(dps, id).toBeLessThan(102);
@@ -309,6 +316,7 @@ describe('weapon balance', () => {
   it('burst damage is capped so the minigun and heavy machine gun do not melt everything', () => {
     for (const id of WEAPON_IDS) {
       const s = BALANCE.weapons[id];
+      if (s.melee) continue;
       expect(s.damage * s.pellets * s.rate, id).toBeLessThan(165);
     }
   });

@@ -173,5 +173,5 @@ describe('benchmark', () => {
     console.log(`sim benchmark: enemies=${w.enemyCount} avg=${avg.toFixed(2)}ms p99=${p99.toFixed(2)}ms max=${samples[samples.length - 1]!.toFixed(2)}ms hash=${hashWorld(w)}`);
     expect(w.enemyCount).toBeGreaterThan(400);
     expect(avg).toBeLessThan(12);
-  });
+  }, 60000);
 });

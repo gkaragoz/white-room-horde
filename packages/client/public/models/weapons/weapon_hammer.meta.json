@@ -1,0 +1,23 @@
+{
+ "id": "hammer",
+ "tris": 286,
+ "muzzle": [
+  0.0,
+  -1.9,
+  0.0
+ ],
+ "grip_l": [
+  0,
+  -0.55,
+  0.0
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

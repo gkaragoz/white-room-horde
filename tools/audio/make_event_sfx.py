@@ -162,6 +162,28 @@ def build():
     c["pull_hum"] = hum
     zap = mix((fft_filter(noise(0.3), lo=1500) * env(int(0.3 * SR), 0.001, 0.3, 3), 0.6, 0.0), (tone(sweep(2400, 300, 0.25, 0.7), 0.25, release=0.2, curve=2), 0.7, 0.0))
     c["blink_zap"] = zap
+    # melee: blade swishes (three takes) and hammer blows (two takes)
+    for k, (f0, f1, ring) in enumerate(((900, 5200, 2600), (1100, 6200, 3100), (800, 4600, 2300)), 1):
+        n = int(0.3 * SR)
+        sw = fft_filter(noise(0.3), lo=f0, hi=f1) * np.sin(np.linspace(0, np.pi, n)) ** 1.4
+        ringing = tone(ring, 0.28, ((1, 1), (2.1, 0.25)), 0.02, 0.2, 2.2) * 0.18
+        c["gun_sword_%d" % k] = mix((sw, 1.0, 0.0), (ringing, 0.8, 0.05))
+    for k, (f0, f1, thud) in enumerate(((150, 1400, 70), (180, 1700, 85)), 1):
+        n = int(0.42 * SR)
+        wh = fft_filter(noise(0.42), lo=f0, hi=f1) * np.sin(np.linspace(0, np.pi * 0.75, n)) ** 1.5
+        hit = lowpass_env(noise(0.4), 700, 90) * env(int(0.4 * SR), 0.002, 0.4, 2.4)
+        body = tone(sweep(thud * 1.8, thud * 0.6, 0.35, 0.6), 0.35, release=0.3, curve=2)
+        c["gun_hammer_%d" % k] = mix((wh, 0.7, 0.0), (hit, 1.0, 0.3), (body, 0.9, 0.3))
+    # class abilities: a rising chime, a low growl, a fast whoosh, an incoming whistle
+    chime = lambda f, st: tone(f, 0.5, ((1, 1), (2, 0.3), (3, 0.12)), 0.01, 0.45, 2.0)
+    c["ability_buff"] = mix((chime(523, 0), 0.8, 0.0), (chime(659, 0), 0.8, 0.09), (chime(784, 0), 0.8, 0.18), (chime(1047, 0), 0.9, 0.27))
+    t9 = t_(0.9)
+    growl = tone(sweep(60, 130, 0.9, 0.8), 0.9, ((1, 1), (2, 0.7), (3, 0.5), (4, 0.3)), 0.06, 0.4, 1.4) * (0.7 + 0.3 * np.sin(t9 * 2 * np.pi * 22))
+    c["ability_power"] = mix((growl, 0.9, 0.0), (fft_filter(noise(0.9), lo=100, hi=1200) * env(int(0.9 * SR), 0.1, 0.5, 1.5), 0.35, 0.0))
+    c["ability_whoosh"] = fft_filter(noise(0.5), lo=300, hi=7000) * np.sin(np.linspace(0, np.pi, int(0.5 * SR))) ** 1.2
+    whistle = tone(sweep(2600, 500, 1.0, 0.9), 1.0, ((1, 1), (2, 0.15)), 0.02, 0.15, 1.1)
+    click = fft_filter(noise(0.03), lo=1500, hi=5000) * env(int(0.03 * SR), 0.0005, 0.03, 2)
+    c["airstrike_call"] = mix((click, 0.7, 0.0), (whistle, 0.6, 0.12))
     return {k: normalise(v) for k, v in c.items()}
 
 

@@ -1,5 +1,5 @@
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -149,7 +149,7 @@ const BASE_STRINGS = {
     controlsTitle: 'Controls',
     pressKey: 'press a key...',
     resetKeys: 'Reset keys',
-    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', switch: 'Switch weapon', hostpause: 'Pause (host)', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
+    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', special: 'Class ability', switch: 'Switch weapon', hostpause: 'Pause (host)', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
     fpsCap: 'Frame limit',
     unlimited: 'Display rate',
     texture: 'Texture detail',
@@ -198,15 +198,17 @@ const BASE_STRINGS = {
       secondwind: ['Second wind', 'Once: get back up at half health instead of going down'],
       rage: ['Rage', 'Up to 70% more damage as your health drops'],
     },
-    classNames: ['Soldier', 'Medic', 'Heavy', 'Scout', 'Demolisher', 'Ranger', 'Berserker'],
+    classNames: ['Soldier', 'Medic', 'Heavy', 'Scout', 'Demolisher', 'Ranger', 'Berserker', 'Swordsman', 'Hammerer'],
     classTips: [
-      'Balanced all-rounder',
-      'Heals nearby allies, revives 80% faster, regenerates',
-      '+90 HP and 22% less damage taken, but slow',
-      'Very fast and dashes often, but fragile',
-      '3 extra grenades and 50% bigger blasts',
-      '+15% damage, bullets pierce one more enemy',
-      'Hits harder as health drops, heals on kills',
+      'Balanced all-rounder. Ability: Rally, the squad nearby fires and moves faster for 6 s',
+      'Heals nearby allies, revives 80% faster, regenerates. Ability: Heal pulse, heals everybody around',
+      '+90 HP and 22% less damage taken, but slow. Ability: Fortify, 65% less damage and cannot be thrown for 5 s',
+      'Very fast and dashes often, but fragile. Ability: Burst, much faster for 3 s and the dash is ready again',
+      '3 extra grenades and 50% bigger blasts. Ability: Airstrike, six marked blasts land ahead of you',
+      '+15% damage, bullets pierce one more enemy. Ability: Overcharge, six shots pierce and hit twice as hard',
+      'Hits harder as health drops, heals on kills. Ability: Rampage, 60% more damage, faster, cannot be stunned for 6 s',
+      'No guns: a blade that cuts a wide arc in front of you. Ability: Blade storm, spins and hits everything around for 2 s',
+      'No guns: a heavy hammer. Hold to charge, let go for a full spin. Ability: Ground slam, a shockwave around you',
     ],
     classTitle: 'Class',
     waveMods: ['', 'Swarm!', 'Armored horde!', 'Fast and furious!', 'Bounty wave!', 'Elite storm!'],
@@ -217,13 +219,14 @@ const BASE_STRINGS = {
     secondWind: 'Second wind!',
     mvp: 'MVP',
     squadKills: 'Kills',
+    abilityTip: 'Class ability (key F): ready, or the seconds until it is',
     finalBlow: 'Final blow',
     dpsLabel: 'DPS',
     dmgTotal: 'Damage dealt',
     killsTip: 'Kills',
     xpTip: 'Experience',
     avgDps: 'Average DPS',
-    weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper', revolver: 'Revolver', mp: 'Machine pistol', dbl: 'Double barrel', dmr: 'Marksman rifle', flamer: 'Flamethrower', gl: 'Grenade launcher' },
+    weapons: { pistol: 'Pistol', smg: 'SMG', ar: 'Assault rifle', shotgun: 'Shotgun', hmg: 'Heavy MG', minigun: 'Minigun', sniper: 'Sniper', revolver: 'Revolver', mp: 'Machine pistol', dbl: 'Double barrel', dmr: 'Marksman rifle', flamer: 'Flamethrower', gl: 'Grenade launcher', sword: 'Sword', hammer: 'War hammer' },
   },
   tr: {
     title: 'white-room-horde',
@@ -345,7 +348,7 @@ const BASE_STRINGS = {
     controlsTitle: 'Kontroller',
     pressKey: 'bir tuşa bas...',
     resetKeys: 'Tuşları sıfırla',
-    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', switch: 'Silah değiştir', hostpause: 'Duraklat (host)', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
+    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', special: 'Sınıf yeteneği', switch: 'Silah değiştir', hostpause: 'Duraklat (host)', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
     fpsCap: 'Kare sınırı',
     unlimited: 'Ekran hızı',
     texture: 'Doku detayı',
@@ -394,15 +397,17 @@ const BASE_STRINGS = {
       secondwind: ['İkinci nefes', 'Bir kez: yere düşmek yerine yarı canla ayağa kalk'],
       rage: ['Öfke', 'Canın azaldıkça %70\'e kadar fazla hasar'],
     },
-    classNames: ['Asker', 'Sağlıkçı', 'Ağır', 'Gözcü', 'Yıkımcı', 'Avcı', 'Çılgın'],
+    classNames: ['Asker', 'Sağlıkçı', 'Ağır', 'Gözcü', 'Yıkımcı', 'Avcı', 'Çılgın', 'Kılıççı', 'Çekiççi'],
     classTips: [
-      'Dengeli, her işe yarar',
-      'Yakındaki dostları iyileştirir, %80 hızlı kaldırır, yenilenir',
-      '+90 can, %22 az hasar, ama yavaş',
-      'Çok hızlı, sık atılır, ama kırılgan',
-      '3 fazladan bomba, %50 büyük patlama',
-      '%15 fazla hasar, mermi bir düşman daha deler',
-      'Canı azaldıkça sert vurur, öldürünce iyileşir',
+      'Dengeli savaşçı. Yetenek: İlham, yakındaki ekip 6 sn daha hızlı ateş eder ve koşar',
+      'Yakındaki dostları iyileştirir, %80 hızlı kaldırır, yenilenir. Yetenek: Şifa dalgası, çevredeki herkesi iyileştirir',
+      '+90 can ve %22 az hasar, ama yavaş. Yetenek: Tahkimat, 5 sn %65 az hasar ve savrulmaz',
+      'Çok hızlı ve sık atılır, ama kırılgan. Yetenek: Hamle, 3 sn çok hızlı ve atılma hazır',
+      '3 fazladan bomba ve %50 büyük patlama. Yetenek: Hava saldırısı, önünüze altı işaretli patlama düşer',
+      '%15 hasar, mermiler bir düşman daha deler. Yetenek: Aşırı yük, altı atış deler ve iki kat vurur',
+      'Canı azaldıkça sert vurur, öldürünce iyileşir. Yetenek: Çılgınlık, 6 sn %60 hasar, daha hızlı, sersemlemez',
+      'Silahsız: önünüzde geniş bir yay çizen kılıç. Yetenek: Kılıç fırtınası, 2 sn dönüp çevredeki her şeye vurur',
+      'Silahsız: ağır bir çekiç. Basılı tut, bırakınca tam dönüş. Yetenek: Yer darbesi, çevrede şok dalgası',
     ],
     classTitle: 'Sınıf',
     waveMods: ['', 'Sürü!', 'Zırhlı sürü!', 'Hızlı ve öfkeli!', 'Ganimet dalgası!', 'Elit fırtınası!'],
@@ -413,13 +418,14 @@ const BASE_STRINGS = {
     secondWind: 'İkinci nefes!',
     mvp: 'MVP',
     squadKills: 'Öldürme',
+    abilityTip: 'Sınıf yeteneği (F tuşu): hazır ya da hazır olmasına kalan saniye',
     finalBlow: 'Son vuruş',
     dpsLabel: 'DPS',
     dmgTotal: 'Verilen hasar',
     killsTip: 'Öldürme',
     xpTip: 'Deneyim',
     avgDps: 'Ortalama DPS',
-    weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı', revolver: 'Revolver', mp: 'Makineli tabanca', dbl: 'Çift namlulu', dmr: 'Nişancı tüfeği', flamer: 'Alev makinesi', gl: 'Bombaatar' },
+    weapons: { pistol: 'Tabanca', smg: 'SMG', ar: 'Piyade tüfeği', shotgun: 'Pompalı', hmg: 'Ağır MG', minigun: 'Minigun', sniper: 'Keskin nişancı', revolver: 'Revolver', mp: 'Makineli tabanca', dbl: 'Çift namlulu', dmr: 'Nişancı tüfeği', flamer: 'Alev makinesi', gl: 'Bombaatar', sword: 'Kılıç', hammer: 'Savaş çekici' },
   },
 } as const;
 
@@ -516,6 +522,7 @@ const CSS = `
 .wrh-ui button.warn{background:#e0524a}
 .wrh-ui button:hover{filter:brightness(1.08)}
 .wrh-weapons{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 10px}
+.wrh-ui button.wrh-wp.dim{opacity:.35}
 .wrh-ui button.wrh-wp{background:#e6dcc8;color:#3a352d;font-size:12px;padding:6px 9px;margin:0;border:2px solid transparent}
 .wrh-ui button.wrh-wp.on{background:#fff;border-color:#1fa2ff}
 .wrh-prev{display:flex;flex-direction:column;align-items:center;margin:2px 0 8px}
@@ -802,7 +809,7 @@ function esc(s: string): string {
 const thumbCache = new Map<number, string>();
 
 /** One emoji per class for the picker. */
-const CLASS_ICONS = ['\u{1F396}\uFE0F', '\u{1FA7A}', '\u{1F6E1}\uFE0F', '\u{1F45F}', '\u{1F4A3}', '\u{1F3AF}', '\u{1F608}'];
+const CLASS_ICONS = ['\u{1F396}\uFE0F', '\u{1FA7A}', '\u{1F6E1}\uFE0F', '\u{1F45F}', '\u{1F4A3}', '\u{1F3AF}', '\u{1F608}', '\u2694\uFE0F', '\u{1F528}'];
 
 /** A little top-down picture of an arena layout, painted from the same data the game uses (cached as a data URL). */
 function arenaThumb(index: number): string {
@@ -875,7 +882,7 @@ export class Ui {
   /** Vest colour index (-1: the slot's own colour). */
   color = -1;
   /** Class index (see CLASS_IDS). */
-  cls = 0;
+  cls = Math.max(0, Math.min(CLASS_IDS.length - 1, loadProfile().cls | 0)); // (also the class of a game that starts without showing the menu)
   /** Names of the players by slot (game over screen). */
   playerNames: string[] = [];
   /** Colour of a player slot as the game draws it (set by main from the lobby choices). */
@@ -1218,7 +1225,7 @@ export class Ui {
   /** Icon, bar and number for each trait of a weapon; bars are scaled against the best of all weapons. */
   private weaponStatBars(id: WeaponId): string {
     const t = this.t;
-    const all = WEAPON_IDS.map((w) => BALANCE.weapons[w]);
+    const all = WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee).map((w) => BALANCE.weapons[w]);
     const perShot = (s: (typeof all)[number]): number => s.damage * s.pellets + (s.blastDamage ?? 0);
     const max = (f: (s: (typeof all)[number]) => number): number => Math.max(...all.map(f));
     const s = BALANCE.weapons[id];
@@ -1289,7 +1296,7 @@ export class Ui {
     }
     const names = this.t.accs as readonly string[];
     const weaponNames = this.t.weapons as Record<string, string>;
-    const unlocked = (): WeaponId[] => WEAPON_IDS.filter((w) => isUnlocked(w, loadProfile()));
+    const unlocked = (): WeaponId[] => WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee && isUnlocked(w, loadProfile()));
     const refresh = (): void => {
       const colorHex = PLAYER_COLORS[this.color >= 0 ? this.color % PLAYER_COLORS.length : 0]!;
       const q = (id: string): HTMLElement => this.screen.querySelector<HTMLElement>('#' + id)!;
@@ -1330,8 +1337,10 @@ export class Ui {
         this.screen.querySelectorAll<HTMLElement>('[data-cls]').forEach((x) => x.classList.toggle('on', x === el));
         const tip = this.screen.querySelector<HTMLElement>('#wrh-class-tip');
         if (tip) tip.textContent = (this.t.classTips as readonly string[])[this.cls] ?? '';
+        this.dimWeapons();
       };
     });
+    this.dimWeapons();
     this.screen.querySelectorAll<HTMLElement>('[data-sw]').forEach((el) => {
       el.onclick = () => {
         const i = Number(el.dataset.sw);
@@ -1660,10 +1669,16 @@ export class Ui {
   private weaponButtons(): string {
     const names = this.t.weapons as Record<string, string>;
     const profile = loadProfile();
-    return WEAPON_IDS.map((w) => {
+    return WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee).map((w) => {
       const ok = isUnlocked(w, profile);
       return `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}"${ok ? '' : ` disabled title="${esc(`${this.t.lockedTip} ${WEAPON_UNLOCK[w]}`)}"`}>${ok ? '' : '&#128274; '}${names[w]}</button>`;
     }).join('');
+  }
+
+  /** Blade and hammer classes fight with their own weapon: the list of guns is greyed out for them. */
+  private dimWeapons(): void {
+    const melee = MELEE_CLASSES.includes(this.cls);
+    this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((x) => x.classList.toggle('dim', melee));
   }
 
   private bindWeapons(): void {
@@ -1690,7 +1705,7 @@ export class Ui {
       const reserve = live ? world.pAmmo[slot]! : world.pInvAmmo[slot * WEAPON_IDS.length + idx]!;
       const dry = st.ammo >= 0 && mag <= 0 && reserve <= 0;
       const key = rank < 9 ? String(rank + 1) : 'Q';
-      rows += `<div class="row${live ? ' cur' : ''}${dry ? ' dry' : ''}"><kbd>${key}</kbd><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${mag}/${st.ammo < 0 ? '&infin;' : reserve}</b></div>`;
+      rows += `<div class="row${live ? ' cur' : ''}${dry ? ' dry' : ''}"><kbd>${key}</kbd><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${st.melee ? '&infin;' : `${mag}/${st.ammo < 0 ? '&infin;' : reserve}`}</b></div>`;
     });
     return rows;
   }
@@ -2209,16 +2224,22 @@ export class Ui {
       const low = reserve >= 0 && mag + reserve < stats.ammo * 0.2;
       const dashReady = world.pDashCd[slot]! <= 0;
       const dashText = dashReady ? t.dashReady : `${Math.ceil(world.pDashCd[slot]!)}s`;
+      const specReady = world.pSpecCd[slot]! <= 0;
+      const specText = world.pSpecT[slot]! > 0 ? `${world.pSpecT[slot]!.toFixed(1)}s` : specReady ? t.dashReady : `${Math.ceil(world.pSpecCd[slot]!)}s`;
+      const ammoText = stats.melee ? '' : ` &middot; <span class="${low || (mag === 0 && reserve === 0) ? 'wrh-low' : ''}">${reloading ? t.reloading : `${mag}/${reserve < 0 ? '&infin;' : reserve}`}${low ? ' !' : ''}</span>`;
       set(
         'h-me',
-        `${(t.weapons as Record<string, string>)[wid]} &middot; <span class="${low || (mag === 0 && reserve === 0) ? 'wrh-low' : ''}">${reloading ? t.reloading : `${mag}/${reserve < 0 ? '&infin;' : reserve}`}${low ? ' !' : ''}</span>` +
-          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>`,
+        `${(t.weapons as Record<string, string>)[wid]}${ammoText}` +
+          ` &middot; &#128163; ${world.pGren[slot]} &middot; <span style="opacity:${dashReady ? 1 : 0.5}">&#9889; ${dashText}</span>` +
+          ` &middot; <span style="opacity:${specReady || world.pSpecT[slot]! > 0 ? 1 : 0.5}" title="${esc(t.abilityTip as string)}">&#9733; ${specText}</span>`,
       );
       set('h-inv', this.inventoryHtml(world, slot));
       this.updateRelics(world, slot);
       const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
-      bar.style.display = reloading ? 'block' : 'none';
+      const charging = !!stats.melee && stats.melee.charge > 0 && world.pCharge[slot]! > 0;
+      bar.style.display = reloading || charging ? 'block' : 'none';
       if (reloading) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (1 - world.pReload[slot]! / stats.reload) * 100))}%`;
+      else if (charging) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (world.pCharge[slot]! / stats.melee!.charge) * 100))}%`;
       const st = world.pState[slot]!;
       if (st === PlayerState.Downed) {
         const sec = Math.ceil(world.pTimer[slot]!);

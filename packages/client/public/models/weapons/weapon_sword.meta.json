@@ -1,0 +1,23 @@
+{
+ "id": "sword",
+ "tris": 358,
+ "muzzle": [
+  0.0,
+  -2.2,
+  0.0
+ ],
+ "grip_l": [
+  0,
+  0.02,
+  0.0
+ ],
+ "grip": [
+  0,
+  0,
+  0
+ ],
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed"
+ ]
+}

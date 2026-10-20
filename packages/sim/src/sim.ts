@@ -22,9 +22,10 @@ import { out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { Crc32 } from './hash';
 import { updatePickups } from './pickups';
 import { KNOCK_DECAY, updateHazards } from './hazards';
+import { meleeAttack, updateAbilities } from './abilities';
 import { updateCards } from './progression';
 import { ensureUsable, equipLoadout, selectByRank, selectNext } from './loadout';
-import { applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, updateBarrels, updatePlayerPerks } from './features';
+import { abilityRate, applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
@@ -58,7 +59,9 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pState[slot] = PlayerState.Alive;
   w.pTimer[slot] = 0;
   w.pRevive[slot] = 0;
-  equipLoadout(w, slot, WEAPON_IDS.indexOf(weapon));
+  // the blade and the hammer classes fight with their own weapon and use no guns
+  const meleeWeapon = cls === 7 ? 'sword' : cls === 8 ? 'hammer' : null;
+  equipLoadout(w, slot, WEAPON_IDS.indexOf(meleeWeapon ?? weapon), meleeWeapon !== null);
   w.pMoving[slot] = 0;
   w.pIFrames[slot] = 0;
   w.pGren[slot] = BALANCE.grenade.max;
@@ -83,6 +86,11 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pKnockX[slot] = 0;
   w.pKnockY[slot] = 0;
   w.pAir[slot] = 0;
+  w.pSpecCd[slot] = 0;
+  w.pSpecT[slot] = 0;
+  w.pRally[slot] = 0;
+  w.pCharge[slot] = 0;
+  w.pOver[slot] = 0;
   for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = -1;
   w.pCards.fill(0, slot * CARD_IDS.length, (slot + 1) * CARD_IDS.length);
   w.modDamage[slot] = w.modRate[slot] = w.modSpeed[slot] = w.modRevive[slot] = w.modMagnet[slot] = w.modXp[slot] = 1;
@@ -329,6 +337,10 @@ function startReload(w: World, s: number, stats: { reload: number }): void {
 function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void {
   const id = WEAPON_IDS[w.pWeapon[s]!]!;
   const stats = BALANCE.weapons[id];
+  if (stats.melee) {
+    meleeAttack(w, s, inp, angle, stats);
+    return;
+  }
   const infinite = stats.ammo < 0;
   w.pCooldown[s] = w.pCooldown[s]! - TICK_DT;
   // reloading: nothing fires until the timer runs out, then the magazine is refilled from the reserve
@@ -360,11 +372,12 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
       const oy = sin(angle) * stats.muzzleFwd - cos(angle) * stats.muzzleSide;
       // a critical hit doubles the damage; the random draw only happens while somebody holds a crit card
       const crit = w.modCrit[s]! > 0 && w.rng.float() < w.modCrit[s]! ? 2 : 1;
-      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage[s]! * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce[s]! + w.pModPierce[s]!);
+      spawnBullet(w, s, w.pX[s]!, w.pY[s]!, w.pX[s]! + ox, w.pY[s]! + oy, a, stats.bulletSpeed, stats.range, stats.damage * w.modDamage[s]! * w.pModDmg[s]! * damageMul(w, s) * crit, stats.blast !== undefined ? 0 : stats.pierce + w.modPierce[s]! + w.pModPierce[s]! + (w.pOver[s]! > 0 ? BALANCE.abilities.ranger!.pierce! : 0));
     }
     w.events.push({ type: 'shot', slot: s, weapon: w.pWeapon[s]!, x: w.pX[s]!, y: w.pY[s]!, angle });
     w.pMag[s] = w.pMag[s]! - 1;
-    w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate[s]! * w.pModRate[s]!);
+    w.pCooldown[s] = w.pCooldown[s]! + 1 / (stats.rate * w.modRate[s]! * w.pModRate[s]! * abilityRate(w, s));
+    if (w.pOver[s]! > 0) w.pOver[s] = w.pOver[s]! - 1;
     shots++;
   }
   if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
@@ -465,9 +478,10 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
     ensureUsable(w, s);
     // a helper holding Revive next to a downed teammate is busy: slower, no shooting (moving off interrupts the revive)
     const busy = (inp.buttons & Buttons.Revive) !== 0 && downedNear(w, s);
-    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1), !busy);
+    const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1) * (w.pCharge[s]! > 0 ? 0.45 : 1), !busy);
     if (!busy && w.pStun[s] === 0) fireWeapon(w, s, inp, angle);
   }
+  updateAbilities(w, inputs);
   updatePlayerPerks(w);
   updateBarrels(w);
   updateRevive(w, inputs);
@@ -539,7 +553,7 @@ export function hashWorld(w: World): number {
   c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
   c.typed(w.kActive).typed(w.kData).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
-  c.typed(w.pPerk).typed(w.eMod).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
+  c.typed(w.pPerk).typed(w.eMod).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);

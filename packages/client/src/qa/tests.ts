@@ -33,7 +33,8 @@ const median = (a: number[]): number => {
   return s[Math.floor(s.length / 2)] ?? 0;
 };
 
-const WEAPONS = WEAPON_IDS as readonly WeaponId[];
+/** The guns (blades and hammers have no muzzle and no bullets, they have their own tests). */
+const WEAPONS = WEAPON_IDS.filter((id) => !BALANCE.weapons[id].melee) as readonly WeaponId[];
 /** The cranium as a sphere: the chibi head is a wide ball whose lower part tucks behind the chin. */
 const CRANIUM_UP = new THREE.Vector3(0, 0.14, 0);
 const CRANIUM_R = 0.52;

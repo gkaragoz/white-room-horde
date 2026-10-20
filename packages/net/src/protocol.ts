@@ -98,7 +98,7 @@ export function encodeBundle(b: Bundle): Uint8Array {
   let o = 6;
   for (const j of b.joins) {
     out[o++] = j.slot;
-    out[o++] = j.weaponIndex | (j.cls << 5); // weapons use the low five bits, the class the top three
+    out[o++] = (j.weaponIndex & 15) | ((j.cls & 15) << 4); // weapons use the low four bits (up to 16), the class the top four
   }
   out.set(body, o);
   return out;
@@ -111,7 +111,7 @@ export function decodeBundle(buf: Uint8Array, slots: number): Bundle {
   const joins: Bundle['joins'] = [];
   let o = 6;
   for (let i = 0; i < n; i++) {
-    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]! & 31, cls: buf[o + 1]! >> 5 });
+    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]! & 15, cls: buf[o + 1]! >> 4 });
     o += 2;
   }
   return { tick, joins, inputs: decodeTick(buf.subarray(o), slots).inputs };

@@ -1,7 +1,7 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, ZoneKind, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
-import { ELITE, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
+import { ELITE, abilityTaken, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
 import { dropLoot } from './pickups';
 import { addTelegraph, addZone, aimAt, launchPlayer } from './hazards';
 import { cellIndex } from './flowfield';
@@ -734,7 +734,7 @@ function runWaves(w: World, playerCount: number): void {
 
 export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number, attacker = -1): boolean {
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
-  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * (1 + lateFloors(w) * BALANCE.late.damagePerFloor) * w.modArmor[slot]! * w.pModArmor[slot]!);
+  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * (1 + lateFloors(w) * BALANCE.late.damagePerFloor) * abilityTaken(w, slot) * w.modArmor[slot]! * w.pModArmor[slot]!);
   const thorns = perk(w, slot, PERK.Thorns);
   if (thorns > 0 && attacker >= 0 && w.eActive[attacker]) {
     const prev = killer;
@@ -840,6 +840,15 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
     w.misc[MISC.KillX] = ex;
     w.misc[MISC.KillY] = ey;
   }
+}
+
+/** Damage dealt by a player's own blow (melee swings): the damage is credited to them. Returns true when the enemy died. */
+export function damageEnemyBy(w: World, i: number, owner: number, damage: number, dx: number, dy: number): boolean {
+  const prev = killer;
+  killer = owner;
+  const dead = damageEnemy(w, i, damage, dx, dy);
+  killer = prev;
+  return dead;
 }
 
 /** Apply bullet damage; returns true when the enemy died. */

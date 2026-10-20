@@ -61,7 +61,7 @@ export function verifyReplay(r: Replay, expectedFinalHash?: number): Verdict {
 }
 
 /** Marks the second version of the binary form (map, difficulty and classes are stored too). */
-const MAGIC = [0x57, 0x52];
+const MAGIC = [0x57, 0x53];
 
 /** Compact binary form: header (seed, map, difficulty, players), then per tick the wire encoding, then the hashes. */
 export function encodeReplay(r: Replay): Uint8Array {
@@ -77,7 +77,7 @@ export function encodeReplay(r: Replay): Uint8Array {
   let o = 9;
   for (const p of r.setup.players) {
     head[o++] = p.slot;
-    head[o++] = WEAPON_IDS.indexOf(p.weapon) | ((p.cls ?? 0) << 5);
+    head[o++] = (WEAPON_IDS.indexOf(p.weapon) & 15) | (((p.cls ?? 0) & 15) << 4);
   }
   dv.setUint32(o, r.ticks.length, true);
   dv.setUint32(o + 4, r.hashes.length, true);
@@ -100,8 +100,10 @@ export function encodeReplay(r: Replay): Uint8Array {
 
 export function decodeReplay(buf: Uint8Array): Replay {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-  const v2 = buf[0] === MAGIC[0] && buf[1] === MAGIC[1];
-  let o = v2 ? 2 : 0;
+  // older replays were recorded with other input and class formats and cannot be replayed any more
+  if (buf[0] !== MAGIC[0] || buf[1] !== MAGIC[1]) throw new Error('This replay was recorded by an older version of the game');
+  const v2 = true;
+  let o = 2;
   const seed = dv.getUint32(o, true);
   o += 4;
   let map = 0;
@@ -116,7 +118,7 @@ export function decodeReplay(buf: Uint8Array): Replay {
   for (let i = 0; i < n; i++) {
     const slot = buf[o++]!;
     const packed = buf[o++]!;
-    players.push({ slot, weapon: WEAPON_IDS[v2 ? packed & 31 : packed]!, cls: v2 ? packed >> 5 : 0 });
+    players.push({ slot, weapon: WEAPON_IDS[packed & 15]!, cls: packed >> 4 });
     if (slot > maxSlot) maxSlot = slot;
   }
   const ticks = dv.getUint32(o, true);

@@ -49,6 +49,10 @@ export type SimEvent =
   | { type: 'telegraph'; shape: number; x: number; y: number }
   | { type: 'teleHit'; shape: number; effect: number; x: number; y: number; radius: number }
   | { type: 'launch'; slot: number; x: number; y: number }
+  /** A class ability was used (cls = index into CLASS_IDS). */
+  | { type: 'ability'; slot: number; cls: number; x: number; y: number }
+  /** A melee swing: an arc (or the whole circle) of `radius` around the player facing `angle`; `charge` 0..1 for a charged hammer. */
+  | { type: 'swing'; slot: number; weapon: number; x: number; y: number; angle: number; arc: number; radius: number; hits: number; charge: number }
   | { type: 'gameOver'; wave: number; kills: number };
 
 /** Struct-of-arrays world (docs/DESIGN.md section 15): fixed-size pools, ids are slot indices. */
@@ -159,6 +163,12 @@ export interface World {
   pKnockX: Float64Array;
   pKnockY: Float64Array;
   pAir: Int32Array;
+  /** Class ability: seconds until it can be used again, seconds a timed one is still on, the rally buff received from a soldier (s), the hammer's charge (s), shots left of the ranger's overcharge. */
+  pSpecCd: Float64Array;
+  pSpecT: Float64Array;
+  pRally: Float64Array;
+  pCharge: Float64Array;
+  pOver: Int32Array;
   /** Lingering ground effects (acid, fire): kind, centre, radius, ticks left. */
   zActive: Uint8Array;
   zKind: Uint8Array;
@@ -178,6 +188,8 @@ export interface World {
   tAmt: Float64Array;
   tLeft: Int32Array;
   tTotal: Int32Array;
+  /** Who fired a friendly telegraph (the demolisher's airstrike), -1 for the enemies' own. */
+  tOwner: Int32Array;
   // explosive barrels
   brActive: Uint8Array;
   brX: Float64Array;
@@ -316,6 +328,11 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pKnockX: new Float64Array(MAX_PLAYERS),
     pKnockY: new Float64Array(MAX_PLAYERS),
     pAir: new Int32Array(MAX_PLAYERS),
+    pSpecCd: new Float64Array(MAX_PLAYERS),
+    pSpecT: new Float64Array(MAX_PLAYERS),
+    pRally: new Float64Array(MAX_PLAYERS),
+    pCharge: new Float64Array(MAX_PLAYERS),
+    pOver: new Int32Array(MAX_PLAYERS),
     zActive: new Uint8Array(MAX_ZONES),
     zKind: new Uint8Array(MAX_ZONES),
     zX: new Float64Array(MAX_ZONES),
@@ -333,6 +350,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     tAmt: new Float64Array(MAX_TELE),
     tLeft: new Int32Array(MAX_TELE),
     tTotal: new Int32Array(MAX_TELE),
+    tOwner: new Int32Array(MAX_TELE).fill(-1),
     brActive: new Uint8Array(MAX_BARRELS),
     brX: new Float64Array(MAX_BARRELS),
     brY: new Float64Array(MAX_BARRELS),

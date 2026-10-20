@@ -301,6 +301,25 @@ export class Fx {
     this.flashes.push({ mesh: m, life: 0.28, max: 0.28, grow: size * 2.2 });
   }
 
+  /** The streak of a melee swing: a ring segment (the whole ring for a spin) that sweeps and fades in a moment. */
+  slash(x: number, y: number, angle: number, arc: number, radius: number, color: string, spin: boolean): void {
+    const g = new THREE.Group();
+    const full = arc > 6;
+    const mesh = new THREE.Mesh(
+      new THREE.RingGeometry(radius * 0.5, radius, full ? 40 : 24, 1, full ? 0 : -arc / 2, full ? Math.PI * 2 : arc),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    g.add(mesh);
+    g.position.set(x, 0.55, -y);
+    g.rotation.y = angle;
+    g.scale.setScalar(spin ? 0.5 : 0.85);
+    this.group.add(g);
+    this.slashes.push({ group: g, mesh, life: 0.2, max: 0.2, spin });
+  }
+
+  private readonly slashes: { group: THREE.Group; mesh: THREE.Mesh; life: number; max: number; spin: boolean }[] = [];
+
   /** A small kick of dust under a running character's feet. */
   dust(x: number, y: number): void {
     this.burst(Kind.Smoke, x, y, 0.12, 1, 0.9, 0, 0, 6.28, 0.35, 0.15, '#d9d3c6');
@@ -446,6 +465,28 @@ export class Fx {
         }
         break;
       }
+      case 'swing': {
+        const hammer = e.weapon === WEAPON_IDS.indexOf('hammer');
+        const spin = e.arc > 6;
+        this.slash(e.x, e.y, e.angle, e.arc, e.radius, hammer ? '#ffb04a' : '#e6f6ff', spin);
+        if (spin) {
+          this.burst(Kind.Smoke, e.x, e.y, 0.3, 10, 4, 0, 0, 6.28, 0.5, 0.3, '#d9cfc0');
+          this.shake = Math.min(0.9, this.shake + 0.15 + e.charge * 0.35);
+        } else this.shake = Math.min(0.9, this.shake + (hammer ? 0.12 : 0.04));
+        if (e.hits > 0) this.burst(Kind.Spark, e.x + Math.cos(e.angle) * e.radius * 0.6, e.y + Math.sin(e.angle) * e.radius * 0.6, 0.8, Math.min(14, 3 + e.hits * 2), 5, 0, 0, 6.28, 0.25, 0.07, '#fff3b0');
+        break;
+      }
+      case 'ability': {
+        const x = e.x;
+        const y = e.y;
+        // one coloured ring and a shower of sparkles in the colour of the class
+        const look: Record<number, [string, number]> = { 0: ['#ffd84a', 6], 1: ['#6dff9a', 6], 2: ['#8fb4ff', 3], 3: ['#6df2ff', 3], 5: ['#ffe27a', 3], 6: ['#ff5a3c', 5], 7: ['#e6f6ff', 4], 8: ['#ffb04a', 5] };
+        const [col, size] = look[e.cls] ?? ['#ffffff', 4];
+        this.shockRing(x, y, col, size);
+        this.sparkle(x, y, 0.6, col, 18, 5);
+        this.flash(x, 0.9, -y, 0.8, col, 0.3, 4);
+        break;
+      }
       case 'blink':
         for (const [x, y] of [[e.x0, e.y0], [e.x, e.y]] as const) {
           this.burst(Kind.Smoke, x, y, 0.5, 8, 2.5, 0, 0, 6.28, 0.5, 0.3, '#6a6fd8');
@@ -471,6 +512,20 @@ export class Fx {
 
   update(dt: number): void {
     this.shake *= Math.max(0, 1 - dt * 7);
+    for (let k = this.slashes.length - 1; k >= 0; k--) {
+      const sl = this.slashes[k]!;
+      sl.life -= dt;
+      if (sl.life <= 0) {
+        this.group.remove(sl.group);
+        sl.mesh.geometry.dispose();
+        (sl.mesh.material as THREE.Material).dispose();
+        this.slashes.splice(k, 1);
+        continue;
+      }
+      const t = 1 - sl.life / sl.max;
+      sl.group.scale.setScalar(sl.spin ? 0.5 + 0.6 * t : 0.85 + 0.25 * t);
+      (sl.mesh.material as THREE.MeshBasicMaterial).opacity = 0.8 * (1 - t) * (1 - t * 0.4);
+    }
     this.hurt = Math.max(0, this.hurt - dt * 2.2);
     this.decalAge += dt;
     if (this.decalDirty && this.decalAge > 0.2) {

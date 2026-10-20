@@ -7,6 +7,12 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Classes, abilities, melee and an announcer (rules change: update the server and reload the page)**
+- Every class has an ability on the new Special key (F; ★ button on touch, Y on a gamepad) that recharges: the soldier rallies the squad (faster fire and steps), the medic sends out a heal pulse, the heavy fortifies (a third of the damage, cannot be thrown), the scout bursts (much faster, dash ready), the demolisher calls an airstrike (six marked blasts that hurt enemies only), the ranger overcharges (piercing shots, double damage), the berserker rampages (more damage, faster, cannot be stunned). The cooldown is on the HUD.
+- Two melee classes with no guns: the *swordsman* (a broad arc in front of him, blade storm: spins and hits everything around) and the *hammerer* (a heavy hammer: hold to charge, let go for a full spin that hits harder the longer it was held; ground slam). New weapons models, icons, swing streaks, arm swing and sounds; gun crates heal them, ammo crates become grenades.
+- Announcer voice lines for first blood, kill streaks (killing spree, rampage, dominating, massacre, godlike, mayhem), crowd kills, nukes, boss kills, a boss on the way and the final blow of a floor (English, "Announcer kill sounds" by TripleSnail, recorded by Antti Saari, CC-BY 3.0; credited in the sounds list). It follows the announcer setting and the voice volume.
+- Input is 10 bytes now (16 button bits), classes are 4 bits on the wire (up to 16): older replays can no longer be played.
+
 ## v0.13.0 (2026-10-20)
 
 **Ten new enemies, ice, two new bosses (rules change: update the server and reload the page)**

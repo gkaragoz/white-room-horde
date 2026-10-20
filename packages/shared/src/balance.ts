@@ -23,6 +23,8 @@ export interface WeaponStats {
   blastDamage?: number;
   spinUp?: number;
   spinDown?: number;
+  /** Melee weapons: swing arc (radians), reach, knockback, and the seconds of charge of a held swing (hammer; 0 = none). */
+  melee?: { arc: number; radius: number; knock: number; charge: number };
 }
 
 export interface EnemyStats {
@@ -91,6 +93,8 @@ export const BALANCE = data as unknown as {
   elites: Record<EliteKey, number>;
   barrels: Record<BarrelKey, number>;
   knock: { perDamage: number; max: number };
+  /** The class abilities (Buttons.Special), per class id. */
+  abilities: Record<string, Record<string, number>>;
   /** Numbers of the special behaviours of the newer enemy types (see enemies.ts, `special`). */
   special: Record<string, Record<string, number>>;
   hazards: { acid: { dps: number; radius: number; seconds: number }; fire: { dps: number; radius: number; seconds: number } };

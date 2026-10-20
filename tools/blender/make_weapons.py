@@ -177,7 +177,7 @@ def sniper(b):
 # support (left) hand target for runtime two-bone IK; grip (right hand) is the origin
 GRIP_L = {"pistol": (0, -0.18, -0.22), "smg": (0, -0.85, -0.22), "ar": (0, -1.1, -0.04), "shotgun": (0, -0.78, -0.22), "hmg": (0, -1.0, -0.14),
           "minigun": (0, -0.55, -0.42), "sniper": (0, -0.95, -0.08),
-          "revolver": (0, -0.55, -0.18), "mp": (0, -0.55, -0.2), "dbl": (0, -0.6, -0.12), "dmr": (0, -1.0, -0.06), "flamer": (0, -0.75, -0.18), "gl": (0, -0.75, -0.2)}
+          "revolver": (0, -0.55, -0.18), "mp": (0, -0.55, -0.2), "dbl": (0, -0.6, -0.12), "dmr": (0, -1.0, -0.06), "flamer": (0, -0.75, -0.18), "gl": (0, -0.75, -0.2), "sword": (0, 0.02, 0.0), "hammer": (0, -0.55, 0.0)}
 
 
 def revolver(b):
@@ -282,7 +282,34 @@ def gl(b):
     return (0, -1.5, 0.14)
 
 
-WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade), ("revolver", revolver), ("mp", mp), ("dbl", dbl), ("dmr", dmr), ("flamer", flamer), ("gl", gl)]
+def sword(b):
+    """A broad blade along -Y: leather grip, golden cross-guard, pommel, a ridge down the flat of the blade and a pointed tip."""
+    b.cyl("root", (0, -0.12, 0.0), 0.06, 0.4, DARK, rot=(math.pi / 2, 0, 0))              # grip
+    b.sphere("root", (0, 0.1, 0.0), 0.11, (1, 1, 1), ACC2)                                  # pommel
+    b.box("root", (0, -0.36, 0.0), (0.8, 0.12, 0.14), ACC)                                  # cross-guard
+    for sx in (-1, 1):
+        b.sphere("root", (sx * 0.42, -0.36, 0.0), 0.09, (1, 1, 1), ACC2)                    # guard tips
+    b.box("root", (0, -1.2, 0.0), (0.4, 1.6, 0.07), "#E6EBF4")                              # blade
+    b.box("root", (0, -1.2, 0.0), (0.12, 1.55, 0.11), "#B9C2D2")                             # fuller ridge
+    b.cyl("root", (0, -2.14, 0.0), 0.2, 0.34, "#E6EBF4", rot=(math.pi / 2, 0, 0), r2=0.0)   # tip
+    return (0, -2.2, 0.0)
+
+
+def hammer(b):
+    """A big war hammer: long wooden haft, an iron head with brass faces and a spike on the back."""
+    b.cyl("root", (0, -0.7, 0.0), 0.075, 1.9, "#8A5A32", rot=(math.pi / 2, 0, 0))            # haft
+    b.sphere("root", (0, 0.3, 0.0), 0.12, (1, 1, 1), DARK2)                                 # butt
+    for k in range(3):
+        b.cyl("root", (0, -0.2 - 0.25 * k, 0.0), 0.095, 0.05, DARK2, rot=(math.pi / 2, 0, 0))   # grip bands
+    b.box("root", (0, -1.72, 0.0), (0.46, 0.5, 0.5), "#4A4F5A")                              # iron head
+    b.box("root", (0.38, -1.72, 0.0), (0.2, 0.56, 0.56), ACC)                                # striking face
+    b.box("root", (-0.38, -1.72, 0.0), (0.2, 0.56, 0.56), ACC)
+    b.box("root", (0, -1.72, 0.0), (0.9, 0.18, 0.18), "#2E323B")                              # binding
+    b.cyl("root", (0, -1.72, 0.34), 0.1, 0.34, "#9AA0AB", r2=0.0)                            # spike on top
+    return (0, -1.9, 0.0)
+
+
+WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade), ("revolver", revolver), ("mp", mp), ("dbl", dbl), ("dmr", dmr), ("flamer", flamer), ("gl", gl), ("sword", sword), ("hammer", hammer)]
 
 
 exec(compile(open(os.path.join(HERE, "meshclean.py"), encoding="utf-8").read(), "meshclean", "exec"), globals())
@@ -431,7 +458,7 @@ def lineup(items):
     fl.data.materials.append(fm)
     order = ["pistol", "smg", "ar", "shotgun", "hmg", "minigun", "sniper", "grenade", "revolver", "mp", "dbl", "dmr", "flamer", "gl"]
     pos = {"pistol": (-8.4, 3.0), "smg": (-3.2, 3.0), "ar": (3.2, 3.0), "shotgun": (9.6, 3.0), "hmg": (-7.4, -3.2), "minigun": (-0.6, -3.2), "sniper": (6.8, -3.2), "grenade": (10.6, -3.2),
-           "revolver": (-8.4, -9.4), "mp": (-3.2, -9.4), "dbl": (3.2, -9.4), "dmr": (9.6, -9.4), "flamer": (-4.0, -15.0), "gl": (4.0, -15.0)}
+           "revolver": (-8.4, -9.4), "mp": (-3.2, -9.4), "dbl": (3.2, -9.4), "dmr": (9.6, -9.4), "flamer": (-4.0, -15.0), "gl": (4.0, -15.0), "sword": (-2.0, -21.0), "hammer": (8.0, -21.0)}
     for (wid, mesh, emp) in items:
         x, y = pos[wid]
         mesh.location = (x + 1.2, y, 0)

@@ -89,6 +89,8 @@ const EN = {
   ctlWeaponsTip: 'Fixed numbers, weakest to strongest (the HUD list shows them); the last four weapons only with Q. A weapon without ammo cannot be picked',
   ctlDash: 'Dash',
   ctlDashTip: 'A quick burst of speed with a moment of invulnerability',
+  ctlSpecial: 'Class ability',
+  ctlSpecialTip: 'The special move of your class (it recharges): rally, heal pulse, fortify, burst, airstrike, overcharge, rampage, blade storm, ground slam',
   ctlRevive: 'Revive a teammate',
   ctlReviveTip: 'Hold next to a downed teammate; moving away interrupts it',
   ctlCards: 'Pick a card',
@@ -198,6 +200,8 @@ const TR: Partial<typeof EN> = {
   ctlWeaponsTip: 'Sabit numaralar, en zayıftan en güçlüye (HUD listesinde yazıyor); son dört silah yalnızca Q ile. Mermisi olmayan silah seçilemez',
   ctlDash: 'Atıl',
   ctlDashTip: 'Kısa süreli hız patlaması ve anlık dokunulmazlık',
+  ctlSpecial: 'Sınıf yeteneği',
+  ctlSpecialTip: 'Sınıfının özel hamlesi (şarj olur): ilham, şifa dalgası, tahkimat, hamle, hava saldırısı, aşırı yük, çılgınlık, kılıç fırtınası, yer darbesi',
   ctlRevive: 'Arkadaşı kaldır',
   ctlReviveTip: 'Yerdeki arkadaşın yanında basılı tut; uzaklaşırsan yarıda kalır',
   ctlCards: 'Kart seç',
@@ -551,6 +555,7 @@ export function renderControlsSheet(host: HTMLElement, c: Pick<PanelContext, 'la
   body.append(line(nums, t.ctlWeapons, t.ctlWeaponsTip));
   body.append(line(caps(b('switch')), t.ctlSwitch, t.ctlSwitchTip));
   body.append(line(caps(b('dash')), t.ctlDash, t.ctlDashTip));
+  body.append(line(caps(b('special')), t.ctlSpecial, t.ctlSpecialTip));
   body.append(line(caps(b('revive')), t.ctlRevive, t.ctlReviveTip));
   const cards = el('span', 'wrh-keys-row');
   ['card1', 'card2', 'card3'].forEach((a) => cards.append(keycap(keyLabel(b(a)[0] ?? ''))));

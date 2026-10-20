@@ -33,6 +33,19 @@ same world from the same inputs. Anything stored in the world must be in `snapsh
    `tools/blender/bake_vat.py` and run the bake (needs the local Mixamo files in `./mixamo`).
 4. Client: the clip table `CLIPS` in `render/crowd.ts`, gib colour in `render/fx.ts`.
 
+## A special enemy behaviour
+The newer enemy types (index from `acider` on) act in phases (`eAct`: free, winding up, acting, recovering; `eActT` ticks
+left). Add a `case` to `special()` in `enemies.ts` with its numbers under `special.<name>` in `balance.json`. Ground
+effects come from `hazards.ts`: `addTelegraph` (a marked circle or rectangle that lands after a delay: hurt, half, kill,
+acid puddle, friendly strike), `addZone` (acid and fire puddles) and `launchPlayer` (throw and stun). The client draws all
+of them from the world pools (`render/groundFx.ts`), so a new attack needs no new rendering.
+
+## A new class and its ability
+`CLASS_IDS` (append) and `classes[]` in `balance.json` (stats), `abilities.<id>` (the numbers), the activation in
+`abilities.ts` (`activate`; running buffs are read in `features.ts`: `abilitySpeed`, `abilityRate`, `abilityDamage`,
+`abilityTaken`, `stunImmune`). Blade and hammer classes (`MELEE_CLASSES`) use a weapon with a `melee` block instead of guns.
+Texts in `ui.ts` / `i18n.ts` (`classNames`, `classTips`), icon in `CLASS_ICONS`.
+
 ## A new card
 1. `types.ts`: `CARD_IDS`, `CARD_RARITY`, `PERSONAL_CARDS`. Effect: a `case` in `applyCard` (`progression.ts`), usually a
    perk slot (`PERK` in `types.ts`, helpers in `features.ts`).

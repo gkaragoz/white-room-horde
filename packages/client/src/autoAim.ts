@@ -154,6 +154,7 @@ export class AimSolver {
    */
   shotClear(w: World, slot: number, t: AimTarget, delayTicks: number): boolean {
     const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[slot]!]!]!;
+    if (st.melee) return lineClear(w, w.pX[slot]!, w.pY[slot]!, t.x, t.y); // a blade has no bullet to get through: only cover in the way matters
     const a = this.angle(w, slot, t, delayTicks);
     const px = w.pX[slot]!;
     const py = w.pY[slot]!;
@@ -168,6 +169,8 @@ export class AimSolver {
   /** The shot angle for `target`; `delayTicks` is how long the input takes to reach the simulation. */
   angle(w: World, slot: number, t: AimTarget, delayTicks: number): number {
     const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[slot]!]!]!;
+    // a blade or hammer swings at what is in front of it: face the target as it is, no lead
+    if (st.melee) return Math.atan2(t.y - w.pY[slot]!, t.x - w.pX[slot]!);
     const delay = Math.max(0, delayTicks) * TICK_DT;
     const pvx = this.pvx[slot]!;
     const pvy = this.pvy[slot]!;

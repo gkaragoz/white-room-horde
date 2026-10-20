@@ -211,6 +211,48 @@
       "reload": 2.4,
       "blast": 2.4,
       "blastDamage": 70
+    },
+    "sword": {
+      "damage": 40,
+      "rate": 2.6,
+      "pellets": 1,
+      "ammo": -1,
+      "spread": 0,
+      "bulletSpeed": 0,
+      "range": 0,
+      "muzzleFwd": 0,
+      "muzzleSide": 0,
+      "muzzleH": 0.8,
+      "pierce": 0,
+      "mag": 1,
+      "reload": 0,
+      "melee": {
+        "arc": 2.5,
+        "radius": 3.4,
+        "knock": 3.5,
+        "charge": 0
+      }
+    },
+    "hammer": {
+      "damage": 85,
+      "rate": 1.15,
+      "pellets": 1,
+      "ammo": -1,
+      "spread": 0,
+      "bulletSpeed": 0,
+      "range": 0,
+      "muzzleFwd": 0,
+      "muzzleSide": 0,
+      "muzzleH": 0.8,
+      "pierce": 0,
+      "mag": 1,
+      "reload": 0,
+      "melee": {
+        "arc": 2.1,
+        "radius": 3.9,
+        "knock": 7,
+        "charge": 1.1
+      }
     }
   },
   "enemies": {
@@ -705,6 +747,40 @@
       "reviveRate": 1,
       "dashRate": 1,
       "rage": 1
+    },
+    {
+      "id": "swordsman",
+      "hp": 20,
+      "speed": 1.16,
+      "damage": 1.0,
+      "rate": 1,
+      "armor": 0.9,
+      "regen": 0.3,
+      "aura": 0,
+      "grenades": 0,
+      "pierce": 0,
+      "lifesteal": 1.5,
+      "blast": 1,
+      "reviveRate": 1,
+      "dashRate": 1.2,
+      "rage": 0
+    },
+    {
+      "id": "hammerer",
+      "hp": 70,
+      "speed": 0.92,
+      "damage": 1.1,
+      "rate": 1,
+      "armor": 0.82,
+      "regen": 0.2,
+      "aura": 0,
+      "grenades": 1,
+      "pierce": 0,
+      "lifesteal": 0,
+      "blast": 1,
+      "reviveRate": 1,
+      "dashRate": 0.9,
+      "rage": 0
     }
   ],
   "perks": {
@@ -900,6 +976,68 @@
       "seconds": 3,
       "range": 7.5,
       "recover": 0.5
+    }
+  },
+  "abilities": {
+    "soldier": {
+      "cd": 18,
+      "seconds": 6,
+      "radius": 12,
+      "rate": 1.3,
+      "speed": 1.12
+    },
+    "medic": {
+      "cd": 16,
+      "radius": 9,
+      "heal": 0.35
+    },
+    "heavy": {
+      "cd": 18,
+      "seconds": 5,
+      "taken": 0.35,
+      "speed": 0.55
+    },
+    "scout": {
+      "cd": 12,
+      "seconds": 3,
+      "speed": 1.6
+    },
+    "demolisher": {
+      "cd": 22,
+      "count": 6,
+      "radius": 3,
+      "delay": 1.0,
+      "stagger": 0.16,
+      "damage": 140,
+      "spread": 4.5,
+      "reach": 14
+    },
+    "ranger": {
+      "cd": 14,
+      "shots": 6,
+      "pierce": 3,
+      "damage": 2
+    },
+    "berserker": {
+      "cd": 20,
+      "seconds": 6,
+      "damage": 1.6,
+      "speed": 1.15
+    },
+    "swordsman": {
+      "cd": 12,
+      "seconds": 2,
+      "radius": 4.2,
+      "every": 6,
+      "damage": 0.8,
+      "speed": 1.2,
+      "knock": 5
+    },
+    "hammerer": {
+      "cd": 10,
+      "radius": 6.2,
+      "damage": 2.2,
+      "knock": 9
     }
   }
 }

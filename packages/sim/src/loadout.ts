@@ -5,6 +5,15 @@ const NW = WEAPON_IDS.length;
 const PISTOL = WEAPON_IDS.indexOf('pistol');
 const stats = (weapon: number) => BALANCE.weapons[WEAPON_IDS[weapon]!]!;
 
+const SWORD = WEAPON_IDS.indexOf('sword');
+const HAMMER = WEAPON_IDS.indexOf('hammer');
+const isGun = (weapon: number): boolean => !stats(weapon).melee;
+
+/** A blade or hammer fighter: carries no guns, so crates of guns and ammo mean nothing to it. */
+export function isMelee(w: World, slot: number): boolean {
+  return owns(w, slot, SWORD) || owns(w, slot, HAMMER);
+}
+
 export function owns(w: World, slot: number, weapon: number): boolean {
   return ((w.pOwned[slot]! >> weapon) & 1) === 1;
 }
@@ -35,8 +44,8 @@ function stash(w: World, slot: number): void {
 }
 
 /** A fresh loadout: the chosen weapon in the hands, a pistol next to it; both are the player's for the rest of the run. */
-export function equipLoadout(w: World, slot: number, weaponIndex: number): void {
-  w.pOwned[slot] = (1 << weaponIndex) | (1 << PISTOL);
+export function equipLoadout(w: World, slot: number, weaponIndex: number, only = false): void {
+  w.pOwned[slot] = only ? 1 << weaponIndex : (1 << weaponIndex) | (1 << PISTOL);
   for (let i = 0; i < NW; i++) {
     const st = stats(i);
     w.pInvMag[slot * NW + i] = st.mag;
@@ -153,10 +162,11 @@ export function ammoLow(w: World, slot: number): boolean {
 
 /** The next stronger weapon the player does not own yet (wraps to the weakest missing one), or -1 when they have them all. */
 export function nextMissing(w: World, slot: number): number {
+  if (isMelee(w, slot)) return -1;
   const top = Math.max(...RANK_INDEX.map((idx, r) => (owns(w, slot, idx) ? r : -1)));
   for (let d = 1; d <= NW; d++) {
     const idx = RANK_INDEX[(top + d) % NW]!;
-    if (!owns(w, slot, idx)) return idx;
+    if (isGun(idx) && !owns(w, slot, idx)) return idx;
   }
   return -1;
 }

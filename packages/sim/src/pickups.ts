@@ -2,7 +2,7 @@ import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAY
 import { clamp, cos, sin, sqrt } from './detmath';
 import { PERK } from '@wrh/shared';
 import { nuke, perk, setPerk, waveModOf } from './features';
-import { ammoLow, ammoNeeded, giveWeapon, owns, refillAll } from './loadout';
+import { ammoLow, ammoNeeded, giveWeapon, isMelee, owns, refillAll } from './loadout';
 import type { World } from './state';
 
 export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0): void {
@@ -31,7 +31,10 @@ function ammoStarved(w: World): boolean {
 /** The weapon of a crate: one somebody in the squad does not own yet, so drops widen the arsenal first. */
 export function pickWeapon(w: World): number {
   const missing: number[] = [];
+  const guns: number[] = [];
   for (let i = 0; i < WEAPON_IDS.length; i++) {
+    if (BALANCE.weapons[WEAPON_IDS[i]!]!.melee) continue;
+    guns.push(i);
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (w.pActive[s] && w.pState[s] !== PlayerState.Dead && !owns(w, s, i)) {
         missing.push(i);
@@ -39,7 +42,7 @@ export function pickWeapon(w: World): number {
       }
     }
   }
-  return missing.length ? missing[w.rng.int(missing.length)]! : w.rng.int(WEAPON_IDS.length);
+  return missing.length ? missing[w.rng.int(missing.length)]! : guns[w.rng.int(guns.length)]!;
 }
 
 /** Roll loot for a dead enemy at (x, y). Bosses always drop a handful around them. */
@@ -154,7 +157,11 @@ function collect(w: World, s: number, i: number): void {
     for (let e = 0; e < MAX_ENEMIES; e++) if (w.eActive[e]) w.eFrost[e] = Math.round(BALANCE.pickups.freezeSeconds * TICK_RATE);
     w.events.push({ type: 'freeze', seconds: BALANCE.pickups.freezeSeconds });
   } else if (kind === PickupType.Weapon) {
-    giveWeapon(w, s, w.kData[i]!);
+    if (isMelee(w, s)) {
+      // a gun is no use to a blade: it is turned into some health
+      const hp = w.pHp[s]! + w.pMaxHp[s]! * 0.25;
+      w.pHp[s] = hp > w.pMaxHp[s]! ? w.pMaxHp[s]! : hp;
+    } else giveWeapon(w, s, w.kData[i]!);
   } else {
     // an ammo crate fills every weapon of the inventory; with everything full it is a grenade instead
     if (ammoNeeded(w, s)) refillAll(w, s);

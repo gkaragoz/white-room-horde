@@ -136,6 +136,8 @@ const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
   dmr: { color: new THREE.Color('#bfe9ff'), w: 1, l: 1.9 },
   flamer: { color: new THREE.Color('#ff7a1a'), w: 2.6, l: 0.6 },
   gl: { color: new THREE.Color('#9fe870'), w: 2.4, l: 0.9 },
+  sword: { color: new THREE.Color('#ffffff'), w: 1, l: 1 },
+  hammer: { color: new THREE.Color('#ffffff'), w: 1, l: 1 },
 };
 const tracerScale = new THREE.Vector3();
 const GLOW_SCALE = new THREE.Vector3(1.9, 1.9, 1.25);
@@ -354,6 +356,8 @@ const prevX = new Float64Array(MAX_PLAYERS), prevY = new Float64Array(MAX_PLAYER
 const curX = new Float64Array(MAX_PLAYERS), curY = new Float64Array(MAX_PLAYERS), curA = new Float64Array(MAX_PLAYERS);
 const moveAngle = new Float64Array(MAX_PLAYERS);
 const lastShot = new Float64Array(MAX_PLAYERS).fill(-10);
+/** The latest melee swing of every character: when, how wide and whether it was a full spin (for the swinging arm). */
+const swings: { t: number; arc: number; spin: boolean }[] = Array.from({ length: MAX_PLAYERS }, () => ({ t: -10, arc: 2, spin: false }));
 let nowSec = 0;
 const lastDust: number[] = new Array<number>(MAX_PLAYERS).fill(0);
 let liftSounded = false;
@@ -410,6 +414,10 @@ function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boo
 }
 
 function handleEvent(e: SimEvent): void {
+  if (e.type === 'swing') {
+    swings[e.slot] = { t: nowSec, arc: Math.min(e.arc, 2.6), spin: e.arc > 6 };
+    if (e.slot === localSlot) cursorPulse();
+  }
   if (e.type === 'shot') {
     lastShot[e.slot] = nowSec;
     if (e.slot === localSlot) cursorPulse();
@@ -468,6 +476,7 @@ function handleEvent(e: SimEvent): void {
     case 'waveStart': {
       const L = UI_STRINGS[ui.lang];
       const mod = e.mod ?? 0;
+      if (e.boss && settings.announcer) audio.announce('mayhem', 4);
       ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${L.wave} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
       break;
     }
@@ -482,6 +491,7 @@ function handleEvent(e: SimEvent): void {
       }
       cine.start(nowSec, BALANCE.floors.finisherSeconds - 0.12, x, y, e.by);
       audio.play('slowIn');
+      if (settings.announcer) setTimeout(() => audio.announce('ownage', 6), 700);
       audio.duckMusic(0.4, BALANCE.floors.finisherSeconds + 0.3);
       ui.screenFlash('#ffffff', 220);
       break;
@@ -499,6 +509,7 @@ function handleEvent(e: SimEvent): void {
       if (e.kind === 7) ui.screenFlash('#ffffff', 700);
       break;
     case 'nuke':
+      if (settings.announcer) audio.announce('megakill', 5);
       slowMo(0.7);
       ui.screenFlash('#fff6c8', 900);
       break;
@@ -508,14 +519,32 @@ function handleEvent(e: SimEvent): void {
     case 'enemyDeath': {
       // the kill you just made lands with a tiny freeze; heavy rounds freeze a little longer; bosses go to slow motion
       if (nowSec - lastShot[localSlot]! < 0.25) hitStop(e.power >= 60 ? 0.06 : e.power >= 25 ? 0.04 : 0.02);
-      if (world && world.eBoss[e.id]) slowMo(0.9);
+      if (world && world.eBoss[e.id]) {
+        slowMo(0.9);
+        if (settings.announcer) audio.announce('carnage', 5);
+      }
       if (nowSec - comboAt > 2.2) comboCount = 0;
       comboCount++;
       comboAt = nowSec;
       const step = COMBO_STEPS.indexOf(comboCount);
       if (step >= 0 && settings.announcer) {
         ui.banner(UI_STRINGS[ui.lang].combos[step]!, `x${comboCount}`, 1100);
-        audio.play('level');
+        if (!audio.announce(COMBO_VOICE[step]!, 2 + step)) audio.play('level');
+      }
+      if (settings.announcer) {
+        if (!firstBlood && world && world.kills >= 1) {
+          firstBlood = true;
+          audio.announce('firstblood', 1);
+        }
+        if (comboCount === 5) audio.announce('doublekill', 1);
+        // a blast that takes a crowd in one go
+        const t = world?.tick ?? 0;
+        burstDeaths = t === burstTick ? burstDeaths + 1 : 1;
+        burstTick = t;
+        if (burstDeaths === 6 && nowSec - lastMulti > 10) {
+          lastMulti = nowSec;
+          audio.announce('triplekill', 2);
+        }
       }
       break;
     }
@@ -660,6 +689,12 @@ function updateCursor(): void {
 let comboCount = 0;
 let comboAt = -10;
 const COMBO_STEPS = [10, 25, 50, 100, 200, 350];
+/** The announcer line of each combo step (same order as the banners: killing spree ... apocalypse). */
+const COMBO_VOICE = ['killingspree', 'rampage', 'dominating', 'massacre', 'godlike', 'mayhem'];
+let firstBlood = false;
+let burstTick = -1;
+let burstDeaths = 0;
+let lastMulti = -100;
 
 // ---- starting a game ----
 function beginPlaying(w: World, slot: number): void {
@@ -1124,7 +1159,24 @@ function frame(nowMs: number): void {
       }
       const aimDriven = animator.apply(w, s, c, nowSec, { firing: nowSec - lastShot[s]! < 0.2, moveAngle: moveAngle[s]!, facing: s === localSlot && localFacing !== null ? localFacing : curA[s]! });
       c.update(dt);
-      if (aimDriven) c.applyAim(dir.set(Math.cos(ang), 0, -Math.sin(ang)));
+      if (aimDriven) {
+        // blades and hammers: the arm sweeps through the arc of a swing, winds the hammer back while it charges, and a spin turns the whole body
+        let aimAng = ang;
+        if (BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!].melee) {
+          const sw = swings[s]!;
+          const age = nowSec - sw.t;
+          const dur = sw.spin ? 0.3 : 0.2;
+          if (w.pCharge[s]! > 0) aimAng = ang + 0.6 + w.pCharge[s]! * 1.1; // pulled back, further the longer it charges
+          else if (age >= 0 && age < dur) {
+            const k = age / dur;
+            if (sw.spin) {
+              aimAng = ang - k * Math.PI * 2;
+              c.root.rotation.y = ang + Math.PI / 2 - k * Math.PI * 2;
+            } else aimAng = ang + (0.5 - k) * sw.arc;
+          } else aimAng = ang + 0.5; // resting: the weapon held a little out to the side
+        }
+        c.applyAim(dir.set(Math.cos(aimAng), 0, -Math.sin(aimAng)));
+      }
     }
     power.end();
     // camera follows the local player, or a living teammate when down/dead
@@ -1187,7 +1239,7 @@ function frame(nowMs: number): void {
         }
         aimMarker.update(tx, -ty, rad, colorFor(localSlot), nowSec, aimTarget.kind * 10000 + aimTarget.id);
       } else aimMarker.update(null, 0, 0, '#ffffff', nowSec, -1);
-      const show = alive && !w.gameOver && settings.ammoRing && !lifted.active;
+      const show = alive && !w.gameOver && settings.ammoRing && !lifted.active && !st.melee;
       ammoRing.update(lx, -ly, frac, reloading, nowSec, show);
       ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, show, reloading);
     }

@@ -69,12 +69,46 @@ export function damageMul(w: World, s: number): number {
   if (perk(w, s, PERK.Quad) > 0) m *= 2;
   const rage = perk(w, s, PERK.Rage);
   if (rage > 0 && w.pMaxHp[s]! > 0) m *= 1 + BALANCE.perks.rageMax * (1 - w.pHp[s]! / w.pMaxHp[s]!) * rage;
-  return m;
+  return m * abilityDamage(w, s);
 }
 
 /** Move speed multiplier from haste and adrenaline. */
-export function speedMul(w: World, s: number): number {
+/** Class abilities: the buffs a running ability puts on a character (see abilities.ts for the abilities themselves). */
+export function abilitySpeed(w: World, s: number): number {
+  const a = BALANCE.abilities;
+  let m = w.pRally[s]! > 0 ? a.soldier!.speed! : 1;
+  if (w.pSpecT[s]! > 0) {
+    const cls = perk(w, s, PERK.Class);
+    m *= cls === 2 ? a.heavy!.speed! : cls === 3 ? a.scout!.speed! : cls === 6 ? a.berserker!.speed! : cls === 7 ? a.swordsman!.speed! : 1;
+  }
+  return m;
+}
+
+export function abilityRate(w: World, s: number): number {
+  return w.pRally[s]! > 0 ? BALANCE.abilities.soldier!.rate! : 1;
+}
+
+export function abilityDamage(w: World, s: number): number {
+  const cls = perk(w, s, PERK.Class);
   let m = 1;
+  if (cls === 6 && w.pSpecT[s]! > 0) m *= BALANCE.abilities.berserker!.damage!;
+  if (cls === 5 && w.pOver[s]! > 0) m *= BALANCE.abilities.ranger!.damage!;
+  return m;
+}
+
+/** Share of the damage a character takes while fortified (the heavy's ability). */
+export function abilityTaken(w: World, s: number): number {
+  return perk(w, s, PERK.Class) === 2 && w.pSpecT[s]! > 0 ? BALANCE.abilities.heavy!.taken! : 1;
+}
+
+/** Cannot be stunned or thrown: a fortified heavy and a berserker in a rampage. */
+export function stunImmune(w: World, s: number): boolean {
+  const cls = perk(w, s, PERK.Class);
+  return w.pSpecT[s]! > 0 && (cls === 2 || cls === 6);
+}
+
+export function speedMul(w: World, s: number): number {
+  let m = abilitySpeed(w, s);
   if (perk(w, s, PERK.Haste) > 0) m = 1.4;
   if (perk(w, s, PERK.Adren) > 0 && BALANCE.perks.adrenSpeed > m) m = BALANCE.perks.adrenSpeed;
   return m;
