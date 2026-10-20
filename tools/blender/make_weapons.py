@@ -285,6 +285,9 @@ def gl(b):
 WEAPONS = [("pistol", pistol), ("smg", smg), ("ar", ar), ("shotgun", shotgun), ("hmg", hmg), ("minigun", minigun), ("sniper", sniper), ("grenade", grenade), ("revolver", revolver), ("mp", mp), ("dbl", dbl), ("dmr", dmr), ("flamer", flamer), ("gl", gl)]
 
 
+exec(compile(open(os.path.join(HERE, "meshclean.py"), encoding="utf-8").read(), "meshclean", "exec"), globals())
+
+
 def cull_hidden(mesh):
     """Delete faces that z-fight or cannot be seen: faces buried inside another part, and coplanar faces that lie on top
     of a larger one. The parts are separate boxes and cylinders glued together, so without this the overlapping
@@ -360,7 +363,7 @@ def build(wid, fn, mats):
     mesh = bpy.context.view_layer.objects.active
     mesh.vertex_groups.clear()
     removed = cull_hidden(mesh)
-    print("weapon", wid, "removed hidden/coplanar faces:", removed)
+    print("weapon", wid, "removed hidden/coplanar faces:", removed, clean_mesh(mesh))
     mesh.name = "weapon_" + wid
     mesh.data.name = "weapon_" + wid
     empties = []

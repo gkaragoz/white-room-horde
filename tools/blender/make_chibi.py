@@ -220,6 +220,11 @@ def finalize(cid, S, objs, rig):
     mesh = bpy.context.view_layer.objects.active
     mesh.name = cid + "_mesh"
     mesh.data.name = cid + "_mesh"
+    if cid.startswith("acc_"):  # hats and masks are static, so welding and de-overlapping them is safe
+        _mc = os.path.join(os.path.dirname(os.path.abspath(globals().get("__file__", "tools/blender/make_chibi.py"))), "meshclean.py")
+        _ns = {}
+        exec(compile(open(_mc, encoding="utf-8").read(), _mc, "exec"), _ns)
+        print("clean", cid, _ns["clean_mesh"](mesh))
     mod = mesh.modifiers.new("Armature", "ARMATURE")
     mod.object = rig
     mesh.parent = rig

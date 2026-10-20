@@ -7,6 +7,9 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Models**
+- Flicker fix: props, weapons and hats now go through `tools/blender/meshclean.py` (weld, outward normals, buried and coplanar faces removed or lifted, ground-plane bottoms dropped so barrels no longer fight with the floor). `tools/blender/audit_meshes.py` checks every GLB.
+
 ## v0.5.0 (2026-10-20)
 
 **Waves**

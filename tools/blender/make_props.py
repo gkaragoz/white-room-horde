@@ -22,6 +22,7 @@ _src = open(os.path.join(HERE, "make_weapons.py"), encoding="utf-8").read()
 _a = _src.index("def cull_hidden(mesh):")
 _b = _src.index("def build(wid, fn, mats):")
 exec(compile(_src[_a:_b], "cull", "exec"), globals())
+exec(compile(open(os.path.join(HERE, "meshclean.py"), encoding="utf-8").read(), "meshclean", "exec"), globals())
 
 WOOD, WOOD2, WOOD3 = "#B88A55", "#8F6A3F", "#D3AA72"
 STEEL, STEEL2 = "#8A94A3", "#5E6877"
@@ -403,6 +404,7 @@ def build(pid, fn, mats):
     mesh = bpy.context.view_layer.objects.active
     mesh.vertex_groups.clear()
     removed = cull_hidden(mesh)
+    removed = (removed, clean_mesh(mesh, floor=True))
     mesh.name = "prop_" + pid
     mesh.data.name = "prop_" + pid
     print("prop", pid, "removed", removed)
