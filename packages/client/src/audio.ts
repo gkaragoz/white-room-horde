@@ -13,6 +13,7 @@ export type Sfx =
   | 'reload' | 'reloadDone' | 'dash' | 'bossRoar' | 'uiClick' | 'uiConfirm' | 'uiBack' | 'uiError' | 'uiOpen' | 'uiClose' | 'heart'
   | 'floorCleared' | 'countTick' | 'countGo' | 'floorCharge' | 'floorLift' | 'floorArrive' | 'floorStart'
   | 'cardOffer' | 'iceFreeze' | 'iceThaw' | 'nuke' | 'secondWind' | 'weaponGet' | 'dead' | 'floorEnter' | 'slowIn' | 'slowOut' | 'impactWall' | 'barrelHit'
+  | 'boneCrack' | 'fleshHit' | 'goreDecap' | 'goreTear' | 'gibBurst'
   | 'warnCircle' | 'warnLine' | 'slamHit' | 'purge' | 'acidSplash' | 'launch' | 'chargeUp' | 'pullHum' | 'blinkZap' | 'abilityBuff' | 'abilityPower' | 'abilityWhoosh' | 'airstrikeCall'
   | 'vo_firstblood' | 'vo_doublekill' | 'vo_triplekill' | 'vo_megakill' | 'vo_killingspree' | 'vo_rampage' | 'vo_dominating' | 'vo_massacre' | 'vo_godlike' | 'vo_mayhem' | 'vo_ownage' | 'vo_carnage';
 
@@ -26,6 +27,7 @@ const GAP: Record<Sfx, number> = {
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
   floorCleared: 0.5, countTick: 0.2, countGo: 0.2, floorCharge: 0.5, floorLift: 1, floorArrive: 0.5, floorStart: 0.5,
   cardOffer: 0.3, iceFreeze: 0.5, iceThaw: 0.3, nuke: 2, secondWind: 1, weaponGet: 0.2, dead: 0.5, floorEnter: 1, slowIn: 1, slowOut: 1, impactWall: 0.05, barrelHit: 0.1,
+  boneCrack: 0.06, fleshHit: 0.05, goreDecap: 0.2, goreTear: 0.2, gibBurst: 0.15,
   warnCircle: 0.25, warnLine: 0.4, slamHit: 0.1, purge: 1, acidSplash: 0.15, launch: 0.2, chargeUp: 0.25, pullHum: 0.8, blinkZap: 0.1, abilityBuff: 0.2, abilityPower: 0.2, abilityWhoosh: 0.2, airstrikeCall: 0.5,
   vo_firstblood: 0, vo_doublekill: 0, vo_triplekill: 0, vo_megakill: 0, vo_killingspree: 0, vo_rampage: 0, vo_dominating: 0, vo_massacre: 0, vo_godlike: 0, vo_mayhem: 0, vo_ownage: 0, vo_carnage: 0,
 };
@@ -115,6 +117,11 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   floorEnter: { files: ['floor_enter'], gain: 0.4, rate: [1, 1] },
   slowIn: { files: ['slowmo_in'], gain: 0.8, rate: [1, 1] },
   slowOut: { files: ['slowmo_out'], gain: 0.7, rate: [1, 1] },
+  boneCrack: { files: ['bone_crack_1', 'bone_crack_2', 'bone_crack_3'], gain: 0.75, rate: [0.92, 1.12] },
+  fleshHit: { files: ['flesh_hit_1', 'flesh_hit_2', 'flesh_hit_3'], gain: 0.65, rate: [0.9, 1.1] },
+  goreDecap: { files: ['gore_decap'], gain: 0.95, rate: [0.94, 1.06] },
+  goreTear: { files: ['gore_tear'], gain: 0.9, rate: [0.94, 1.08] },
+  gibBurst: { files: ['gib_burst'], gain: 0.95, rate: [0.92, 1.08] },
   impactWall: { files: n3('impactMetal_light'), gain: 0.22, rate: [1.3, 1.7] },
   barrelHit: { files: n3('impactMetal_heavy'), gain: 0.5, rate: [0.9, 1.1] },
   warnCircle: { files: ['warn_circle'], gain: 0.45, rate: [1, 1] },
@@ -145,7 +152,7 @@ const BANK: Partial<Record<Sfx, Entry>> = {
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
-const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
+const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'boneCrack', 'fleshHit', 'goreDecap', 'goreTear', 'gibBurst', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
 
 const VOICE_SFX = new Set<Sfx>(['vo_firstblood', 'vo_doublekill', 'vo_triplekill', 'vo_megakill', 'vo_killingspree', 'vo_rampage', 'vo_dominating', 'vo_massacre', 'vo_godlike', 'vo_mayhem', 'vo_ownage', 'vo_carnage', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
 
@@ -505,6 +512,8 @@ export class Audio {
   }
 
   // ---- playback ----
+  /** Blood-and-gibs level (0 off); set by main. */
+  gore = 1;
   private readonly availCache = new Map<string, string[]>();
 
   private playBank(name: Sfx, pan: number, gainMul: number): boolean {
@@ -690,10 +699,19 @@ export class Audio {
       case 'enemyHit':
         this.play('hit', e);
         if (Math.random() < 0.35) this.play('zHit', e);
+        if (this.gore > 0) {
+          if (Math.random() < 0.7) this.play('fleshHit', e);
+          if (e.damage >= 26 && Math.random() < 0.55) this.play('boneCrack', e);
+        }
         break;
       case 'enemyDeath':
         this.play('death', e);
         this.play('zDeath', e);
+        if (this.gore > 0) {
+          this.play('fleshHit', e);
+          if (e.power >= 30 && Math.random() < 0.6) this.play('gibBurst', e);
+          else if (Math.random() < 0.5) this.play('boneCrack', e);
+        }
         break;
       case 'spit':
         this.play('spit', e);

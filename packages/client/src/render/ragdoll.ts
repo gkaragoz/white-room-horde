@@ -219,7 +219,10 @@ export class RagdollPool {
     b.root.rotation.set(0, yaw, 0);
     b.root.visible = true;
     // pose from the animation at the moment of death
-    for (const [n, bone] of b.bones) bone.quaternion.copy(b.restQ.get(n)!);
+    for (const [n, bone] of b.bones) {
+      bone.quaternion.copy(b.restQ.get(n)!);
+      bone.scale.setScalar(1); // (a part may have been torn off the last time this body was used)
+    }
     b.mixer.stopAllAction();
     const act = b.actions.get(clip) ?? b.actions.get('z_walk');
     if (act) {
@@ -253,12 +256,34 @@ export class RagdollPool {
     b.asleep = false;
     b.rested = 0;
     b.root.scale.setScalar(1);
+    b.root.position.y = 0;
     b.quiet = 0;
     b.active = true;
     b.age = 0;
     b.born = ++this.clock;
     this.apply(b);
+    this.lastBody = b;
     return true;
+  }
+
+  /** The body most recently thrown (a part can still be torn off it). */
+  private lastBody: Body | null = null;
+
+  /** Tear a part off the newest body: its bone shrinks to nothing; returns where the joint is (world coordinates), or null. */
+  detachLast(name: 'head' | 'armL' | 'armR' | 'thighL' | 'thighR'): (() => { x: number; y: number; z: number }) | null {
+    const b = this.lastBody;
+    const bone = b?.bones.get(name);
+    if (!b || !b.active || !bone) return null;
+    bone.scale.setScalar(0.0001);
+    const i = NAMES.indexOf(name);
+    const at = { x: 0, y: 0, z: 0 };
+    // the joint keeps moving with the body, so a fountain of blood can stay on the stump
+    return () => {
+      at.x = b.pos[i * 3]!;
+      at.y = b.pos[i * 3 + 1]!;
+      at.z = b.pos[i * 3 + 2]!;
+      return at;
+    };
   }
 
   private integrate(b: Body): void {
@@ -388,9 +413,10 @@ export class RagdollPool {
         if (k <= 0) {
           b.active = false;
           b.root.visible = false;
-          b.root.scale.setScalar(1);
+          b.root.position.y = 0;
         } else {
-          b.root.scale.setScalar(k);
+          // sink into the floor where it lies (the body is placed in world coordinates, so scaling the root would drag it toward the middle of the arena)
+          b.root.position.y = -(1 - k) * 1.4;
         }
       }
     }

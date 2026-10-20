@@ -257,15 +257,15 @@
   },
   "enemies": {
     "grunt": {
-      "hp": 20,
+      "hp": 32,
       "speed": 4.4,
       "radius": 0.55,
       "damage": 8,
       "interval": 0.8
     },
     "runner": {
-      "hp": 12,
-      "speed": 10,
+      "hp": 18,
+      "speed": 6.0,
       "radius": 0.4,
       "damage": 5,
       "interval": 0.5
@@ -279,7 +279,7 @@
     },
     "exploder": {
       "hp": 15,
-      "speed": 8,
+      "speed": 5.5,
       "radius": 0.5,
       "damage": 40,
       "interval": 0,
@@ -307,15 +307,15 @@
       "interval": 6.0
     },
     "crawler": {
-      "hp": 10,
-      "speed": 6.6,
+      "hp": 16,
+      "speed": 5.0,
       "radius": 0.45,
       "damage": 6,
       "interval": 0.6
     },
     "leaper": {
-      "hp": 35,
-      "speed": 6,
+      "hp": 50,
+      "speed": 5.0,
       "radius": 0.5,
       "damage": 10,
       "interval": 0.8
@@ -378,8 +378,8 @@
       "interval": 6.0
     },
     "blinker": {
-      "hp": 35,
-      "speed": 7.5,
+      "hp": 45,
+      "speed": 5.0,
       "radius": 0.5,
       "damage": 10,
       "interval": 3.5
@@ -415,12 +415,12 @@
     "finisherSeconds": 2.6
   },
   "waves": {
-    "baseCount": 30,
-    "perPlayer": 10,
-    "countGrowth": 1.12,
+    "baseCount": 14,
+    "perPlayer": 6,
+    "countGrowth": 1.08,
     "hpGrowth": 0.08,
     "playerHpGrowth": 0.1,
-    "cap": 500,
+    "cap": 170,
     "spawnPerTick": 8,
     "spawnMinDistance": 16,
     "unlock": {
@@ -469,7 +469,7 @@
       "reviver": 3,
       "magnetar": 3
     },
-    "waveSizeMul": 1.4,
+    "waveSizeMul": 1.2,
     "spawnSeconds": 25,
     "spawnBurst": 0.3
   },

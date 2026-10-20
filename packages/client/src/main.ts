@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
+import { GoreParts, Part } from './render/gore';
+import { GIB_COLORS } from './render/fx';
 import { heightAt } from '@wrh/shared';
 import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
@@ -107,6 +109,9 @@ worldReady = true;
 crowd.corpseLife = [2.5, 5, 14][settings.corpseTime]!;
 ragdolls.restLife = [1.2, 3.2, 10][settings.corpseTime]!;
 stage.scene.add(ragdolls.group);
+const goreParts = new GoreParts();
+stage.scene.add(goreParts.group);
+fx.onClear = () => goreParts.clear();
 if (stage.backend === 'webgl') ragdolls.warm(['grunt', 'runner', 'crawler', 'tank', 'spitter', 'shielder', 'leaper', 'exploder'], stage.renderer, stage.scene, stage.camera);
 const pickups = new PickupView();
 stage.scene.add(pickups.group);
@@ -189,6 +194,7 @@ function applySettings(): void {
   stage.setDynamicLights(settings.dynLights);
   fx.density = [0.5, 1, 1.6][settings.particles]!;
   fx.gore = [0.4, 1, 1.8][settings.gore]!;
+  audio.gore = settings.gore >= 1 ? 1 : 0;
   audio.sfxVolume = settings.sfxVolume;
   audio.voiceVolume = settings.voiceVolume;
   audio.uiSounds = settings.uiSounds;
@@ -360,7 +366,7 @@ const curX = new Float64Array(MAX_PLAYERS), curY = new Float64Array(MAX_PLAYERS)
 const moveAngle = new Float64Array(MAX_PLAYERS);
 const lastShot = new Float64Array(MAX_PLAYERS).fill(-10);
 /** The latest melee swing of every character: when, how wide and whether it was a full spin (for the swinging arm). */
-const swings: { t: number; arc: number; spin: boolean }[] = Array.from({ length: MAX_PLAYERS }, () => ({ t: -10, arc: 2, spin: false }));
+const swings: { t: number; arc: number; spin: boolean; dir: number; heavy: boolean }[] = Array.from({ length: MAX_PLAYERS }, () => ({ t: -10, arc: 2, spin: false, dir: 1, heavy: false }));
 let nowSec = 0;
 const lastDust: number[] = new Array<number>(MAX_PLAYERS).fill(0);
 let liftSounded = false;
@@ -413,13 +419,47 @@ function tryRagdoll(w: World, e: Extract<SimEvent, { type: 'enemyDeath' }>): boo
   }
   const info = crowd.deathInfo(w, e.id);
   // sim (x, y) -> three (x, z = -y)
-  return ragdolls.spawn(type, e.x, -e.y, info.yaw, info.clip, info.time, { x: info.vx * 0.5, z: -info.vy * 0.5 }, { x: e.dx, z: -e.dy, power: e.power * boost + (boost > 1 ? 40 : 0) });
+  const ok = ragdolls.spawn(type, e.x, -e.y, info.yaw, info.clip, info.time, { x: info.vx * 0.5, z: -info.vy * 0.5 }, { x: e.dx, z: -e.dy, power: e.power * boost + (boost > 1 ? 40 : 0) });
+  if (ok) tearOff(e, type, boost);
+  return ok;
+}
+
+/** A hard kill can take a head or a limb with it (Gore setting: none on low, some on normal, plenty on extra). */
+function tearOff(e: Extract<SimEvent, { type: 'enemyDeath' }>, type: string, boost: number): void {
+  const g = settings.gore;
+  if (g === 0) return;
+  const chance = (g === 2 ? 0.34 : 0.15) + Math.min(0.4, e.power * 0.006) + (boost > 1 ? 0.25 : 0);
+  if (Math.random() > chance) return;
+  const n = g === 2 && Math.random() < 0.3 ? 2 : 1;
+  const used: string[] = [];
+  for (let k = 0; k < n; k++) {
+    const roll = Math.random();
+    const name = (roll < 0.45 ? 'head' : roll < 0.62 ? 'armL' : roll < 0.79 ? 'armR' : roll < 0.9 ? 'thighL' : 'thighR') as 'head' | 'armL' | 'armR' | 'thighL' | 'thighR';
+    if (used.includes(name)) continue;
+    used.push(name);
+    const at = ragdolls.detachLast(name);
+    if (!at) continue;
+    const p = at();
+    const color = GIB_COLORS[type] ?? '#c9b8a0';
+    goreParts.spawn(name === 'head' ? Part.Head : name.startsWith('arm') ? Part.Arm : Part.Leg, p.x, -p.z, p.y, e.dx, e.dy, e.power * boost, color, BALANCE.enemies[type as (typeof ENEMY_TYPES)[number]].radius > 0.6 ? 1.3 : 1);
+    goreParts.fountain(at, e.dx, e.dy);
+    audio.play(name === 'head' ? 'goreDecap' : 'goreTear', e);
+  }
 }
 
 function handleEvent(e: SimEvent): void {
   if (e.type === 'swing') {
-    swings[e.slot] = { t: nowSec, arc: Math.min(e.arc, 2.6), spin: e.arc > 6 };
-    if (e.slot === localSlot) cursorPulse();
+    const heavy = WEAPON_IDS[e.weapon] === 'hammer';
+    // blade cuts alternate from side to side, so a run of swings reads as a combo
+    swings[e.slot] = { t: nowSec, arc: Math.min(e.arc, 2.6), spin: e.arc > 6, dir: -swings[e.slot]!.dir, heavy };
+    if (e.slot === localSlot) {
+      cursorPulse();
+      // landing the blow is felt: a short freeze and a kick of the camera, harder for the hammer and for a hit that takes several
+      if (e.hits > 0) {
+        hitStop((heavy ? 0.075 : 0.035) + Math.min(0.04, e.hits * 0.008) + (e.charge ?? 0) * 0.05);
+        fx.shake = Math.min(0.5, fx.shake + (heavy ? 0.22 : 0.08) + Math.min(0.15, e.hits * 0.03));
+      }
+    }
   }
   if (e.type === 'shot') {
     lastShot[e.slot] = nowSec;
@@ -1158,14 +1198,32 @@ function frame(nowMs: number): void {
         if (BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!].melee) {
           const sw = swings[s]!;
           const age = nowSec - sw.t;
-          const dur = sw.spin ? 0.3 : 0.2;
-          if (w.pCharge[s]! > 0) aimAng = ang + 0.6 + w.pCharge[s]! * 1.1; // pulled back, further the longer it charges
-          else if (age >= 0 && age < dur) {
+          const dur = sw.spin ? 0.3 : sw.heavy ? 0.26 : 0.2;
+          if (w.pCharge[s]! > 0) {
+            // pulled back, further the longer it charges; the body leans away and trembles when nearly full
+            aimAng = ang + 0.6 + w.pCharge[s]! * 1.1;
+            c.root.rotation.y += Math.min(0.5, w.pCharge[s]! * 0.5);
+            const full = Math.max(0, w.pCharge[s]! - 0.7);
+            c.root.position.x += Math.sin(nowSec * 70) * 0.04 * full;
+          } else if (age >= 0 && age < dur) {
+            // fast through the middle of the cut (ease), the body steps into it and twists with it
             const k = age / dur;
+            const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+            const lunge = Math.sin(Math.PI * k) * (sw.heavy ? 0.5 : 0.3);
+            c.root.position.x += Math.cos(ang) * lunge;
+            c.root.position.z -= Math.sin(ang) * lunge;
             if (sw.spin) {
-              aimAng = ang - k * Math.PI * 2;
-              c.root.rotation.y = ang + Math.PI / 2 - k * Math.PI * 2;
-            } else aimAng = ang + (0.5 - k) * sw.arc;
+              aimAng = ang - e * Math.PI * 2;
+              c.root.rotation.y = ang + Math.PI / 2 - e * Math.PI * 2;
+            } else {
+              aimAng = ang + (0.5 - e) * sw.arc * sw.dir;
+              c.root.rotation.y += (0.5 - e) * sw.arc * sw.dir * 0.35;
+            }
+          } else if (age >= dur && age < dur + 0.18) {
+            // follow-through: the weapon settles back to its resting side instead of snapping
+            const r = (age - dur) / 0.18;
+            const endAng = sw.spin ? 0 : -0.5 * sw.arc * sw.dir;
+            aimAng = ang + endAng + (0.5 - endAng) * r * r * (3 - 2 * r);
           } else aimAng = ang + 0.5; // resting: the weapon held a little out to the side
         }
         c.applyAim(dir.set(Math.cos(aimAng), 0, -Math.sin(aimAng)));
@@ -1299,6 +1357,7 @@ function frame(nowMs: number): void {
     }
     fx.update(dt);
     ragdolls.update(dt);
+    goreParts.update(dt, fx);
     pickups.update(w, nowSec);
     {
       const tags: { px: number; py: number; text: string; color: string }[] = [];
@@ -1470,6 +1529,7 @@ setTimeout(() => stage.warmFlight(), 800);
   perf,
   ui,
   ragdolls,
+  goreParts,
   spawnBoss: () => (world ? spawnBoss(world) : -1),
   hazards: { addTelegraph, addZone, launchPlayer, spawnEnemy },
   cine,

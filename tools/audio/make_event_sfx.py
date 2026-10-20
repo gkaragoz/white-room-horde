@@ -184,6 +184,32 @@ def build():
     whistle = tone(sweep(2600, 500, 1.0, 0.9), 1.0, ((1, 1), (2, 0.15)), 0.02, 0.15, 1.1)
     click = fft_filter(noise(0.03), lo=1500, hi=5000) * env(int(0.03 * SR), 0.0005, 0.03, 2)
     c["airstrike_call"] = mix((click, 0.7, 0.0), (whistle, 0.6, 0.12))
+    # gore: bone cracks and wet hits (three takes each), a decapitation, a limb torn off, a body bursting
+    for k, f in enumerate((1800, 2400, 1500), 1):
+        crack = fft_filter(noise(0.09), lo=f, hi=f * 3) * env(int(0.09 * SR), 0.0003, 0.09, 3.5)
+        snap = tone(sweep(f * 0.8, f * 0.3, 0.05), 0.05, ((1, 1), (1.6, 0.4)), 0.0005, 0.05, 2)
+        thud = lowpass_env(noise(0.18), 500, 100) * env(int(0.18 * SR), 0.001, 0.18, 3)
+        c["bone_crack_%d" % k] = mix((crack, 1.0, 0.0), (snap, 0.5, 0.0), (thud, 0.7, 0.01))
+    for k in range(1, 4):
+        tw = t_(0.15)
+        wet = lowpass_env(noise(0.22), 2200 + k * 300, 250) * env(int(0.22 * SR), 0.001, 0.22, 2.2)
+        thump = tone(sweep(130, 55, 0.18), 0.18, release=0.16)
+        squelch = fft_filter(noise(0.15), lo=300, hi=1400) * env(len(tw), 0.002, 0.15, 2) * (0.5 + 0.5 * np.sin(tw * 2 * np.pi * (35 + k * 6)))
+        c["flesh_hit_%d" % k] = mix((wet, 1.0, 0.0), (thump, 0.8, 0.0), (squelch, 0.4, 0.04))
+    slice_ = fft_filter(noise(0.14), lo=2000, hi=9000) * np.linspace(0.3, 1, int(0.14 * SR)) * env(int(0.14 * SR), 0.002, 0.06, 1.5)
+    splash = lowpass_env(noise(0.5), 3200, 200) * env(int(0.5 * SR), 0.003, 0.5, 2)
+    drips = np.zeros(int(0.7 * SR))
+    for k in range(6):
+        i = int((0.05 + k * 0.09 + rng.random() * 0.05) * SR)
+        d = tone(sweep(900 + rng.random() * 600, 300, 0.05), 0.05, release=0.045, curve=2)
+        drips[i:i + len(d)] += d * (0.5 - k * 0.05)
+    c["gore_decap"] = mix((slice_, 0.9, 0.0), (splash, 1.0, 0.1), (tone(sweep(110, 45, 0.3), 0.3, release=0.27), 0.7, 0.12), (drips, 0.6, 0.25))
+    tn = int(0.55 * SR)
+    ripple = fft_filter(noise(0.55), lo=200, hi=2500) * env(tn, 0.01, 0.35, 1.6) * (0.55 + 0.45 * np.sin(t_(0.55) * 2 * np.pi * 30))
+    snapp = fft_filter(noise(0.07), lo=1500, hi=6000) * env(int(0.07 * SR), 0.0004, 0.07, 3)
+    c["gore_tear"] = mix((ripple, 0.9, 0.0), (snapp, 0.9, 0.12), (snapp, 0.7, 0.3), (lowpass_env(noise(0.3), 1500, 150) * env(int(0.3 * SR), 0.002, 0.3, 2.5), 0.9, 0.35))
+    burst = lowpass_env(noise(0.7), 2800, 120) * env(int(0.7 * SR), 0.002, 0.7, 2)
+    c["gib_burst"] = mix((burst, 1.0, 0.0), (tone(sweep(100, 38, 0.4), 0.4, release=0.36), 0.9, 0.0), (drips, 0.5, 0.2), (fft_filter(noise(0.1), lo=1200, hi=5000) * env(int(0.1 * SR), 0.0005, 0.1, 3), 0.6, 0.0))
     return {k: normalise(v) for k, v in c.items()}
 
 

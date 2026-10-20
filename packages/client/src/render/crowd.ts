@@ -491,7 +491,7 @@ export class Crowd {
       c.vy *= f;
       const s = this.sample(clip, now - c.born);
       const left = this.corpseLife - (now - c.born);
-      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale * (left < CORPSE_FADE ? Math.max(0.02, left / CORPSE_FADE) : 1), heightAt(map, c.x, c.y, c.layer));
+      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale, heightAt(map, c.x, c.y, c.layer) - (left < CORPSE_FADE ? (1 - Math.max(0, left / CORPSE_FADE)) * 1.3 : 0)); // sinks into the floor where it lies
     }
     let tris = 0;
     for (const t of this.types) {

@@ -6,7 +6,7 @@ const MAX_PARTICLES = 3600;
 const MAX_HOLES = 360;
 const GRAVITY = 16;
 
-const GIB_COLORS: Record<string, string> = {
+export const GIB_COLORS: Record<string, string> = {
   grunt: '#9aa57a',
   runner: '#b9b27a',
   tank: '#8e8a98',
@@ -190,7 +190,11 @@ export class Fx {
   }
 
   /** Wipe the blood and the bullet holes: a new floor starts clean. */
+  /** Called when the floor is wiped (a new floor starts clean); main clears the flying parts here. */
+  onClear: (() => void) | null = null;
+
   clearFloor(): void {
+    this.onClear?.();
     for (const t of this.decalTiles) {
       t.ctx.clearRect(0, 0, t.canvas.width, t.canvas.height);
       t.tex.needsUpdate = true;
@@ -385,6 +389,22 @@ export class Fx {
     this.burst(Kind.Spark, x, y, h, count, speed, 0, 0, 6.28, 0.7, 0.05, color);
   }
 
+  /** A single drop of blood shed by a flying part. */
+  drip(x: number, y: number, h: number): void {
+    this.burst(Kind.Blood, x, y, h, 1, 1.2, 0, 0, 6.28, 0.5, 0.06, '#9b121a');
+  }
+
+  /** The blood that lands where a part hits the floor. */
+  gorePatch(x: number, y: number, r: number): void {
+    this.splat(x, y, r, '#7d0d14', 0.65);
+    this.burst(Kind.Blood, x, y, 0.2, 7, 4, 0, 0, 6.28, 0.5, 0.07, '#a3141c');
+  }
+
+  /** Blood pumping out of a stump: a few droplets thrown up and out, weaker as `k` falls from 1 to 0. */
+  spurt(x: number, y: number, h: number, dirX: number, dirY: number, k: number): void {
+    this.burst(Kind.Blood, x, y, h, Math.max(1, Math.round(5 * k)), 3 + 4 * k, dirX, dirY, 1.2, 0.7, 0.07, '#b3161f');
+  }
+
   /** Particle amount and blood/gib amount multipliers (settings). */
   density = 1;
   gore = 1;
@@ -459,16 +479,21 @@ export class Fx {
         break;
       }
       case 'enemyHit':
-        this.burst(Kind.Blood, e.x, e.y, 0.9, 5, 4, 0, 0, 6.28, 0.5, 0.07, '#8c1018');
+        // the harder the blow, the more blood, and a spray of fine droplets
+        this.burst(Kind.Blood, e.x, e.y, 0.9, 6 + Math.min(14, Math.round(e.damage * 0.12)), 4 + Math.min(4, e.damage * 0.03), 0, 0, 6.28, 0.55, 0.075, '#8c1018');
+        if (e.damage >= 18) this.burst(Kind.Blood, e.x, e.y, 1.1, Math.min(16, Math.round(e.damage * 0.1)), 7.5, 0, 0, 6.28, 0.4, 0.04, '#b3161f');
+        if (e.damage >= 45) this.splat(e.x, e.y, 0.5 + Math.min(0.6, e.damage * 0.004), '#7d0d14', 0.55);
         if (e.damage >= 30) this.shockRing(e.x, e.y, e.damage >= 80 ? '#ffe9a0' : '#ffffff', 0.9 + Math.min(1.4, e.damage * 0.01));
         break;
       case 'enemyDeath': {
         const power = Math.min(1.6, 0.6 + e.power * 0.01);
         const type = ENEMY_TYPES[e.etype]!;
         if (type === 'exploder') break; // the explosion event covers it
-        this.burst(Kind.Blood, e.x, e.y, 0.8, Math.round(26 * power), 8 * power, e.dx, e.dy, 1.8, 0.9, 0.09, '#a3141c');
-        this.burst(Kind.Gib, e.x, e.y, 0.8, 5 + Math.round(6 * power), 7.5 * power, e.dx, e.dy, 2.8, 1.9, 0.18, GIB_COLORS[type] ?? '#aaa');
-        this.splat(e.x + e.dx * 0.5, e.y + e.dy * 0.5, 0.7 * power, '#7d0d14');
+        this.burst(Kind.Blood, e.x, e.y, 0.8, Math.round(38 * power), 9 * power, e.dx, e.dy, 1.8, 0.95, 0.1, '#a3141c');
+        this.burst(Kind.Blood, e.x, e.y, 0.9, Math.round(18 * power), 5, 0, 0, 6.28, 0.7, 0.08, '#8c1018');
+        this.burst(Kind.Gib, e.x, e.y, 0.8, 6 + Math.round(9 * power), 7.5 * power, e.dx, e.dy, 2.8, 1.9, 0.18, GIB_COLORS[type] ?? '#aaa');
+        this.splat(e.x + e.dx * 0.5, e.y + e.dy * 0.5, 0.95 * power, '#7d0d14');
+        this.splat(e.x + e.dx * 1.6, e.y + e.dy * 1.6, 0.6 * power, '#6a0a10', 0.6);
         break;
       }
       case 'explosion':

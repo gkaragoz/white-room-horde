@@ -7,6 +7,14 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Juice and gore (rules change: update the server and reload the page)**
+
+- Fewer, chunkier enemies: smaller waves (cap 170) with more health, and the fast ones are slower (runner 6, crawler and leaper 5, exploder 5.5, blinker 5) so you outrun everything by about 2x.
+- Heads, arms and legs fly off hard kills (Settings, Blood and gibs: none on low, some on normal, plenty on extra), with blood pumping from the stump, a trail of drops and a splat where the part lands. Hits and kills spray more blood.
+- New sounds: bone cracks, wet hits, a decapitation, a limb torn off, a body bursting (all synthesised for the game).
+- Melee feels heavier: a freeze and a camera kick when a swing connects, blade cuts alternate from side to side, the body steps into the swing and twists with it, the hammer trembles when fully charged, the weapon settles back after the swing.
+- Dead enemies no longer drift toward where they died while they fade; they sink into the floor where they lie.
+
 ## v0.16.0 (2026-10-20)
 
 **Melee fixes, a cleaner HUD and fewer frame spikes (rules change: update the server and reload the page)**
