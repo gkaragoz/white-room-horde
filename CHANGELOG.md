@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.8.1 (2026-10-20)
+
 - The flight composer is not warmed on software renderers (it stalled CI browsers); the game smoke test holds the mouse until the simulation has really moved on (slow CI machines ran too few ticks).
 
 ## v0.8.0 (2026-10-20)
