@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.8.4 (2026-10-20)
+
 **Menus**
 - Three round buttons are always at the top right (menu, lobby, pause, game): language, controls and settings. The language button opens a list; the whole screen is redrawn in the new language and what you typed stays.
 - Players joining, picking weapons or the host choosing an arena now update the lobby in place: no new screen, the scroll position, the 3D preview and your clicks stay untouched.
