@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.17.0 (2026-10-20)
+
 **Juice and gore (rules change: update the server and reload the page)**
 
 - Fewer, chunkier enemies: smaller waves (cap 170) with more health, and the fast ones are slower (runner 6, crawler and leaper 5, exploder 5.5, blinker 5) so you outrun everything by about 2x.
