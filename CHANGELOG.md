@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.5.2 (2026-10-20)
+
 **Models**
 - Loot dropped by enemies (ammo box, medkit, grenade, weapon case, shield, speed bolt, quad crystal, nuke, ice crystal) is now a chunky TF2-style Blender model (`tools/blender/make_pickups.py`) instead of plain shapes.
 - Fix: the barrel walls were removed by the buried-face check (you could see inside); the check now needs the whole face to be buried.
