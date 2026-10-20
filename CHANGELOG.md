@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.11.0 (2026-10-20)
+
 **Feel and fixes (rules change: update the server and reload the page)**
 - Client-side prediction: online, your own character, the camera, flashlight and ammo ring follow your steering and dashes at once (the pending inputs are replayed on top of the confirmed state, mispredictions are eased out), and with auto aim off the character turns with the mouse immediately. Your shots and everybody else still come from the confirmed simulation.
 - The input lead is measured from the first second (the first pings set the estimate): until now the first seconds of a game could lose inputs to "too late" on a slow line.
