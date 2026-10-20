@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.8.2 (2026-10-20)
+
 - Settings: "Download report" saves one text file with the game version, settings, page errors and warnings, frame and network history of the last five minutes, stalls with their likely cause and the relay's `/stats`; it replaces the F3/F4 keys (the "Show frame rate and network numbers" switch stays).
 - The climb's blur composer is warmed while the menu is up instead of in the first seconds of a game (a half second freeze there).
 
