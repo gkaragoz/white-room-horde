@@ -105,12 +105,14 @@ try {
   const host = await open(`http://127.0.0.1:${process.env.DIRECT ? PORT : PROXY_PORT}/?menu=1`, 8);
   await host.page.screenshot({ path: 'tools/ci/net-stutter-menu.png' }).catch(() => {});
   await host.page.waitForSelector('#wrh-host', { timeout: 30000, state: 'attached' });
+  await host.page.click('#wrh-card-play');
   await host.page.click('#wrh-online');
   await host.page.click('#wrh-host');
   await host.page.waitForFunction(() => window.__wrh?.session?.code, null, { timeout: 30000 });
   const code = await host.page.evaluate(() => window.__wrh.session.code);
   const guest = await open(`http://127.0.0.1:${PORT}/?menu=1`, 0, { width: 200, height: 140 });
-  await guest.page.waitForSelector('#wrh-join', { timeout: 90000 });
+  await guest.page.waitForSelector('#wrh-join', { timeout: 90000, state: 'attached' });
+  await guest.page.click('#wrh-card-play');
   await guest.page.click('#wrh-online');
   await guest.page.fill('#wrh-code', code);
   await guest.page.click('#wrh-join');

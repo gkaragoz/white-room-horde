@@ -806,7 +806,6 @@ export const moreTests: QaTest[] = [
           onResetKeys: () => undefined,
           onReset: () => changes.push(['reset', true]),
           onClose: () => changes.push(['close', true]),
-          onControls: () => changes.push(['controls', true]),
           onReport: () => changes.push(['report', true]),
           needsReload: (k: string) => k === 'aa',
           onReload: () => changes.push(['reload', true]),
@@ -1251,7 +1250,7 @@ export const moreTests: QaTest[] = [
       }, settings);
       try {
         const check = (where: string): void => {
-          for (const id of ['#tb-lang', '#tb-ctl', '#tb-set']) {
+          for (const id of ['#tb-lang', '#tb-set']) {
             const b = host.querySelector<HTMLElement>(id);
             if (!b) problems.push(`${where}: ${id} is missing`);
             else if (getComputedStyle(b).display === 'none') problems.push(`${where}: ${id} is hidden`);
@@ -1272,12 +1271,13 @@ export const moreTests: QaTest[] = [
         if (items.length !== LANGS.length) problems.push(`${items.length} languages listed, expected ${LANGS.length}`);
         items.find((i) => i.getAttribute('data-lang') === 'tr')!.click();
         if (!picked.some((p) => JSON.stringify(p) === '["lang","tr"]')) problems.push('picking Turkish did not report the language');
-        // settings and controls open from the toolbar
+        // settings open from the toolbar; the controls live inside them (no separate controls button any more)
+        if (host.querySelector('#tb-ctl')) problems.push('the separate controls button is still there');
         host.querySelector<HTMLElement>('#tb-set')!.click();
         if (!host.querySelector('.wrh-set-tabs')) problems.push('the settings button does not open the settings');
-        host.querySelector<HTMLElement>('#tb-ctl')!.click();
-        if (!host.querySelector('.wrh-ctl-row')) problems.push('the controls button does not open the controls sheet');
-        host.querySelector<HTMLElement>('#tb-ctl')!.click();
+        host.querySelector<HTMLElement>('.wrh-set-tabs button:last-child')!.click();
+        if (!host.querySelector('.wrh-ctl-row')) problems.push('the Controls tab of the settings does not show the controls sheet');
+        host.querySelector<HTMLElement>('#tb-set')!.click();
         // a language change redraws the menu in the new language and keeps what was typed
         ui.showMenu();
         const name = host.querySelector<HTMLInputElement>('#wrh-name');
@@ -1289,7 +1289,7 @@ export const moreTests: QaTest[] = [
       } finally {
         host.remove();
       }
-      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'three buttons everywhere, language list, settings, controls, redraw with typed text kept' };
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'two buttons everywhere, language list, settings with the controls tab, redraw with typed text kept' };
     },
   },
   {

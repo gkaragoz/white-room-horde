@@ -149,6 +149,10 @@ export class Preview {
       return;
     }
     if (!this.look) return;
+    if (this.ready && this.canvas.offsetParent === null) {
+      this.clock.getDelta(); // on a menu page that is not showing: do not spend a frame on it
+      return;
+    }
     this.tick(Math.min(0.05, this.clock.getDelta()));
     this.renderer.render(this.scene, this.camera);
     if (this.character || this.weaponMesh) this.ready = true;

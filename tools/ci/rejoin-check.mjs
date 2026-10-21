@@ -50,12 +50,14 @@ let failed = false;
 try {
   const host = await open(0);
   await host.page.waitForSelector('#wrh-host', { timeout: 60000, state: 'attached' });
+  await host.page.click('#wrh-card-play');
   await host.page.click('#wrh-online');
   await host.page.click('#wrh-host');
   await host.page.waitForFunction(() => window.__wrh?.session?.code, null, { timeout: 30000 });
   const code = await host.page.evaluate(() => window.__wrh.session.code);
   const guest = await open(1);
   await guest.page.waitForSelector('#wrh-join', { timeout: 90000, state: 'attached' });
+  await guest.page.click('#wrh-card-play');
   await guest.page.click('#wrh-online');
   await guest.page.fill('#wrh-code', code);
   await guest.page.click('#wrh-join');

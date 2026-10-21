@@ -75,6 +75,7 @@ try {
     process.exit(name === 'chromium' || !results.every((r) => r.ok) ? 1 : 0);
   }
   check('menu shows Play solo', true);
+  await page.click('#wrh-card-play'); // the hub's Play card opens the Play page
   await page.click('#wrh-solo');
   await page.waitForFunction(() => window.__wrh?.world && window.__wrh.world.tick > 5, undefined, { timeout: 60000 });
   check('solo game starts from the menu', true);

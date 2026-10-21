@@ -1,5 +1,5 @@
 import { icon, chipIcon } from './icons';
-import { MENU_CSS, menuMarkup } from './menu';
+import { MENU_CSS, lobbyMarkup, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
 import { droneNeed } from '@wrh/sim';
 import { POWERS } from './render/power';
@@ -9,13 +9,13 @@ import { asset } from './assets';
 import { ACTIONS } from './input';
 import { THEMES } from './render/arena';
 import { universalCardTexts } from './cardText';
-import { MODS_CSS, modsPanel, modsRow } from './modsUi';
-import { achWords, markSeen, unreadCount } from './achievements';
+import { MODS_CSS, modsCardIcon, modsPanel, modsRow, modsSummary } from './modsUi';
+import { achWords, isGot, markSeen, unreadCount } from './achievements';
 import { ACH_CSS, achPage, runAchievementsHtml } from './achUi';
-import type { AchievementDef } from '@wrh/shared';
+import { ACHIEVEMENTS, type AchievementDef } from '@wrh/shared';
 import { EXTRA } from './i18n';
 import { renderGameOver, type RunExtras } from './gameOver';
-import { renderControlsSheet, renderSettingsPanel } from './settingsPanel';
+import { renderSettingsPanel } from './settingsPanel';
 import { discoverRelay } from './relay';
 import { Preview } from './render/preview';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
@@ -44,6 +44,13 @@ const BASE_STRINGS = {
     tag: 'co-op horde survival',
     name: 'Your name',
     solo: 'Play solo',
+    back: 'Back',
+    play: 'Play',
+    playSub: 'solo or online with friends',
+    hubLoadout: 'Weapons and Class',
+    hubSettingsSub: 'graphics, sound, controls',
+    change: 'Change',
+    yourLoadout: 'Your loadout',
     host: 'Host game',
     join: 'Join game',
     online: 'Play online',
@@ -121,7 +128,6 @@ const BASE_STRINGS = {
     high: 'High',
     desync: 'Desync detected!',
     connecting: 'Connecting...',
-    controls: 'WASD move · auto aim · click fire · R reload · click the weapon list to pick a weapon · Shift dash · F class ability · right-click grenade at the cursor · E revive · 1-3 cards',
     weapon: 'Starting weapon',
     arena: 'Arena',
     difficulty: 'Difficulty',
@@ -144,7 +150,6 @@ const BASE_STRINGS = {
     switched: 'Out of ammo, switched to',
     newWeapon: 'New weapon',
     tbLang: 'Language',
-    tbControls: 'Controls',
     tbSettings: 'Settings',
     backToMain: 'Ammo found, back to',
     sidearm: 'Sidearm',
@@ -265,6 +270,13 @@ const BASE_STRINGS = {
     tag: 'co-op sürü hayatta kalma',
     name: 'Adın',
     solo: 'Tek başına oyna',
+    back: 'Geri',
+    play: 'Oyna',
+    playSub: 'tek başına veya arkadaşlarla çevrimiçi',
+    hubLoadout: 'Silahlar ve Sınıf',
+    hubSettingsSub: 'grafik, ses, kontroller',
+    change: 'Değiştir',
+    yourLoadout: 'Seçimin',
     host: 'Oda kur',
     join: 'Odaya katıl',
     online: 'Çevrimiçi oyna',
@@ -342,7 +354,6 @@ const BASE_STRINGS = {
     high: 'Yüksek',
     desync: 'Senkron bozuldu!',
     connecting: 'Bağlanıyor...',
-    controls: 'WASD hareket · otomatik nişan · tık ateş · R doldur · silah listesine tıkla · Shift atıl · F sınıf yeteneği · sağ tık imlece bomba · E kaldır · 1-3 kart',
     weapon: 'Başlangıç silahı',
     arena: 'Arena',
     difficulty: 'Zorluk',
@@ -365,7 +376,6 @@ const BASE_STRINGS = {
     switched: 'Mermi bitti, geçildi:',
     newWeapon: 'Yeni silah',
     tbLang: 'Dil',
-    tbControls: 'Kontroller',
     tbSettings: 'Ayarlar',
     backToMain: 'Mermi bulundu, dönüldü:',
     sidearm: 'Yedek silah',
@@ -717,6 +727,20 @@ const CSS_BASE = `
 .wrh-set-panel.wide{width:min(760px,95vw)}
 .wrh-set-head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px 6px}
 .wrh-set-head h2{margin:0;font-size:22px}
+.wrh-ui .wrh-set-back{display:none}
+.wrh-set-sub{margin:14px 0 2px;font-size:13px;font-weight:800;color:#6b6252}
+/* in the main menu the settings are a page of their own: full screen, Back at the top left, tabs in a column on wide screens */
+[data-menu="1"] .wrh-set{background:radial-gradient(1300px 760px at 72% 12%,rgba(255,255,255,.95),transparent 62%),linear-gradient(180deg,#eef2f6,#d5dde6);backdrop-filter:none;align-items:stretch;padding:clamp(14px,2.6vh,36px) clamp(14px,3.6vw,76px) clamp(14px,2.4vh,30px);zoom:var(--wrh-zoom,1)}
+[data-menu="1"] .wrh-set-panel,[data-menu="1"] .wrh-set-panel.wide{width:100%;max-width:1100px;height:100%;max-height:none;margin:0 auto;border-radius:24px;background:rgba(255,253,248,.86);box-shadow:0 10px 40px rgba(60,45,20,.14)}
+[data-menu="1"] .wrh-set-head{justify-content:flex-start;gap:18px;padding:16px 22px 8px}
+[data-menu="1"] .wrh-set-head h2{font-size:clamp(24px,3vw,34px)}
+[data-menu="1"] .wrh-set-x{display:none!important}
+[data-menu="1"] .wrh-ui .wrh-set-back{display:inline-flex;align-items:center;margin:0;padding:10px 20px;border-radius:14px;font-size:17px;font-weight:800;background:#fffdf8;color:#2b3a52;border:2px solid #cdbfa5;box-shadow:0 3px 0 #cdbfa5;cursor:pointer}
+[data-menu="1"] .wrh-set-tabs{padding:0 22px;gap:6px}
+[data-menu="1"] .wrh-ui .wrh-set-tabs button{font-size:16px;padding:10px 16px}
+[data-menu="1"] .wrh-set-body{padding:6px 24px 14px;flex:1}
+[data-menu="1"] .wrh-set-foot{padding:12px 22px 16px}
+@media (max-width:700px){[data-menu="1"] .wrh-set{padding:10px;padding-top:54px}[data-menu="1"] .wrh-set-body{padding:4px 12px 12px}}
 .wrh-set-x{background:none!important;color:#3a352d!important;font-size:30px!important;line-height:26px;padding:0 6px!important;margin:0!important}
 .wrh-set-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px;border-bottom:2px solid #e6dcc8}
 .wrh-ui .wrh-set-tabs button{background:none;color:#7a7060;border:0;border-bottom:3px solid transparent;border-radius:0;margin:0 0 -2px;padding:8px 12px;font-size:14px;font-weight:700}
@@ -1299,16 +1323,15 @@ export class Ui {
     }, 3600);
   }
 
-  /** The three round buttons that are always there, top right: language, controls and settings. */
+  /** The two round buttons that are always there, top right: language and settings. */
   private buildToolbar(): void {
     this.toolbar.className = 'wrh-tb';
-    this.toolbar.innerHTML = `<button type="button" class="wrh-tbtn" id="tb-lang">${icon('tb_lang', 26)}<small></small></button><button type="button" class="wrh-tbtn" id="tb-ctl">${icon('tb_ctl', 26)}</button><button type="button" class="wrh-tbtn" id="tb-set">${icon('tb_set', 26)}</button><div class="wrh-langpop" id="tb-pop"></div>`;
+    this.toolbar.innerHTML = `<button type="button" class="wrh-tbtn" id="tb-lang">${icon('tb_lang', 26)}<small></small></button><button type="button" class="wrh-tbtn" id="tb-set">${icon('tb_set', 26)}</button><div class="wrh-langpop" id="tb-pop"></div>`;
     this.langPop = this.toolbar.querySelector<HTMLElement>('#tb-pop');
     this.toolbar.querySelector<HTMLElement>('#tb-lang')!.onclick = (e) => {
       e.stopPropagation();
       this.langPop!.classList.toggle('open');
     };
-    this.toolbar.querySelector<HTMLElement>('#tb-ctl')!.onclick = () => this.toggleControls();
     this.toolbar.querySelector<HTMLElement>('#tb-set')!.onclick = () => this.toggleSettings();
     document.addEventListener('click', () => this.langPop?.classList.remove('open'));
     this.refreshToolbar();
@@ -1324,7 +1347,6 @@ export class Ui {
       }
     };
     set('#tb-lang', t.tbLang);
-    set('#tb-ctl', t.tbControls);
     set('#tb-set', t.tbSettings);
     const code = this.toolbar.querySelector('#tb-lang small');
     if (code) code.textContent = this.lang.toUpperCase();
@@ -1349,7 +1371,12 @@ export class Ui {
       if (i.id) typed.set(i.id, i.value);
     });
     const scroll = this.screen.querySelector<HTMLElement>('.wrh-scroll')?.scrollTop ?? 0;
-    this.redraw();
+    this.keepMenuPage = true;
+    try {
+      this.redraw();
+    } finally {
+      this.keepMenuPage = false;
+    }
     typed.forEach((v, id) => {
       const i = this.screen.querySelector<HTMLInputElement>('#' + id);
       if (i && !i.value) i.value = v;
@@ -1471,19 +1498,30 @@ export class Ui {
     this.preview = null;
   }
 
-  /** Markup of the 3D preview: tabs, the turntable, arrows for the accessory or weapon, and the colour swatches. */
-  private previewBlock(): string {
+  /** Tabs, the turntable, the arrows for the accessory or weapon and the name of what is shown. */
+  private previewStage(): string {
     const t = this.t;
-    const swatches = PLAYER_COLORS.map((c, i) => `<button type="button" class="wrh-sw${i === this.color ? ' on' : ''}" data-sw="${i}" style="background:${c}" aria-label="${c}"></button>`).join('');
-    return `<div class="wrh-prev">
-      <div class="wrh-tabs"><button type="button" class="wrh-wp${this.previewMode === 'char' ? ' on' : ''}" data-ptab="char">${t.tabChar}</button><button type="button" class="wrh-wp${this.previewMode === 'weapon' ? ' on' : ''}" data-ptab="weapon">${t.tabWeapon}</button></div>
+    return `<div class="wrh-tabs"><button type="button" class="wrh-wp${this.previewMode === 'char' ? ' on' : ''}" data-ptab="char">${t.tabChar}</button><button type="button" class="wrh-wp${this.previewMode === 'weapon' ? ' on' : ''}" data-ptab="weapon">${t.tabWeapon}</button></div>
       <div class="wrh-stage"><button type="button" class="wrh-arrow" data-pdir="-1" aria-label="previous">${icon('hud_left', 32)}</button><div class="wrh-canvas" id="wrh-prev-host"></div><button type="button" class="wrh-arrow" data-pdir="1" aria-label="next">${icon('hud_right', 32)}</button></div>
-      <div class="wrh-prev-name" id="wrh-prev-name"></div><div class="wrh-prev-stats" id="wrh-prev-stats"></div>
-      <div class="wrh-swatches" id="wrh-swatches">${swatches}</div>
-      <label style="margin-top:8px">${t.classTitle}</label>
-      <div class="wrh-classes">${(t.classNames as readonly string[]).map((n, i) => `<button type="button" class="wrh-class${i === this.cls ? ' on' : ''}" data-cls="${i}" title="${esc((t.classTips as readonly string[])[i]!)}"><span class="ci">${CLASS_ICON(i)}</span><b>${n}</b></button>`).join('')}</div>
-      <div class="wrh-class-tip" id="wrh-class-tip">${esc((t.classTips as readonly string[])[this.cls]!)}</div>
-    </div>`;
+      <div class="wrh-prev-name" id="wrh-prev-name"></div><div class="wrh-prev-stats" id="wrh-prev-stats"></div>`;
+  }
+
+  private previewSwatches(): string {
+    const swatches = PLAYER_COLORS.map((c, i) => `<button type="button" class="wrh-sw${i === this.color ? ' on' : ''}" data-sw="${i}" style="background:${c}" aria-label="${c}"></button>`).join('');
+    return `<div class="wrh-swatches" id="wrh-swatches">${swatches}</div>`;
+  }
+
+  private classPicker(): string {
+    const t = this.t;
+    const tips = t.classTips as readonly string[];
+    return `<label style="margin-top:8px">${t.classTitle}</label>
+      <div class="wrh-classes">${(t.classNames as readonly string[]).map((n, i) => `<button type="button" class="wrh-class${i === this.cls ? ' on' : ''}" data-cls="${i}" title="${esc(tips[i]!)}"><span class="ci">${CLASS_ICON(i)}</span><b>${n}</b></button>`).join('')}</div>
+      <div class="wrh-class-tip" id="wrh-class-tip">${esc(tips[this.cls]!)}</div>`;
+  }
+
+  /** Markup of the whole 3D preview block (the online room): turntable, colours and class. */
+  private previewBlock(): string {
+    return `<div class="wrh-prev">${this.previewStage()}${this.previewSwatches()}${this.classPicker()}</div>`;
   }
 
   /** Wire the preview block: arrows change the accessory (Character tab) or the weapon (Weapon tab), swatches the colour. */
@@ -1492,9 +1530,10 @@ export class Ui {
     const host = this.screen.querySelector<HTMLElement>('#wrh-prev-host');
     if (!host) return;
     try {
-      // the menu's stage is big (it fills the middle of the screen), the lobby keeps the small turntable
+      // the menu's stage is big; its page may be hidden right now, so the size comes from the window, not from the layout
+      const lobby = host.closest('.wrh-lobby') !== null;
       const big = host.closest('.wrh-home') !== null;
-      const size = big ? Math.max(240, Math.min(480, Math.round(Math.min(window.innerHeight * 0.34, (host.parentElement?.clientWidth ?? 600) - 130)))) : 230;
+      const size = big ? Math.max(170, Math.min(lobby ? 320 : 440, Math.round(Math.min(window.innerHeight * (lobby ? 0.32 : 0.4), window.innerWidth - 190)))) : 230;
       this.preview = new Preview(size);
       host.appendChild(this.preview.canvas);
     } catch {
@@ -1512,6 +1551,7 @@ export class Ui {
       this.screen.querySelectorAll<HTMLElement>('[data-sw]').forEach((el) => el.classList.toggle('on', Number(el.dataset.sw) === this.color));
       this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => el.classList.toggle('on', el.dataset.w === this.weapon));
       void this.preview?.set({ mode: this.previewMode, accessory: ACCESSORIES[this.acc % ACCESSORIES.length]!, color: colorHex, weapon: this.weapon });
+      this.refreshHub();
     };
     this.screen.querySelectorAll<HTMLElement>('[data-ptab]').forEach((el) => {
       el.onclick = () => {
@@ -1544,6 +1584,7 @@ export class Ui {
         const tip = this.screen.querySelector<HTMLElement>('#wrh-class-tip');
         if (tip) tip.textContent = (this.t.classTips as readonly string[])[this.cls] ?? '';
         this.dimWeapons();
+        this.refreshHub();
       };
     });
     this.dimWeapons();
@@ -1595,9 +1636,111 @@ export class Ui {
     return `<label>${t.arena}</label><div class="wrh-arenas">${cards}</div><label>${t.difficulty}</label><div id="wrh-modsrow">${modsRow(this.lang, mods, true)}</div>`;
   }
 
+  /** The page of the main menu that is showing ('hub' is the card hub). */
+  private menuPage = 'hub';
+  private escBound = false;
+  private keepMenuPage = false;
+
+  private home(): HTMLElement | null {
+    return this.screen.querySelector<HTMLElement>('.wrh-home[data-page]');
+  }
+
+  /** Open a page of the main menu: the 3D stage moves to the page that wants it and the keyboard focus to its Back button. */
+  private goPage(page: string, focus = true): void {
+    const home = this.home();
+    if (!home) return;
+    this.menuPage = page;
+    home.dataset.page = page;
+    const stage = this.screen.querySelector<HTMLElement>('#wrh-stagebox');
+    const slot = this.screen.querySelector<HTMLElement>(`.wrh-slot[data-slot="${page}"]`);
+    if (stage && slot) slot.appendChild(stage);
+    home.scrollTop = 0;
+    if (focus) {
+      const target = page === 'hub' ? home.querySelector<HTMLElement>('#wrh-card-play') : home.querySelector<HTMLElement>(`[data-p="${page}"] .wrh-back`);
+      target?.focus({ preventScroll: true });
+    }
+  }
+
+  /** Escape: close what is on top (settings, the online dialog), else go back one level. */
+  private onEscape(e: KeyboardEvent): void {
+    if (e.code !== 'Escape' || e.defaultPrevented || document.documentElement.dataset.menu !== '1') return;
+    if (document.querySelector('.wrh-ach, .wrh-modal')) return; // those close themselves
+    if (this.settingsOpen) {
+      this.toggleSettings();
+      return;
+    }
+    const online = this.screen.querySelector<HTMLElement>('#wrh-online-panel');
+    if (online?.classList.contains('open')) {
+      online.classList.remove('open');
+      return;
+    }
+    if (this.menuPage !== 'hub' && this.menuPage !== 'lobby') this.goPage('hub');
+  }
+
+  /** The cards of the hub follow the weapon, class and difficulty chosen on the other pages. */
+  private refreshHub(): void {
+    if (!this.home()) return;
+    const set = (id: string, text: string): void => {
+      const e = this.screen.querySelector<HTMLElement>('#' + id);
+      if (e) e.textContent = text;
+    };
+    const w = (this.t.weapons as Record<string, string>)[this.weapon] ?? '';
+    const c = (this.t.classNames as readonly string[])[this.cls] ?? '';
+    const line = MELEE_CLASSES.includes(this.cls) ? c : `${w} · ${c}`;
+    set('wrh-hc-loadout', line);
+    set('wrh-loadline', line);
+    const wi = this.screen.querySelector<HTMLElement>('#wrh-hc-wicon');
+    if (wi) wi.innerHTML = this.weaponCardIcon();
+    set('wrh-hc-mods', modsSummary(this.lang, this.mods));
+    const mi = this.screen.querySelector<HTMLElement>('#wrh-hc-micon');
+    if (mi) mi.innerHTML = modsCardIcon(this.mods);
+  }
+
+  private weaponCardIcon(): string {
+    return `<img src="${asset(`ui/wpn_${this.weapon}.png`)}" alt="" draggable="false">`;
+  }
+
+  /** The Difficulty page: the same multiplier grid the room uses, drawn in the page. */
+  private drawModsPage(): void {
+    const host = this.screen.querySelector<HTMLElement>('#wrh-mods-page');
+    if (!host) return;
+    const scroll = host.scrollTop;
+    host.innerHTML = modsPanel(this.lang, this.mods, true, true);
+    host.querySelectorAll<HTMLElement>('.wrh-mod').forEach((b) => {
+      b.onclick = () => this.setMods(this.mods ^ (1 << Number(b.dataset.mod)));
+    });
+    const all = host.querySelector<HTMLElement>('#wrh-mods-all');
+    if (all) all.onclick = () => this.setMods(2 ** MODS_N - 1);
+    const none = host.querySelector<HTMLElement>('#wrh-mods-none');
+    if (none) none.onclick = () => this.setMods(0);
+    host.scrollTop = scroll;
+  }
+
+  private setMods(v: number): void {
+    this.mods = v;
+    this.persistLook();
+    this.drawModsPage();
+    this.refreshHub();
+    const row = this.screen.querySelector<HTMLElement>('#wrh-modsrow');
+    if (row) {
+      row.innerHTML = modsRow(this.lang, this.mods, true);
+      this.bindMenuMods();
+    }
+  }
+
+  /** In the main menu the difficulty summary on the Play page opens the Difficulty page. */
+  private bindMenuMods(): void {
+    const open = this.screen.querySelector<HTMLElement>('#wrh-mods-open');
+    if (open) open.onclick = () => this.goPage('mods');
+  }
+
   showMenu(error = ''): void {
     this.redraw = () => this.showMenu(error);
     document.documentElement.dataset.menu = '1';
+    if (!this.escBound) {
+      this.escBound = true;
+      window.addEventListener('keydown', (e) => this.onEscape(e));
+    }
     this.lobbyCode = '';
     const t = this.t;
     const profile = loadProfile();
@@ -1628,6 +1771,8 @@ export class Ui {
     const saved0 = loadRejoin();
     // a saved game of another major.minor cannot be rejoined (the relay turns it away): do not offer it
     const rejoin = saved0 && (saved0.v === undefined || compatibleVersions(saved0.v, GAME_VERSION)) ? saved0 : null;
+    const ach = achWords(this.lang);
+    const got = ACHIEVEMENTS.filter((a) => isGot(a, profile.ach)).length;
     this.screen.innerHTML = menuMarkup({
       title: t.title,
       tag: t.tag,
@@ -1639,36 +1784,52 @@ export class Ui {
       savedName: saved,
       weaponLabel: t.weapon,
       weaponsHtml: this.weaponButtons(),
-      previewHtml: this.previewBlock(),
+      stageHtml: `<div class="wrh-prev">${this.previewStage()}</div>`,
+      lookHtml: this.previewSwatches(),
+      classHtml: this.classPicker(),
       arenaHtml: this.arenaRows(true, this.map, this.mods),
+      modsHtml: modsPanel(this.lang, this.mods, true, true),
       soloLabel: t.solo,
       hostLabel: t.host,
       joinLabel: t.join,
       onlineLabel: t.online,
       settingsLabel: t.settings,
-      achLabel: achWords(this.lang).title,
+      achLabel: ach.title,
       achUnread: unreadCount(profile.ach),
+      achSub: `${got} / ${ACHIEVEMENTS.length} ${ach.earned}`,
       closeLabel: t.close,
-      rejoinHtml: rejoin ? `<button id="wrh-rejoin" class="wrh-big alt">${icon('hud_link', 28)}<span>${t.rejoin} (${esc(rejoin.code)})</span></button>` : '',
+      rejoinHtml: rejoin ? `<button type="button" id="wrh-rejoin" class="wrh-hc wrh-hc-rejoin"><span class="ico">${icon('hud_link', 34)}</span><span class="txt"><b>${t.rejoin} (${esc(rejoin.code)})</b></span></button>` : '',
       codeLabel: t.code,
       inviteCode,
       passLabel: t.password,
       serverLabel: t.server,
       defServer,
-      controls: t.controls,
       error,
+      words: {
+        back: t.back,
+        play: t.play,
+        playSub: t.playSub,
+        loadout: t.hubLoadout,
+        loadoutSub: '',
+        loadoutIcon: this.weaponCardIcon(),
+        difficulty: t.difficulty,
+        modsSub: modsSummary(this.lang, this.mods),
+        modsIcon: modsCardIcon(this.mods),
+        settingsSub: t.hubSettingsSub,
+        change: t.change,
+        achIcon: asset('ui/ach_menu.webp'),
+      },
     });
     this.bindWeapons();
     this.bindPreview();
+    this.refreshHub();
     void this.fillRelay(fromParam !== null);
     this.bindGroup('map', (id) => {
       this.map = Number(id);
       this.persistLook();
     });
-    this.bindMods(true, () => this.mods, (v) => {
-      this.mods = v;
-      this.persistLook();
-    });
+    this.drawModsPage();
+    this.bindMenuMods();
     const q = <E extends HTMLElement>(id: string): E => this.screen.querySelector<E>('#' + id)!;
     const name = (): string => {
       const n = q<HTMLInputElement>('wrh-name').value.trim() || 'player';
@@ -1686,19 +1847,24 @@ export class Ui {
     const online = q('wrh-online-panel');
     const openOnline = (on: boolean): void => {
       online.classList.toggle('open', on);
+      if (on) q('wrh-host').focus({ preventScroll: true });
     };
     q('wrh-online').onclick = () => openOnline(true);
     q('wrh-online-x').onclick = () => openOnline(false);
     online.onclick = (e) => {
       if (e.target === online) openOnline(false);
     };
-    online.onkeydown = (e) => {
-      if ((e as KeyboardEvent).key === 'Escape') openOnline(false);
-    };
+    this.screen.querySelectorAll<HTMLElement>('[data-go]').forEach((el) => {
+      el.addEventListener('click', () => this.goPage(el.dataset.go!));
+    });
     q('wrh-open-settings').onclick = () => this.toggleSettings();
     q('wrh-open-ach').onclick = () => this.showAchievements();
+    // a language change redraws the menu: stay on the page the player was on
+    if (this.keepMenuPage && this.menuPage !== 'hub') this.goPage(this.menuPage, false);
+    else this.menuPage = 'hub';
     if (inviteCode) {
-      // an invite link: the online panel is open with the code filled in and Join is the main button
+      // an invite link: the Play page opens with the online dialog and the code filled in, and Join is the main button
+      this.goPage('play', false);
       openOnline(true);
       q('wrh-join').classList.remove('alt');
       q('wrh-host').classList.add('alt');
@@ -2163,15 +2329,24 @@ export class Ui {
     this.lobbyOpts = `${options.map}/${options.mods}`;
     this.lobbyMap = options.map;
     this.lobbyMods = options.mods;
-    delete document.documentElement.dataset.menu;
-    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll" id="wrh-lobby">
-      <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span>${locked ? ' ' + icon('hud_lock', 24) : ''}</h1>
-      <p class="sub">${iAmHost ? '' : t.waiting}</p>
-      <label id="wrh-pcount">${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist" id="wrh-plist">${this.lobbyList(players)}</ul>
-      <label>${t.weapon}</label><div class="wrh-weapons">${this.weaponButtons()}</div>
-      ${this.previewBlock()}<div id="wrh-arena-wrap">${this.arenaRows(iAmHost, options.map, options.mods)}</div>
-      ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-invite" class="alt">${icon('hud_link', 18)} ${t.invite}</button><button id="wrh-leave" class="warn">${t.leave}</button>
-    </div>`;
+    document.documentElement.dataset.menu = '1'; // the room is a full-screen page of the menu too
+    this.menuPage = 'lobby';
+    this.screen.innerHTML = lobbyMarkup({
+      back: t.back,
+      codeLabel: t.code,
+      code,
+      locked: locked ? ' ' + icon('hud_lock', 24) : '',
+      waiting: iAmHost ? '' : t.waiting,
+      playersLabel: `${t.players} (${players.length}/${MAX_PLAYERS})`,
+      playersHtml: this.lobbyList(players),
+      weaponLabel: t.weapon,
+      weaponsHtml: this.weaponButtons(),
+      previewHtml: this.previewBlock(),
+      arenaHtml: this.arenaRows(iAmHost, options.map, options.mods),
+      startHtml: iAmHost ? `<button id="wrh-start">${t.start}</button>` : '',
+      inviteHtml: `<button id="wrh-invite" class="alt">${icon('hud_link', 18)} ${t.invite}</button>`,
+      leaveLabel: t.leave,
+    });
     this.bindWeapons();
     this.bindPreview();
     if (iAmHost) this.bindArena();
@@ -2377,36 +2552,18 @@ export class Ui {
 
   toggleSettings(): void {
     this.settingsOpen = !this.settingsOpen;
-    if (this.settingsOpen) this.controlsOpen = false;
     this.renderSettings();
   }
 
   private settingsTab = 'graphics';
   private settingsScroll = 0;
-  private controlsOpen = false;
 
-  /** True while the settings window or the controls sheet is open. */
+  /** True while the settings window is open. */
   get overlayOpen(): boolean {
-    return this.settingsOpen || this.controlsOpen;
-  }
-
-  /** The controls sheet: every control as keycaps with what it does. */
-  toggleControls(): void {
-    this.controlsOpen = !this.controlsOpen;
-    if (this.controlsOpen) this.settingsOpen = false;
-    this.renderSettings();
+    return this.settingsOpen;
   }
 
   private renderSettings(): void {
-    if (this.controlsOpen) {
-      renderControlsSheet(this.settingsEl, {
-        lang: this.lang,
-        bindings: this.h.getBindings(),
-        onClose: () => this.toggleControls(),
-        onSetting: () => undefined,
-      });
-      return;
-    }
     if (!this.settingsOpen) {
       this.settingsEl.innerHTML = '';
       return;
@@ -2436,7 +2593,6 @@ export class Ui {
       needsReload: (key) => this.h.needsReload?.(key) ?? false,
       onReload: () => location.reload(),
       onClose: () => this.toggleSettings(),
-      onControls: () => this.toggleControls(),
     });
   }
 
@@ -2450,7 +2606,7 @@ export class Ui {
     document.documentElement.lang = this.lang;
     if (langChanged) window.dispatchEvent(new Event('wrh-lang')); // the release notes window follows the language
     this.refreshToolbar();
-    if (this.settingsOpen || this.controlsOpen) this.renderSettings();
+    if (this.settingsOpen) this.renderSettings();
     this.lastCards = '';
     if (langChanged) {
       this.hudBuilt = false;

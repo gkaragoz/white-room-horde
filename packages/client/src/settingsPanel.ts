@@ -8,13 +8,14 @@ import { keyLabel } from './input';
 const EN = {
   settings: 'Settings',
   close: 'Close',
+  back: 'Back',
   reset: 'Reset to defaults',
-  controls: 'Controls',
   tabGraphics: 'Graphics',
   tabAudio: 'Audio',
   tabGame: 'Gameplay',
   tabAccess: 'Accessibility',
-  tabKeys: 'Keys',
+  tabKeys: 'Controls',
+  gRebind: 'Change keys',
   gRender: 'Rendering',
   gLight: 'Lighting and weather',
   gFx: 'Effects',
@@ -73,7 +74,6 @@ const EN = {
   reloadNow: 'Reload now',
   keysHint: 'Click a key, then press the new one.',
   resetKeys: 'Reset keys',
-  showControls: 'Show the controls sheet',
   ctlTitle: 'Controls',
   ctlMove: 'Move',
   ctlMoveTip: 'Run around the arena',
@@ -119,13 +119,14 @@ const EN = {
 const TR: Partial<typeof EN> = {
   settings: 'Ayarlar',
   close: 'Kapat',
+  back: 'Geri',
   reset: 'Varsayılana dön',
-  controls: 'Kontroller',
   tabGraphics: 'Grafik',
   tabAudio: 'Ses',
   tabGame: 'Oynanış',
   tabAccess: 'Erişilebilirlik',
-  tabKeys: 'Tuşlar',
+  tabKeys: 'Kontroller',
+  gRebind: 'Tuşları değiştir',
   gRender: 'Görüntü',
   gLight: 'Işık ve hava',
   gFx: 'Efektler',
@@ -184,7 +185,6 @@ const TR: Partial<typeof EN> = {
   reloadNow: 'Şimdi yenile',
   keysHint: 'Bir tuşa tıkla, sonra yenisine bas.',
   resetKeys: 'Tuşları sıfırla',
-  showControls: 'Kontrol sayfasını göster',
   ctlTitle: 'Kontroller',
   ctlMove: 'Hareket',
   ctlMoveTip: 'Arenada koş',
@@ -246,7 +246,6 @@ export interface PanelContext {
   onResetKeys(): void;
   onReset(): void;
   onClose(): void;
-  onControls(): void;
   /** Download the problem report (frame times, network numbers, errors, settings). */
   onReport(): void;
   /** The setting differs from what the running renderer was built with (it applies after a reload). */
@@ -260,6 +259,7 @@ type Row =
   | { kind: 'toggle'; key: keyof Settings; label: string }
   | { kind: 'choice'; key: keyof Settings; label: string; options: Choice[]; reload?: boolean }
   | { kind: 'keys' }
+  | { kind: 'sheet' }
   | { kind: 'report'; label: string; button: string };
 interface Group {
   title: string;
@@ -369,7 +369,14 @@ function tabsFor(t: PanelText, c: PanelContext): { id: string; label: string; gr
         },
       ],
     },
-    { id: 'keys', label: t.tabKeys, groups: [{ title: t.tabKeys, rows: [{ kind: 'keys' }] }] },
+    {
+      id: 'keys',
+      label: t.tabKeys,
+      groups: [
+        { title: t.ctlTitle, rows: [{ kind: 'sheet' }] },
+        { title: t.gRebind, rows: [{ kind: 'keys' }] },
+      ],
+    },
   ];
 }
 
@@ -385,7 +392,10 @@ export function renderSettingsPanel(host: HTMLElement, c: PanelContext): void {
   });
   const panel = el('div', 'wrh-set-panel');
   const head = el('div', 'wrh-set-head');
-  head.append(el('h2', undefined, t.settings));
+  const back = el('button', 'wrh-set-back', `‹ ${t.back}`);
+  back.type = 'button';
+  back.onclick = () => c.onClose();
+  head.append(back, el('h2', undefined, t.settings));
   const x = el('button', 'wrh-set-x', '×');
   x.type = 'button';
   x.title = t.close;
@@ -404,16 +414,13 @@ export function renderSettingsPanel(host: HTMLElement, c: PanelContext): void {
     for (const r of g.rows) body.append(buildRow(r, t, c));
   }
   const foot = el('div', 'wrh-set-foot');
-  const ctl = el('button', undefined, `⌨ ${t.controls}`);
-  ctl.type = 'button';
-  ctl.onclick = () => c.onControls();
   const reset = el('button', undefined, t.reset);
   reset.type = 'button';
   reset.onclick = () => c.onReset();
   const close = el('button', 'primary', t.close);
   close.type = 'button';
   close.onclick = () => c.onClose();
-  foot.append(ctl, reset, close);
+  foot.append(reset, close);
   panel.append(head, bar, body, foot);
   overlay.append(panel);
   host.append(overlay);
@@ -423,6 +430,11 @@ export function renderSettingsPanel(host: HTMLElement, c: PanelContext): void {
 
 function buildRow(r: Row, t: PanelText, c: PanelContext): HTMLElement {
   const s = c.settings as unknown as Record<string, unknown>;
+  if (r.kind === 'sheet') {
+    const wrap = el('div', 'wrh-set-sheet');
+    wrap.append(...controlsBody(c.lang, c.bindings));
+    return wrap;
+  }
   if (r.kind === 'keys') {
     const wrap = el('div', 'wrh-set-keys');
     wrap.append(el('p', 'wrh-set-note', t.keysHint));
@@ -509,23 +521,11 @@ function keycap(text: string, wide = false): HTMLElement {
 const MOUSE_SVG = (left: boolean, right: boolean, wheel = false): string =>
   `<svg class="wrh-mouse" viewBox="0 0 40 56" width="34" height="48" aria-hidden="true"><rect x="3" y="3" width="34" height="50" rx="17" fill="#fffdf8" stroke="#3a352d" stroke-width="2.5"/><path d="M3 24h34M20 3v21" stroke="#3a352d" stroke-width="2" fill="none"/><path d="M20 3h0A17 17 0 0 0 3 20v4h17z" fill="${left ? '#1fa2ff' : 'none'}" opacity=".85"/><path d="M20 3h0a17 17 0 0 1 17 17v4H20z" fill="${right ? '#1fa2ff' : 'none'}" opacity=".85"/><rect x="17.5" y="9" width="5" height="9" rx="2.5" fill="${wheel ? '#1fa2ff' : '#cdbfa5'}"/></svg>`;
 
-/** The controls sheet: every control with keycaps and what it does. */
-export function renderControlsSheet(host: HTMLElement, c: Pick<PanelContext, 'lang' | 'bindings' | 'onClose' | 'onSetting'>): void {
-  const t = panelText(c.lang);
-  const b = (a: string): string[] => c.bindings[a] ?? [];
-  host.innerHTML = '';
-  const overlay = el('div', 'wrh-set');
-  overlay.addEventListener('pointerdown', (e) => {
-    if (e.target === overlay) c.onClose();
-  });
-  const panel = el('div', 'wrh-set-panel wide');
-  const head = el('div', 'wrh-set-head');
-  head.append(el('h2', undefined, `⌨ ${t.ctlTitle}`));
-  const x = el('button', 'wrh-set-x', '×');
-  x.type = 'button';
-  x.onclick = () => c.onClose();
-  head.append(x);
-  const body = el('div', 'wrh-set-body');
+/** Every control with keycaps and what it does (the reference part of the Controls tab and of the sheet). */
+function controlsBody(lang: Lang, bindings: Record<string, string[]>): HTMLElement[] {
+  const t = panelText(lang);
+  const b = (a: string): string[] => bindings[a] ?? [];
+  const body: HTMLElement[] = [];
 
   const caps = (codes: string[]): HTMLElement => {
     const d = el('span', 'wrh-keys-row');
@@ -551,33 +551,33 @@ export function renderControlsSheet(host: HTMLElement, c: Pick<PanelContext, 'la
     return line(wrap, title, tip);
   };
 
-  body.append(el('div', 'wrh-set-group', t.secKeyboard));
+  body.push(el('div', 'wrh-set-sub', t.secKeyboard));
   const move = el('span', 'wrh-keys-row');
   ['up', 'left', 'down', 'right'].forEach((a) => move.append(keycap(keyLabel(b(a)[0] ?? ''))));
-  body.append(line(move, t.ctlMove, t.ctlMoveTip));
-  body.append(mouseLine(MOUSE_SVG(false, false, true), t.mouseMove, t.ctlAim, t.ctlAimTip));
+  body.push(line(move, t.ctlMove, t.ctlMoveTip));
+  body.push(mouseLine(MOUSE_SVG(false, false, true), t.mouseMove, t.ctlAim, t.ctlAimTip));
   const fire = el('span', 'wrh-ctl-mouse');
   fire.innerHTML = `${MOUSE_SVG(true, false)}<small>${t.mouseLeft}</small>`;
   fire.append(el('em', undefined, '/'), caps(b('fire')));
-  body.append(line(fire, t.ctlFire, t.ctlFireTip));
+  body.push(line(fire, t.ctlFire, t.ctlFireTip));
   const gren = el('span', 'wrh-ctl-mouse');
   gren.innerHTML = `${MOUSE_SVG(false, true)}<small>${t.mouseRight}</small>`;
   gren.append(el('em', undefined, '/'), caps(b('grenade')));
-  body.append(line(gren, t.ctlGrenade, t.ctlGrenadeTip));
-  body.append(line(caps(b('reload')), t.ctlReload, t.ctlReloadTip));
+  body.push(line(gren, t.ctlGrenade, t.ctlGrenadeTip));
+  body.push(line(caps(b('reload')), t.ctlReload, t.ctlReloadTip));
   const pick = el('span', 'wrh-ctl-mouse');
   pick.innerHTML = `${MOUSE_SVG(true, false)}<small>${t.mouseLeft}</small>`;
-  body.append(line(pick, t.ctlWeapons, t.ctlWeaponsTip));
-  body.append(line(caps(b('dash')), t.ctlDash, t.ctlDashTip));
-  body.append(line(caps(b('special')), t.ctlSpecial, t.ctlSpecialTip));
-  body.append(line(caps(b('revive')), t.ctlRevive, t.ctlReviveTip));
+  body.push(line(pick, t.ctlWeapons, t.ctlWeaponsTip));
+  body.push(line(caps(b('dash')), t.ctlDash, t.ctlDashTip));
+  body.push(line(caps(b('special')), t.ctlSpecial, t.ctlSpecialTip));
+  body.push(line(caps(b('revive')), t.ctlRevive, t.ctlReviveTip));
   const cards = el('span', 'wrh-keys-row');
   ['card1', 'card2', 'card3'].forEach((a) => cards.append(keycap(keyLabel(b(a)[0] ?? ''))));
-  body.append(line(cards, t.ctlCards, t.ctlCardsTip));
-  body.append(line(caps(b('hostpause')), t.ctlHostPause, t.ctlHostPauseTip));
-  body.append(line(caps(b('pause')), t.ctlPause, t.ctlPauseTip));
+  body.push(line(cards, t.ctlCards, t.ctlCardsTip));
+  body.push(line(caps(b('hostpause')), t.ctlHostPause, t.ctlHostPauseTip));
+  body.push(line(caps(b('pause')), t.ctlPause, t.ctlPauseTip));
 
-  body.append(el('div', 'wrh-set-group', t.secPad));
+  body.push(el('div', 'wrh-set-sub', t.secPad));
   const pad = el('div', 'wrh-padgrid');
   for (const text of [t.padMove, t.padAim, t.padFire, t.padGrenade, t.padReload, t.padDash, t.padRevive, t.padSwitch, t.padCards, t.padPause]) {
     const [btn, ...rest] = text.split(': ');
@@ -585,8 +585,28 @@ export function renderControlsSheet(host: HTMLElement, c: Pick<PanelContext, 'la
     cell.append(el('kbd', 'wrh-key pad', btn!), el('span', undefined, rest.join(': ')));
     pad.append(cell);
   }
-  body.append(pad);
+  body.push(pad);
 
+  return body;
+}
+
+/** The controls sheet on its own (used by the QA page): every control as keycaps with what it does. */
+export function renderControlsSheet(host: HTMLElement, c: Pick<PanelContext, 'lang' | 'bindings' | 'onClose' | 'onSetting'>): void {
+  const t = panelText(c.lang);
+  host.innerHTML = '';
+  const overlay = el('div', 'wrh-set');
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay) c.onClose();
+  });
+  const panel = el('div', 'wrh-set-panel wide');
+  const head = el('div', 'wrh-set-head');
+  head.append(el('h2', undefined, `⌨ ${t.ctlTitle}`));
+  const x = el('button', 'wrh-set-x', '×');
+  x.type = 'button';
+  x.onclick = () => c.onClose();
+  head.append(x);
+  const body = el('div', 'wrh-set-body');
+  body.append(...controlsBody(c.lang, c.bindings));
   const foot = el('div', 'wrh-set-foot');
   const close = el('button', 'primary', t.close);
   close.type = 'button';
