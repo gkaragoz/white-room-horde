@@ -1,4 +1,4 @@
-import { UNIVERSAL_CARDS } from '@wrh/shared';
+import { CLASS_CARDS, UNIVERSAL_CARDS } from '@wrh/shared';
 import type { Lang } from './ui';
 
 /**
@@ -33,6 +33,11 @@ const P: Record<Lang, Record<string, Phrase>> = {
     regen: { up: '+{n} health per second', down: '' },
     thorns: { up: 'Reflect {n} damage', down: '' },
     shield: { up: '+{n} shield', down: '' },
+    acd: { up: 'Ability cooldown +{n}%', down: 'Ability cooldown -{n}%' },
+    adur: { up: 'Ability lasts +{n}%', down: 'Ability lasts -{n}%' },
+    admg: { up: 'Ability power +{n}%', down: 'Ability power -{n}%' },
+    arad: { up: 'Ability radius +{n}%', down: 'Ability radius -{n}%' },
+    aextra: { up: 'Ability: +{n} more shots', down: 'Ability: -{n} shots' },
   },
   tr: {
     dmg: { up: '+%{n} hasar', down: '-%{n} hasar' },
@@ -55,6 +60,11 @@ const P: Record<Lang, Record<string, Phrase>> = {
     regen: { up: 'Saniyede +{n} can', down: '' },
     thorns: { up: '{n} hasarı geri yansıt', down: '' },
     shield: { up: '+{n} kalkan', down: '' },
+    acd: { up: 'Yetenek bekleme +%{n}', down: 'Yetenek bekleme -%{n}' },
+    adur: { up: 'Yetenek süresi +%{n}', down: 'Yetenek süresi -%{n}' },
+    admg: { up: 'Yetenek gücü +%{n}', down: 'Yetenek gücü -%{n}' },
+    arad: { up: 'Yetenek menzili +%{n}', down: 'Yetenek menzili -%{n}' },
+    aextra: { up: 'Yetenek: {n} atış fazla', down: 'Yetenek: {n} atış az' },
   },
   de: {
     dmg: { up: '+{n} % Schaden', down: '-{n} % Schaden' },
@@ -77,6 +87,11 @@ const P: Record<Lang, Record<string, Phrase>> = {
     regen: { up: '+{n} Leben pro Sekunde', down: '' },
     thorns: { up: '{n} Schaden zurückwerfen', down: '' },
     shield: { up: '+{n} Schild', down: '' },
+    acd: { up: 'Fähigkeits-Abklingzeit +{n} %', down: 'Fähigkeits-Abklingzeit -{n} %' },
+    adur: { up: 'Fähigkeit hält {n} % länger', down: 'Fähigkeit hält {n} % kürzer' },
+    admg: { up: 'Fähigkeitsstärke +{n} %', down: 'Fähigkeitsstärke -{n} %' },
+    arad: { up: 'Fähigkeitsradius +{n} %', down: 'Fähigkeitsradius -{n} %' },
+    aextra: { up: 'Fähigkeit: +{n} Schüsse', down: 'Fähigkeit: -{n} Schüsse' },
   },
   es: {
     dmg: { up: '+{n} % de daño', down: '-{n} % de daño' },
@@ -99,6 +114,11 @@ const P: Record<Lang, Record<string, Phrase>> = {
     regen: { up: '+{n} de vida por segundo', down: '' },
     thorns: { up: 'Devuelve {n} de daño', down: '' },
     shield: { up: '+{n} de escudo', down: '' },
+    acd: { up: 'Enfriamiento de habilidad +{n} %', down: 'Enfriamiento de habilidad -{n} %' },
+    adur: { up: 'La habilidad dura {n} % más', down: 'La habilidad dura {n} % menos' },
+    admg: { up: 'Poder de habilidad +{n} %', down: 'Poder de habilidad -{n} %' },
+    arad: { up: 'Radio de habilidad +{n} %', down: 'Radio de habilidad -{n} %' },
+    aextra: { up: 'Habilidad: +{n} disparos', down: 'Habilidad: -{n} disparos' },
   },
   fr: {
     dmg: { up: '+{n} % de dégâts', down: '-{n} % de dégâts' },
@@ -121,6 +141,11 @@ const P: Record<Lang, Record<string, Phrase>> = {
     regen: { up: '+{n} de vie par seconde', down: '' },
     thorns: { up: 'Renvoie {n} de dégâts', down: '' },
     shield: { up: '+{n} de bouclier', down: '' },
+    acd: { up: 'Récupération de capacité +{n} %', down: 'Récupération de capacité -{n} %' },
+    adur: { up: 'La capacité dure {n} % de plus', down: 'La capacité dure {n} % de moins' },
+    admg: { up: 'Puissance de capacité +{n} %', down: 'Puissance de capacité -{n} %' },
+    arad: { up: 'Rayon de capacité +{n} %', down: 'Rayon de capacité -{n} %' },
+    aextra: { up: 'Capacité : +{n} tirs', down: 'Capacité : -{n} tirs' },
   },
   ru: {
     dmg: { up: '+{n}% урона', down: '-{n}% урона' },
@@ -143,13 +168,18 @@ const P: Record<Lang, Record<string, Phrase>> = {
     regen: { up: '+{n} здоровья в секунду', down: '' },
     thorns: { up: 'Отражает {n} урона', down: '' },
     shield: { up: '+{n} щита', down: '' },
+    acd: { up: 'Перезарядка способности +{n}%', down: 'Перезарядка способности -{n}%' },
+    adur: { up: 'Способность длится на {n}% дольше', down: 'Способность длится на {n}% меньше' },
+    admg: { up: 'Сила способности +{n}%', down: 'Сила способности -{n}%' },
+    arad: { up: 'Радиус способности +{n}%', down: 'Радиус способности -{n}%' },
+    aextra: { up: 'Способность: +{n} выстрелов', down: 'Способность: -{n} выстрелов' },
   },
 };
 
 /** The pairs of stat names that share a phrase (the personal and the team flavour of the same thing). */
 const ALIAS: Record<string, string> = { pdmg: 'dmg', prate: 'rate', pspeed: 'speed', parmor: 'armor' };
 /** Stats written as a share: the value is a factor (1.3 = +30%) or an added fraction (0.25 = +25%). */
-const FACTOR = new Set(['armor', 'parmor', 'reload', 'dash', 'magnet', 'xp', 'blast', 'revive', 'loot']);
+const FACTOR = new Set(['armor', 'parmor', 'reload', 'dash', 'magnet', 'xp', 'blast', 'revive', 'loot', 'acd', 'adur', 'admg', 'arad']);
 const FRACTION = new Set(['dmg', 'pdmg', 'rate', 'prate', 'speed', 'pspeed', 'crit', 'heal']);
 
 function line(lang: Lang, stat: string, v: number): string {
@@ -167,10 +197,10 @@ function line(lang: Lang, stat: string, v: number): string {
   return (up ? phrase.up : phrase.down || phrase.up).replace('{n}', String(amount));
 }
 
-/** id -> [title, text] for one language. */
+/** id -> [title, text] for one language (the 50 universal and the 90 class cards). */
 export function universalCardTexts(lang: Lang): Record<string, [string, string]> {
   const out: Record<string, [string, string]> = {};
-  for (const c of UNIVERSAL_CARDS) {
+  for (const c of [...UNIVERSAL_CARDS, ...CLASS_CARDS]) {
     out[c.id] = [c.names[lang], c.ops.map(([stat, v]) => line(lang, stat, v)).filter((s) => s).join(' · ')];
   }
   return out;

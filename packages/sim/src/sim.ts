@@ -106,6 +106,8 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.modDamage[slot] = w.modRate[slot] = w.modSpeed[slot] = w.modRevive[slot] = w.modMagnet[slot] = w.modXp[slot] = 1;
   w.modBlast[slot] = w.modReload[slot] = w.modDash[slot] = w.modArmor[slot] = 1;
   w.modPierce[slot] = w.modCrit[slot] = 0;
+  w.modAbCd[slot] = w.modAbDur[slot] = w.modAbDmg[slot] = w.modAbRad[slot] = 1;
+  w.modAbExtra[slot] = 0;
   resetPerks(w, slot);
   resetDrones(w, slot);
   applyClass(w, slot, cls);
@@ -422,7 +424,7 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
           dashCd = 0;
         } else if (cls === 6) specT = AB.berserker!.seconds!;
         else if (cls === 7) specT = AB.swordsman!.seconds!;
-        if (cls <= 8) specCd = AB[['soldier', 'medic', 'heavy', 'scout', 'demolisher', 'ranger', 'berserker', 'swordsman', 'hammerer'][cls]!]!.cd!;
+        if (cls <= 8) specCd = AB[['soldier', 'medic', 'heavy', 'scout', 'demolisher', 'ranger', 'berserker', 'swordsman', 'hammerer'][cls]!]!.cd! * w.modAbCd[s]!;
       }
       if (haste > 0) haste = haste - TICK_DT > 0 ? haste - TICK_DT : 0;
       if (adren > 0) adren = adren - TICK_DT > 0 ? adren - TICK_DT : 0;
@@ -685,6 +687,7 @@ export function hashWorld(w: World): number {
   c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer).typed(w.pCardLock).typed(w.pCardPrev).typed(w.pCards);
   c.typed(w.modDamage).typed(w.modRate).typed(w.modSpeed).typed(w.modPierce).typed(w.modRevive).typed(w.modMagnet).typed(w.modXp).typed(w.modBlast).typed(w.modReload).typed(w.modDash).typed(w.modArmor).typed(w.modCrit);
   c.typed(w.pModRate).typed(w.pModPierce).typed(w.pModArmor).typed(w.pLifesteal);
+  c.typed(w.modAbCd).typed(w.modAbDur).typed(w.modAbDmg).typed(w.modAbRad).typed(w.modAbExtra);
   c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);
   c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);
   c.typed(w.pMag).typed(w.pReload).typed(w.pDash).typed(w.pDashCd).typed(w.pDashX).typed(w.pDashY).typed(w.pModDmg).typed(w.pModSpeed);

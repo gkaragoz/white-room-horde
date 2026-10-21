@@ -1,4 +1,4 @@
-import { BALANCE, Buttons, RANGED_MASK, CARD_CLASS, CARD_IDS, FloorPhase, MISC, UNIVERSAL_CARDS, CARD_RARITY, ENEMY_TYPES, PERSONAL_CARDS, PickupType, PlayerState, RARITY_WEIGHT, TEAM_CARDS, WEAPON_IDS, type CardId, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, CLASS_CARDS, RANGED_MASK, CARD_CLASS, CARD_IDS, FloorPhase, MISC, UNIVERSAL_CARDS, CARD_RARITY, ENEMY_TYPES, PERSONAL_CARDS, PickupType, PlayerState, RARITY_WEIGHT, TEAM_CARDS, WEAPON_IDS, type CardId, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createWorld, spawnEnemy, step, type World } from '../src';
 import { dropLoot, spawnPickup } from '../src/pickups';
@@ -33,9 +33,10 @@ function pick(w: World, id: CardId, by = 0): void {
 const offerOf = (w: World, s: number): number[] => [0, 1, 2].map((i) => w.pOffer[s * 3 + i]!);
 
 describe('card pool', () => {
-  it('has 86 cards (36 old, 50 universal), every one with a rarity, unique ids and a consistent team / personal split', () => {
-    expect(CARD_IDS.length).toBe(36 + UNIVERSAL_CARDS.length);
+  it('has 176 cards (36 old, 50 universal, 90 class), every one with a rarity, unique ids and a consistent team / personal split', () => {
+    expect(CARD_IDS.length).toBe(36 + UNIVERSAL_CARDS.length + CLASS_CARDS.length);
     expect(UNIVERSAL_CARDS.length).toBe(50);
+    expect(CLASS_CARDS.length).toBe(90);
     expect(new Set(CARD_IDS).size).toBe(CARD_IDS.length);
     for (const id of CARD_IDS) expect([0, 1, 2]).toContain(CARD_RARITY[id]);
     for (const p of PERSONAL_CARDS) expect(CARD_IDS).toContain(p);
@@ -44,7 +45,7 @@ describe('card pool', () => {
     expect([...TEAM_CARDS].sort()).toEqual(['grenades', 'heal', 'luck']);
     expect(PERSONAL_CARDS.length + TEAM_CARDS.length).toBe(CARD_IDS.length);
     for (const id of Object.keys(CARD_RARITY)) expect(CARD_IDS).toContain(id);
-    const universal = UNIVERSAL_CARDS.map((u) => u.id as string);
+    const universal = [...UNIVERSAL_CARDS, ...CLASS_CARDS].map((u) => u.id as string);
     const perkCards = ['regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage', 'drone'];
     for (const id of CARD_IDS) expect(BALANCE.progression.cards).toHaveProperty(id === 'arsenal' || id === 'heal' || id === 'ammo' || perkCards.includes(id) || universal.includes(id) ? 'damage' : id);
   });
@@ -66,13 +67,17 @@ describe('card pool', () => {
     const byRarity = [0, 0, 0];
     const members = [0, 0, 0];
     CARD_IDS.forEach((id, i) => {
+      if (((CARD_CLASS[id] >> 0) & 1) === 0) return; // the player is a soldier: other classes' cards are never offered
       byRarity[CARD_RARITY[id]]! += count[i]!;
       members[CARD_RARITY[id]]!++;
     });
     const avg = byRarity.map((c, r) => c / members[r]!);
     expect(avg[0]!).toBeGreaterThan(avg[1]! * 1.4);
     expect(avg[1]!).toBeGreaterThan(avg[2]! * 1.8);
-    for (let i = 0; i < CARD_IDS.length; i++) expect(count[i], CARD_IDS[i]).toBeGreaterThan(0);
+    for (let i = 0; i < CARD_IDS.length; i++) {
+      if (((CARD_CLASS[CARD_IDS[i]!] >> 0) & 1) === 0) expect(count[i], CARD_IDS[i]).toBe(0);
+      else expect(count[i], CARD_IDS[i]).toBeGreaterThan(0);
+    }
     expect(RARITY_WEIGHT.length).toBe(3);
   });
 });
@@ -382,7 +387,7 @@ describe('the level queue and the class filter', () => {
       const w = quiet(40 + cls);
       addPlayer(w, 0, 0, 0, cls === 7 ? 'sword' : cls === 8 ? 'hammer' : 'pistol', cls);
       const seen = new Set<number>();
-      for (let n = 0; n < 600; n++) {
+      for (let n = 0; n < 3000; n++) {
         for (let i = 0; i < 3; i++) w.pOffer[i] = -1;
         w.pPending[0] = 0;
         w.pXp[0] = 0;
@@ -416,5 +421,44 @@ describe('the level queue and the class filter', () => {
     addPlayer(w, 0, 0, 0, 'pistol');
     pick(w, 'ammo');
     expect(w.modReload[0]).toBeCloseTo(BALANCE.progression.cards.loader, 9);
+  });
+});
+
+describe('class cards', () => {
+  it('each class has ten of its own, offered only to that class', () => {
+    for (let cls = 0; cls < 9; cls++) expect(CLASS_CARDS.filter((c) => c.cls === cls).length).toBe(10);
+    for (const cls of [0, 1, 7, 8]) {
+      const w = quiet(60 + cls);
+      addPlayer(w, 0, 0, 0, cls === 7 ? 'sword' : cls === 8 ? 'hammer' : 'pistol', cls);
+      const seen = new Set<number>();
+      for (let n = 0; n < 800; n++) {
+        for (let i = 0; i < 3; i++) w.pOffer[i] = -1;
+        w.pPending[0] = 0;
+        w.pXp[0] = 0;
+        awardXp(w, 0, xpForNext(w, 0));
+        for (const c of offerOf(w, 0)) seen.add(c);
+      }
+      for (const card of CLASS_CARDS) expect(seen.has(CARD_IDS.indexOf(card.id)), `${card.id} for class ${cls}`).toBe(card.cls === cls);
+      expect(CLASS_CARDS.filter((c) => c.cls === cls && seen.has(CARD_IDS.indexOf(c.id))).length).toBe(10);
+    }
+  });
+
+  it('ability cards change the ability: cooldown, duration, radius, damage, extra shots', () => {
+    const w = quiet(70);
+    addPlayer(w, 0, 0, 0, 'pistol', 5); // ranger
+    pick(w, 'quickdraw');
+    pick(w, 'bigquiver');
+    pick(w, 'heavybolts');
+    expect(w.modAbCd[0]).toBeCloseTo(0.8, 9);
+    expect(w.modAbExtra[0]).toBe(2);
+    expect(w.modAbDmg[0]).toBeCloseTo(1.3, 9);
+    // the ability uses them: cooldown shorter, more shots
+    step(w, [{ ...NONE, buttons: Buttons.Special }]);
+    expect(w.pOver[0]).toBe(BALANCE.abilities.ranger!.shots! + 2);
+    expect(w.pSpecCd[0]).toBeCloseTo(BALANCE.abilities.ranger!.cd! * 0.8, 1);
+    // the other player is untouched
+    const o = quiet(71);
+    addPlayer(o, 0, 0, 0, 'pistol', 5);
+    expect([o.modAbCd[0], o.modAbExtra[0], o.modAbDmg[0], o.modAbRad[0], o.modAbDur[0]]).toEqual([1, 0, 1, 1, 1]);
   });
 });

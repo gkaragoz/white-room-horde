@@ -120,8 +120,8 @@ export function abilityRateFrom(rally: number): number {
 export function abilityDamage(w: World, s: number): number {
   const cls = perk(w, s, PERK.Class);
   let m = 1;
-  if (cls === 6 && w.pSpecT[s]! > 0) m *= BALANCE.abilities.berserker!.damage!;
-  if (cls === 5 && w.pOver[s]! > 0) m *= BALANCE.abilities.ranger!.damage!;
+  if (cls === 6 && w.pSpecT[s]! > 0) m *= 1 + (BALANCE.abilities.berserker!.damage! - 1) * w.modAbDmg[s]!;
+  if (cls === 5 && w.pOver[s]! > 0) m *= 1 + (BALANCE.abilities.ranger!.damage! - 1) * w.modAbDmg[s]!;
   return m;
 }
 

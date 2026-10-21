@@ -1,9 +1,9 @@
-import { PERK, UNIVERSAL_CARDS } from '@wrh/shared';
+import { CLASS_CARDS, PERK, UNIVERSAL_CARDS } from '@wrh/shared';
 import { addPerk, setPerk, perk } from './features';
 import { PlayerState } from '@wrh/shared';
 import type { World } from './state';
 
-const TABLE = new Map<string, (typeof UNIVERSAL_CARDS)[number]['ops']>(UNIVERSAL_CARDS.map((c) => [c.id, c.ops]));
+const TABLE = new Map<string, readonly (readonly [string, number])[]>([...UNIVERSAL_CARDS, ...CLASS_CARDS].map((c) => [c.id, c.ops]));
 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
 
@@ -79,6 +79,21 @@ export function applyUniversal(w: World, id: string, by: number): boolean {
         break;
       case 'regen':
         addPerk(w, by, PERK.Regen, v);
+        break;
+      case 'acd':
+        w.modAbCd[by] = clamp(w.modAbCd[by]! * v, 0.3, 1);
+        break;
+      case 'adur':
+        w.modAbDur[by] = Math.min(3, w.modAbDur[by]! * v);
+        break;
+      case 'admg':
+        w.modAbDmg[by] = Math.min(4, w.modAbDmg[by]! * v);
+        break;
+      case 'arad':
+        w.modAbRad[by] = Math.min(2.5, w.modAbRad[by]! * v);
+        break;
+      case 'aextra':
+        w.modAbExtra[by] = Math.min(12, w.modAbExtra[by]! + v);
         break;
       case 'thorns':
         addPerk(w, by, PERK.Thorns, v);
