@@ -1132,12 +1132,13 @@ def _():
 
 @ic("longshot")
 def _():
-    arrow((-0.2, 0, 0.5), 1.3, 20, 3.0)
-    with G((1.55, 0, -0.25), 0.55):
-        for k, c in enumerate((RED, WHITE, RED)):
-            disc(0.85 - k * 0.27, 0.12, mat(c, 0.5), (0, 0.05 * k * -1, 0), 20)
-    for k in range(4):
-        box(0.18, 0.06, 0.06, mat(DARK), (-1.6 + k * 0.45, -0.3, -0.5 + k * 0.1), (0, 15, 0), 0.0)
+    with G((0.6, 0, 0.2), 1.0):
+        for k, c in enumerate((RED, WHITE, RED, WHITE, RED)):
+            disc(1.25 - k * 0.24, 0.14, mat(c, 0.5), (0, -0.05 * k, 0), 22)
+        cyl(0.12, 1.0, mat(BROWN, 0.6), (0, 0.2, -1.6), (0, 0, 0), 8)
+    arrow((-0.35, -0.3, 0.25), 1.45, 25, 2.6)
+    for k in range(3):
+        box(0.35, 0.1, 0.1, mat(DARK), (-1.5 + k * 0.5, -0.3, -1.0 - k * 0.1), (0, 0, 0), 0.0)
 
 
 @ic("quickdraw")
