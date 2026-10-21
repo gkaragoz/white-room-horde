@@ -125,11 +125,18 @@ try {
             const map = window.__wrh.maps[w.map];
             const len = Math.hypot(b.x - a.x, b.y - a.y);
             let t0 = performance.now();
+            let prev = 0;
             const tick = () => {
               const k = Math.min(1, ((performance.now() - t0) / 1000) * 11 / len);
-              w.pX[0] = a.x + (b.x - a.x) * k;
-              w.pY[0] = a.y + (b.y - a.y) * k;
-              w.pLayer[0] = window.__wrh.geo.nextLayer(map, w.pX[0], w.pY[0], w.pLayer[0]);
+              // in steps of at most 0.2 units: a busy runner can deliver a late timer that jumps over the end of the ramp, where the layer changes
+              const n = Math.max(1, Math.ceil(((k - prev) * len) / 0.2));
+              for (let i = 1; i <= n; i++) {
+                const kk = prev + ((k - prev) * i) / n;
+                w.pX[0] = a.x + (b.x - a.x) * kk;
+                w.pY[0] = a.y + (b.y - a.y) * kk;
+                w.pLayer[0] = window.__wrh.geo.nextLayer(map, w.pX[0], w.pY[0], w.pLayer[0]);
+              }
+              prev = k;
               if (k < 1) setTimeout(tick, 8);
               else res({ layer: w.pLayer[0], z: window.__wrh.drones.debug(0).z });
             };
