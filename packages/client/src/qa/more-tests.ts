@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Buttons, TeleEffect, TeleShape, ZoneKind, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS } from '@wrh/shared';
+import { BALANCE, Buttons, FloorPhase, MISC, TeleEffect, TeleShape, ZoneKind, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS } from '@wrh/shared';
 import { addPlayer, addTelegraph, addZone, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
 import { AimSolver, TargetLock, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
@@ -513,6 +513,8 @@ export const moreTests: QaTest[] = [
       const w = createWorld(7);
       w.waveTick = 1e9;
       w.countMul = 0;
+      w.misc[MISC.Phase] = FloorPhase.Cleared; // offers open once the floor is cleared
+      w.misc[MISC.PhaseEnd] = 1e9;
       addPlayer(w, 0, 0, 0);
       // three levels reached in one go
       w.pLevel[0] = 4;
@@ -528,7 +530,7 @@ export const moreTests: QaTest[] = [
           problems.push('queued offer never opened');
           break;
         }
-        if (round > 0 && w.pCardTimer[0]! < 295) problems.push(`offer ${round} opened with a running clock (${w.pCardTimer[0]})`);
+        if (round > 0 && w.pCardTimer[0]! < BALANCE.progression.cardSeconds * 30 - 5) problems.push(`offer ${round} opened with a running clock (${w.pCardTimer[0]})`);
         step(w, [{ ...idle, buttons: Buttons.Card1 }]);
         picks.push(w.pLevel[0]!);
         // the same key kept down for 10 ticks must not pick the next offer

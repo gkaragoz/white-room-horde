@@ -699,7 +699,7 @@
   "progression": {
     "xpBase": 15,
     "xpPerLevel": 12,
-    "cardSeconds": 10,
+    "cardSeconds": 15,
     "xp": {
       "grunt": 1,
       "runner": 1,

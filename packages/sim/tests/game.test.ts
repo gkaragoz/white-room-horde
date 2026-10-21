@@ -1,4 +1,4 @@
-import { BALANCE, Buttons, CARD_IDS, PlayerState, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, CARD_IDS, FloorPhase, MISC, PlayerState, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createGame, createWorld, decodeReplay, encodeReplay, hashWorld, playReplay, Recorder, scriptedInput, spawnBoss, step } from '../src';
 import { awardXp, xpForNext } from '../src/progression';
@@ -42,12 +42,17 @@ describe('life cycle', () => {
 });
 
 describe('cards', () => {
-  it('level up opens an offer; Card1 applies it; timeout picks randomly', () => {
+  it('a level up banks during the fight; the offer opens when the floor is cleared; Card1 applies it; the timeout takes the first card', () => {
     const w = createWorld(4);
     w.waveTick = 1e9;
     addPlayer(w, 0, 0, 0);
     awardXp(w, 0, xpForNext(w, 0));
     expect(w.pLevel[0]).toBe(2);
+    expect(w.pOffer[0]).toBe(-1); // mid-fight: nothing opens, the level waits
+    expect(w.pPending[0]).toBe(1);
+    w.misc[MISC.Phase] = FloorPhase.Cleared;
+    w.misc[MISC.PhaseEnd] = 1e9;
+    step(w, [NONE]);
     expect(w.pOffer[0]).toBeGreaterThanOrEqual(0);
     const offered = w.pOffer[0]!;
     step(w, [{ ...NONE, buttons: Buttons.Card1 }]);
@@ -55,8 +60,12 @@ describe('cards', () => {
     const id = CARD_IDS[offered]!;
     if (id === 'damage') expect(w.modDamage[0]).toBeGreaterThan(1);
     awardXp(w, 0, xpForNext(w, 0));
+    for (let t = 0; t < 20; t++) step(w, [NONE]);
+    const first = w.pOffer[0]!;
+    expect(first).toBeGreaterThanOrEqual(0);
     for (let t = 0; t < BALANCE.progression.cardSeconds * 30 + 20; t++) step(w, [NONE]);
     expect(w.pOffer[0]).toBe(-1);
+    expect(w.pCards[CARD_IDS.length * 0 + first]).toBe(1); // the first card of the offer was taken for the player
   });
 });
 

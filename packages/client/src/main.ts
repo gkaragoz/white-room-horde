@@ -677,7 +677,7 @@ function handleEvent(e: SimEvent): void {
       break;
     }
     case 'levelUp':
-      if (e.slot === localSlot) ui.banner(ui.lang === 'tr' ? 'Seviye atlandı!' : 'Level up!', `${e.level}`, 1500);
+      // no popup any more: the badge at the top of the screen counts the levels waiting for a card
       break;
     case 'cardPicked': {
       // a card for the whole squad: the info bar says what it is and who took it

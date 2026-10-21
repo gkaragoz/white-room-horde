@@ -596,7 +596,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
   for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pIFrames[s]! > 0) w.pIFrames[s] = w.pIFrames[s]! - TICK_DT;
   updateAway(w, inputsIn);
   // while the party is lifted to the next floor nobody can move, shoot or throw: only the aim is kept
-  if (w.misc[MISC.Phase] === FloorPhase.Ascend || w.tick < w.misc[MISC.Cine]!) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: 0, ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}), ...(i.gAim !== undefined ? { gAim: i.gAim } : {}) } : i));
+  if (w.misc[MISC.Phase] === FloorPhase.Ascend || w.tick < w.misc[MISC.Cine]!) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: i.buttons & (Buttons.Card1 | Buttons.Card2 | Buttons.Card3), ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}), ...(i.gAim !== undefined ? { gAim: i.gAim } : {}) } : i));
   updateCards(w, inputs);
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s] || w.pState[s] === PlayerState.Dead) continue;

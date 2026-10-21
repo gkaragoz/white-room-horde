@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, DRONE_MAX_LEVEL, DRONE_TYPES, MAX_ENEMIES, PickupType, PlayerState, type PlayerInput } from '@wrh/shared';
+import { BALANCE, CARD_IDS, FloorPhase, MISC, DRONE_MAX_LEVEL, DRONE_TYPES, MAX_ENEMIES, PickupType, PlayerState, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createGame, createWorld, hashWorld, serializeWorld, restoreWorld, spawnBoss, spawnEnemy, step, type World } from '../src';
 import { awardDroneXp, droneNeed, droneStat, droneTier, grantDrone } from '../src/drones';
@@ -387,8 +387,10 @@ describe('determinism', () => {
 describe('player experience still works with the drone card in the pool', () => {
   it('awardXp opens offers that may contain the drone card', () => {
     const w = quiet();
+    w.misc[MISC.Phase] = FloorPhase.Cleared;
+    w.misc[MISC.PhaseEnd] = 1e9;
     let seen = false;
-    for (let n = 0; n < 400 && !seen; n++) {
+    for (let n = 0; n < 3000 && !seen; n++) {
       for (let i = 0; i < 3; i++) w.pOffer[i] = -1;
       w.pPending[0] = 0;
       w.pLevel[0] = 1;

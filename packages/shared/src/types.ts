@@ -1,3 +1,4 @@
+import { UNIVERSAL_CARDS } from './cards-universal';
 /**
  * One player's input for one tick. Quantised so it is identical on every client and cheap to send
  * (docs/DESIGN.md section 8: ~6 bytes per player per tick).
@@ -71,7 +72,7 @@ export const PlayerState = { Alive: 0, Downed: 1, Dead: 2 } as const;
  * The card pool (docs/DESIGN.md section 9). Index = card id in the sim and in the offer. TEAM_CARDS help everybody,
  * every other card only the character that picked it. Art for each card lives in packages/client/public/cards/<id>.png.
  */
-export const CARD_IDS = [
+const BASE_CARD_IDS = [
   // team
   'damage', 'rate', 'speed', 'hp', 'pierce', 'arsenal', 'heal', 'ammo', 'grenades', 'medic', 'magnet', 'luck', 'scholar', 'blast', 'quickhands', 'roll', 'armor', 'crit',
   // personal
@@ -80,19 +81,33 @@ export const CARD_IDS = [
   // appended last so the ids of the older cards (and the offers they roll) do not move
   'drone',
 ] as const;
-export type CardId = (typeof CARD_IDS)[number];
+export type CardId = (typeof BASE_CARD_IDS)[number] | (typeof UNIVERSAL_CARDS)[number]['id'];
+/** All cards: the first 36 never move (offers and saves use the index); the 50 universal cards follow. */
+export const CARD_IDS: readonly CardId[] = [...BASE_CARD_IDS, ...UNIVERSAL_CARDS.map((c) => c.id)];
 /** The few cards that help the whole squad; they show up on the info bar with the name of whoever took them. */
-export const TEAM_CARDS: readonly string[] = ['heal', 'ammo', 'grenades', 'luck'];
+export const TEAM_CARDS: readonly string[] = ['heal', 'grenades', 'luck'];
 /** Cards that only help the character that picked them: all the others. */
 export const PERSONAL_CARDS: readonly string[] = CARD_IDS.filter((id) => !TEAM_CARDS.includes(id));
 /** 0 common, 1 rare, 2 epic: how often a card is offered and how its frame looks. */
-export const CARD_RARITY: Record<CardId, 0 | 1 | 2> = {
+const BASE_RARITY: Record<(typeof BASE_CARD_IDS)[number], 0 | 1 | 2> = {
   damage: 0, rate: 0, speed: 0, hp: 0, heal: 0, ammo: 0, magnet: 0, sharp: 0, sprint: 0, bulk: 0,
   pierce: 1, grenades: 1, medic: 1, luck: 1, scholar: 1, roll: 1, quickhands: 1, armor: 1, tempo: 1, marksman: 1, ironskin: 1,
   arsenal: 2, blast: 2, crit: 2, vampire: 2,
   regen: 0, scavenger: 0, adrenaline: 0, thorns: 1, shock: 1, frost: 1, barrier: 1, rage: 1, volatile: 2, secondwind: 2,
   drone: 1,
 };
+export const CARD_RARITY = { ...BASE_RARITY, ...Object.fromEntries(UNIVERSAL_CARDS.map((c) => [c.id, c.rarity])) } as Record<CardId, 0 | 1 | 2>;
+/** Who may be offered a card: a mask over the class ids (bit n = class n may). */
+export const ALL_CLASSES = 0x1ff;
+/** The classes that shoot (bullets and magazines) and the two that only swing. */
+export const RANGED_MASK = 0x7f;
+export const MELEE_MASK = 0x180;
+const MASK_OF = { 1: RANGED_MASK, 2: MELEE_MASK, 3: ALL_CLASSES } as const;
+export const CARD_CLASS = {
+  ...Object.fromEntries(BASE_CARD_IDS.map((id) => [id, ALL_CLASSES])),
+  ...Object.fromEntries(['pierce', 'marksman', 'quickhands', 'grenades', 'arsenal', 'ammo', 'scavenger'].map((id) => [id, RANGED_MASK])),
+  ...Object.fromEntries(UNIVERSAL_CARDS.map((c) => [c.id, MASK_OF[c.cls]])),
+} as Record<CardId, number>;
 /** Offer weights per rarity. */
 export const RARITY_WEIGHT: readonly number[] = [6, 3, 1];
 

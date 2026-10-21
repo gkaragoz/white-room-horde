@@ -8,6 +8,7 @@ import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
 import { THEMES } from './render/arena';
+import { universalCardTexts } from './cardText';
 import { EXTRA } from './i18n';
 import { renderGameOver, type RunExtras } from './gameOver';
 import { renderControlsSheet, renderSettingsPanel } from './settingsPanel';
@@ -484,6 +485,11 @@ export const UI_STRINGS: Record<Lang, StringSet> = {
   fr: merge(BASE_STRINGS.en, EXTRA.fr),
   ru: merge(BASE_STRINGS.en, EXTRA.ru),
 };
+// the 50 universal cards: names from their table, texts made from their stat changes
+for (const lang of Object.keys(UI_STRINGS) as Lang[]) {
+  const set = UI_STRINGS[lang] as unknown as { cards: Record<string, readonly [string, string]> };
+  set.cards = { ...set.cards, ...universalCardTexts(lang) };
+}
 
 export interface UiHandlers {
   onSolo(name: string): void;
@@ -661,6 +667,12 @@ const CSS_BASE = `
 .wrh-cine i{position:absolute;left:0;right:0;height:calc(9vh*var(--k));background:#07060c}
 .wrh-cine i.top{top:0}.wrh-cine i.bot{bottom:0}
 .wrh-cine b{position:absolute;left:0;right:0;bottom:calc(9vh*var(--k) + 18px);text-align:center;font-size:clamp(18px,3.2vw,38px);letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 0 12px var(--who,#fff),0 3px 0 rgba(0,0,0,.6);opacity:calc(var(--k)*var(--k));transform:translateY(calc((1 - var(--k))*14px))}
+.wrh-lvl{position:absolute;left:50%;top:58px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;pointer-events:none;z-index:6;animation:wrhlvl 1.4s ease-in-out infinite alternate}
+.wrh-lvl img{height:46px;width:auto;filter:drop-shadow(0 3px 5px rgba(20,28,44,.35))}
+.wrh-lvl .fb{display:none;font:900 22px system-ui,sans-serif;letter-spacing:.06em;color:#3a2a00;background:#ffd54a;border-radius:12px;padding:4px 14px}
+.wrh-lvl.noimg img{display:none}.wrh-lvl.noimg .fb{display:block}
+.wrh-lvl b{font:900 26px system-ui,sans-serif;color:#fff;text-shadow:0 2px 0 #3a2a00,0 0 8px rgba(255,213,74,.8)}
+@keyframes wrhlvl{from{transform:translateX(-50%) scale(1)}to{transform:translateX(-50%) scale(1.07)}}
 .wrh-more{display:inline-block;margin-left:6px;padding:0 8px;border-radius:10px;background:#ffd54a;color:#3a2a00;font-size:.8em;vertical-align:middle}
 .wrh-cards .wrh-card{animation:wrh-cardin .28s cubic-bezier(.2,1.4,.4,1) both}
 .wrh-cards .wrh-card:nth-child(3){animation-delay:.05s}.wrh-cards .wrh-card:nth-child(4){animation-delay:.1s}
@@ -1954,6 +1966,7 @@ export class Ui {
     return rows;
   }
 
+  private lvlImgBound = false;
   private countEl: HTMLElement | null = null;
   /** Seconds currently shown by the floor countdown (for the pop animation and the tick sound). */
   countShown = -1;
@@ -2171,6 +2184,7 @@ export class Ui {
       <div class="wrh-drone" id="h-drone"></div>
       <div class="wrh-banner" id="h-banner" style="display:none"></div>
       <div class="wrh-cards" id="h-cards" style="display:none"></div>
+      <div class="wrh-lvl" id="h-lvl" style="display:none"><img src="${asset('ui/levelup.png')}" alt="" draggable="false"><span class="fb">LEVEL UP</span><b></b></div>
       <div class="wrh-warn" id="h-warn" style="display:none"></div>
       <div class="wrh-hint" id="h-hint"></div>
       <div class="wrh-hostpause" id="h-hostpause"></div>`;
@@ -2560,6 +2574,19 @@ export class Ui {
       this.warn('');
       set('h-hint', '');
     }
+    // the level-up badge: how many levels wait for a card (the open offer counts)
+    const lvlEl = this.hud.querySelector<HTMLElement>('#h-lvl')!;
+    const waiting = world.gameOver || world.pState[slot] === PlayerState.Dead ? 0 : world.pPending[slot]! + (world.pOffer[slot * 3]! >= 0 ? 1 : 0);
+    if (waiting > 0) {
+      if (lvlEl.style.display !== 'flex') lvlEl.style.display = 'flex';
+      const label = lvlEl.querySelector('b')!;
+      const text = `x${waiting}`;
+      if (label.textContent !== text) label.textContent = text;
+      if (!this.lvlImgBound) {
+        this.lvlImgBound = true;
+        lvlEl.querySelector('img')!.addEventListener('error', () => lvlEl.classList.add('noimg'));
+      }
+    } else if (lvlEl.style.display !== 'none') lvlEl.style.display = 'none';
     // cards
     const cardsEl = this.hud.querySelector<HTMLElement>('#h-cards')!;
     if (world.pOffer[slot * 3]! >= 0 && !world.gameOver && world.pState[slot] === PlayerState.Alive) {

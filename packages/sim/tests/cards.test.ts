@@ -1,4 +1,4 @@
-import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, ENEMY_TYPES, PERSONAL_CARDS, PickupType, PlayerState, RARITY_WEIGHT, TEAM_CARDS, WEAPON_IDS, type CardId, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, RANGED_MASK, CARD_CLASS, CARD_IDS, FloorPhase, MISC, UNIVERSAL_CARDS, CARD_RARITY, ENEMY_TYPES, PERSONAL_CARDS, PickupType, PlayerState, RARITY_WEIGHT, TEAM_CARDS, WEAPON_IDS, type CardId, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createWorld, spawnEnemy, step, type World } from '../src';
 import { dropLoot, spawnPickup } from '../src/pickups';
@@ -11,6 +11,9 @@ function quiet(seed: number): World {
   const w = createWorld(seed);
   w.waveTick = 1e9;
   w.countMul = 0;
+  // offers only open when the floor is cleared
+  w.misc[MISC.Phase] = FloorPhase.Cleared;
+  w.misc[MISC.PhaseEnd] = 1e9;
   return w;
 }
 
@@ -30,18 +33,20 @@ function pick(w: World, id: CardId, by = 0): void {
 const offerOf = (w: World, s: number): number[] => [0, 1, 2].map((i) => w.pOffer[s * 3 + i]!);
 
 describe('card pool', () => {
-  it('has 36 cards, every one with a rarity, unique ids and a consistent team / personal split', () => {
-    expect(CARD_IDS.length).toBe(36);
-    expect(new Set(CARD_IDS).size).toBe(36);
+  it('has 86 cards (36 old, 50 universal), every one with a rarity, unique ids and a consistent team / personal split', () => {
+    expect(CARD_IDS.length).toBe(36 + UNIVERSAL_CARDS.length);
+    expect(UNIVERSAL_CARDS.length).toBe(50);
+    expect(new Set(CARD_IDS).size).toBe(CARD_IDS.length);
     for (const id of CARD_IDS) expect([0, 1, 2]).toContain(CARD_RARITY[id]);
     for (const p of PERSONAL_CARDS) expect(CARD_IDS).toContain(p);
     for (const t of TEAM_CARDS) expect(CARD_IDS).toContain(t);
     // every card is exactly one of the two: nothing is chosen for the team except the four gifts to everybody
-    expect([...TEAM_CARDS].sort()).toEqual(['ammo', 'grenades', 'heal', 'luck']);
+    expect([...TEAM_CARDS].sort()).toEqual(['grenades', 'heal', 'luck']);
     expect(PERSONAL_CARDS.length + TEAM_CARDS.length).toBe(CARD_IDS.length);
     for (const id of Object.keys(CARD_RARITY)) expect(CARD_IDS).toContain(id);
+    const universal = UNIVERSAL_CARDS.map((u) => u.id as string);
     const perkCards = ['regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage', 'drone'];
-    for (const id of CARD_IDS) expect(BALANCE.progression.cards).toHaveProperty(id === 'arsenal' || id === 'heal' || id === 'ammo' || perkCards.includes(id) ? 'damage' : id);
+    for (const id of CARD_IDS) expect(BALANCE.progression.cards).toHaveProperty(id === 'arsenal' || id === 'heal' || id === 'ammo' || perkCards.includes(id) || universal.includes(id) ? 'damage' : id);
   });
 
   it('offers three different cards and favours common over rare over epic', () => {
@@ -335,5 +340,81 @@ describe('card effects in play', () => {
     };
     expect(blast(1.5)).toBeCloseTo(blast(1) * 1.5);
     expect(WEAPON_IDS.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the level queue and the class filter', () => {
+  it('levels bank mid-fight and open one offer after the other once the floor is cleared, surviving the climb', () => {
+    const w = createWorld(31);
+    w.waveTick = 1e9;
+    w.countMul = 0;
+    addPlayer(w, 0, 0, 0);
+    for (let n = 0; n < 3; n++) awardXp(w, 0, xpForNext(w, 0));
+    expect(w.pPending[0]).toBe(3);
+    for (let t = 0; t < 60; t++) step(w, [NONE]);
+    expect(offerOf(w, 0)).toEqual([-1, -1, -1]); // a fight is going on: nothing opens
+    w.misc[MISC.Phase] = FloorPhase.Cleared;
+    w.misc[MISC.PhaseEnd] = 1e9;
+    step(w, [NONE]);
+    expect(offerOf(w, 0)[0]).toBeGreaterThanOrEqual(0);
+    expect(w.pPending[0]).toBe(2);
+    // the climb keeps the queue and the open offer (its clock waits)
+    w.misc[MISC.Phase] = FloorPhase.Ascend;
+    const timer = w.pCardTimer[0]!;
+    for (let t = 0; t < 90; t++) step(w, [NONE]);
+    expect(w.pCardTimer[0]).toBe(timer);
+    expect(w.pPending[0]).toBe(2);
+    // a pick during the climb is allowed; the next offer waits for the next quiet phase
+    step(w, [{ ...NONE, buttons: Buttons.Card1 }]);
+    for (let t = 0; t < 40; t++) step(w, [NONE]);
+    expect(offerOf(w, 0)).toEqual([-1, -1, -1]);
+    expect(w.pPending[0]).toBe(2);
+    w.misc[MISC.Phase] = FloorPhase.Arrive;
+    for (let t = 0; t < 20; t++) step(w, [NONE]);
+    expect(offerOf(w, 0)[0]).toBeGreaterThanOrEqual(0);
+    expect(w.pPending[0]).toBe(1);
+  });
+
+  it('blade and hammer fighters never see the cards that only make sense for guns; shooters never see melee-only ones', () => {
+    const onlyGuns = CARD_IDS.filter((id) => CARD_CLASS[id] === RANGED_MASK);
+    expect(onlyGuns.length).toBeGreaterThanOrEqual(10);
+    for (const cls of [7, 8, 0]) {
+      const w = quiet(40 + cls);
+      addPlayer(w, 0, 0, 0, cls === 7 ? 'sword' : cls === 8 ? 'hammer' : 'pistol', cls);
+      const seen = new Set<number>();
+      for (let n = 0; n < 600; n++) {
+        for (let i = 0; i < 3; i++) w.pOffer[i] = -1;
+        w.pPending[0] = 0;
+        w.pXp[0] = 0;
+        awardXp(w, 0, xpForNext(w, 0));
+        for (const c of offerOf(w, 0)) seen.add(c);
+      }
+      for (const id of CARD_IDS) {
+        const idx = CARD_IDS.indexOf(id);
+        if (cls === 0) expect(seen.has(idx) || ((CARD_CLASS[id] >> 0) & 1) === 0, id).toBe(true);
+        else if (CARD_CLASS[id] === RANGED_MASK) expect(seen.has(idx), `${id} for class ${cls}`).toBe(false);
+      }
+    }
+  });
+
+  it('every universal card changes only its owner and stays inside its clamps, however often it is taken', () => {
+    for (const card of UNIVERSAL_CARDS) {
+      const w = quiet(50);
+      addPlayer(w, 0, 0, 0, 'pistol');
+      addPlayer(w, 1, 5, 0, 'pistol');
+      const other = [w.modDamage[1], w.pModDmg[1], w.pMaxHp[1], w.pModArmor[1], w.modReload[1], w.modDash[1]];
+      for (let n = 0; n < 12; n++) pick(w, card.id as CardId);
+      expect(w.pMaxHp[0]!, card.id).toBeGreaterThanOrEqual(30);
+      expect(w.modArmor[0]! >= 0.4 && w.pModArmor[0]! >= 0.35, card.id).toBe(true);
+      expect(w.modReload[0]! >= 0.3 && w.modDash[0]! >= 0.25 && w.modCrit[0]! <= 0.75, card.id).toBe(true);
+      expect([w.modDamage[1], w.pModDmg[1], w.pMaxHp[1], w.pModArmor[1], w.modReload[1], w.modDash[1]], card.id).toEqual(other);
+    }
+  });
+
+  it('the old ammo card is a speed loader now', () => {
+    const w = quiet(51);
+    addPlayer(w, 0, 0, 0, 'pistol');
+    pick(w, 'ammo');
+    expect(w.modReload[0]).toBeCloseTo(BALANCE.progression.cards.loader, 9);
   });
 });

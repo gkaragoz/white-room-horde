@@ -1,6 +1,7 @@
 import { grantDrone } from './drones';
-import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, FloorPhase, MAX_PLAYERS, MISC, PlayerState, RARITY_WEIGHT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, CARD_CLASS, CARD_IDS, CARD_RARITY, FloorPhase, MAX_PLAYERS, MISC, PlayerState, RARITY_WEIGHT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { PERK } from '@wrh/shared';
+import { applyUniversal } from './cardtable';
 import { addPerk, perk, setPerk } from './features';
 import { giveWeapon, nextMissing, selectWeapon } from './loadout';
 import type { World } from './state';
@@ -11,10 +12,14 @@ const CARDS = CARD_IDS.length;
 const PICK_LOCK_TICKS = 12;
 const CARD_BUTTONS = Buttons.Card1 | Buttons.Card2 | Buttons.Card3;
 
-/** Offers open one at a time, never while the squad is climbing between floors, and not right after a pick. */
+/**
+ * Levels bank up in `pPending` during a floor. Offers open one at a time, only once the floor is cleared (or on the new floor
+ * before its enemies come), never in the middle of a fight, never during the climb, and not right after a pick.
+ */
 function tryOpen(w: World, slot: number): void {
   if (w.pOffer[slot * 3]! >= 0 || w.pPending[slot]! <= 0 || w.pCardLock[slot]! > 0) return;
-  if (w.misc[MISC.Phase] === FloorPhase.Ascend) return;
+  const phase = w.misc[MISC.Phase];
+  if (phase !== FloorPhase.Cleared && phase !== FloorPhase.Arrive) return;
   openOffer(w, slot);
 }
 
@@ -38,16 +43,23 @@ export function xpForNext(w: World, slot: number): number {
   return BALANCE.progression.xpBase + BALANCE.progression.xpPerLevel * w.pLevel[slot]!;
 }
 
-/** Three different cards for one character, drawn with weights by rarity (common 6, rare 3, epic 1). */
+/** Three different cards for one character, drawn with weights by rarity (common 6, rare 3, epic 1) among the cards its class can use. */
 function openOffer(w: World, slot: number): void {
   w.pPending[slot] = w.pPending[slot]! - 1;
   const picked: number[] = [];
+  const cls = perk(w, slot, PERK.Class);
+  const pool: number[] = [];
   let total = 0;
-  for (let c = 0; c < CARDS; c++) total += RARITY_WEIGHT[CARD_RARITY[CARD_IDS[c]!]]!;
+  for (let c = 0; c < CARDS; c++) {
+    const id = CARD_IDS[c]!;
+    if (((CARD_CLASS[id] >> cls) & 1) === 0) continue;
+    pool.push(c);
+    total += RARITY_WEIGHT[CARD_RARITY[id]]!;
+  }
   while (picked.length < 3) {
     let r = w.rng.int(total);
-    let chosen = CARDS - 1;
-    for (let c = 0; c < CARDS; c++) {
+    let chosen = pool[pool.length - 1]!;
+    for (const c of pool) {
       r -= RARITY_WEIGHT[CARD_RARITY[CARD_IDS[c]!]]!;
       if (r < 0) {
         chosen = c;
@@ -190,6 +202,10 @@ function applyCard(w: World, card: number, by: number): void {
         if (w.pActive[s] && w.pState[s] === PlayerState.Alive) w.pHp[s] = w.pMaxHp[s]!;
       }
       break;
+    default:
+      // the universal cards: a table of stat changes
+      applyUniversal(w, CARD_IDS[card]!, by);
+      break;
   }
 }
 
@@ -210,13 +226,12 @@ export function updateCards(w: World, inputs: ReadonlyArray<PlayerInput | undefi
       tryOpen(w, s);
       continue;
     }
-    if (climbing) continue; // the clock of an open offer waits while the floor is being climbed
     let choice = -1;
     if (fresh & Buttons.Card1) choice = 0;
     else if (fresh & Buttons.Card2) choice = 1;
     else if (fresh & Buttons.Card3) choice = 2;
-    w.pCardTimer[s] = w.pCardTimer[s]! - 1;
-    if (choice < 0 && w.pCardTimer[s]! <= 0) choice = w.rng.int(3);
+    if (!climbing) w.pCardTimer[s] = w.pCardTimer[s]! - 1; // the clock of an open offer waits while the floor is being climbed (picking is still allowed)
+    if (choice < 0 && !climbing && w.pCardTimer[s]! <= 0) choice = 0; // out of time: the first card (no dice)
     if (choice < 0) continue;
     const card = w.pOffer[s * 3 + choice]!;
     for (let i = 0; i < 3; i++) w.pOffer[s * 3 + i] = -1;

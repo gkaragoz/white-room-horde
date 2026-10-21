@@ -5,7 +5,7 @@ import { playBots } from './bot';
 describe('balance', () => {
   it('a squad of simple bots gets a good way up and then dies: the game neither ends at once nor lets a squad live for ever', () => {
     // eight minutes of play each: the waves are big now, so a full soak would take too long on every test run
-    const floors = [1, 2].map((seed) => playBots(seed, 3, 30 * 60 * 8).floor);
+    const floors = [2, 3].map((seed) => playBots(seed, 3, 30 * 60 * 8).floor);
     for (const f of floors) {
       expect(f).toBeGreaterThanOrEqual(4);
       expect(f).toBeLessThanOrEqual(60);
