@@ -57,7 +57,7 @@ def ts():
         texts = {"en": en, "tr": tr}
         for lang in ("de", "es", "fr", "ru"):
             texts[lang] = tuple(extra.get(lang, en))
-        t = ", ".join("%s: [%s, %s]" % (k, json.dumps(v[0], ensure_ascii=False).replace('"', "'"), json.dumps(v[1], ensure_ascii=False).replace('"', "'")) for k, v in texts.items())
+        t = ", ".join("%s: [%s, %s]" % (k, q(v[0]), q(v[1])) for k, v in texts.items())
         f = ", ".join("%s: %s" % (k, v) for k, v in fx.items())
         out.append("  { id: '%s', weight: %d, fx: { %s }, text: { %s } }," % (mid, weight, f, t))
     out.append("] as const satisfies readonly ModDef[];")
