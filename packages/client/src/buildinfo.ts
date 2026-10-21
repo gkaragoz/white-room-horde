@@ -1,3 +1,5 @@
+import { toggleReleaseNotes } from './releaseNotes';
+
 /** What this build is: shown in the corner of every screen so a report or a screenshot says which version it came from. */
 export const BUILD = {
   version: __APP_VERSION__,
@@ -18,9 +20,13 @@ export function mountVersionBadge(parent: HTMLElement = document.body): HTMLElem
   const el = document.createElement('div');
   el.id = 'wrh-version';
   el.textContent = buildLabel();
-  el.title = buildTitle();
+  el.title = buildTitle() + '\n(click: what is new)';
   el.style.cssText =
     'position:fixed;left:8px;top:6px;z-index:50;font:600 11px/1.2 system-ui,sans-serif;color:#3a352d;opacity:.62;pointer-events:auto;user-select:text;text-shadow:0 1px 0 rgba(255,255,255,.6);letter-spacing:.2px';
+  // a click opens the release notes (in the interface language)
+  el.style.cursor = 'pointer';
+  el.style.textDecoration = 'underline dotted';
+  el.onclick = () => toggleReleaseNotes();
   parent.appendChild(el);
   return el;
 }

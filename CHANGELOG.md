@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+- The version number in the corner is clickable: it opens a window with the release notes in plain words, in the interface language (and it follows the language when you change it while it is open). Esc or a click outside closes it.
+
 ## v0.19.0 (2026-10-20)
 
 **More of everything: 10 enemies, 5 elites, 5 bosses, 10 guns, harder floors (rules and wire format change: update the server and reload the page)**

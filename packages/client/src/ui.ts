@@ -954,6 +954,7 @@ export class Ui {
     document.head.appendChild(style);
     this.root.className = 'wrh-ui';
     this.lang = settings.lang;
+    document.documentElement.lang = this.lang;
     this.hud.style.cssText = 'position:absolute;inset:0;pointer-events:none';
     this.dev.className = 'wrh-hud-dev';
     this.infoEl.className = 'wrh-info';
@@ -2191,6 +2192,8 @@ export class Ui {
     this.root.style.setProperty('--wrh-zoom', String([1, 1.18, 1.38][s.textSize] ?? 1));
     const langChanged = this.lang !== s.lang;
     this.lang = s.lang;
+    document.documentElement.lang = this.lang;
+    if (langChanged) window.dispatchEvent(new Event('wrh-lang')); // the release notes window follows the language
     this.refreshToolbar();
     if (this.settingsOpen || this.controlsOpen) this.renderSettings();
     this.lastCards = '';
