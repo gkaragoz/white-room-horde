@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.24.0 (2026-10-21)
+
 **Unlimited ammo and click-to-pick weapons (rules change: update the server and reload the page)**
 
 - Ammo is unlimited: only the magazine and the reload count. Ammo crates, reserves, low-ammo drop bonus and automatic weapon switching are gone; the Full magazines card is now Speed loader (reload 20% faster).
