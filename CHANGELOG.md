@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.25.0 (2026-10-21)
+
 **Balance: harder enemies, boss attacks as a share of health (rules change: update the server and reload the page)**
 
 - All flat enemy damage (melee, spit, explosions, acid and fire) is doubled (`enemyDamageMul`).
