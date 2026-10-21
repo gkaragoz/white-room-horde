@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.22.0 (2026-10-21)
+
 **Drone companions (rules and wire format change: update the server and reload the page)**
 
 - Every player can carry **one active drone** that hovers beside them (a propeller-free sci-fi pod with an anti-gravity halo) and acts on its own, and keeps the others in an inventory (click the drone card at the top left to open the list and switch; a switch warms the new drone up for 4 s). Seven kinds: **medic** (a green beam heals the squad members who need it most, more of them at once as it levels; revives a downed player from tier 4), **frost** (a slowing field, bosses half, damage and a freezing pulse on higher tiers), **rocket** (salvos that burst on the crowd), **gun** (long range, accurate), **twin gun** (close range spray, more barrels with the tiers), **tesla** (chain lightning) and **collector** (pulls the loot its owner wants from far away).
