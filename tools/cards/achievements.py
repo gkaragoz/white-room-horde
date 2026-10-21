@@ -72,6 +72,10 @@ def rows():
     return out
 
 
+def q(text):
+    return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
 def ts():
     r = rows()
     out = [
@@ -93,7 +97,7 @@ def ts():
         "export const ACHIEVEMENTS = [",
     ]
     for aid, group, tier, kind, stat, target, hidden, en, tr in r:
-        out.append("  { id: '%s', group: '%s', tier: %d, kind: '%s', stat: '%s', target: %d, hidden: %s, name: { en: %s, tr: %s } }," % (aid, group, tier, kind, stat, target, "true" if hidden else "false", json.dumps(en, ensure_ascii=False).replace('"', "'"), json.dumps(tr, ensure_ascii=False).replace('"', "'")))
+        out.append("  { id: '%s', group: '%s', tier: %d, kind: '%s', stat: '%s', target: %d, hidden: %s, name: { en: %s, tr: %s } }," % (aid, group, tier, kind, stat, target, "true" if hidden else "false", q(en), q(tr)))
     out.append("] as const satisfies readonly AchievementDef[];")
     out.append("")
     return "\n".join(out)
