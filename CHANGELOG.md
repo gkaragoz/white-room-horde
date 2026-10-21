@@ -7,6 +7,12 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Weak machines and releases without chores**
+
+- Slow computers: the horde outside the camera is no longer sent to the graphics card, a quality governor lowers particles, gore, lingering corpses and the horde's shadows in three steps when the frame rate still sags at the lowest resolution (and raises them again), and a client that fell behind the server spends a bigger slice of each frame catching up. The simulation itself was measured at about 1.5 ms per tick with 510 enemies, so it was left alone (`packages/sim/scripts/bench.ts`).
+- The browser checks `play-all`, `aim-check`, `notes-check` and `net-stutter` run in CI as well.
+- New `relay` workflow: pushing a version tag deploys the Cloudflare relay and checks that it reports the new version (needs the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; without them it only warns). See `docs/RELEASING.md`.
+
 ## v0.20.0 (2026-10-21)
 
 **Online movement without stutter (the input message changes: update the server and reload the page)**

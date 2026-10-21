@@ -113,5 +113,33 @@ console.log(`worst frames: ${worst.map((f) => f[1].toFixed(0)).join(', ')} ms`);
 console.log(`renderer: ${data.info.calls} calls, ${data.info.triangles} triangles, ${data.mem.geometries} geometries, ${data.mem.textures} textures, ${data.programs} programs`);
 console.log(`first ${warm} frames (before measuring) hold the one-off compiles: worst ${Math.max(...data.all.slice(0, warm).map((f) => f[1])).toFixed(0)} ms`);
 if (errors.length) console.log('PAGE ERRORS:\n- ' + errors.slice(0, 5).join('\n- '));
+if (args.includes('--levers')) {
+  // what each lever buys on this machine: average frame time over four seconds with it pulled
+  const avg = () =>
+    page.evaluate(
+      () =>
+        new Promise((res) => {
+          let n = 0;
+          const a = performance.now();
+          const f = () => {
+            n++;
+            if (performance.now() - a < 4000) requestAnimationFrame(f);
+            else res((performance.now() - a) / n);
+          };
+          requestAnimationFrame(f);
+        }),
+    );
+  const row = async (label) => console.log(`lever ${label.padEnd(34)} ${(await avg()).toFixed(0)} ms/frame`);
+  await row('as is');
+  await page.evaluate(() => (window.__wrh.crowd.group.visible = false));
+  await row('horde not drawn');
+  await page.evaluate(() => {
+    window.__wrh.crowd.group.visible = true;
+    window.__wrh.crowd.setShadows(false);
+  });
+  await row('horde shadows off');
+  await page.evaluate(() => window.__wrh.stage.setScale(0.55));
+  await row('shadows off + resolution 0.55');
+}
 await browser.close();
 server.close();

@@ -1,0 +1,46 @@
+name: relay
+# Deploys the Cloudflare relay when a version tag is pushed (the relay and every client must run the same major.minor).
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN (the "Edit Cloudflare Workers" template) and CLOUDFLARE_ACCOUNT_ID.
+# Without them the job only says so and succeeds; `pnpm --filter @wrh/relay exec wrangler deploy` by hand still works.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Are the secrets there?
+        id: have
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "::warning::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set: the relay was not deployed. Run wrangler deploy by hand."; fi
+      - uses: actions/checkout@v4
+        if: steps.have.outputs.ok == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.have.outputs.ok == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.have.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.have.outputs.ok == 'true'
+      - name: Deploy
+        if: steps.have.outputs.ok == 'true'
+        working-directory: packages/relay
+        run: pnpm exec wrangler deploy
+      - name: The relay reports the version of this commit
+        if: steps.have.outputs.ok == 'true'
+        run: |
+          want=$(node -p "require('./package.json').version")
+          for i in 1 2 3 4 5 6; do
+            got=$(curl -fsS https://white-room-horde-relay.gkaragoz96tablet.workers.dev/version.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" || true)
+            echo "relay says $got, wanted $want"
+            [ "$got" = "$want" ] && exit 0
+            sleep 5
+          done
+          exit 1

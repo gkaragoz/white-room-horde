@@ -18,3 +18,17 @@ What was changed: the blood layer is cut into tiles that upload one at a time in
 rings and melee slashes reuse meshes and materials; ragdoll bodies of the common enemy types are built and compiled at load; the
 ragdoll pose code reuses scratch objects; the sound bank keeps its list of decoded files; the HUD no longer rebuilds elements
 every update (the browser re-serialises innerHTML, so comparing against it never matched).
+
+## v0.21.0: where the time goes on a weak machine
+
+`pnpm --filter @wrh/server exec tsx ../sim/scripts/bench.ts [wave] [ticks] [players]` times the simulation alone: a full horde
+(510 enemies, wave 25-40, 4 bots) costs about 1.5 ms per tick (p95 3 ms, worst 12 ms) against a 33 ms budget, so the simulation is not
+what drags a slow machine down. With the software renderer the main thread is idle 78% of the time while frames take 250 ms: the
+rendering side is the cost (hundreds of thousands of triangles per frame, shadows, post-processing).
+
+What the game now does about it:
+- The horde outside the camera's view is not put into the instance buffers (`Crowd.setView`).
+- A quality governor (`applyQuality` in `main.ts`) follows the resolution scaler: when the frame rate still sags at the lowest
+  resolution, particles and gore, the corpses kept and the horde's shadows shed weight in three steps, and come back with headroom.
+- A client that is far behind the server (catching up) gives the simulation a bigger slice of each frame (10 ms up to 35 ms).
+- `node tools/ci/perf-spikes.mjs 4 25 3 --soft --levers` prints what each lever buys on the machine it runs on.

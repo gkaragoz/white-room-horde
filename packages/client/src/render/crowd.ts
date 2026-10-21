@@ -209,6 +209,12 @@ export class Crowd {
   private corpses: Corpse[] = [];
   /** Seconds a death animation stays on screen (a setting). */
   corpseLife = CORPSE_DEFAULT;
+  /** Ground rectangle (sim coordinates) the camera sees, plus a margin: what is outside is not put into the instance buffers. Null: draw everything. */
+  private view: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
+  /** Enemies and corpses skipped by the view cull in the last frame (diagnostics). */
+  culled = 0;
+  /** Upper limit on the corpses kept lying around, lowered by the quality governor on slow machines. */
+  corpseCap = Infinity;
   private readonly flash = new Float32Array(MAX_ENEMIES);
   /** How iced over each enemy is drawn (0..1), eased toward the sim's frozen state; a thaw is noticed when it drops from solid. */
   readonly frostLevel = new Float32Array(MAX_ENEMIES);
@@ -301,6 +307,14 @@ export class Crowd {
     const clips = new Map<string, ClipRef>();
     for (const c of meta.clips) clips.set(c.id, c);
     return { mesh, geometry, posYaw, anim, hop, frost, clips, count: 0, capacity, scale: meta.scale };
+  }
+
+  setView(minX: number, maxX: number, minY: number, maxY: number): void {
+    this.view = { minX, maxX, minY, maxY };
+  }
+
+  clearView(): void {
+    this.view = null;
   }
 
   /** Call before each sim step so the next frames can interpolate from the previous tick. */
@@ -401,9 +415,17 @@ export class Crowd {
       this.frostWas[i] = on ? 1 : 0;
     }
     for (const t of this.types) t.count = 0;
+    const view = this.view;
+    let culled = 0;
     for (let i = 0; i < MAX_ENEMIES; i++) {
       if (!w.eActive[i]) {
         this.drawn[i] = 0;
+        continue;
+      }
+      // off screen: nothing to draw (it starts afresh when it comes back into view)
+      if (view && (w.eX[i]! < view.minX || w.eX[i]! > view.maxX || w.eY[i]! < view.minY || w.eY[i]! > view.maxY)) {
+        this.drawn[i] = 0;
+        culled++;
         continue;
       }
       const ri = this.renderIndex(w, i, w.eType[i]!);
@@ -490,7 +512,12 @@ export class Crowd {
     }
     // corpses do not pile up: after a few seconds they shrink away and only the blood stays on the floor
     for (let k = this.corpses.length - 1; k >= 0; k--) if (now - this.corpses[k]!.born > this.corpseLife) this.corpses.splice(k, 1);
+    while (this.corpses.length > this.corpseCap) this.corpses.shift();
     for (const c of this.corpses) {
+      if (view && (c.x < view.minX || c.x > view.maxX || c.y < view.minY || c.y > view.maxY)) {
+        culled++;
+        continue;
+      }
       const t = this.types[c.render]!;
       const clip = t.clips.get(c.clip) ?? t.clips.get(this.specFor(c.render).death)!;
       // knocked back by the killing shot, friction brings it to rest
@@ -503,6 +530,7 @@ export class Crowd {
       const left = this.corpseLife - (now - c.born);
       this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale, heightAt(map, c.x, c.y, c.layer) - (left < CORPSE_FADE ? (1 - Math.max(0, left / CORPSE_FADE)) * 1.3 : 0)); // sinks into the floor where it lies
     }
+    this.culled = culled;
     let tris = 0;
     for (const t of this.types) {
       t.geometry.instanceCount = t.count;

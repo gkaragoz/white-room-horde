@@ -209,6 +209,7 @@ function applySettings(): void {
   stage.setDynamicLights(settings.dynLights);
   fx.density = [0.5, 1, 1.6][settings.particles]!;
   fx.gore = [0.4, 1, 1.8][settings.gore]!;
+  if (qualityLevel > 0) applyQuality(qualityLevel);
   audio.gore = settings.gore >= 1 ? 1 : 0;
   audio.sfxVolume = settings.sfxVolume;
   audio.voiceVolume = settings.voiceVolume;
@@ -1025,6 +1026,50 @@ function onlineInputTick(): void {
 const inputTimer = new InputTimer(onlineInputTick);
 inputTimer.start();
 
+const _vp = new THREE.Vector3();
+const _vq = new THREE.Vector3();
+
+/** The ground rectangle the camera sees (sim coordinates) with a margin for tall bodies: the horde outside it is not sent to the GPU. */
+function setCrowdView(): void {
+  const cam = stage.camera;
+  cam.updateMatrixWorld();
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (const [cx, cy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+    _vp.set(cx, cy, -1).unproject(cam);
+    _vq.set(cx, cy, 1).unproject(cam);
+    const dy = _vq.y - _vp.y;
+    if (Math.abs(dy) < 1e-6) {
+      crowd.clearView();
+      return;
+    }
+    const t = -_vp.y / dy;
+    const gx = _vp.x + (_vq.x - _vp.x) * t;
+    const gy = -(_vp.z + (_vq.z - _vp.z) * t);
+    minX = Math.min(minX, gx);
+    maxX = Math.max(maxX, gx);
+    minY = Math.min(minY, gy);
+    maxY = Math.max(maxY, gy);
+  }
+  const m = 7; // a boss is tall, floors above and below shift what is seen
+  crowd.setView(minX - m, maxX + m, minY - m, maxY + m);
+}
+
+/**
+ * Quality governor, the step after resolution scaling: when the frame rate still sags at the lowest resolution, effects shed
+ * weight one level at a time (0 = everything). It comes back up when there is headroom.
+ */
+let qualityLevel = 0;
+function applyQuality(level: number): void {
+  qualityLevel = level;
+  const base = [0.5, 1, 1.6][settings.particles]!;
+  const baseGore = [0.4, 1, 1.8][settings.gore]!;
+  fx.density = base * [1, 0.7, 0.45, 0.3][level]!;
+  fx.gore = baseGore * [1, 0.7, 0.45, 0.3][level]!;
+  crowd.corpseCap = [Infinity, 80, 30, 8][level]!;
+  if (level >= 1) crowd.setShadows(false);
+  else if (autoScale >= 0.8) crowd.setShadows(true);
+}
+
 let lastDrawn = 0;
 let slowSeconds = 0;
 let autoScaleQuiet = 0;
@@ -1056,6 +1101,14 @@ function adaptScale(currentFps: number, seconds: number): void {
     stage.setScale(autoScale);
     if (autoScale <= 0.65) crowd.setShadows(false); // last resort for slow machines: the horde stops casting shadows
     slowSeconds = 0;
+    autoScaleQuiet = 5;
+  } else if (slowSeconds >= 3 && autoScale <= 0.55 && qualityLevel < 3) {
+    applyQuality(qualityLevel + 1);
+    slowSeconds = 0;
+    autoScaleQuiet = 5;
+  } else if (fastSeconds >= 10 && qualityLevel > 0) {
+    applyQuality(qualityLevel - 1);
+    fastSeconds = 0;
     autoScaleQuiet = 5;
   } else if (fastSeconds >= 10 && autoScale < settings.scale) {
     autoScale = Math.min(settings.scale, autoScale + 0.05);
@@ -1428,6 +1481,8 @@ function frame(nowMs: number): void {
     }
     audio.setListener(fx0, fy0);
     audio.tick(w, localSlot, dt);
+    if (lifted.active) crowd.clearView();
+    else setCrowdView();
     crowd.update(w, alpha, animSec);
     ground.colorblind = settings.colorblind;
     ground.update(w, nowSec, catchingUp ? null : fx, dt);

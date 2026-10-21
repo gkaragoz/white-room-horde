@@ -23,6 +23,7 @@ jobs:
   # (same simulation hashes as Node) in Firefox and WebKit.
   browser-qa:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -38,3 +39,10 @@ jobs:
       - run: node tools/ci/game-smoke.mjs chromium
       - run: node tools/ci/game-smoke.mjs firefox
       - run: node tools/ci/game-smoke.mjs webkit
+      # the whole game in a real page: every class, aiming, the release notes window, and the online movement check
+      # (the last one only prints its numbers on a runner without a GPU; see tools/ci/net-stutter.mjs)
+      - run: node tools/ci/play-all.mjs
+      - run: node tools/ci/aim-check.mjs
+      - run: node tools/ci/notes-check.mjs
+      - run: node tools/ci/net-stutter.mjs
+        continue-on-error: true

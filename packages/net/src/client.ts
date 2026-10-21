@@ -355,8 +355,10 @@ export class NetSession {
     const behind = this.received - this.applied;
     if (behind > 45) {
       this.catchingUp = true;
+      // the further behind, the bigger the slice of the frame given to catching up (up to ~3.5x): a slow machine must not fall further and further behind
+      const slice = Math.min(sliceMs * 3.5, sliceMs + behind * 0.4);
       const t0 = performance.now();
-      while (performance.now() - t0 < sliceMs) {
+      while (performance.now() - t0 < slice) {
         const b = this.bundles.get(this.applied + 1);
         if (!b) break;
         this.stepOne(b, hooks);
