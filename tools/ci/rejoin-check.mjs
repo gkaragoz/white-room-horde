@@ -78,7 +78,20 @@ try {
   })();
   check('the guest can fire before the pause (the check itself works)', beforePause.fired, JSON.stringify(beforePause));
 
-  // ---- 1. pause and resume (the paused time does not count: the squad that only stands about is still alive afterwards)
+  // ---- 1. a dropped connection continues in the same world (first, while the squad is still alive: a finished game does not reconnect)
+  await guest.page.evaluate(() => {
+    window.__keep = window.__wrh.world;
+    window.__wrh.ws.close(); // the page reconnects by itself
+  });
+  await guest.page.waitForFunction(() => window.__wrh.session?.adopted === true, null, { timeout: 30000 }).catch(() => {});
+  await sleep(3500);
+  const re = await guest.page.evaluate(() => ({ same: window.__wrh.world === window.__keep, adopted: window.__wrh.session.adopted, slot: window.__wrh.session.slot, tick: window.__wrh.world.tick, backlog: window.__wrh.session.backlog, desyncs: window.__wrh.session.desyncTicks.length }));
+  const hostTick = await host.page.evaluate(() => window.__wrh.world.tick);
+  check('the page carried on in the same world with its slot', re.same && re.adopted && re.slot === 1, JSON.stringify(re));
+  check('and it is level with the host (no replay from tick 0)', Math.abs(re.tick - hostTick) < 90 && re.backlog < 120, `guest ${re.tick}, host ${hostTick}, backlog ${re.backlog}`);
+  check('no desync after the reconnect', re.desyncs === 0);
+
+  // ---- 2. pause and resume
   const sockHost = host.sockets.n;
   const sockGuest = guest.sockets.n;
   await host.page.evaluate(() => window.__wrh.session.setPause(true));
@@ -108,19 +121,6 @@ try {
   // a player the horde has already downed cannot shoot whatever the network does: then only the input path is judged (below)
   check('after the long pause the guest can fire again', afterPause.fired || afterPause.state !== 0, JSON.stringify(afterPause));
   check('and its input tags are where the relay can use them', afterPause.away === 0 && afterPause.ahead <= afterPause.lead + 4, `ahead ${afterPause.ahead}, lead ${afterPause.lead}`);
-
-  // ---- 2. a dropped connection continues in the same world
-  await guest.page.evaluate(() => {
-    window.__keep = window.__wrh.world;
-    window.__wrh.ws.close(); // the page reconnects by itself
-  });
-  await guest.page.waitForFunction(() => window.__wrh.session?.adopted === true, null, { timeout: 30000 }).catch(() => {});
-  await sleep(3500);
-  const re = await guest.page.evaluate(() => ({ same: window.__wrh.world === window.__keep, adopted: window.__wrh.session.adopted, slot: window.__wrh.session.slot, tick: window.__wrh.world.tick, backlog: window.__wrh.session.backlog, desyncs: window.__wrh.session.desyncTicks.length }));
-  const hostTick = await host.page.evaluate(() => window.__wrh.world.tick);
-  check('the page carried on in the same world with its slot', re.same && re.adopted && re.slot === 1, JSON.stringify(re));
-  check('and it is level with the host (no replay from tick 0)', Math.abs(re.tick - hostTick) < 90 && re.backlog < 120, `guest ${re.tick}, host ${hostTick}, backlog ${re.backlog}`);
-  check('no desync after the reconnect', re.desyncs === 0);
 
   // ---- 3. F5 and "return to the game"
   await guest.page.reload();
