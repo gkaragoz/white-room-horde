@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.20.1 (2026-10-21)
+
 **Weak machines and releases without chores**
 
 - Slow computers: the horde outside the camera is no longer sent to the graphics card, a quality governor lowers particles, gore, lingering corpses and the horde's shadows in three steps when the frame rate still sags at the lowest resolution (and raises them again), and a client that fell behind the server spends a bigger slice of each frame catching up. The simulation itself was measured at about 1.5 ms per tick with 510 enemies, so it was left alone (`packages/sim/scripts/bench.ts`).
