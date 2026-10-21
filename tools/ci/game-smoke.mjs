@@ -37,6 +37,14 @@ const check = (label, ok, detail = '') => {
   results.push({ label, ok });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? '  ' + detail : ''}`);
 };
+/** Wait (a slow runner trails real time) until the weapon in the hands is `weapon`, at most 4 s. */
+const weaponIs = async (weapon) => {
+  for (let i = 0; i < 40; i++) {
+    if ((await state()).weapon === weapon) return true;
+    await sleep(100);
+  }
+  return false;
+};
 const state = () =>
   page.evaluate(() => {
     const w = window.__wrh.world;
@@ -120,14 +128,11 @@ try {
   await hold(['Digit2', 'KeyQ'], 4);
   check('number keys and Q no longer pick a weapon', (await state()).weapon === 0, `weapon ${(await state()).weapon}`);
   await page.click('.wrh-inv .row[data-w="9"]');
-  await sleep(300);
-  check('a click on the MP row takes the MP', (await state()).weapon === 8, `weapon ${(await state()).weapon}`);
+  check('a click on the MP row takes the MP', await weaponIs(8), `weapon ${(await state()).weapon}`);
   await page.click('.wrh-inv .row[data-w="4"]');
-  await sleep(300);
-  check('a click on the shotgun row takes the shotgun', (await state()).weapon === 3, `weapon ${(await state()).weapon}`);
+  check('a click on the shotgun row takes the shotgun', await weaponIs(3), `weapon ${(await state()).weapon}`);
   await page.click('.wrh-inv .row[data-w="1"]');
-  await sleep(300);
-  check('a click on the pistol row takes the pistol', (await state()).weapon === 0, `weapon ${(await state()).weapon}`);
+  check('a click on the pistol row takes the pistol', await weaponIs(0), `weapon ${(await state()).weapon}`);
   const inv = await page.evaluate(() => document.querySelectorAll('.wrh-inv .row').length);
   check('the weapon list shows the owned weapons', inv === 3, `${inv} rows`);
 
