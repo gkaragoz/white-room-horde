@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.23.0 (2026-10-21)
+
 **Online: pause, dropped connections and coming back (rules change: update the server and reload the page)**
 
 - A host pause of a minute no longer cuts everybody's connection: the silence watchdog saw the pause as a dead line the moment the game resumed (no tick for 58 s) and both pages reconnected at once. The silence clock now restarts when a pause starts and ends, and the watchdog waits 3 s after a resume.
