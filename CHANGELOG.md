@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.26.0 (2026-10-21)
+
 **Level queue and 50 universal cards (rules change: update the server and reload the page)**
 
 - Levels bank up during a floor (`pPending`); the card offer opens only when the floor is cleared (or on the new floor before its enemies come), never mid-fight, never during the climb. Picking is allowed during the climb; the offer clock waits.
