@@ -7,6 +7,12 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**20 difficulty multipliers instead of Easy / Normal / Hard (rules change: update the server and reload the page)**
+
+- The `difficulty` number (0-2) is now `mods`, a 20-bit mask over `MODS` (`tools/cards/mods.py`): world, room options, the `options` and `start` messages, the replay header (32 bits, new magic) and the hash. All multipliers make the game harder; `packages/sim/src/mods.ts` turns the mask into factors that enemies, pickups, cards and the player stats read.
+- Score = (floors x 500 + kills x 10 + bosses x 1000 + seconds alive) x (1 + sum of the weights / 20), shown on the game over screen; the profile keeps the best score.
+- Menu and lobby: a summary button opens the full-screen grid (host and solo edit, guests look).
+
 ## v0.27.0 (2026-10-21)
 
 **90 class cards (rules change: update the server and reload the page)**

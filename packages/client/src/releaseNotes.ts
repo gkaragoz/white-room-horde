@@ -23,6 +23,28 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.28',
+    date: '2026-10-22',
+    text: {
+      en: {
+        title: '20 difficulty multipliers',
+        items: [
+          'Easy, Normal and Hard are gone. Instead there are 20 multipliers you switch on one by one (tougher enemies, bigger hordes, fragile you, no medkits, steeper floors...). The host chooses for everybody in the lobby.',
+          'Every multiplier raises your final score: your score is floors, kills, bosses and time alive, times the combined multiplier. The game over screen shows it.',
+          'The multipliers have their own full-screen grid with an icon for each; hover one to read what it does.',
+        ],
+      },
+      tr: {
+        title: '20 zorluk çarpanı',
+        items: [
+          'Kolay, Normal ve Zor kalktı. Yerine tek tek açıp kapattığın 20 çarpan geldi (daha sağlam düşmanlar, büyük sürüler, kırılgan sen, medkit yok, daha dik katlar...). Lobide herkes için host seçer.',
+          'Her çarpan final skorunu yükseltir: skor, kat, öldürme, boss ve hayatta kalma süresinin toplamı çarpı birleşik çarpandır. Oyun sonu ekranında görünür.',
+          'Çarpanların her biri için simgeli, tam ekran kendi ızgarası var; üzerine gelince ne yaptığı yazar.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.27',
     date: '2026-10-21',
     text: {
