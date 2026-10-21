@@ -89,6 +89,7 @@ const BASE_STRINGS = {
     infoBy: 'taken by',
     teamInfo: { heal: 'Everyone healed to full', ammo: 'Every weapon refilled for everyone', grenades: '+2 grenades for everyone', luck: '+50% loot drops for the squad' },
     lvShort: 'Lv',
+    youBadge: 'YOU',
     choosing: 'choosing a card',
     settings: 'Settings',
     volume: 'Volume',
@@ -308,6 +309,7 @@ const BASE_STRINGS = {
     infoBy: 'seçen',
     teamInfo: { heal: 'Herkesin canı tam doldu', ammo: 'Herkesin tüm silahları doldu', grenades: 'Herkese +2 el bombası', luck: 'Takım için %50 daha çok ganimet' },
     lvShort: 'Sv',
+    youBadge: 'SEN',
     choosing: 'kart seçiyor',
     settings: 'Ayarlar',
     volume: 'Ses',
@@ -633,7 +635,9 @@ const CSS_BASE = `
 .wrh-bar.boss>i{background:#d8362e}
 .wrh-squad{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:7px;max-width:260px}
 .wrh-pc{width:196px;padding:6px 9px 7px;border-radius:12px;background:rgba(251,246,234,.82);border:1.5px solid rgba(43,58,82,.18);border-left:4px solid var(--pc);box-shadow:0 2px 8px rgba(20,28,44,.18);backdrop-filter:blur(2px);font-size:12px;font-weight:600;color:#2b3a52}
-.wrh-pc.me{width:230px;padding:8px 11px 9px;font-size:13px}
+.wrh-pc.me{width:230px;padding:8px 11px 9px;font-size:13px;background:rgba(255,255,255,.93);box-shadow:0 0 0 2px #fff,0 0 0 4px #1b2433,0 0 16px 4px rgba(255,255,255,.8)}
+.wrh-pc.me .top b{flex:0 1 auto;padding:1px 7px;border-radius:7px;background:#1b2433;color:#fff}
+.wrh-pc.me .top .you{font-style:normal;font-size:9px;font-weight:900;letter-spacing:.08em;padding:1px 6px;border-radius:6px;background:#fff;color:#1b2433;box-shadow:inset 0 0 0 1.5px #1b2433}.wrh-pc.me .top .lv{margin-left:auto}
 .wrh-pc .top{display:flex;align-items:center;gap:6px;margin-bottom:4px}
 .wrh-pc .top b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
 .wrh-pc .top .lv{font-size:.82em;font-weight:800;padding:0 5px;border-radius:7px;background:rgba(43,58,82,.12)}
@@ -2546,7 +2550,7 @@ export class Ui {
       if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>${icon('chip_haste', 16)}</i>${Math.ceil(haste)}s</span>`;
       if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>${icon('chip_quad', 16)}</i>${Math.ceil(quad)}s</span>`;
       squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${frac < 0.3 && st === PlayerState.Alive ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
-        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${world.pDrone[s] ? `<span class="dr-chip">${icon('drone_' + (world.pDrone[s]! - 1), 14)}${world.pDLv[s * DRONE_TYPES.length + world.pDrone[s]! - 1]}</span>` : ''}${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
+        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${s === slot ? `<i class="you">${t.youBadge}</i>` : ''}${world.pDrone[s] ? `<span class="dr-chip">${icon('drone_' + (world.pDrone[s]! - 1), 14)}${world.pDLv[s * DRONE_TYPES.length + world.pDrone[s]! - 1]}</span>` : ''}${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
         `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
         `<div class="stats" data-tip="pc" data-s="${s}"><span>${t.dpsLabel} <b>${Math.round(this.dpsOf(world, s, now))}</b></span><span>${icon('go_kills', 14)} <b>${Math.round(world.pPerk[s * PERKS + PERK.Kills]!)}</b></span></div>` +
         (chips ? `<div class="chips">${chips}</div>` : '') +

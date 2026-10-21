@@ -74,6 +74,7 @@ attribute float iHop;
 attribute float iFrost;
 varying float vFrost;
 varying float vFrostH;
+varying float vPale;
 uniform highp sampler2D uVat;
 `;
 
@@ -92,6 +93,18 @@ vFrostH = transformed.y - iHop;
 const FROST_DECL = /* glsl */ `
 varying float vFrost;
 varying float vFrostH;
+varying float vPale;
+`;
+
+// Corpses (negative shade) wash out to a pale grey-teal so only the living stand out, and every body gets a thin cool rim
+// light that separates its silhouette from the pale floor.
+const PALE_COLOR = /* glsl */ `
+diffuseColor.rgb = mix( diffuseColor.rgb, vec3( dot( diffuseColor.rgb, vec3( 0.3, 0.59, 0.11 ) ) * 1.15 + 0.1 ), vPale * 0.7 );
+`;
+
+const RIM_EMISSIVE = /* glsl */ `
+float rimF = pow( 1.0 - clamp( dot( normalize( normal ), normalize( vViewPosition ) ), 0.0, 1.0 ), 3.0 );
+totalEmissiveRadiance += vec3( 0.55, 0.78, 0.9 ) * rimF * 0.32 * ( 1.0 - vPale );
 `;
 
 const FROST_COLOR = /* glsl */ `
@@ -112,16 +125,16 @@ function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolea
     shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\n' + VERTEX_DECL).replace('#include <begin_vertex>', VERTEX_BEGIN);
     if (tint) {
       // per-instance brightness variation rides in iAnim.w
-      shader.vertexShader = shader.vertexShader.replace('#include <color_vertex>', '#include <color_vertex>\n#ifdef USE_COLOR\nvColor.rgb *= iAnim.w;\n#endif');
+      shader.vertexShader = shader.vertexShader.replace('#include <color_vertex>', '#include <color_vertex>\n#ifdef USE_COLOR\nvColor.rgb *= abs( iAnim.w );\n#endif\nvPale = step( iAnim.w, 0.0 );');
       // frost: an ice coat that creeps up from the feet (iFrost 0..1), noise from the paint texture breaks its edge
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', '#include <common>\n' + FROST_DECL)
-        .replace('#include <color_fragment>', '#include <color_fragment>\n' + FROST_COLOR)
+        .replace('#include <color_fragment>', '#include <color_fragment>\n' + FROST_COLOR + PALE_COLOR)
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix( roughnessFactor, 0.16, frostCover );')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FROST_EMISSIVE);
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + FROST_EMISSIVE + RIM_EMISSIVE);
     }
   };
-  material.customProgramCacheKey = () => (tint ? 'wrh-vat-lit-frost' : 'wrh-vat-depth');
+  material.customProgramCacheKey = () => (tint ? 'wrh-vat-lit-frost-rim' : 'wrh-vat-depth');
 }
 
 /**
@@ -131,7 +144,7 @@ function patchVat(material: THREE.Material, vat: THREE.DataTexture, tint: boolea
 async function makeNodeMaterial(vat: THREE.DataTexture, paint: THREE.Texture): Promise<THREE.Material> {
   const webgpu = await import('three/webgpu');
   const tsl = await import('three/tsl');
-  const { attribute, vertexIndex, textureLoad, ivec2, int, vec3, vec4, mix, cos, sin, texture, uv, positionWorld, smoothstep, float } = tsl;
+  const { attribute, vertexIndex, textureLoad, ivec2, int, vec3, vec4, mix, cos, sin, texture, uv, positionWorld, smoothstep, float, normalView, positionView, pow } = tsl;
   const posYaw = attribute('iPosYaw', 'vec4');
   const anim = attribute('iAnim', 'vec4');
   const hop = attribute('iHop', 'float');
@@ -146,12 +159,16 @@ async function makeNodeMaterial(vat: THREE.DataTexture, paint: THREE.Texture): P
   const mat = new webgpu.MeshStandardNodeMaterial({ flatShading: true, roughness: 0.85, metalness: 0 });
   mat.positionNode = rotated.add(vec3(posYaw.x, hop, posYaw.z));
   const col = attribute('color', 'vec3');
-  const base = texture(paint).rgb.mul(col).mul(anim.w);
+  const pale = anim.w.lessThan(0).select(1, 0);
+  const lit = texture(paint).rgb.mul(col).mul(anim.w.abs());
+  const grey = lit.dot(vec3(0.3, 0.59, 0.11)).mul(1.15).add(0.1);
+  const base = mix(lit, vec3(grey, grey, grey), pale.mul(0.7));
   const noise = texture(paint, uv().mul(2.7).add(vec3(0.37, 0.11, 0).xy)).g;
   const cover = smoothstep(float(0), float(0.32), frost.mul(2.1).sub(positionWorld.y.mul(0.5)).add(noise.sub(0.5).mul(0.75)));
   const ice = mix(vec3(0.58, 0.84, 1.0), vec3(0.93, 0.98, 1.0), noise);
   mat.colorNode = vec4(mix(base, ice, cover.mul(0.93).mul(frost.greaterThan(0.001).select(1, 0))), 1);
-  mat.emissiveNode = vec3(0.2, 0.42, 0.7).mul(cover).mul(0.5);
+  const rim = pow(float(1).sub(normalView.dot(positionView.negate().normalize()).clamp(0, 1)), 3);
+  mat.emissiveNode = vec3(0.2, 0.42, 0.7).mul(cover).mul(0.5).add(vec3(0.55, 0.78, 0.9).mul(rim).mul(0.32).mul(float(1).sub(pale)));
   mat.roughnessNode = mix(float(0.85), float(0.16), cover);
   return mat;
 }
@@ -528,7 +545,7 @@ export class Crowd {
       c.vy *= f;
       const s = this.sample(clip, now - c.born);
       const left = this.corpseLife - (now - c.born);
-      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, 0.8, c.scale, heightAt(map, c.x, c.y, c.layer) - (left < CORPSE_FADE ? (1 - Math.max(0, left / CORPSE_FADE)) * 1.3 : 0)); // sinks into the floor where it lies
+      this.put(t, c.x, -c.y, c.yaw, s.a, s.b, s.m, -0.8, c.scale, heightAt(map, c.x, c.y, c.layer) - (left < CORPSE_FADE ? (1 - Math.max(0, left / CORPSE_FADE)) * 1.3 : 0)); // sinks into the floor where it lies
     }
     this.culled = culled;
     let tris = 0;

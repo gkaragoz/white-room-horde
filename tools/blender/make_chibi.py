@@ -235,8 +235,25 @@ def finalize(cid, S, objs, rig):
 DARK, GLOVE = "#61656F", "#3F3F45"
 
 
+# Enemy readability grade (set by bake_vat.py): the pastel greens/pinks read as friendly and vanish on the pale floor, so
+# the head and torso colours go cooler (hue squeezed into teal..indigo) and darker. Accents (goo, fuses, horns) are left alone.
+ENEMY_GRADE = g.get("ENEMY_GRADE", os.environ.get("ENEMY_GRADE", "0") == "1")
+
+
+def grade(hexc, k=1.0):
+    import colorsys
+    r, gg, bb = [int(hexc.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    h, sat, v = colorsys.rgb_to_hsv(r, gg, bb)
+    h = 0.44 + 0.30 * h
+    sat = min(1.0, 0.38 + 0.5 * sat)
+    v = v * (0.5 + 0.12 * (1 - k))
+    return "#%02X%02X%02X" % tuple(round(x * 255) for x in colorsys.hsv_to_rgb(h, sat, v))
+
+
 def body_parts(b, head_c, body_c, slim=1.0, head_k=1.0, tint_body=False, belt=DARK, glove=GLOVE, arms=True):
     """Shared chibi anatomy. Rest pose: arms down."""
+    if ENEMY_GRADE:
+        head_c, body_c = grade(head_c, 1.0), grade(body_c, 0.6)
     b.sphere("head", (0, 0, 1.05), 0.46 * head_k, (1, 1, 0.95), head_c)
     b.sphere("spine", (0, 0, 0.5), 0.34, (slim, 0.85 * slim, 1.15), body_c, tint=tint_body)
     b.sphere("spine", (0, 0, 0.62), 0.37, (1.02 * slim, 0.9 * slim, 0.55), belt)

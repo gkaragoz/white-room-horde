@@ -246,9 +246,12 @@ export const crowdTests: QaTest[] = [
       addPlayer(w, 0, 0, 6);
       const e = spawnEnemy(w, ENEMY_TYPES.indexOf('tank'), 0, 0, false);
       w.eCooldown[e] = 1e9;
+      // icy blue = pixels that turned bluer and brighter than the untouched enemy (the enemies themselves are dark teal/indigo)
+      let ref: Uint8Array | null = null;
       const bluish = (px: Uint8Array): number => {
+        if (!ref) return 0;
         let n = 0;
-        for (let i = 0; i < px.length; i += 4) if (px[i + 2]! > px[i]! + 28 && px[i + 2]! > 150) n++;
+        for (let i = 0; i < px.length; i += 4) if (px[i + 2]! - ref[i + 2]! > 35 && px[i + 2]! > px[i]! + 8) n++;
         return n;
       };
       const frame = (dtSec: number): Uint8Array => {
@@ -264,6 +267,7 @@ export const crowdTests: QaTest[] = [
         ctx.stage.setZoom(3);
         crowd.update(w, 1, 1000);
         const warm = frame(0.05);
+        ref = warm;
         const base = bluish(warm);
         w.eFrost[e] = 100000;
         // let the coat grow for about 1.2 s of (fake) time

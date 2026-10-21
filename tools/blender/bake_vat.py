@@ -22,6 +22,7 @@ ONLY = [x for x in os.environ.get("ONLY", "").split(",") if x] or None
 SAMPLE_FPS, MIN_S, MAX_S = 12, 8, 40
 SRC_FPS = 30
 
+os.environ["ENEMY_GRADE"] = "1"  # cooler, darker enemy palette (see make_chibi.grade)
 RT = os.path.join(HERE, "retarget_mixamo.py")
 G = {"__name__": "rt", "__file__": RT, "NO_RUN": True}
 exec(compile(open(RT, encoding="utf-8").read(), RT, "exec"), G)

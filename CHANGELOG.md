@@ -7,6 +7,12 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Readability: darker blood, cooler enemies, and a clear "you" in the squad panel**
+
+- Blood is now dark and desaturated and dissolves over about 20 seconds (scaled by the Corpses setting); saturated red is kept for attack warnings.
+- Enemies have a cooler, darker teal/indigo palette with a thin rim light, and corpses wash out pale, so the living stand out on the pale floor.
+- Your own card in the party panel has a permanent white frame, glow, filled name and a YOU badge that never clashes with the slot colours.
+
 ## v0.28.0 (2026-10-21)
 
 **20 difficulty multipliers instead of Easy / Normal / Hard (rules change: update the server and reload the page)**
