@@ -65,10 +65,14 @@ async function ticks(page, n, max = 40000) {
 }
 
 const CLASS_NAMES = ['soldier', 'medic', 'heavy', 'scout', 'demolisher', 'ranger', 'berserker', 'swordsman', 'hammerer'];
+// PLAY_PART picks parts of the run (CI runs them in parallel jobs): classes1 (0-4), classes2 (5-8), arenas, misc (finisher + menu). Default: everything.
+const PART = (process.env.PLAY_PART || 'classes1,classes2,arenas,misc').split(',');
+const want = (p) => PART.includes(p);
 
 try {
   // ---- every class: its weapon, its ability on a real key, its attack on a real mouse button -------------------------
   for (let cls = 0; cls < 9; cls++) {
+    if (!want(cls < 5 ? 'classes1' : 'classes2')) continue;
     const { page, ctx, errors } = await open('/?solo=1&wave=6&map=' + (cls % 6), { cls });
     await ticks(page, 30);
     const info = await world(page, () => {
@@ -106,7 +110,7 @@ try {
   }
 
   // ---- the vertical arenas with scripted players ---------------------------------------------------------------------
-  for (const [id, map] of [['overpass', 6], ['depot', 7], ['rampyard', 8], ['tunnelhub', 9], ['mezzanine', 10]]) {
+  for (const [id, map] of want('arenas') ? [['overpass', 6], ['depot', 7], ['rampyard', 8], ['tunnelhub', 9], ['mezzanine', 10]] : []) {
     const { page, ctx, errors } = await open(`/?solo=1&god=1&auto=1&bots=2&wave=14&map=${map}`);
     await ticks(page, 240);
     const st = await world(page, () => {
@@ -120,7 +124,7 @@ try {
   }
 
   // ---- the finisher: the last enemy dies, the camera pushes in, the countdown waits ----------------------------------
-  {
+  if (want('misc')) {
     const { page, ctx, errors } = await open('/?solo=1&god=1&map=0');
     await ticks(page, 60);
     // kill everything the floor will ever send the way the sim does it: run the wave to its end, then empty the arena
@@ -153,7 +157,7 @@ try {
   }
 
   // ---- the menu: nine classes, two languages --------------------------------------------------------------------------
-  {
+  if (want('misc')) {
     const ctx = await browser.newContext({ viewport: { width: 1100, height: 780 } });
     const page = await ctx.newPage();
     const errors = [];

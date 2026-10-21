@@ -1,0 +1,62 @@
+name: qa-full
+# The complete browser QA, split into parallel jobs (about 8 minutes wall clock instead of 33 in a row).
+# Runs on version tags, weekly, by hand, and when game code or the QA scripts change on main.
+on:
+  push:
+    tags: ['v*']
+    branches: [main, master]
+    paths:
+      - 'packages/**'
+      - 'tools/ci/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/qa-full.yml'
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+concurrency:
+  group: qa-full-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  qa:
+    name: qa (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # the QA page in all three engines (cross-engine determinism) and the game page in Firefox and WebKit
+          - name: engines
+            browsers: chromium firefox webkit
+            run: node tools/ci/qa-browsers.mjs chromium firefox webkit && node tools/ci/game-smoke.mjs firefox && node tools/ci/game-smoke.mjs webkit
+          # every class and arena in the real game page (play-all.mjs, split by PLAY_PART)
+          - name: play classes 0-4
+            browsers: chromium
+            run: PLAY_PART=classes1 node tools/ci/play-all.mjs
+          - name: play classes 5-8
+            browsers: chromium
+            run: PLAY_PART=classes2 node tools/ci/play-all.mjs
+          - name: play arenas
+            browsers: chromium
+            run: PLAY_PART=arenas node tools/ci/play-all.mjs
+          - name: play finisher and menu
+            browsers: chromium
+            run: PLAY_PART=misc node tools/ci/play-all.mjs
+          - name: aim and release notes
+            browsers: chromium
+            run: node tools/ci/aim-check.mjs && node tools/ci/notes-check.mjs
+          - name: menu and drone shots
+            browsers: chromium
+            run: node tools/ci/menu-shots.mjs && node tools/ci/drone-shots.mjs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @wrh/client build
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browsers }}
+      - run: ${{ matrix.run }}
