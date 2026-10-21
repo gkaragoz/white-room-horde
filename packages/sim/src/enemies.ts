@@ -1,4 +1,4 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, ZoneKind, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, STAT, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, FloorPhase, MAP_COUNT, MISC, TeleEffect, TeleShape, WEAPON_IDS, WEAPON_SLOTS, ZoneKind, MAX_ENEMIES, MAX_GRENADES, MAX_PLAYERS, MAX_SPIT, PERK, PERKS, PlayerState, STAT, TICK_DT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { addStat, heal, maxStat } from './stats';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
@@ -1127,6 +1127,8 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   w.kills++;
   const eliteKill = w.eMod[i] !== 0;
   if (w.eBoss[i]) addStat(w, killer, STAT.BossKills, 1);
+  if (eliteKill) addStat(w, killer, STAT.EliteKills, 1);
+  if (killer >= 0) w.pWpnKills[killer * WEAPON_SLOTS + w.pWeapon[killer]!] = w.pWpnKills[killer * WEAPON_SLOTS + w.pWeapon[killer]!]! + 1;
   w.events.push({ type: 'enemyDeath', id: i, etype: type, x: w.eX[i]!, y: w.eY[i]!, dx, dy, power });
   dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0, w.eLayer[i]!, eliteKill);
   // experience belongs to the character that made the kill; a kill nobody owns is shared by the living

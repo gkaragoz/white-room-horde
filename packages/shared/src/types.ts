@@ -133,7 +133,7 @@ export const PERKS = 24;
 /** Slots of the per-player statistics (pStat[slot * STATS + STAT.x]): what the game-over screen tells about a run. */
 export const STAT = {
   DamageTaken: 0, Healed: 1, Crits: 2, MaxHit: 3, Shots: 4, Hits: 5, Swings: 6, Barrels: 7, Revives: 8, Pickups: 9,
-  Dashes: 10, Abilities: 11, Grenades: 12, Distance: 13, AliveTicks: 14, BossKills: 15, Downs: 16,
+  Dashes: 10, Abilities: 11, Grenades: 12, Distance: 13, AliveTicks: 14, BossKills: 15, Downs: 16, EliteKills: 17,
 } as const;
 export const STATS = 20;
 

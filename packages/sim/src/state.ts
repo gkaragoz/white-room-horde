@@ -196,6 +196,8 @@ export interface World {
   /** Per-player statistics (see STAT) and the ticks spent with every weapon. */
   pStat: Float64Array;
   pWpnTime: Float64Array;
+  /** Kills per weapon (the one in the hands when the enemy died), for the achievements. */
+  pWpnKills: Int32Array;
   pOver: Int32Array;
   /** Drone companions. pDrone: active type + 1 per player (0 none); pDLv / pDXp: level (0 = not owned) and experience per player and type. */
   pDrone: Uint8Array;
@@ -396,6 +398,7 @@ export function createWorld(seed: number, map = 0, mods = 0): World {
     pCharge: new Float64Array(MAX_PLAYERS),
     pStat: new Float64Array(MAX_PLAYERS * STATS),
     pWpnTime: new Float64Array(MAX_PLAYERS * WEAPON_SLOTS),
+    pWpnKills: new Int32Array(MAX_PLAYERS * WEAPON_SLOTS),
     pOver: new Int32Array(MAX_PLAYERS),
     pDrone: new Uint8Array(MAX_PLAYERS),
     pDLv: new Uint8Array(MAX_PLAYERS * DRONE_TYPES.length),
