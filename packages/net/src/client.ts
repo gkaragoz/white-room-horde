@@ -11,6 +11,8 @@ export type NetState = 'idle' | 'lobby' | 'playing' | 'closed';
 /** Max bundles applied per `pump` call when catching up (smooths bursts and late-join fast forward). */
 const MAX_STEPS_PER_PUMP = 6;
 const MAX_SLOTS = 11;
+/** How far ahead of the relay (in ticks) the newest input tag may run before it is pulled back. */
+const RUNAWAY_TICKS = 15;
 
 /**
  * Client side of the lockstep protocol: sends this player's inputs tagged for a future tick, buffers the confirmed
@@ -202,6 +204,7 @@ export class NetSession {
         }
         break;
       case 'paused':
+        if (this.paused && m.on !== true) this.clampSent();
         if (this.paused !== (m.on === true)) {
           // no bundles arrive while the game is paused: the silence clock restarts at both ends, or the first frame after the resume would
           // see a minute without a tick and cut a healthy connection
@@ -248,7 +251,19 @@ export class NetSession {
   /** The tick a new local input should be tagged with so it arrives in time: never one that was used before. */
   inputTick(): number {
     this.updateLead();
-    return Math.max(this.maxSent + 1, Math.max(this.received, this.applied) + this.lead);
+    const base = Math.max(this.received, this.applied) + this.lead;
+    // self-heal: a tag far ahead of the relay's tick (a pause that lasted, a stalled link, an adopted session) would be refused as
+    // "absurdly early" for ever, because the tags then lead by the same distance for the rest of the game
+    if (this.maxSent + 1 > base + RUNAWAY_TICKS) this.clampSent();
+    return Math.max(this.maxSent + 1, base);
+  }
+
+  /** Bring the newest tag back to where the relay can use it (reused tags are fine: the relay keeps the newest input per tick). */
+  private clampSent(): void {
+    const base = Math.max(this.received, this.applied) + this.lead;
+    if (this.maxSent < base) return;
+    this.maxSent = base - 1;
+    for (const t of this.sent.keys()) if (t > this.maxSent) this.sent.delete(t);
   }
 
   /** Wall-clock time (performance.now milliseconds) of the last input sent: the clock the local character is drawn on. */
@@ -259,7 +274,8 @@ export class NetSession {
   }
 
   sendInput(input: PlayerInput): void {
-    if (this.state !== 'playing') return;
+    // while the game is paused the relay's tick stands still: inputs tagged ahead would pile up until the relay refuses them all
+    if (this.state !== 'playing' || this.paused) return;
     const tick = this.inputTick();
     this.sent.set(tick, input);
     this.maxSent = tick;

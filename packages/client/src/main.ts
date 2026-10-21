@@ -1066,7 +1066,7 @@ let diagLastSample = 0;
 
 /** One input per simulation tick, sent from the worker timer whatever the page is doing. */
 function onlineInputTick(): void {
-  if (mode !== 'online' || !session || session.state !== 'playing' || !world) return;
+  if (mode !== 'online' || !session || session.state !== 'playing' || session.paused || !world) return;
   // after a hitch the worker's ticks arrive back to back: one input per tick of real time, not a burst of the same sample
   const nowMs = performance.now();
   if (nowMs - session.lastSendAt < (TICK_DT * 1000) * 0.45) {

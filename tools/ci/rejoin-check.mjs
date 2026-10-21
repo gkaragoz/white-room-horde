@@ -64,11 +64,25 @@ try {
   for (const p of [host.page, guest.page]) await p.waitForFunction(() => window.__wrh?.world && window.__wrh.world.tick > 60, null, { timeout: 90000 });
   await sleep(2000);
 
+  const beforePause = await (async () => {
+    const mag0 = await guest.page.evaluate(() => window.__wrh.world.pMag[window.__wrh.session.slot]);
+    await guest.page.mouse.move(200, 90);
+    await guest.page.mouse.down();
+    await guest.page.keyboard.down('Space');
+    await sleep(2500);
+    await guest.page.keyboard.up('Space');
+    await guest.page.mouse.up();
+    await sleep(3000);
+    const st = await guest.page.evaluate(() => ({ mag: window.__wrh.world.pMag[window.__wrh.session.slot], reload: window.__wrh.world.pReload[window.__wrh.session.slot] }));
+    return { mag0, ...st, fired: st.mag < mag0 || st.reload > 0 };
+  })();
+  check('the guest can fire before the pause (the check itself works)', beforePause.fired, JSON.stringify(beforePause));
+
   // ---- 1. pause and resume
   const sockHost = host.sockets.n;
   const sockGuest = guest.sockets.n;
   await host.page.evaluate(() => window.__wrh.session.setPause(true));
-  await sleep(7000);
+  await sleep(12000); // longer than the 10 s after which a page's input tags used to run out of the relay's reach for good
   const pausedSeen = await guest.page.evaluate(() => window.__wrh.session.paused);
   check('the guest sees the pause', pausedSeen === true);
   const tPaused = await guest.page.evaluate(() => window.__wrh.world.tick);
@@ -77,6 +91,23 @@ try {
   const tAfter = await guest.page.evaluate(() => window.__wrh.world.tick);
   check('the game runs again after the resume', tAfter - tPaused > 60, `${tAfter - tPaused} ticks`);
   check('no connection was cut by the watchdog (no new socket on either page)', host.sockets.n === sockHost && guest.sockets.n === sockGuest, `host +${host.sockets.n - sockHost}, guest +${guest.sockets.n - sockGuest}`);
+  // everybody can still act: the guest holds the fire button and its magazine moves (or it reloads), the world sees real input again
+  const fireTest = async () => {
+    const mag0 = await guest.page.evaluate(() => window.__wrh.world.pMag[window.__wrh.session.slot]);
+    await guest.page.mouse.move(200, 90);
+    await guest.page.mouse.down();
+    await guest.page.keyboard.down('Space');
+    await sleep(2500);
+    await guest.page.keyboard.up('Space');
+    await guest.page.mouse.up();
+    await sleep(3000); // the confirmed world trails real time on a software renderer
+    const st = await guest.page.evaluate(() => ({ mag: window.__wrh.world.pMag[window.__wrh.session.slot], reload: window.__wrh.world.pReload[window.__wrh.session.slot], state: window.__wrh.world.pState[window.__wrh.session.slot], away: window.__wrh.world.pAway[window.__wrh.session.slot], ahead: window.__wrh.session.sentTick - window.__wrh.session.received, lead: window.__wrh.session.lead }));
+    return { mag0, ...st, fired: st.mag < mag0 || st.reload > 0 };
+  };
+  const afterPause = await fireTest();
+  // a player the horde has already downed cannot shoot whatever the network does: then only the input path is judged (below)
+  check('after the long pause the guest can fire again', afterPause.fired || afterPause.state !== 0, JSON.stringify(afterPause));
+  check('and its input tags are where the relay can use them', afterPause.away === 0 && afterPause.ahead <= afterPause.lead + 4, `ahead ${afterPause.ahead}, lead ${afterPause.lead}`);
 
   // ---- 2. a dropped connection continues in the same world
   await guest.page.evaluate(() => {

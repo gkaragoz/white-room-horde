@@ -44,6 +44,8 @@ const DRAIN_PER_TICK = 300;
 /** Ticks a snapshot donor has to answer before the asker is given the whole history instead (5 s). */
 const SNAPSHOT_TIMEOUT_TICKS = 150;
 const MAX_AHEAD_TICKS = 300;
+/** While the game is paused no input is kept that is further ahead than this (a page that does not know yet keeps sending). */
+const PAUSED_AHEAD_TICKS = 60;
 
 /** A client's input as the relay accepts it: in range, and without the Away flag (only the relay may say a player is away). */
 function cleanInput(i: PlayerInput): PlayerInput {
@@ -306,7 +308,7 @@ export class Room {
 
   input(slot: number, tick: number, input: PlayerInput): void {
     const m = this.members[slot];
-    if (!m || tick < this.tick || tick > this.tick + MAX_AHEAD_TICKS) return; // too late (the previous input stays) or absurdly early
+    if (!m || tick < this.tick || tick > this.tick + (this.paused ? PAUSED_AHEAD_TICKS : MAX_AHEAD_TICKS)) return; // too late (the previous input stays) or absurdly early
     m.pending.set(tick, cleanInput(input));
   }
 
@@ -317,7 +319,7 @@ export class Room {
     const n = list.length;
     for (let i = 0; i < n; i++) {
       const t = tick - (n - 1 - i);
-      if (t < this.tick || t > this.tick + MAX_AHEAD_TICKS) continue;
+      if (t < this.tick || t > this.tick + (this.paused ? PAUSED_AHEAD_TICKS : MAX_AHEAD_TICKS)) continue;
       if (i === n - 1) m.pending.set(t, cleanInput(list[i]!));
       else if (!m.pending.has(t)) {
         m.pending.set(t, cleanInput(list[i]!));
@@ -388,6 +390,8 @@ export class Room {
   setPaused(on: boolean): void {
     if (!this.started || this.paused === on) return;
     this.paused = on;
+    // inputs queued far ahead while the game stood still would be applied minutes late: drop them, the pages tag fresh ones
+    if (!on) for (const m of this.members) if (m) for (const t of m.pending.keys()) if (t > this.tick + PAUSED_AHEAD_TICKS) m.pending.delete(t);
     for (const m of this.members) if (m?.conn) send(m.conn, { t: 'paused', on });
   }
 

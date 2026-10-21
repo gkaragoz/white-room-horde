@@ -230,3 +230,52 @@ describe('away players', () => {
     expect(next.inputs[0]!.buttons & Buttons.Away).toBe(0);
   });
 });
+
+describe('input tags across a pause', () => {
+  function pauseCase(pauseMs: number): void {
+    const w = new World2();
+    w.run(3000);
+    const host = w.pairs[0]!.session;
+    const guest = w.pairs[1]!.session;
+    const room = [...w.mgr.rooms.values()][0]!;
+    host.setPause(true);
+    w.run(pauseMs, () => expect(room.members[1]!.pending.size).toBeLessThan(80)); // nothing piles up on the relay while it stands still
+    host.setPause(false);
+    w.run(2500);
+    for (const s of [host, guest]) expect(s.sentTick - room.tick).toBeLessThanOrEqual(s.lead + 3); // the tags are where the relay can use them
+    // real inputs are applied again: the relay does not have to invent "away" inputs
+    expect(room.members[1]!.miss ?? 0).toBeLessThan(3);
+    expect(guest.world!.pAway[1]).toBe(0);
+    expect(host.world!.pAway[0]).toBe(0);
+  }
+
+  it('after a pause of 5 s everybody can still act', () => pauseCase(5000));
+  it('after a pause of 15 s everybody can still act (this used to lock every input out for good)', () => pauseCase(15_000));
+  it('after a pause of a minute everybody can still act', () => pauseCase(60_000));
+
+  it('a page sends no inputs while the game is paused', () => {
+    const w = new World2();
+    w.run(2000);
+    let n = 0;
+    const orig = w.mgr.handle.bind(w.mgr);
+    w.mgr.handle = (c, d) => {
+      if (typeof d !== 'string' && d[0] === Bin.Inputs) n++;
+      orig(c, d);
+    };
+    w.pairs[0]!.session.setPause(true);
+    w.run(3000);
+    expect(n).toBe(0);
+    w.pairs[0]!.session.setPause(false);
+    w.run(500);
+    expect(n).toBeGreaterThan(10);
+  });
+
+  it('a tag that ran far ahead of the relay is pulled back by itself', () => {
+    const w = new World2();
+    w.run(2000);
+    const guest = w.pairs[1]!.session;
+    (guest as unknown as { maxSent: number }).maxSent = guest.applied + 500;
+    const base = Math.max(guest.received, guest.applied) + guest.lead;
+    expect(guest.inputTick()).toBeLessThanOrEqual(base + 1);
+  });
+});

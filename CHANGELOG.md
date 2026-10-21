@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+- Online: after a long pause (about 10 s or more) nobody could shoot or move any more. The pages kept numbering their inputs while the relay's clock stood still, so after the resume every input was refused as too early, for ever. Pages now send nothing while paused, pull their numbering back by themselves, and the relay drops inputs that run ahead during a pause.
+
 ## v0.23.0 (2026-10-21)
 
 **Online: pause, dropped connections and coming back (rules change: update the server and reload the page)**
