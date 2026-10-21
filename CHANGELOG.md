@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.28.1 (2026-10-21)
+
 **Readability: darker blood, cooler enemies, and a clear "you" in the squad panel**
 
 - Blood is now dark and desaturated and dissolves over about 20 seconds (scaled by the Corpses setting); saturated red is kept for attack warnings.
