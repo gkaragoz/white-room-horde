@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.28.0 (2026-10-21)
+
 **20 difficulty multipliers instead of Easy / Normal / Hard (rules change: update the server and reload the page)**
 
 - The `difficulty` number (0-2) is now `mods`, a 20-bit mask over `MODS` (`tools/cards/mods.py`): world, room options, the `options` and `start` messages, the replay header (32 bits, new magic) and the hash. All multipliers make the game harder; `packages/sim/src/mods.ts` turns the mask into factors that enemies, pickups, cards and the player stats read.
