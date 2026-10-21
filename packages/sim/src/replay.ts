@@ -60,21 +60,21 @@ export function verifyReplay(r: Replay, expectedFinalHash?: number): Verdict {
   return { ok: mismatch < 0 && finalOk && r.hashes.length > 0, mismatch, ticks: world.tick, wave: world.wave, kills: world.kills, hash };
 }
 
-/** Marks the second version of the binary form (map, difficulty and classes are stored too). */
-const MAGIC = [0x57, 0x54];
+/** Marks the third version of the binary form (map, the difficulty multipliers as 32 bits and the classes are stored too). */
+const MAGIC = [0x57, 0x55];
 
-/** Compact binary form: header (seed, map, difficulty, players), then per tick the wire encoding, then the hashes. */
+/** Compact binary form: header (seed, map, mods, players), then per tick the wire encoding, then the hashes. */
 export function encodeReplay(r: Replay): Uint8Array {
   const parts: Uint8Array[] = [];
-  const head = new Uint8Array(2 + 4 + 2 + 1 + r.setup.players.length * 3 + 4 + 4);
+  const head = new Uint8Array(2 + 4 + 1 + 4 + 1 + r.setup.players.length * 3 + 4 + 4);
   const dv = new DataView(head.buffer);
   head[0] = MAGIC[0]!;
   head[1] = MAGIC[1]!;
   dv.setUint32(2, r.setup.seed >>> 0, true);
   head[6] = r.setup.map ?? 0;
-  head[7] = r.setup.difficulty ?? 1;
-  head[8] = r.setup.players.length;
-  let o = 9;
+  dv.setUint32(7, (r.setup.mods ?? 0) >>> 0, true);
+  head[11] = r.setup.players.length;
+  let o = 12;
   for (const p of r.setup.players) {
     head[o++] = p.slot;
     head[o++] = WEAPON_IDS.indexOf(p.weapon) & 255;
@@ -108,10 +108,11 @@ export function decodeReplay(buf: Uint8Array): Replay {
   const seed = dv.getUint32(o, true);
   o += 4;
   let map = 0;
-  let difficulty = 1;
+  let mods = 0;
   if (v2) {
     map = buf[o++]!;
-    difficulty = buf[o++]!;
+    mods = dv.getUint32(o, true);
+    o += 4;
   }
   const n = buf[o++]!;
   const players: { slot: number; weapon: WeaponId; cls: number }[] = [];
@@ -125,7 +126,7 @@ export function decodeReplay(buf: Uint8Array): Replay {
   const ticks = dv.getUint32(o, true);
   const nh = dv.getUint32(o + 4, true);
   o += 8;
-  const out: Replay = { setup: { seed, players, map, difficulty }, ticks: [], hashes: [] };
+  const out: Replay = { setup: { seed, players, map, mods }, ticks: [], hashes: [] };
   for (let t = 0; t < ticks; t++) {
     const d = decodeTick(buf.subarray(o), maxSlot + 1);
     out.ticks.push(d.inputs);

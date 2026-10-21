@@ -14,7 +14,10 @@ export interface Profile {
   cls: number;
   /** Last solo options. */
   map: number;
-  difficulty: number;
+  /** The difficulty multipliers chosen last (a bit mask over MODS). */
+  mods: number;
+  /** Best final score (floors, kills, bosses and time, times the multiplier). */
+  bestScore: number;
 }
 
 export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headphones', 'acc_helmet', 'acc_crown', 'acc_horns', 'acc_tophat', 'acc_cowboy', 'acc_ninja', 'acc_mohawk', 'acc_bunny', 'acc_visor',
@@ -24,7 +27,7 @@ export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headph
 export const WEAPON_UNLOCK: Record<WeaponId, number> = { pistol: 0, smg: 0, ar: 0, shotgun: 3, hmg: 5, sniper: 7, minigun: 9, revolver: 2, mp: 4, dbl: 6, dmr: 8, flamer: 10, gl: 12, sword: 0, hammer: 0, akimbo: 6, nailgun: 9, crossbow: 12, arcthrower: 15, autoshotgun: 18, plasma: 21, frostgun: 24, sawlauncher: 28, rocket: 32, railgun: 38 };
 
 const KEY = 'wrh.profile';
-const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 };
+const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, color: -1, cls: 0, map: -1, mods: 0, bestScore: 0 };
 
 export function loadProfile(): Profile {
   try {
@@ -43,13 +46,14 @@ export function saveProfile(p: Profile): void {
 }
 
 /** Fold a finished run into the profile; reports what improved so the game over screen can say so. */
-export function recordGame(wave: number, kills: number): { newWave: boolean; newKills: boolean; unlocked: WeaponId[]; profile: Profile } {
+export function recordGame(wave: number, kills: number, score = 0): { newWave: boolean; newKills: boolean; unlocked: WeaponId[]; profile: Profile } {
   const p = loadProfile();
   const before = p.bestWave;
   const newWave = wave > p.bestWave;
   const newKills = kills > p.bestKills;
   p.bestWave = Math.max(p.bestWave, wave);
   p.bestKills = Math.max(p.bestKills, kills);
+  p.bestScore = Math.max(p.bestScore, score);
   p.games++;
   p.totalKills += kills;
   saveProfile(p);

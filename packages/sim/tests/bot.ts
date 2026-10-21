@@ -5,7 +5,7 @@ import { createGame, step, type World } from '../src';
  * A simple but not stupid player for balance checks: it keeps away from the crowd (a push from every enemy close by, a
  * pull to the middle near the walls), shoots the nearest enemy, throws grenades into thick crowds, takes the first card
  * (a fresh press now and then), goes to helpful pickups and revives a downed friend when it is safe. Humans do better
- * (they kite in loops, pick weapons, dodge telegraphs), so the floor the bots reach is a floor under the real difficulty.
+ * (they kite in loops, pick weapons, dodge telegraphs), so the floor the bots reach is a floor under the real mods.
  */
 export function botInput(w: World, s: number): PlayerInput {
   const px = w.pX[s]!;

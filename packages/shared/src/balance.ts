@@ -103,7 +103,6 @@ export const BALANCE = data as unknown as {
   /** Hit areas: the enemies' attack areas and explosions grow by `enemyMul`, melee enemies strike from `melee` further away, our bullets are `bulletR` wide. */
   hitbox: { enemyMul: number; bulletR: number; melee: number };
   dash: { seconds: number; speedMul: number; cooldown: number; iFrames: number };
-  difficulty: { hp: number[]; count: number[]; damage: number[] };
   pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; hasteSeconds: number; quadSeconds: number; shieldAmount: number; freezeSeconds: number; nukeDamage: number; chance: { health: number; grenade: number; weapon: number; shield: number; haste: number; quad: number; nuke: number; freeze: number; drone: number }; eliteDrone: number; healthAmount: number; bossDrops: { health: number; grenade: number; drone: number } };
   grenade: { maxRange: number; minRange: number; max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
   spit: { speed: number; life: number; radius: number };

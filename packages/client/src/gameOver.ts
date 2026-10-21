@@ -1,6 +1,7 @@
 import { icon as icon2 } from './icons';
 import { PERK, PERKS, STAT, STATS, WEAPON_IDS, WEAPON_SLOTS, MAX_PLAYERS } from '@wrh/shared';
 import type { World } from '@wrh/sim';
+import { multText, runScore } from './modsUi';
 
 /** What the client alone knows about a run (the simulation never sees a mouse). */
 export interface RunExtras {
@@ -24,6 +25,8 @@ interface Row {
 const L: Record<string, Record<string, string>> = {
   en: {
     title: 'What the run looked like',
+    score: 'Score',
+    mult: 'Difficulty multiplier',
     skip: 'click to skip',
     squad: 'Squad',
     reached: 'Floor reached',
@@ -60,6 +63,8 @@ const L: Record<string, Record<string, string>> = {
   },
   tr: {
     title: 'Oyun nasıl geçti',
+    score: 'Skor',
+    mult: 'Zorluk çarpanı',
     skip: 'geçmek için tıkla',
     squad: 'Takım',
     reached: 'Ulaşılan kat',
@@ -122,7 +127,10 @@ function rowsFor(world: World, s: number, lang: string, ex: RunExtras & { slot: 
   const kills = perk(PERK.Kills);
   const mins = Math.max(1 / 6, secs / 60);
   const time = (v: number): string => `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}`;
+  const sc = runScore(world);
   const rows: Row[] = [
+    { id: 'score', icon: 'reached', value: sc.final, text: fmt, hot: world.mods !== 0 },
+    ...(world.mods !== 0 ? ([{ id: 'mult', icon: 'boss', value: sc.mult, text: () => multText(world.mods), raw: multText(world.mods) }] as Row[]) : []),
     { id: 'reached', icon: 'reached', value: world.wave, text: fmt, hot: world.wave >= 20 },
     { id: 'kills', icon: 'kills', value: kills, text: fmt, hot: kills >= 400 },
     { id: 'time', icon: 'time', value: secs, text: time },

@@ -1,4 +1,4 @@
-import { GAME_VERSION, Buttons, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { GAME_VERSION, MOD_COUNT, Buttons, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
@@ -74,7 +74,7 @@ export class Room {
   started = false;
   tick = 0;
   seed = 0;
-  options: RoomOptions = { map: 0, difficulty: 1 };
+  options: RoomOptions = { map: 0, mods: 0 };
   /** The layout actually in use once the game has started. */
   map = 0;
   password = '';
@@ -116,7 +116,7 @@ export class Room {
   }
 
   private sendStart(conn: Conn): void {
-    send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, difficulty: this.options.difficulty });
+    send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, mods: this.options.mods });
     if (this.paused) send(conn, { t: 'paused', on: true });
   }
 
@@ -255,7 +255,7 @@ export class Room {
   setOptions(o: Partial<RoomOptions>): void {
     if (this.started) return;
     if (typeof o.map === 'number' && Number.isInteger(o.map) && o.map >= -1 && o.map < MAP_COUNT) this.options.map = o.map;
-    if (typeof o.difficulty === 'number' && Number.isInteger(o.difficulty) && o.difficulty >= 0 && o.difficulty <= 2) this.options.difficulty = o.difficulty;
+    if (typeof o.mods === 'number' && Number.isInteger(o.mods) && o.mods >= 0 && o.mods < 2 ** MOD_COUNT) this.options.mods = o.mods;
     this.broadcastRoom();
   }
 
@@ -578,7 +578,7 @@ export class RoomManager {
         if (isHost()) a!.room.start();
         break;
       case 'options':
-        if (isHost()) a!.room.setOptions({ map: msg.map, difficulty: msg.difficulty });
+        if (isHost()) a!.room.setOptions({ map: msg.map, mods: msg.mods });
         break;
       case 'hash':
         if (a && Number.isFinite(msg.tick) && Number.isFinite(msg.hash)) a.room.hash(a.slot, msg.tick, msg.hash);

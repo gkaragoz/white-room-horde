@@ -6,6 +6,7 @@ import { nuke, perk, setPerk, waveModOf } from './features';
 import { dronePickup, grantDrone } from './drones';
 import { giveWeapon, isMelee, owns } from './loadout';
 import type { World } from './state';
+import { fxOf } from './mods';
 
 export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0, layer = 0): void {
   for (let i = 0; i < MAX_PICKUPS; i++) {
@@ -51,8 +52,8 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 
   const cfg = BALANCE.pickups;
   if (boss) {
     const kinds: number[] = [];
-    for (let i = 0; i < cfg.bossDrops.health; i++) kinds.push(PickupType.Health);
-    for (let i = 0; i < cfg.bossDrops.grenade; i++) kinds.push(PickupType.Grenade);
+    for (let i = 0; i < cfg.bossDrops.health && !fxOf(w).noHealthDrops; i++) kinds.push(PickupType.Health);
+    for (let i = 0; i < cfg.bossDrops.grenade && !fxOf(w).noGrenades; i++) kinds.push(PickupType.Grenade);
     // a boss usually leaves a drone core too (always drawn: the stream does not depend on the outcome)
     if (w.rng.float() < cfg.bossDrops.drone) kinds.push(PickupType.Drone);
     kinds.forEach((k, n) => {
@@ -66,9 +67,13 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 
   // a squad of blades alone has no use for guns or bullets: those drops would only be wasted
   const guns = gunsInSquad(w);
   const r = w.rng.float();
-  const luck = w.modLoot * (waveModOf(w.wave) === 4 ? 2 : 1);
-  if (r < cfg.chance.health * luck) spawnPickup(w, PickupType.Health, x, y, 0, layer);
-  else if (r < (cfg.chance.health + cfg.chance.grenade) * luck) spawnPickup(w, PickupType.Grenade, x, y, 0, layer);
+  const fx = fxOf(w);
+  const luck = w.modLoot * (waveModOf(w.wave) === 4 ? 2 : 1) * fx.loot;
+  if (r < cfg.chance.health * luck) {
+    if (!fx.noHealthDrops) spawnPickup(w, PickupType.Health, x, y, 0, layer);
+  } else if (r < (cfg.chance.health + cfg.chance.grenade) * luck) {
+    if (!fx.noGrenades) spawnPickup(w, PickupType.Grenade, x, y, 0, layer);
+  }
   else if (guns && r < (cfg.chance.health + cfg.chance.grenade + cfg.chance.weapon) * luck) spawnPickup(w, PickupType.Weapon, x, y, pickWeapon(w), layer);
   else {
     // the rarer power-ups

@@ -33,6 +33,7 @@ import { droneReviveHelp, resetDrones, updateDrones } from './drones';
 import { equipLoadout, selectWeapon } from './loadout';
 import { abilityRate, abilityRateFrom, applyClass, bulletVsBarrels, damageMul, droneCredit, hooks, perk, placeBarrels, resetPerks, setPerk, speedMul, speedMulFrom, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
+import { fxOf } from './mods';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
 
@@ -50,9 +51,9 @@ export interface GameSetup {
   seed: number;
   /** Players present at the start: slot and starting weapon. */
   players: { slot: number; weapon: WeaponId; cls?: number }[];
-  /** Arena layout index (MAPS) and difficulty 0 easy / 1 normal / 2 hard. */
+  /** Arena layout index (MAPS) and the chosen difficulty multipliers (a bit mask over MODS, 0 = none). */
   map?: number;
-  difficulty?: number;
+  mods?: number;
 }
 
 export function addPlayer(w: World, slot: number, x: number, y: number, weapon: WeaponId = 'pistol', cls = 0): void {
@@ -115,7 +116,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
 
 /** Deterministic game start used by every client and by replays: players spread on a ring around the centre. */
 export function createGame(setup: GameSetup): World {
-  const w = createWorld(setup.seed, setup.map ?? 0, setup.difficulty ?? 1);
+  const w = createWorld(setup.seed, setup.map ?? 0, setup.mods ?? 0);
   const n = setup.players.length;
   for (let i = 0; i < n; i++) {
     const p = setup.players[i]!;
@@ -663,7 +664,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
         standing++;
       } else if (w.pHp[s]! <= 0) {
         w.pState[s] = PlayerState.Downed;
-        w.pTimer[s] = BALANCE.player.downedSeconds;
+        w.pTimer[s] = BALANCE.player.downedSeconds * fxOf(w).downedMul;
         w.pRevive[s] = 0;
         addStat(w, s, STAT.Downs, 1);
         w.events.push({ type: 'playerDown', slot: s, x: w.pX[s]!, y: w.pY[s]! });
@@ -682,7 +683,7 @@ export function hashWorld(w: World): number {
   const c = new Crc32();
   c.u32(w.tick);
   for (const v of w.rng.getState()) c.u32(v);
-  c.u32(w.difficulty).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver);
+  c.u32(w.mods).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver);
   c.typed(new Float64Array([w.modLoot]));
   c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer).typed(w.pCardLock).typed(w.pCardPrev).typed(w.pCards);
   c.typed(w.modDamage).typed(w.modRate).typed(w.modSpeed).typed(w.modPierce).typed(w.modRevive).typed(w.modMagnet).typed(w.modXp).typed(w.modBlast).typed(w.modReload).typed(w.modDash).typed(w.modArmor).typed(w.modCrit);

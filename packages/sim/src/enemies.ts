@@ -10,6 +10,7 @@ import { applyObstacles, currentMap, out, pushOut, segmentBlocked, useMap } from
 import { deckWalkable, isLayered, nextLayer, rampAt, rampDir, MAPS } from '@wrh/shared';
 import { SH_H, SH_W } from './spatial';
 import type { World } from './state';
+import { fxOf } from './mods';
 
 const N_TYPES = ENEMY_TYPES.length;
 /** Aim units (0..65535) to radians. */
@@ -70,7 +71,7 @@ function rad(w: World, i: number): number {
 
 /** Past the first floors enemies hit harder (and are a little tougher) on top of the base growth, so a strong squad keeps being tested. */
 function lateFloors(w: World): number {
-  return w.wave > BALANCE.late.start ? w.wave - BALANCE.late.start : 0;
+  return w.wave > BALANCE.late.start ? (w.wave - BALANCE.late.start) * fxOf(w).lateMul : 0;
 }
 
 /** How many enemies the current wave brings in total (fixed when the wave starts). */
@@ -79,7 +80,7 @@ function waveTotal(w: World): number {
   let players = 0;
   for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) players++;
   const mod = waveModOf(w.wave);
-  return Math.floor((cfg.baseCount + cfg.perPlayer * players) * w.countMul * cfg.waveSizeMul * BALANCE.difficulty.count[w.difficulty]! * (mod === 1 ? 1.5 : 1));
+  return Math.floor((cfg.baseCount + cfg.perPlayer * players) * w.countMul * cfg.waveSizeMul * fxOf(w).enemyCount * (mod === 1 ? 1.5 : 1));
 }
 
 /** Start of a wave: its size is fixed now and the "cleared" marker is reset (misc[1] still to arrive, misc[2] cleared at tick, misc[3] total). */
@@ -128,7 +129,7 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     if (w.eActive[i]) continue;
     let players = 0;
     for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) players++;
-    const hp = HP[type]! * w.hpMul * (1 + lateFloors(w) * BALANCE.late.hpPerFloor) * BALANCE.difficulty.hp[w.difficulty]! * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
+    const hp = HP[type]! * w.hpMul * (1 + lateFloors(w) * BALANCE.late.hpPerFloor) * fxOf(w).enemyHp * (1 + BALANCE.waves.playerHpGrowth * (players > 1 ? players - 1 : 0));
     w.eActive[i] = 1;
     w.eBoss[i] = 0;
     w.eMod[i] = 0;
@@ -907,7 +908,7 @@ export function spawnBoss(w: World): number {
   const i = spawnEnemy(w, T_TANK, spawnX, spawnY);
   if (i >= 0) {
     w.eBoss[i] = BOSS_ORDER[((((w.wave / BALANCE.progression.boss.everyWaves) | 0) - 1) % BOSS_ORDER.length + BOSS_ORDER.length) % BOSS_ORDER.length]!;
-    w.eHp[i] = w.eHp[i]! * BALANCE.progression.boss.hpMul;
+    w.eHp[i] = w.eHp[i]! * BALANCE.progression.boss.hpMul * fxOf(w).bossHp;
   }
   return i;
 }
@@ -1082,7 +1083,7 @@ export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number,
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
   // a negative amount is a share of the victim's max health (boss attacks: they scale with the player, not with the floor);
   // everything else is flat damage that is doubled and grows on late floors
-  const base = rawDamage < 0 ? Math.min(0.95, -rawDamage * BALANCE.difficulty.damage[w.difficulty]!) * w.pMaxHp[slot]! : rawDamage * BALANCE.enemyDamageMul * BALANCE.difficulty.damage[w.difficulty]! * (1 + lateFloors(w) * BALANCE.late.damagePerFloor);
+  const base = rawDamage < 0 ? Math.min(0.95, -rawDamage * fxOf(w).enemyDamage) * w.pMaxHp[slot]! : rawDamage * BALANCE.enemyDamageMul * fxOf(w).enemyDamage * (1 + lateFloors(w) * BALANCE.late.damagePerFloor);
   const damage = absorb(w, slot, base * abilityTaken(w, slot) * w.modArmor[slot]! * w.pModArmor[slot]!);
   const thorns = perk(w, slot, PERK.Thorns);
   if (thorns > 0 && attacker >= 0 && w.eActive[attacker]) {
@@ -1346,7 +1347,7 @@ export function updateEnemies(w: World): void {
     const type = w.eType[i]!;
     let x = w.eX[i]!;
     let y = w.eY[i]!;
-    w.eCooldown[i] = w.eCooldown[i]! - TICK_DT;
+    w.eCooldown[i] = w.eCooldown[i]! - TICK_DT / fxOf(w).enemyCooldown;
     if (w.eMod[i] === ELITE.Regen) w.eHp[i] = w.eHp[i]! + BALANCE.elites.regenPerSec * w.hpMul * TICK_DT;
     else if (w.eMod[i] === ELITE.Toxic && (w.tick + i) % BALANCE.elites.toxicEvery === 0) addZone(w, w.eX[i]!, w.eY[i]!, 1.0, 3, ZoneKind.Acid);
     const age = w.tick - w.eStateTick[i]!;

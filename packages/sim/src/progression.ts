@@ -5,6 +5,7 @@ import { applyUniversal } from './cardtable';
 import { addPerk, perk, setPerk } from './features';
 import { giveWeapon, nextMissing, selectWeapon } from './loadout';
 import type { World } from './state';
+import { fxOf } from './mods';
 
 const CARDS = CARD_IDS.length;
 
@@ -69,7 +70,7 @@ function openOffer(w: World, slot: number): void {
     if (!picked.includes(chosen)) picked.push(chosen);
   }
   for (let i = 0; i < 3; i++) w.pOffer[slot * 3 + i] = picked[i]!;
-  w.pCardTimer[slot] = BALANCE.progression.cardSeconds * TICK_RATE;
+  w.pCardTimer[slot] = Math.round(BALANCE.progression.cardSeconds * fxOf(w).cardSeconds * TICK_RATE);
   w.events.push({ type: 'cardOffer', slot, cards: picked });
 }
 

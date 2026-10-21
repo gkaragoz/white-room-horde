@@ -78,7 +78,7 @@ export interface World {
   enemyCount: number;
   gameOver: number;
   /** 0 easy, 1 normal, 2 hard (scales enemy hp, count and damage) and the arena layout index. */
-  difficulty: number;
+  mods: number;
   map: number;
   /** Team modifier from a card that helps everybody: loot luck. All the other upgrades are per player (arrays below). */
   modLoot: number;
@@ -290,7 +290,7 @@ export interface World {
   grid: SpatialHash;
 }
 
-export function createWorld(seed: number, map = 0, difficulty = 1): World {
+export function createWorld(seed: number, map = 0, mods = 0): World {
   const w: World = {
     tick: 0,
     rng: new Rng(seed),
@@ -301,7 +301,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     kills: 0,
     enemyCount: 0,
     gameOver: 0,
-    difficulty,
+    mods,
     map,
     modLoot: 1,
     pXp: new Float64Array(MAX_PLAYERS),

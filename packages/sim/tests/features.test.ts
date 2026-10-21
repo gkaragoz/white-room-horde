@@ -8,8 +8,8 @@ import { awardXp, xpForNext } from '../src/progression';
 const NONE: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 const T = (n: string): number => ENEMY_TYPES.indexOf(n as (typeof ENEMY_TYPES)[number]);
 
-function quiet(seed: number, map = 0, difficulty = 1): ReturnType<typeof createWorld> {
-  const w = createWorld(seed, map, difficulty);
+function quiet(seed: number, map = 0, mods = 1): ReturnType<typeof createWorld> {
+  const w = createWorld(seed, map, mods);
   w.waveTick = 1e9;
   w.countMul = 0;
   return w;
@@ -86,7 +86,7 @@ describe('dash', () => {
   });
 });
 
-describe('personal cards, weapon drops and difficulty', () => {
+describe('personal cards, weapon drops and mods', () => {
   it('personal cards only change the player who picked them', () => {
     const w = quiet(6);
     addPlayer(w, 0, 0, 0);
@@ -114,26 +114,6 @@ describe('personal cards, weapon drops and difficulty', () => {
     expect(w.pWeapon[0]).toBe(WEAPON_IDS.indexOf('pistol'));
     expect((w.pOwned[0]! >> WEAPON_IDS.indexOf('sniper')) & 1).toBe(1);
     expect(w.pInvMag[WEAPON_IDS.indexOf('sniper')]).toBe(BALANCE.weapons.sniper.mag);
-  });
-
-  it('hard mode has tougher enemies and fewer-hit players than easy mode', () => {
-    const hp = (d: number): number => {
-      const w = quiet(8, 0, d);
-      addPlayer(w, 0, 0, 0);
-      const k = spawnEnemy(w, T('grunt'), 10, 0, false);
-      return w.eHp[k]!;
-    };
-    expect(hp(2)).toBeGreaterThan(hp(1));
-    expect(hp(1)).toBeGreaterThan(hp(0));
-    const hits = (d: number): number => {
-      const w = quiet(9, 0, d);
-      addPlayer(w, 0, 0, 0);
-      const k = spawnEnemy(w, T('grunt'), 0.8, 0, false);
-      w.eCooldown[k] = 0;
-      for (let t = 0; t < 120 && w.pHp[0]! > 0; t++) step(w, [NONE]);
-      return BALANCE.player.hp - w.pHp[0]!;
-    };
-    expect(hits(2)).toBeGreaterThan(hits(0));
   });
 });
 
@@ -225,12 +205,12 @@ describe('maps', () => {
     };
     expect(run(1)).toBe(run(1));
     expect(run(0)).not.toBe(run(2));
-    const a = createGame({ ...base, map: 2, difficulty: 2 });
+    const a = createGame({ ...base, map: 2, mods: 2 });
     for (let t = 0; t < 200; t++) step(a, [NONE]);
     const b = createWorld(9);
     restoreWorld(b, serializeWorld(a));
     expect(b.map).toBe(2);
-    expect(b.difficulty).toBe(2);
+    expect(b.mods).toBe(2);
     expect(hashWorld(b)).toBe(hashWorld(a));
     for (let t = 0; t < 200; t++) {
       step(a, [NONE]);

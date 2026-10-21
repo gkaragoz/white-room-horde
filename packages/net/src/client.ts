@@ -23,7 +23,7 @@ export class NetSession {
   code = '';
   slot = -1;
   players: PlayerInfo[] = [];
-  options: RoomOptions = { map: 0, difficulty: 1 };
+  options: RoomOptions = { map: 0, mods: 0 };
   /** Secret for rejoining this slot after a dropped connection (kept by the page in sessionStorage). */
   token = '';
   locked = false;
@@ -114,8 +114,8 @@ export class NetSession {
   adopted = false;
 
   /** Host only, before the game starts. */
-  setOptions(map: number, difficulty: number): void {
-    this.sendJson({ t: 'options', map, difficulty });
+  setOptions(map: number, mods: number): void {
+    this.sendJson({ t: 'options', map, mods });
   }
 
   setLook(acc: number, color = -1, cls = 0): void {
@@ -177,7 +177,7 @@ export class NetSession {
         this.paused = false;
         this.adopted = false; // the relay could not resume us: a new world from tick 0, as for a new player
         this.pendingStart = { seed: m.seed, players: m.players };
-        this.world = createGame({ seed: m.seed, players: m.players, map: m.map, difficulty: m.difficulty });
+        this.world = createGame({ seed: m.seed, players: m.players, map: m.map, mods: m.mods });
         this.history.clear();
         this.bundles.clear();
         this.received = -1;
