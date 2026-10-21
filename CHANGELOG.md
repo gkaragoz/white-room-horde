@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.22.1 (2026-10-21)
+
 **Flicker on the ramp maps and weapons in the head (client only; nothing changes in the rules or on the wire)**
 
 - Z-fighting (flicker) on the layered maps (overpass, depot, rampyard, tunnelhub, mezzanine): the ramp's side and back quads lay exactly in the planes of the ramp walls and the deck/block faces, and a deck slab shared its footprint with a block (they fought most while the roof faded). The quads now sit a hair inside the footprint, the deck slab is a hair smaller and lower than the block under it, the ramp stripes sit higher above the slope.
