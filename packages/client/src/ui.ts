@@ -150,6 +150,7 @@ const BASE_STRINGS = {
     password: 'Room password (optional)',
     rejoin: 'Rejoin the game you left',
     lockedTip: 'Reach wave',
+    lockedFloor: 'Reach floor {n} (your best: {m})',
     best: 'Best',
     newBest: 'New record!',
     unlockedWeapon: 'Unlocked',
@@ -369,6 +370,7 @@ const BASE_STRINGS = {
     password: 'Oda şifresi (isteğe bağlı)',
     rejoin: 'Ayrıldığın oyuna geri dön',
     lockedTip: 'Şu dalgaya ulaş:',
+    lockedFloor: '{n}. kata ulaş (en iyin: {m})',
     best: 'En iyi',
     newBest: 'Yeni rekor!',
     unlockedWeapon: 'Açıldı',
@@ -510,6 +512,8 @@ export interface UiHandlers {
   onResetSettings(): void;
   /** Download the problem report. */
   onReport?(): void;
+  /** The setting differs from what the running renderer was built with. */
+  needsReload?(key: string): boolean;
 }
 
 export interface Settings {
@@ -716,6 +720,8 @@ const CSS_BASE = `
 .wrh-ui .wrh-set-foot button{background:#efe7d6;color:#3a352d;margin:0}
 .wrh-ui .wrh-set-foot button.primary{background:#1fa2ff;color:#fff}
 .wrh-set-note{margin:8px 0;font-size:13px;opacity:.75}
+.wrh-set-reload{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:-2px 0 4px;padding:4px 8px;font-size:12px;font-weight:700;color:#8a5a00;background:rgba(255,190,80,.18);border-radius:6px}
+.wrh-set-reload .wrh-set-small{margin:0}
 .wrh-set-keygrid{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;font-size:14px;font-weight:600}
 .wrh-ui .wrh-set-keybtn{background:#efe7d6;color:#3a352d;margin:0;padding:4px 8px;border-radius:9px}
 .wrh-ui .wrh-set-small{background:#efe7d6;color:#3a352d;font-size:12px;margin:10px 0 0}
@@ -894,7 +900,7 @@ const CSS_BASE = `
 .wrh-ui.night .wrh-top,.wrh-ui.night .wrh-me,.wrh-ui.night .wrh-hint{color:#2b3a52;text-shadow:none}
 
 .wrh-scroll{max-height:92vh;overflow:auto}
-.wrh-ui button.wrh-wp:disabled{opacity:.45;cursor:not-allowed}
+.wrh-ui button.wrh-wp:disabled,.wrh-ui button.wrh-wp.locked{opacity:.45;cursor:not-allowed}
 .wrh-keys{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin:4px 0 8px;font-size:12px}
 .wrh-keys button{margin:0;padding:3px 8px;font-size:12px;background:#e6dcc8;color:#3a352d}
 .wrh-low{color:#d8362e}
@@ -1186,6 +1192,24 @@ export class Ui {
     });
     this.toolbar.addEventListener('mouseout', (e) => {
       if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.wrh-tbtn')) this.tipEl.style.display = 'none';
+    });
+    // a locked weapon of the menu says what opens it
+    const lockedAt = (e: Event): HTMLElement | null => (e.target as HTMLElement).closest<HTMLElement>('.wrh-wp.locked[data-lock]');
+    this.screen.addEventListener('mouseover', (e) => {
+      const el = lockedAt(e);
+      if (!el) return;
+      const text = this.t.lockedFloor.replace('{n}', el.dataset.lock ?? '').replace('{m}', String(loadProfile().bestWave));
+      this.squadTip = null;
+      this.hoverTip = null;
+      this.tipEl.style.setProperty('--rc', '#9aa5b4');
+      this.tipEl.innerHTML = `<b>${esc(text)}</b>`;
+      this.tipEl.style.display = 'block';
+      const r = el.getBoundingClientRect();
+      this.tipEl.style.left = `${Math.max(6, Math.min(innerWidth - this.tipEl.offsetWidth - 6, r.left + r.width / 2 - this.tipEl.offsetWidth / 2))}px`;
+      this.tipEl.style.top = `${Math.max(6, r.top - this.tipEl.offsetHeight - 8)}px`;
+    });
+    this.screen.addEventListener('mouseout', (e) => {
+      if (lockedAt(e) && !lockedAt({ target: e.relatedTarget } as unknown as Event)) this.tipEl.style.display = 'none';
     });
     this.relicEl.addEventListener('mouseover', (e) => {
       this.squadTip = null;
@@ -1518,6 +1542,7 @@ export class Ui {
     // picking a weapon in the list also shows it
     this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => {
       el.addEventListener('click', () => {
+        if (el.classList.contains('locked')) return;
         this.previewMode = 'weapon';
         refresh();
       });
@@ -1872,7 +1897,7 @@ export class Ui {
     const profile = loadProfile();
     return WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee).map((w) => {
       const ok = isUnlocked(w, profile);
-      return `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}"${ok ? '' : ` disabled title="${esc(`${this.t.lockedTip} ${WEAPON_UNLOCK[w]}`)}"`}>${ok ? '' : icon('hud_lock', 16) + ' '}<img class="wp-i" src="${asset(`ui/wpn_${w}.png`)}" alt="" draggable="false">${names[w]}</button>`;
+      return `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}${ok ? '' : ' locked'}" data-w="${w}"${ok ? '' : ` aria-disabled="true" data-lock="${WEAPON_UNLOCK[w]}"`}>${ok ? '' : icon('hud_lock', 16) + ' '}<img class="wp-i" src="${asset(`ui/wpn_${w}.png`)}" alt="" draggable="false">${names[w]}</button>`;
     }).join('');
   }
 
@@ -1885,6 +1910,7 @@ export class Ui {
   private bindWeapons(): void {
     this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => {
       el.onclick = () => {
+        if (el.classList.contains('locked')) return; // locked guns only explain themselves (hover tip)
         this.weapon = el.dataset.w as WeaponId;
         this.screen.querySelectorAll('.wrh-wp[data-w]').forEach((x) => x.classList.toggle('on', x === el));
         this.h.onWeapon(this.weapon);
@@ -2329,6 +2355,8 @@ export class Ui {
       },
       onReset: () => this.h.onResetSettings(),
       onReport: () => this.h.onReport?.(),
+      needsReload: (key) => this.h.needsReload?.(key) ?? false,
+      onReload: () => location.reload(),
       onClose: () => this.toggleSettings(),
       onControls: () => this.toggleControls(),
     });

@@ -7,6 +7,10 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+- Graphics settings apply at once: texture detail (floor and blood canvases are repainted, the blood already on the floor stays) and SMAA / off no longer reload the page. Settings that only a new renderer can apply (WebGL2 / WebGPU, MSAA) show a note under the row, "Applies when you reload the page", with a "Reload now" button.
+- Lobby preview: the character holds every weapon pointing the way it faces and upright while the turntable spins (the arm is aimed every frame, with the head kept clear); a QA check measures the barrel of all weapons.
+- Locked weapons in the menu are no longer natively disabled: clicks are ignored and hovering explains why ("Reach floor N (your best: M)", English and Turkish).
+
 ## v0.24.0 (2026-10-21)
 
 **Unlimited ammo and click-to-pick weapons (rules change: update the server and reload the page)**

@@ -60,6 +60,7 @@ let autoScale = settings.scale;
 
 const wantBackend = params.get('renderer') === 'webgpu' ? 'webgpu' : params.get('renderer') === 'webgl' ? 'webgl' : settings.renderer;
 const backend = await pickBackend(wantBackend);
+const createdMsaa = settings.aa === 'msaa';
 async function createStage(): Promise<Stage> {
   try {
     return await Stage.create(app, { aa: settings.aa, bounce: settings.bounce, backend, texture: settings.texture });
@@ -313,6 +314,12 @@ const ui = new Ui(
       autoScale = settings.scale;
       applySettings();
     },
+    needsReload: (key) => {
+      // the renderer and MSAA are fixed when the page loads; everything else applies at once
+      if (key === 'renderer') return settings.renderer !== backend;
+      if (key === 'aa') return backend === 'webgl' && settings.aa !== 'smaa' && (settings.aa === 'msaa') !== createdMsaa; // SMAA is a post pass: live
+      return false;
+    },
     onSetting: (key, value) => {
       if (key === 'volume') settings = { ...settings, volume: value as number };
       else if (key === 'music') settings = { ...settings, music: value as number };
@@ -321,16 +328,11 @@ const ui = new Ui(
         settings = { ...settings, scale: value as number };
         autoScale = settings.scale;
       }
-      else if (key === 'renderer') {
-        settings = { ...settings, renderer: value as Settings['renderer'] };
-        applySettings();
-        location.reload();
-        return;
-      } else if (key === 'texture') {
+      else if (key === 'renderer') settings = { ...settings, renderer: value as Settings['renderer'] };
+      else if (key === 'texture') {
         settings = { ...settings, texture: value as 0 | 1 };
-        applySettings();
-        location.reload();
-        return;
+        stage.setFloorQuality(settings.texture);
+        fx.setDecalDetail(settings.texture);
       } else if (key === 'fpsCap') settings = { ...settings, fpsCap: value as Settings['fpsCap'] };
       else if (key === 'autoScale') {
         settings = { ...settings, autoScale: value as boolean };
@@ -342,9 +344,7 @@ const ui = new Ui(
       else if (key === 'weather') settings = { ...settings, weather: value as boolean };
       else if (key === 'aa') {
         settings = { ...settings, aa: value as Settings['aa'] };
-        applySettings();
-        location.reload();
-        return;
+        stage.setSmaa(settings.aa === 'smaa');
       }
       else if (key === 'colorblind') settings = { ...settings, colorblind: value as boolean };
       else if (key === 'textSize') settings = { ...settings, textSize: value as 0 | 1 | 2 };

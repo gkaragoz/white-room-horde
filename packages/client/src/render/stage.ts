@@ -36,7 +36,8 @@ export class Stage {
   readonly floor: THREE.Mesh;
   /** Motion blur of the climb: only drawn while `blur` is above zero, through a 4x multisampled composer. */
   private flightComposer: EffectComposer | null = null;
-  private blurPass: ShaderPass | null = null;
+  private flightBlur: ShaderPass | null = null;
+  private composerBlur: ShaderPass | null = null;
   private blur = 0;
   /** 0..1: the shaft between floors darkens the sky. */
   private dark = 0;
@@ -135,19 +136,49 @@ export class Stage {
     this.scene.fog = new THREE.Fog(this.bg.clone(), 1e5, 1e6);
     this.floor = makeFloor(opts.texture ?? 1);
     this.scene.add(this.floor);
-    if (opts.aa === 'smaa' && backend === 'webgl') {
-      // the x-ray outline of hidden characters needs a stencil buffer in the post-processing target too
-      this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, stencilBuffer: true }));
-      this.composer.addPass(new RenderPass(this.scene, this.camera));
-      this.blurPass = new ShaderPass(MOTION_BLUR);
-      this.blurPass.enabled = false;
-      this.composer.addPass(this.blurPass);
-      // tone map first so SMAA sees display-referred colours (edge detection is tuned for those)
-      this.composer.addPass(new OutputPass());
-      this.composer.addPass(new SMAAPass());
-    }
+    this.setSmaa(opts.aa === 'smaa');
     this.resize();
     window.addEventListener('resize', () => this.resize());
+  }
+
+  /**
+   * SMAA on or off while running (WebGL only; MSAA is fixed when the renderer is created). The post-processing chain is
+   * built or thrown away here, so the setting does not need a reload.
+   */
+  setSmaa(on: boolean): void {
+    if (this.backend !== 'webgl') return;
+    if (!on) {
+      if (!this.composer) return;
+      this.composer.dispose();
+      this.composer = null;
+      this.composerBlur = null;
+      return;
+    }
+    if (this.composer) return;
+    // the x-ray outline of hidden characters needs a stencil buffer in the post-processing target too
+    const c = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, stencilBuffer: true }));
+    c.addPass(new RenderPass(this.scene, this.camera));
+    const blur = new ShaderPass(MOTION_BLUR);
+    blur.enabled = false;
+    c.addPass(blur);
+    // tone map first so SMAA sees display-referred colours (edge detection is tuned for those)
+    c.addPass(new OutputPass());
+    c.addPass(new SMAAPass());
+    c.setPixelRatio(this.renderer.getPixelRatio());
+    c.setSize(this.container.clientWidth || window.innerWidth, this.container.clientHeight || window.innerHeight);
+    this.composer = c;
+    this.composerBlur = blur;
+  }
+
+  /** Repaint the floor texture at another quality (the climb's second floor shares the material). */
+  setFloorQuality(quality: 0 | 1): void {
+    const mat = this.floor.material as THREE.MeshStandardMaterial;
+    const old = mat.map;
+    const tex = makeFloorTexture(quality);
+    tex.repeat.set((2.5 * ARENA_HALF_W) / 30, (1.8 * ARENA_HALF_H) / 20);
+    mat.map = tex;
+    mat.needsUpdate = true;
+    old?.dispose();
   }
 
   /** Rain on or off (it fades in and out). */
@@ -411,8 +442,8 @@ export class Stage {
       const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, stencilBuffer: true, samples: 4 });
       const c = new EffectComposer(this.renderer, rt);
       c.addPass(new RenderPass(this.scene, this.camera));
-      this.blurPass = new ShaderPass(MOTION_BLUR);
-      c.addPass(this.blurPass);
+      this.flightBlur = new ShaderPass(MOTION_BLUR);
+      c.addPass(this.flightBlur);
       c.addPass(new OutputPass());
       c.setPixelRatio(this.renderer.getPixelRatio());
       c.setSize(this.container.clientWidth || window.innerWidth, this.container.clientHeight || window.innerHeight);
@@ -451,7 +482,7 @@ export class Stage {
       const w = this.container.clientWidth || window.innerWidth;
       const h = this.container.clientHeight || window.innerHeight;
       const comp = this.composer ?? this.ensureFlightComposer();
-      const pass = this.blurPass!;
+      const pass = (this.composer ? this.composerBlur : this.flightBlur)!;
       pass.enabled = true;
       pass.uniforms.uStrength!.value = this.blur;
       pass.uniforms.uAspect!.value = w / h;
@@ -487,6 +518,16 @@ void main(){
 
 /** Light concrete floor with soft painted patches and a faint grid, drawn once to a canvas. */
 function makeFloor(quality: 0 | 1): THREE.Mesh {
+  const tex = makeFloorTexture(quality);
+  tex.repeat.set((2.5 * ARENA_HALF_W) / 30, (1.8 * ARENA_HALF_H) / 20); // the tile keeps its size on a bigger floor
+  const floorMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF_W * 2, ARENA_HALF_H * 2), floorMat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function makeFloorTexture(quality: 0 | 1): THREE.CanvasTexture {
   const size = quality === 1 ? 2048 : 1024;
   const c = document.createElement('canvas');
   c.width = c.height = size;
@@ -522,10 +563,5 @@ function makeFloor(quality: 0 | 1): THREE.Mesh {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = quality === 1 ? 8 : 1;
-  tex.repeat.set((2.5 * ARENA_HALF_W) / 30, (1.8 * ARENA_HALF_H) / 20); // the tile keeps its size on a bigger floor
-  const floorMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF_W * 2, ARENA_HALF_H * 2), floorMat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.receiveShadow = true;
-  return mesh;
+  return tex;
 }
