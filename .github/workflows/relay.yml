@@ -37,7 +37,7 @@ jobs:
         if: steps.have.outputs.ok == 'true'
         run: |
           want=$(node -p "require('./package.json').version")
-          for i in 1 2 3 4 5 6; do
+          for i in $(seq 1 36); do
             got=$(curl -fsS https://white-room-horde-relay.gkaragoz96tablet.workers.dev/version.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" || true)
             echo "relay says $got, wanted $want"
             [ "$got" = "$want" ] && exit 0
