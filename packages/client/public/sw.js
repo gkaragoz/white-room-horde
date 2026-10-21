@@ -3,7 +3,7 @@
  * new release is picked up at once. The cache name carries the game version (see main.ts), old caches are removed. */
 const VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
 const CACHE = 'wrh-' + VERSION;
-const BIG = /\/(models|sfx|music|cards)\//;
+const BIG = /\/(models|sfx|music|cards|icons)\//;
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

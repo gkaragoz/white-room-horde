@@ -26,7 +26,8 @@ const NEW = ['pouncer', 'hurler', 'grabber', 'spiker', 'shocker', 'brood', 'trap
 const GUNS = ['railgun', 'crossbow', 'plasma', 'rocket', 'nailgun', 'autoshotgun', 'akimbo', 'frostgun', 'sawlauncher', 'arcthrower'];
 const ctx = await browser.newContext({ viewport: { width: 900, height: 600 } });
 await ctx.addInitScript(() => {
-  localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 60, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 }));
+  localStorage.setItem('wrh.notesSeen', '999.0');
+      localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 60, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 }));
   localStorage.setItem('wrh.lang', 'en');
 });
 const errors = [];

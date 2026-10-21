@@ -7,6 +7,13 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**A roomier main menu and a new icon set (client only; nothing changes in the rules or on the wire)**
+
+- The main menu is now full screen: the name and big Play solo / Play online / Settings buttons on the left, the 3D character stage with the nine classes in the middle, arenas and difficulty on the right, the starting weapons as icon tiles. Online play (host, room code, password, server) moved into its own window; an invite link opens it with the code filled in. Calm white-room background with slow drifting bubbles. Phone layouts (portrait and landscape) with touch-sized buttons. The markup and styles live in `packages/client/src/menu.ts`, the element ids the QA scripts use stayed the same.
+- A new icon set drawn in Blender (`tools/blender/icon_kit.py`, `make_icons.py`): 80 raised toy-style badges as 128 px WebP in `public/icons` (about 470 KB in all) for the classes, weapon statistics, HUD buttons, squad chips, toolbar, difficulty skulls and the 25 game-over statistics, replacing the emoji, Unicode glyphs and inline SVGs. `packages/client/src/icons.ts` turns a name into the markup. The app icon is a PNG (192 and 512) as well.
+- The release notes window opens by itself the first time a returning player starts a new version (once per version; the first-ever visit and the version number in the corner behave as before).
+- New `tools/ci/menu-shots.mjs`: screenshots at desktop, laptop and phone sizes plus layout checks; `notes-check.mjs` covers the automatic opening; the other browser scripts mark the notes as seen so the window does not cover the menu.
+
 ## v0.20.1 (2026-10-21)
 
 **Weak machines and releases without chores**

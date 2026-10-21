@@ -23,6 +23,60 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.21',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: 'A roomier main menu and a new icon set',
+        items: [
+          'The main menu now fills the whole screen: character stage, arenas and weapons side by side, with online play tucked into its own window. It works on phones too.',
+          'Every icon in the game was redrawn as a toy-style badge: classes, weapon stats, squad chips, game-over stats and the toolbar.',
+          'This window opens by itself the first time you start a new version (click the version number in the corner to open it any time).',
+        ],
+      },
+      tr: {
+        title: 'Ferah ana menü ve yeni ikon seti',
+        items: [
+          'Ana menü artık tüm ekranı kaplıyor: karakter sahnesi, arenalar ve silahlar yan yana, çevrimiçi oyun ayrı bir pencerede. Telefonda da çalışıyor.',
+          'Oyundaki tüm ikonlar oyuncak tarzı rozetler olarak yeniden çizildi: sınıflar, silah özellikleri, ekip rozetleri, oyun sonu istatistikleri ve araç çubuğu.',
+          'Yeni bir sürümü ilk açtığında bu pencere kendiliğinden açılır (köşedeki sürüm numarasına tıklayarak istediğin zaman açabilirsin).',
+        ],
+      },
+      de: {
+        title: 'Geräumigeres Hauptmenü und neue Symbole',
+        items: [
+          'Das Hauptmenü füllt jetzt den ganzen Bildschirm; Online-Spiel hat ein eigenes Fenster. Funktioniert auch auf dem Handy.',
+          'Alle Symbole im Spiel wurden als Spielzeug-Abzeichen neu gezeichnet.',
+          'Dieses Fenster öffnet sich beim ersten Start einer neuen Version von selbst.',
+        ],
+      },
+      es: {
+        title: 'Menú principal más amplio e iconos nuevos',
+        items: [
+          'El menú principal ocupa toda la pantalla; el juego en línea tiene su propia ventana. También funciona en el móvil.',
+          'Todos los iconos del juego se redibujaron como insignias de juguete.',
+          'Esta ventana se abre sola la primera vez que inicias una versión nueva.',
+        ],
+      },
+      fr: {
+        title: 'Menu principal plus aéré et nouvelles icônes',
+        items: [
+          'Le menu principal occupe tout l’écran ; le jeu en ligne a sa propre fenêtre. Il fonctionne aussi sur téléphone.',
+          'Toutes les icônes du jeu ont été redessinées en badges de jouet.',
+          'Cette fenêtre s’ouvre toute seule au premier lancement d’une nouvelle version.',
+        ],
+      },
+      ru: {
+        title: 'Просторное главное меню и новые значки',
+        items: [
+          'Главное меню теперь занимает весь экран; сетевая игра — в отдельном окне. Работает и на телефоне.',
+          'Все значки в игре перерисованы как игрушечные значки-бейджи.',
+          'Это окно открывается само при первом запуске новой версии.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.20',
     date: '2026-10-21',
     text: {
@@ -301,4 +355,30 @@ export function toggleReleaseNotes(): void {
     }
   });
   obs.observe(document.body, { childList: true });
+}
+
+/** major.minor of this build: the key that says which notes a player has already been shown. */
+function currentMinor(): string {
+  return __APP_VERSION__.split('.').slice(0, 2).join('.');
+}
+
+let autoChecked = false;
+
+/**
+ * Opens the notes by themselves the first time a player starts a version they have not seen (once per page load, from the
+ * main menu). A first-ever visit just remembers the version: the notes of releases they never played mean nothing to them.
+ */
+export function autoOpenReleaseNotes(): void {
+  if (autoChecked) return;
+  autoChecked = true;
+  try {
+    const seen = localStorage.getItem('wrh.notesSeen');
+    const cur = currentMinor();
+    if (seen === cur) return;
+    const returning = localStorage.getItem('wrh.profile') !== null || seen !== null;
+    localStorage.setItem('wrh.notesSeen', cur);
+    if (returning && !open) toggleReleaseNotes();
+  } catch {
+    /* no storage (private window): nothing to remember, nothing to show */
+  }
 }

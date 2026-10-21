@@ -33,7 +33,8 @@ const browser = await chromium.launch({ args: [...flags, '--enable-precise-memor
 const ctx = await browser.newContext({ viewport: { width: Number(process.env.W ?? 480), height: Number(process.env.H ?? 270) } });
 await ctx.addInitScript(() => {
   try {
-    localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 }));
+    localStorage.setItem('wrh.notesSeen', '999.0');
+      localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 }));
     localStorage.setItem('wrh.lang', 'en');
   } catch {}
   window.__f = [];

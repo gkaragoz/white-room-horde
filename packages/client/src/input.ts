@@ -363,6 +363,7 @@ export class Input {
   /** Two virtual sticks and four round buttons for phones and tablets. */
   private buildTouchControls(): void {
     const layer = document.createElement('div');
+    layer.className = 'wrh-touch';
     layer.style.cssText = 'position:fixed;inset:0;z-index:5;touch-action:none;pointer-events:none;-webkit-user-select:none;user-select:none';
     document.body.appendChild(layer);
     this.touchLayer = layer;

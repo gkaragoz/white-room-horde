@@ -24,7 +24,8 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ctx = await browser.newContext({ viewport: { width: 900, height: 620 } });
 await ctx.addInitScript(() => {
-  localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 7, map: -1, difficulty: 1 }));
+  localStorage.setItem('wrh.notesSeen', '999.0');
+      localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 7, map: -1, difficulty: 1 }));
   localStorage.setItem('wrh.settings', JSON.stringify({ gore: 2 }));
   localStorage.setItem('wrh.lang', 'en');
 });

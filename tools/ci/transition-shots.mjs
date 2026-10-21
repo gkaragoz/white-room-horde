@@ -25,7 +25,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const map = process.argv[2] ?? '0';
 const ctx = await browser.newContext({ viewport: { width: Number(process.env.W ?? 560), height: Number(process.env.H ?? 360) } });
 await ctx.addInitScript(() => {
-  localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 }));
+  localStorage.setItem('wrh.notesSeen', '999.0');
+      localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 }));
   localStorage.setItem('wrh.lang', 'en');
 });
 const page = await ctx.newPage();

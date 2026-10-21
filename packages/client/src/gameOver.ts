@@ -1,3 +1,4 @@
+import { icon as icon2 } from './icons';
 import { PERK, PERKS, STAT, STATS, WEAPON_IDS, WEAPON_SLOTS, MAX_PLAYERS } from '@wrh/shared';
 import type { World } from '@wrh/sim';
 
@@ -96,38 +97,10 @@ const L: Record<string, Record<string, string>> = {
 };
 
 /** Small flat icons (24 x 24), drawn here so they are crisp at any size and take the colour of the card. */
-const ICON: Record<string, string> = {
-  reached: '<path d="M4 20V10l8-6 8 6v10h-5v-6H9v6z"/>',
-  kills: '<path d="M12 3a8 8 0 0 0-8 8c0 2.6 1.2 4.4 3 5.5V20h10v-3.5c1.8-1.1 3-2.9 3-5.5a8 8 0 0 0-8-8zm-3 9a1.6 1.6 0 1 1 0-3.2A1.6 1.6 0 0 1 9 12zm6 0a1.6 1.6 0 1 1 0-3.2A1.6 1.6 0 0 1 15 12zM10 20v-2h1.4v2zm2.6 0v-2H14v2z"/>',
-  time: '<path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm1 9.6-4-2.3.8-1.4 3.2 1.8V6h1.6z"/>',
-  damage: '<path d="m12 2 2.2 6.3L21 9l-5 4.2 1.6 6.6L12 16l-5.6 3.8L8 13.2 3 9l6.8-.7z"/>',
-  taken: '<path d="M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5z"/>',
-  healed: '<path d="M12 21s-8-5.2-8-11a4.6 4.6 0 0 1 8-3 4.6 4.6 0 0 1 8 3c0 5.8-8 11-8 11z"/>',
-  maxhit: '<path d="M13 2 4 14h6l-1 8 10-13h-6z"/>',
-  crits: '<path d="m12 1 3 7 7.5.6-5.7 5 1.8 7.4L12 17l-6.6 4 1.8-7.4-5.7-5L9 8z"/>',
-  shots: '<path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 3a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>',
-  hits: '<path d="M11 2h2v5h-2zm0 15h2v5h-2zM2 11h5v2H2zm15 0h5v2h-5zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>',
-  swings: '<path d="M20 3 9 14l-1-1-4 4 3 3 4-4-1-1L21 4zM6 17l1 1-2 2-1-1z"/>',
-  grenades: '<path d="M13 3h4v2h-2l-1 2.1A7 7 0 1 1 5 14a7 7 0 0 1 6-6.9L12 4z"/>',
-  barrels: '<path d="M7 3h10l2 4v10l-2 4H7l-2-4V7zm0 5v2h10V8zm0 6v2h10v-2z"/>',
-  revives: '<path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/>',
-  pickups: '<path d="M6 8h12l2 13H4zm3-1a3 3 0 0 1 6 0z"/>',
-  dashes: '<path d="m4 5 7 7-7 7V5zm9 0 7 7-7 7V5z"/>',
-  abilities: '<path d="m12 2 1.8 4.6L18 4.5l-1.2 4.8L22 11l-4.6 1.8L19 18l-4.6-1.6L12 22l-2.4-5.6L5 18l1.6-5.2L2 11l5.2-1.7L6 4.5l4.2 2.1z"/>',
-  distance: '<path d="M4 18c2 0 3-1 4-3l1-3c1-2 2-3 4-3h7v3h-5c-1 0-1.6.6-2 1.7l-.8 2.6C11.5 18.6 9.6 21 7 21H4z"/>',
-  boss: '<path d="m3 18 1.5-10 4.6 4.5L12 5l2.9 7.5L19.5 8 21 18z"/>',
-  downs: '<path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm-1 4h2v6.2l2.3-2.3 1.4 1.4L12 17.6l-4.7-4.3 1.4-1.4 2.3 2.3z"/>',
-  dps: '<path d="M3 17 9 11l4 4 8-8v4h2V4h-7v2h3.6L13 12.6l-4-4L1.6 15.6z"/>',
-  kpm: '<path d="M5 3h14v3H5zm1 5h12l-1 13H7zm3 2v9h2v-9zm4 0v9h2v-9z"/>',
-  clicks: '<path d="M7 2h10a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm4 2v6H6V5a1 1 0 0 1 1-1zm2 0h4a1 1 0 0 1 1 1v5h-5z"/>',
-  keys: '<path d="M3 6h18v12H3zm3 3v2h2V9zm4 0v2h2V9zm4 0v2h2V9zm4 0v2h1V9zM6 13v2h12v-2z"/>',
-  combo: '<path d="M13 1s1 4-2 7c-2 2-5 4-5 8a6 6 0 0 0 12 0c0-2-1-3-2-4 0 2-1 3-2 3 1-4 0-9-1-14z"/>',
-};
-
 const fmt = (v: number): string => Math.round(v).toLocaleString();
 
 function icon(name: string): string {
-  return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[name] ?? ICON.damage}</svg>`;
+  return icon2(`go_${name}`, 26);
 }
 
 /** The rows of one player's page. */

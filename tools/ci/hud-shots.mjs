@@ -30,7 +30,8 @@ const ok = (label, v, d = '') => {
 async function open(url, cls) {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 } });
   await ctx.addInitScript((c) => {
-    localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: c, map: -1, difficulty: 1 }));
+    localStorage.setItem('wrh.notesSeen', '999.0');
+      localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: c, map: -1, difficulty: 1 }));
     localStorage.setItem('wrh.lang', 'en');
   }, cls);
   const page = await ctx.newPage();

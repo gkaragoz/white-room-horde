@@ -84,6 +84,7 @@ async function open(url, cls, size = { width: 360, height: 240 }) {
   const ctx = await browser.newContext({ viewport: size });
   await ctx.addInitScript((c) => {
     try {
+      localStorage.setItem('wrh.notesSeen', '999.0');
       localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: c, map: 0, difficulty: 0 }));
       localStorage.setItem('wrh.lang', 'en');
     } catch {}
@@ -104,11 +105,13 @@ try {
   const host = await open(`http://127.0.0.1:${process.env.DIRECT ? PORT : PROXY_PORT}/?menu=1`, 8);
   await host.page.screenshot({ path: 'tools/ci/net-stutter-menu.png' }).catch(() => {});
   await host.page.waitForSelector('#wrh-host', { timeout: 30000, state: 'attached' });
+  await host.page.click('#wrh-online');
   await host.page.click('#wrh-host');
   await host.page.waitForFunction(() => window.__wrh?.session?.code, null, { timeout: 30000 });
   const code = await host.page.evaluate(() => window.__wrh.session.code);
   const guest = await open(`http://127.0.0.1:${PORT}/?menu=1`, 0, { width: 200, height: 140 });
   await guest.page.waitForSelector('#wrh-join', { timeout: 90000 });
+  await guest.page.click('#wrh-online');
   await guest.page.fill('#wrh-code', code);
   await guest.page.click('#wrh-join');
   await sleep(1500);

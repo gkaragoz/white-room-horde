@@ -1,3 +1,6 @@
+import { icon, chipIcon } from './icons';
+import { MENU_CSS, menuMarkup } from './menu';
+import { autoOpenReleaseNotes } from './releaseNotes';
 import { POWERS } from './render/power';
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
@@ -37,6 +40,7 @@ const BASE_STRINGS = {
     solo: 'Play solo',
     host: 'Host game',
     join: 'Join game',
+    online: 'Play online',
     code: 'Room code',
     server: 'Server',
     start: 'Start game',
@@ -242,6 +246,7 @@ const BASE_STRINGS = {
     solo: 'Tek başına oyna',
     host: 'Oda kur',
     join: 'Odaya katıl',
+    online: 'Çevrimiçi oyna',
     code: 'Oda kodu',
     server: 'Sunucu',
     start: 'Oyunu başlat',
@@ -521,7 +526,7 @@ export interface Settings {
   lang: Lang;
 }
 
-const CSS = `
+const CSS_BASE = `
 .wrh-ui{position:fixed;inset:0;pointer-events:none;font-family:system-ui,sans-serif;color:#3a352d}
 .wrh-ui *{box-sizing:border-box}
 .wrh-panel,.wrh-top,.wrh-me,.wrh-squad,.wrh-inv{zoom:var(--wrh-zoom,1)}
@@ -548,7 +553,9 @@ const CSS = `
 .wrh-prev-name{font-weight:800;font-size:16px;margin-top:6px}
 .wrh-prev-stats{font-size:12px;min-height:16px;width:100%;max-width:300px}
 .wrh-stat{display:flex;align-items:center;gap:6px;margin:2px 0}
-.wrh-stat .ic{width:18px;text-align:center}
+.wrh-stat .ic{width:20px;text-align:center}
+.wrh-skull.off{opacity:.28;filter:grayscale(1)}
+.wrh-ico{display:inline-block;vertical-align:middle;object-fit:contain;pointer-events:none;user-select:none}
 .wrh-stat .nm{width:68px;font-weight:600;opacity:.8}
 .wrh-stat .bar{flex:1;height:8px;border-radius:5px;background:rgba(60,45,20,.18);overflow:hidden}
 .wrh-stat .bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#1fa2ff,#6fd0ff)}
@@ -587,7 +594,7 @@ const CSS = `
 .wrh-pc .top,.wrh-pc .stats,.wrh-pc .chip{cursor:help}
 .wrh-pc .chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
 .wrh-pc .chip{display:inline-flex;align-items:center;gap:3px;padding:1px 6px 1px 2px;border-radius:9px;background:rgba(43,58,82,.1);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent);font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;line-height:15px}
-.wrh-pc .chip i{display:inline-block;min-width:15px;height:15px;border-radius:50%;background:var(--c);color:#12202f;font-style:normal;text-align:center;font-size:10px;line-height:15px;text-shadow:0 0 1px rgba(255,255,255,.5)}
+.wrh-pc .chip i{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;font-style:normal}
 .wrh-pc .chip.timed{animation:wrh-lowhp .5s ease-in-out infinite alternate}
 .wrh-pc:not(.me) .chips{margin-top:4px}
 .wrh-pc:not(.me) .chip{font-size:9.5px}
@@ -715,7 +722,7 @@ const CSS = `
 .wrh-ui button.wrh-play{width:100%;font-size:19px;padding:13px;margin:6px 0 4px;background:linear-gradient(180deg,#38b6ff,#1488e6);box-shadow:0 3px 0 #0e6fba}
 .wrh-classes{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 2px;width:100%;max-width:340px}
 .wrh-ui button.wrh-class{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;margin:0;border-radius:10px;background:#efe7d6;color:#3a352d;border:3px solid transparent;font-size:11px;box-shadow:0 2px 4px rgba(60,45,20,.15)}
-.wrh-ui button.wrh-class .ci{font-size:20px;line-height:1.1}
+.wrh-ui button.wrh-class .ci{font-size:20px;line-height:1.1;display:block;height:40px}
 .wrh-ui button.wrh-class.on{background:#fff;border-color:#1fa2ff}
 .wrh-class-tip{font-size:12px;opacity:.8;min-height:30px;text-align:center;max-width:340px}
 .wrh-combo{position:absolute;right:16px;top:90px;text-align:right;font-weight:900;color:#d8362e;text-shadow:0 2px 0 #fff,0 0 14px rgba(255,255,255,.8);pointer-events:none;transition:transform .08s}
@@ -771,8 +778,8 @@ const CSS = `
 .wrh-go-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;text-align:left}
 .wrh-go-card{display:grid;grid-template-columns:34px 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;padding:9px 12px;border-radius:12px;background:#fffaf0;border:2px solid #e4d9c3;box-shadow:0 2px 6px rgba(20,28,44,.12);opacity:0;transform:translateY(14px) scale(.9)}
 .wrh-go-card.in{opacity:1;transform:none;animation:wrh-go-pop .38s cubic-bezier(.2,1.5,.4,1)}
-.wrh-go-card i{grid-row:1 / 3;width:34px;height:34px;border-radius:10px;background:#2b3a52;display:flex;align-items:center;justify-content:center}
-.wrh-go-card i svg{width:22px;height:22px;fill:#ffd21f}
+.wrh-go-card i{grid-row:1 / 3;width:34px;height:34px;border-radius:10px;background:none;display:flex;align-items:center;justify-content:center}
+.wrh-go-card i .wrh-ico{width:30px;height:30px}
 .wrh-go-card b{font-size:11px;font-weight:700;letter-spacing:.03em;opacity:.7;line-height:1.15}
 .wrh-go-card .v{font-size:21px;font-weight:900;font-variant-numeric:tabular-nums;color:#2b3a52;line-height:1.1}
 .wrh-go-card.hot{border-color:#ffb000;background:#fff6d6;box-shadow:0 0 0 1px #ffb00066,0 2px 10px #ffb00055}
@@ -843,6 +850,7 @@ const CSS = `
 .wrh-low{color:#d8362e}
 .wrh-hud-dev{position:absolute;left:12px;top:26px;font-size:12px;line-height:1.5}
 `;
+const CSS = CSS_BASE + MENU_CSS;
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -852,7 +860,7 @@ function esc(s: string): string {
 const thumbCache = new Map<number, string>();
 
 /** One emoji per class for the picker. */
-const CLASS_ICONS = ['\u{1F396}\uFE0F', '\u{1FA7A}', '\u{1F6E1}\uFE0F', '\u{1F45F}', '\u{1F4A3}', '\u{1F3AF}', '\u{1F608}', '\u2694\uFE0F', '\u{1F528}'];
+const CLASS_ICON = (i: number): string => icon(`class_${i}`, 40);
 
 /** A little top-down picture of an arena layout, painted from the same data the game uses (cached as a data URL). */
 function arenaThumb(index: number): string {
@@ -904,12 +912,9 @@ function arenaThumb(index: number): string {
   return url;
 }
 
-/** A skull icon: bone white when lit, faint when not. */
+/** A skull icon: lit for the difficulty level, faint when not. */
 function skull(lit: boolean, size = 22): string {
-  const body = lit ? '#fbf6ea' : '#cfc6b3';
-  const line = lit ? '#3a352d' : '#a89f8c';
-  const eye = lit ? '#2b2118' : '#a89f8c';
-  return `<svg class="wrh-skull" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><path d="M12 2.2C6.9 2.2 3.2 5.7 3.2 10.4c0 2.7 1.3 4.8 3.3 6.1V20c0 .6.4 1 1 1H9v-2h1.2v2h3.6v-2H15v2h1.5c.6 0 1-.4 1-1v-3.5c2-1.3 3.3-3.4 3.3-6.1 0-4.7-3.7-8.2-8.8-8.2z" fill="${body}" stroke="${line}" stroke-width="1.4" stroke-linejoin="round"/><ellipse cx="8.6" cy="11" rx="2.4" ry="2.7" fill="${eye}"/><ellipse cx="15.4" cy="11" rx="2.4" ry="2.7" fill="${eye}"/><path d="M12 13.3l-1.1 2.2h2.2z" fill="${eye}"/></svg>`;
+  return `<span class="wrh-skull${lit ? '' : ' off'}">${icon('diff_skull', size)}</span>`;
 }
 
 export class Ui {
@@ -1175,7 +1180,7 @@ export class Ui {
     const el = document.createElement('div');
     el.className = 'it';
     el.style.setProperty('--c', item.color);
-    el.innerHTML = `<div class="ic">&#9733;</div><div><b>${esc(item.title)}</b><span>${esc(item.detail)}</span><small>${this.t.infoBy}: ${esc(item.who)}</small></div>`;
+    el.innerHTML = `<div class="ic">${icon('hud_star', 24)}</div><div><b>${esc(item.title)}</b><span>${esc(item.detail)}</span><small>${this.t.infoBy}: ${esc(item.who)}</small></div>`;
     this.infoEl.appendChild(el);
     void el.offsetWidth;
     el.classList.add('in');
@@ -1192,7 +1197,7 @@ export class Ui {
   /** The three round buttons that are always there, top right: language, controls and settings. */
   private buildToolbar(): void {
     this.toolbar.className = 'wrh-tb';
-    this.toolbar.innerHTML = `<button type="button" class="wrh-tbtn" id="tb-lang">&#127760;<small></small></button><button type="button" class="wrh-tbtn" id="tb-ctl">&#9000;</button><button type="button" class="wrh-tbtn" id="tb-set">&#9881;</button><div class="wrh-langpop" id="tb-pop"></div>`;
+    this.toolbar.innerHTML = `<button type="button" class="wrh-tbtn" id="tb-lang">${icon('tb_lang', 26)}<small></small></button><button type="button" class="wrh-tbtn" id="tb-ctl">${icon('tb_ctl', 26)}</button><button type="button" class="wrh-tbtn" id="tb-set">${icon('tb_set', 26)}</button><div class="wrh-langpop" id="tb-pop"></div>`;
     this.langPop = this.toolbar.querySelector<HTMLElement>('#tb-pop');
     this.toolbar.querySelector<HTMLElement>('#tb-lang')!.onclick = (e) => {
       e.stopPropagation();
@@ -1265,6 +1270,7 @@ export class Ui {
     this.redraw = null;
     this.lobbyCode = '';
     this.disposePreview();
+    delete document.documentElement.dataset.menu;
     this.screen.innerHTML = '';
   }
 
@@ -1324,18 +1330,18 @@ export class Ui {
     const s = BALANCE.weapons[id];
     const dps = perShot(s) * s.rate;
     const rows: { icon: string; label: string; frac: number; text: string }[] = [
-      { icon: '&#128165;', label: t.statDmg, frac: perShot(s) / max(perShot), text: `${s.damage}${s.pellets > 1 ? '&times;' + s.pellets : ''}${s.blast ? ' + ' + s.blastDamage : ''}` },
-      { icon: '&#9889;', label: t.statRate, frac: s.rate / max((x) => x.rate), text: `${s.rate}/s` },
-      { icon: '&#128293;', label: t.statDps, frac: dps / max((x) => perShot(x) * x.rate), text: String(Math.round(dps)) },
-      { icon: '&#127919;', label: t.statRange, frac: s.range / max((x) => x.range), text: String(s.range) },
-      { icon: '&#9678;', label: t.statAcc, frac: 1 - s.spread / (max((x) => x.spread) * 1.1), text: `${Math.round((1 - s.spread) * 100)}%` },
-      { icon: '&#128230;', label: t.statMag, frac: s.mag / max((x) => x.mag), text: String(s.mag) },
-      { icon: '&#128260;', label: t.statReload, frac: 1 - s.reload / (max((x) => x.reload) * 1.2), text: `${s.reload}s` },
-      { icon: '&#10138;', label: s.blast ? t.statBlast : t.statPierce, frac: s.blast ? s.blast / 3 : Math.min(1, s.pierce / 5), text: s.blast ? String(s.blast) : String(s.pierce) },
-      { icon: '&#127873;', label: t.statAmmo, frac: s.ammo < 0 ? 1 : s.ammo / max((x) => (x.ammo < 0 ? 0 : x.ammo)), text: s.ammo < 0 ? '&infin;' : String(s.ammo) },
+      { icon: 'stat_dmg', label: t.statDmg, frac: perShot(s) / max(perShot), text: `${s.damage}${s.pellets > 1 ? '&times;' + s.pellets : ''}${s.blast ? ' + ' + s.blastDamage : ''}` },
+      { icon: 'stat_rate', label: t.statRate, frac: s.rate / max((x) => x.rate), text: `${s.rate}/s` },
+      { icon: 'stat_dps', label: t.statDps, frac: dps / max((x) => perShot(x) * x.rate), text: String(Math.round(dps)) },
+      { icon: 'stat_range', label: t.statRange, frac: s.range / max((x) => x.range), text: String(s.range) },
+      { icon: 'stat_acc', label: t.statAcc, frac: 1 - s.spread / (max((x) => x.spread) * 1.1), text: `${Math.round((1 - s.spread) * 100)}%` },
+      { icon: 'stat_mag', label: t.statMag, frac: s.mag / max((x) => x.mag), text: String(s.mag) },
+      { icon: 'stat_reload', label: t.statReload, frac: 1 - s.reload / (max((x) => x.reload) * 1.2), text: `${s.reload}s` },
+      { icon: s.blast ? 'stat_blast' : 'stat_pierce', label: s.blast ? t.statBlast : t.statPierce, frac: s.blast ? s.blast / 3 : Math.min(1, s.pierce / 5), text: s.blast ? String(s.blast) : String(s.pierce) },
+      { icon: 'stat_ammo', label: t.statAmmo, frac: s.ammo < 0 ? 1 : s.ammo / max((x) => (x.ammo < 0 ? 0 : x.ammo)), text: s.ammo < 0 ? '&infin;' : String(s.ammo) },
     ];
     return rows
-      .map((r) => `<div class="wrh-stat"><span class="ic">${r.icon}</span><span class="nm">${r.label}</span><span class="bar"><i style="width:${Math.max(4, Math.min(100, Math.round(r.frac * 100)))}%"></i></span><b>${r.text}</b></div>`)
+      .map((r) => `<div class="wrh-stat"><span class="ic">${icon(r.icon, 20)}</span><span class="nm">${r.label}</span><span class="bar"><i style="width:${Math.max(4, Math.min(100, Math.round(r.frac * 100)))}%"></i></span><b>${r.text}</b></div>`)
       .join('');
   }
 
@@ -1367,11 +1373,11 @@ export class Ui {
     const swatches = PLAYER_COLORS.map((c, i) => `<button type="button" class="wrh-sw${i === this.color ? ' on' : ''}" data-sw="${i}" style="background:${c}" aria-label="${c}"></button>`).join('');
     return `<div class="wrh-prev">
       <div class="wrh-tabs"><button type="button" class="wrh-wp${this.previewMode === 'char' ? ' on' : ''}" data-ptab="char">${t.tabChar}</button><button type="button" class="wrh-wp${this.previewMode === 'weapon' ? ' on' : ''}" data-ptab="weapon">${t.tabWeapon}</button></div>
-      <div class="wrh-stage"><button type="button" class="wrh-arrow" data-pdir="-1" aria-label="previous">&#9664;</button><div class="wrh-canvas" id="wrh-prev-host"></div><button type="button" class="wrh-arrow" data-pdir="1" aria-label="next">&#9654;</button></div>
+      <div class="wrh-stage"><button type="button" class="wrh-arrow" data-pdir="-1" aria-label="previous">${icon('hud_left', 32)}</button><div class="wrh-canvas" id="wrh-prev-host"></div><button type="button" class="wrh-arrow" data-pdir="1" aria-label="next">${icon('hud_right', 32)}</button></div>
       <div class="wrh-prev-name" id="wrh-prev-name"></div><div class="wrh-prev-stats" id="wrh-prev-stats"></div>
       <div class="wrh-swatches" id="wrh-swatches">${swatches}</div>
       <label style="margin-top:8px">${t.classTitle}</label>
-      <div class="wrh-classes">${(t.classNames as readonly string[]).map((n, i) => `<button type="button" class="wrh-class${i === this.cls ? ' on' : ''}" data-cls="${i}" title="${esc((t.classTips as readonly string[])[i]!)}"><span class="ci">${CLASS_ICONS[i]}</span><b>${n}</b></button>`).join('')}</div>
+      <div class="wrh-classes">${(t.classNames as readonly string[]).map((n, i) => `<button type="button" class="wrh-class${i === this.cls ? ' on' : ''}" data-cls="${i}" title="${esc((t.classTips as readonly string[])[i]!)}"><span class="ci">${CLASS_ICON(i)}</span><b>${n}</b></button>`).join('')}</div>
       <div class="wrh-class-tip" id="wrh-class-tip">${esc((t.classTips as readonly string[])[this.cls]!)}</div>
     </div>`;
   }
@@ -1382,7 +1388,10 @@ export class Ui {
     const host = this.screen.querySelector<HTMLElement>('#wrh-prev-host');
     if (!host) return;
     try {
-      this.preview = new Preview(230);
+      // the menu's stage is big (it fills the middle of the screen), the lobby keeps the small turntable
+      const big = host.closest('.wrh-home') !== null;
+      const size = big ? Math.max(240, Math.min(480, Math.round(Math.min(window.innerHeight * 0.34, (host.parentElement?.clientWidth ?? 600) - 130)))) : 230;
+      this.preview = new Preview(size);
       host.appendChild(this.preview.canvas);
     } catch {
       this.preview = null; // no WebGL for a second context: the menu still works without the picture
@@ -1488,6 +1497,7 @@ export class Ui {
 
   showMenu(error = ''): void {
     this.redraw = () => this.showMenu(error);
+    document.documentElement.dataset.menu = '1';
     this.lobbyCode = '';
     const t = this.t;
     const profile = loadProfile();
@@ -1516,25 +1526,34 @@ export class Ui {
     const hosted = location.hostname.endsWith('github.io');
     const defServer = fromParam ?? (stored || (hosted ? '' : location.port === '5173' ? `ws://${location.hostname}:8787/ws` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
     const rejoin = loadRejoin();
-    this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll wrh-menu">
-      <h1 class="wrh-logo">${t.title}</h1><p class="sub">${t.tag} &middot; ${t.best}: ${profile.bestWave} / ${profile.bestKills}</p>
-      ${inviteCode ? `<p class="wrh-invite">&#127881; ${t.invited} <b>${esc(inviteCode)}</b>. ${t.invitedHint}</p>` : ''}
-      <div class="wrh-cols"><div>
-      <label>${t.name}</label><input id="wrh-name" maxlength="16" value="${esc(saved)}" placeholder="player">
-      <label>${t.weapon}</label><div class="wrh-weapons" id="wrh-weapons">${this.weaponButtons()}</div>
-      ${this.previewBlock()}
-      </div><div>
-      ${this.arenaRows(true, this.map, this.difficulty)}
-      <button id="wrh-solo" class="wrh-play">${t.solo}</button>
-      <button id="wrh-host" class="alt">${t.host}</button>
-      ${rejoin ? `<button id="wrh-rejoin" class="alt">${t.rejoin} (${esc(rejoin.code)})</button>` : ''}
-      <div class="wrh-row"><div style="flex:1"><label>${t.code}</label><input id="wrh-code" maxlength="4" style="text-transform:uppercase" placeholder="ABCD" value="${esc(inviteCode)}"></div><button id="wrh-join" class="alt">${t.join}</button></div>
-      <label>${t.password}</label><input id="wrh-pass" maxlength="24" autocomplete="off">
-      <label>${t.server}</label><input id="wrh-server" value="${esc(defServer)}" placeholder="wss://your-tunnel.example.com/ws"><p class="sub" id="wrh-relay-note" style="margin:-6px 0 8px"></p>
-      </div></div>
-      <p class="sub" style="margin:10px 0 0;text-align:center">${t.controls}</p>
-      ${error ? `<p style="color:#c8242c;font-weight:700">${esc(error)}</p>` : ''}
-    </div>`;
+    this.screen.innerHTML = menuMarkup({
+      title: t.title,
+      tag: t.tag,
+      bestLabel: t.best,
+      bestWave: profile.bestWave,
+      bestKills: profile.bestKills,
+      invite: inviteCode ? `<p class="wrh-invite">${icon('hud_party', 22)} ${t.invited} <b>${esc(inviteCode)}</b>. ${t.invitedHint}</p>` : '',
+      nameLabel: t.name,
+      savedName: saved,
+      weaponLabel: t.weapon,
+      weaponsHtml: this.weaponButtons(),
+      previewHtml: this.previewBlock(),
+      arenaHtml: this.arenaRows(true, this.map, this.difficulty),
+      soloLabel: t.solo,
+      hostLabel: t.host,
+      joinLabel: t.join,
+      onlineLabel: t.online,
+      settingsLabel: t.settings,
+      closeLabel: t.close,
+      rejoinHtml: rejoin ? `<button id="wrh-rejoin" class="wrh-big alt">${icon('hud_link', 28)}<span>${t.rejoin} (${esc(rejoin.code)})</span></button>` : '',
+      codeLabel: t.code,
+      inviteCode,
+      passLabel: t.password,
+      serverLabel: t.server,
+      defServer,
+      controls: t.controls,
+      error,
+    });
     this.bindWeapons();
     this.bindPreview();
     void this.fillRelay(fromParam !== null);
@@ -1560,17 +1579,35 @@ export class Ui {
     q('wrh-solo').onclick = () => this.h.onSolo(name());
     q('wrh-host').onclick = () => this.h.onHost(name(), q<HTMLInputElement>('wrh-server').value.trim(), pass());
     q('wrh-join').onclick = () => this.h.onJoin(name(), q<HTMLInputElement>('wrh-code').value.trim().toUpperCase(), q<HTMLInputElement>('wrh-server').value.trim(), pass());
+    const online = q('wrh-online-panel');
+    const openOnline = (on: boolean): void => {
+      online.classList.toggle('open', on);
+    };
+    q('wrh-online').onclick = () => openOnline(true);
+    q('wrh-online-x').onclick = () => openOnline(false);
+    online.onclick = (e) => {
+      if (e.target === online) openOnline(false);
+    };
+    online.onkeydown = (e) => {
+      if ((e as KeyboardEvent).key === 'Escape') openOnline(false);
+    };
+    q('wrh-open-settings').onclick = () => this.toggleSettings();
     if (inviteCode) {
+      // an invite link: the online panel is open with the code filled in and Join is the main button
+      openOnline(true);
       q('wrh-join').classList.remove('alt');
       q('wrh-host').classList.add('alt');
-      q('wrh-name').focus();
-      // Enter in the name box joins the invited room
+      q('wrh-code').onkeydown = (e) => {
+        if ((e as KeyboardEvent).key === 'Enter') q('wrh-join').click();
+      };
       q('wrh-name').onkeydown = (e) => {
         if ((e as KeyboardEvent).key === 'Enter') q('wrh-join').click();
       };
     }
     const rj = this.screen.querySelector<HTMLElement>('#wrh-rejoin');
     if (rj) rj.onclick = () => this.h.onRejoin();
+    // a new version: its release notes open by themselves (once)
+    autoOpenReleaseNotes();
   }
 
   /** Pause screen (solo only; online games keep running). */
@@ -1578,6 +1615,7 @@ export class Ui {
     this.redraw = () => this.showPause();
     this.lobbyCode = '';
     const t = this.t;
+    delete document.documentElement.dataset.menu;
     this.screen.innerHTML = `<div class="wrh-panel wrh-center" style="text-align:center"><h1>${t.paused}</h1>
       <button id="wrh-resume">${t.resume}</button><button id="wrh-pset" class="alt">${t.settings}</button><button id="wrh-leave" class="warn">${t.leave}</button></div>`;
     this.screen.querySelector<HTMLElement>('#wrh-resume')!.onclick = () => this.h.onResume();
@@ -1707,7 +1745,7 @@ export class Ui {
     if (!el) {
       el = document.createElement('div');
       el.className = 'wrh-ring';
-      el.innerHTML = '<i class="bleed"></i><i class="prog"></i><b>&#10010;</b>';
+      el.innerHTML = '<i class="bleed"></i><i class="prog"></i><b>' + icon('go_revives', 20) + '</b>';
       this.root.appendChild(el);
       this.ringEls[slot] = el;
     }
@@ -1769,7 +1807,7 @@ export class Ui {
     const profile = loadProfile();
     return WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee).map((w) => {
       const ok = isUnlocked(w, profile);
-      return `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}"${ok ? '' : ` disabled title="${esc(`${this.t.lockedTip} ${WEAPON_UNLOCK[w]}`)}"`}>${ok ? '' : '&#128274; '}${names[w]}</button>`;
+      return `<button type="button" class="wrh-wp${w === this.weapon ? ' on' : ''}" data-w="${w}"${ok ? '' : ` disabled title="${esc(`${this.t.lockedTip} ${WEAPON_UNLOCK[w]}`)}"`}>${ok ? '' : icon('hud_lock', 16) + ' '}<img class="wp-i" src="${asset(`ui/wpn_${w}.png`)}" alt="" draggable="false">${names[w]}</button>`;
     }).join('');
   }
 
@@ -1867,6 +1905,7 @@ export class Ui {
   showConnecting(): void {
     this.redraw = () => this.showConnecting();
     this.lobbyCode = '';
+    delete document.documentElement.dataset.menu;
     this.screen.innerHTML = `<div class="wrh-panel wrh-center"><h1>${this.t.connecting}</h1></div>`;
   }
 
@@ -1933,13 +1972,14 @@ export class Ui {
     this.lobbyOpts = `${options.map}/${options.difficulty}`;
     this.lobbyMap = options.map;
     this.lobbyDifficulty = options.difficulty;
+    delete document.documentElement.dataset.menu;
     this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll" id="wrh-lobby">
-      <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span>${locked ? ' &#128274;' : ''}</h1>
+      <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span>${locked ? ' ' + icon('hud_lock', 24) : ''}</h1>
       <p class="sub">${iAmHost ? '' : t.waiting}</p>
       <label id="wrh-pcount">${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist" id="wrh-plist">${this.lobbyList(players)}</ul>
       <label>${t.weapon}</label><div class="wrh-weapons">${this.weaponButtons()}</div>
       ${this.previewBlock()}<div id="wrh-arena-wrap">${this.arenaRows(iAmHost, options.map, options.difficulty)}</div>
-      ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-invite" class="alt">&#128279; ${t.invite}</button><button id="wrh-leave" class="warn">${t.leave}</button>
+      ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-invite" class="alt">${icon('hud_link', 18)} ${t.invite}</button><button id="wrh-leave" class="warn">${t.leave}</button>
     </div>`;
     this.bindWeapons();
     this.bindPreview();
@@ -1983,7 +2023,7 @@ export class Ui {
     const t = this.t;
     const names = t.weapons as Record<string, string>;
     const extra = rec
-      ? `${rec.newWave || rec.newKills ? `<p style="color:#d8862e;font-weight:800">${t.newBest}</p>` : ''}${rec.unlocked.length ? `<p>&#128275; ${t.unlockedWeapon}: <b>${rec.unlocked.map((w) => names[w]).join(', ')}</b></p>` : ''}`
+      ? `${rec.newWave || rec.newKills ? `<p style="color:#d8862e;font-weight:800">${t.newBest}</p>` : ''}${rec.unlocked.length ? `<p>${icon('hud_unlock', 18)} ${t.unlockedWeapon}: <b>${rec.unlocked.map((w) => names[w]).join(', ')}</b></p>` : ''}`
       : '';
     const head = `<h1>${t.over}</h1>
       <p>${t.reached} <b>${world.wave}</b> &middot; ${t.kills} <b>${world.kills}</b> &middot; ${t.level} <b>${Math.max(1, ...Array.from(world.pLevel).filter((_, i) => world.pActive[i]))}</b></p>${extra}${this.squadStats(world)}`;
@@ -2074,7 +2114,7 @@ export class Ui {
     const el = this.hud.querySelector<HTMLElement>('#h-hostpause');
     if (!el) return;
     el.style.display = on ? 'block' : 'none';
-    if (on) el.innerHTML = `&#9208; ${this.t.hostPaused}${canResume ? `<small>${this.t.hostResume}</small>` : ''}`;
+    if (on) el.innerHTML = `${icon('hud_pause', 18)} ${this.t.hostPaused}${canResume ? `<small>${this.t.hostResume}</small>` : ''}`;
   }
 
   private readonly cineEl = document.createElement('div');
@@ -2328,7 +2368,6 @@ export class Ui {
 
     // squad: one card per player with a smooth health bar (and its number), shield and the upgrades they carry
     let squad = '';
-    const glyph: Record<string, string> = { damage: '⚔', rate: '»', pierce: '↠', crit: '✦', blast: '✹', speed: '➤', hp: '♥', armor: '◈', magnet: '⊛', luck: '♣', scholar: '✎', medic: '✚', quick: '↻', roll: '↺', vampire: 'V' };
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (!world.pActive[s]) continue;
       const st = world.pState[s]!;
@@ -2336,23 +2375,23 @@ export class Ui {
       const frac = st === PlayerState.Alive ? world.pHp[s]! / maxHp : st === PlayerState.Downed ? world.pTimer[s]! / BALANCE.player.downedSeconds : 0;
       const col = this.slotColor(s);
       const down = st === PlayerState.Downed;
-      const num = st === PlayerState.Alive ? `${Math.ceil(world.pHp[s]!)}<small>/${Math.round(maxHp)}</small>` : down ? `${Math.ceil(world.pTimer[s]!)}s` : '&#10007;';
+      const num = st === PlayerState.Alive ? `${Math.ceil(world.pHp[s]!)}<small>/${Math.round(maxHp)}</small>` : down ? `${Math.ceil(world.pTimer[s]!)}s` : icon('hud_cross', 14);
       const fill = down ? '#f0a020' : `hsl(${Math.round(Math.max(0, Math.min(1, frac)) * 120)} 72% 46%)`;
       const shield = Math.max(0, Math.min(100, world.pPerk[s * PERKS + PERK.Shield]!));
       let chips = '';
       for (let k = 0; k < POWERS.length; k++) {
         const lv = POWERS[k]!.level(world, s);
         if (lv < 0.005) continue;
-        chips += `<span class="chip" data-tip="chip" data-s="${s}" data-k="${k}" style="--c:${POWERS[k]!.color}"><i>${glyph[POWERS[k]!.id] ?? '+'}</i>${Math.round(lv * 100)}%</span>`;
+        chips += `<span class="chip" data-tip="chip" data-s="${s}" data-k="${k}" style="--c:${POWERS[k]!.color}"><i>${chipIcon(POWERS[k]!.id, 16)}</i>${Math.round(lv * 100)}%</span>`;
       }
       const haste = world.pPerk[s * PERKS + PERK.Haste]!;
       const quad = world.pPerk[s * PERKS + PERK.Quad]!;
-      if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>&#9889;</i>${Math.ceil(haste)}s</span>`;
-      if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>&#10006;4</i>${Math.ceil(quad)}s</span>`;
+      if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>${icon('chip_haste', 16)}</i>${Math.ceil(haste)}s</span>`;
+      if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>${icon('chip_quad', 16)}</i>${Math.ceil(quad)}s</span>`;
       squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${frac < 0.3 && st === PlayerState.Alive ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
-        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' &#9760;' : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
+        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
         `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
-        `<div class="stats" data-tip="pc" data-s="${s}"><span>${t.dpsLabel} <b>${Math.round(this.dpsOf(world, s, now))}</b></span><span>&#9760; <b>${Math.round(world.pPerk[s * PERKS + PERK.Kills]!)}</b></span></div>` +
+        `<div class="stats" data-tip="pc" data-s="${s}"><span>${t.dpsLabel} <b>${Math.round(this.dpsOf(world, s, now))}</b></span><span>${icon('go_kills', 14)} <b>${Math.round(world.pPerk[s * PERKS + PERK.Kills]!)}</b></span></div>` +
         (chips ? `<div class="chips">${chips}</div>` : '') +
         '</div>';
     }
@@ -2368,16 +2407,16 @@ export class Ui {
       const dashText = dashReady ? '' : `${Math.ceil(world.pDashCd[slot]!)}s`;
       const specReady = world.pSpecCd[slot]! <= 0;
       const specOn = world.pSpecT[slot]! > 0;
-      const specText = specOn ? `${world.pSpecT[slot]!.toFixed(1)}s` : specReady ? '&#10003;' : `${Math.ceil(world.pSpecCd[slot]!)}s`;
+      const specText = specOn ? `${world.pSpecT[slot]!.toFixed(1)}s` : specReady ? icon('hud_check', 16) : `${Math.ceil(world.pSpecCd[slot]!)}s`;
       const cls = Math.round(world.pPerk[slot * PERKS + PERK.Class]!);
       const abName = (t.abilityNames as readonly string[])[cls] ?? '';
       const gear = (kind: string, icon: string, label: string, val: string, on: boolean, cd: boolean): string =>
         `<div class="g${on ? ' on' : ''}${cd ? ' cd' : ''}" data-tip="gear" data-g="${kind}"><i>${icon}</i><span>${label}</span><b>${val}</b></div>`;
       set(
         'h-me',
-        gear('gren', '&#128163;', '', String(world.pGren[slot]), world.pGren[slot]! > 0, world.pGren[slot]! <= 0) +
-          gear('dash', '&#9889;', '', dashText || '&#10003;', dashReady, !dashReady) +
-          gear('spec', '&#9733;', esc(abName), specText, specReady || specOn, !specReady && !specOn),
+        gear('gren', icon('hud_grenade', 26), '', String(world.pGren[slot]), world.pGren[slot]! > 0, world.pGren[slot]! <= 0) +
+          gear('dash', icon('hud_dash', 26), '', dashText || icon('hud_check', 16), dashReady, !dashReady) +
+          gear('spec', icon('hud_ability', 26), esc(abName), specText, specReady || specOn, !specReady && !specOn),
       );
       this.gearInfo = { abName, cls };
       set('h-inv', this.inventoryHtml(world, slot));

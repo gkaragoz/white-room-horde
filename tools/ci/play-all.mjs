@@ -35,6 +35,7 @@ async function open(url, profile = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1000, height: 700 } });
   await ctx.addInitScript((p) => {
     try {
+      localStorage.setItem('wrh.notesSeen', '999.0');
       localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 30, bestKills: 999, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1, ...p }));
       localStorage.setItem('wrh.lang', 'en');
     } catch {}
