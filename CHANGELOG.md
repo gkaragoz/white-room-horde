@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.29.1 (2026-10-21)
+
 **New main menu: a card hub with full-screen pages (client only)**
 
 - The menu opens on a slim top bar (logo, best score, language and settings buttons) and big cards: a wide green **Play** card, **Achievements** (with the red "!" badge), **Weapons and Class**, **Difficulty** (shows the number of multipliers and the score multiplier) and **Settings**. Each card opens a full-screen page with a **Back** button; **Esc** goes back one level.
