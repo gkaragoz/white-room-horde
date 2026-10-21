@@ -69,16 +69,16 @@ try {
     await guest.page.mouse.move(200, 90);
     await guest.page.mouse.down();
     await guest.page.keyboard.down('Space');
-    await sleep(2500);
+    await sleep(1200);
     await guest.page.keyboard.up('Space');
     await guest.page.mouse.up();
-    await sleep(3000);
+    await sleep(2000);
     const st = await guest.page.evaluate(() => ({ mag: window.__wrh.world.pMag[window.__wrh.session.slot], reload: window.__wrh.world.pReload[window.__wrh.session.slot] }));
     return { mag0, ...st, fired: st.mag < mag0 || st.reload > 0 };
   })();
   check('the guest can fire before the pause (the check itself works)', beforePause.fired, JSON.stringify(beforePause));
 
-  // ---- 1. pause and resume
+  // ---- 1. pause and resume (the paused time does not count: the squad that only stands about is still alive afterwards)
   const sockHost = host.sockets.n;
   const sockGuest = guest.sockets.n;
   await host.page.evaluate(() => window.__wrh.session.setPause(true));
@@ -87,7 +87,7 @@ try {
   check('the guest sees the pause', pausedSeen === true);
   const tPaused = await guest.page.evaluate(() => window.__wrh.world.tick);
   await host.page.evaluate(() => window.__wrh.session.setPause(false));
-  await sleep(6000);
+  await sleep(3500);
   const tAfter = await guest.page.evaluate(() => window.__wrh.world.tick);
   check('the game runs again after the resume', tAfter - tPaused > 60, `${tAfter - tPaused} ticks`);
   check('no connection was cut by the watchdog (no new socket on either page)', host.sockets.n === sockHost && guest.sockets.n === sockGuest, `host +${host.sockets.n - sockHost}, guest +${guest.sockets.n - sockGuest}`);
@@ -97,10 +97,10 @@ try {
     await guest.page.mouse.move(200, 90);
     await guest.page.mouse.down();
     await guest.page.keyboard.down('Space');
-    await sleep(2500);
+    await sleep(1200);
     await guest.page.keyboard.up('Space');
     await guest.page.mouse.up();
-    await sleep(3000); // the confirmed world trails real time on a software renderer
+    await sleep(2000); // the confirmed world trails real time on a software renderer
     const st = await guest.page.evaluate(() => ({ mag: window.__wrh.world.pMag[window.__wrh.session.slot], reload: window.__wrh.world.pReload[window.__wrh.session.slot], state: window.__wrh.world.pState[window.__wrh.session.slot], away: window.__wrh.world.pAway[window.__wrh.session.slot], ahead: window.__wrh.session.sentTick - window.__wrh.session.received, lead: window.__wrh.session.lead }));
     return { mag0, ...st, fired: st.mag < mag0 || st.reload > 0 };
   };
