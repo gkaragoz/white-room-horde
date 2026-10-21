@@ -7,6 +7,12 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Level queue and 50 universal cards (rules change: update the server and reload the page)**
+
+- Levels bank up during a floor (`pPending`); the card offer opens only when the floor is cleared (or on the new floor before its enemies come), never mid-fight, never during the climb. Picking is allowed during the climb; the offer clock waits.
+- Each offer lasts 15 s and takes the first card when it runs out (no dice). A LEVEL UP badge with the count of waiting levels sits at the top of the screen; the level-up popup is gone.
+- 50 new universal cards (`tools/cards/universal.py` is the table, `cardtable.ts` applies the stat changes). Card classes are masks over the class ids: blade and hammer fighters do not see gun-only cards (pierce, marksman, quick hands, grenades, arsenal, speed loader, scavenger).
+
 ## v0.25.0 (2026-10-21)
 
 **Balance: harder enemies, boss attacks as a share of health (rules change: update the server and reload the page)**

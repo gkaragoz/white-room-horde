@@ -23,6 +23,30 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.26',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: 'Level-ups wait for the end of the floor, 50 new cards',
+        items: [
+          'Level-ups no longer interrupt a fight: they bank up, a LEVEL UP badge with the count sits at the top of the screen, and the card screen opens when the floor is cleared. Waiting levels carry on through the climb and into the next floor.',
+          'Every card choice has 15 seconds; when the time runs out the first card is taken (no dice).',
+          '50 new cards for everybody, from common to epic, many with a trade-off (Glass Cannon, Risk and Reward, Titan...).',
+          'Blade and hammer fighters no longer get cards that only make sense for guns (piercing, magazines, grenades...).',
+        ],
+      },
+      tr: {
+        title: 'Seviyeler kat sonunu bekler, 50 yeni kart',
+        items: [
+          'Seviye atlamak artık savaşı bölmez: seviyeler birikir, ekranın üstünde sayıyla bir LEVEL UP rozeti durur ve kart ekranı kat temizlenince açılır. Bekleyen seviyeler tırmanışta ve sonraki katta da devam eder.',
+          'Her kart seçiminin 15 saniyesi var; süre dolunca ilk kart alınır (zar yok).',
+          'Herkes için 50 yeni kart, yaygından destansıya kadar, çoğu bir bedelle (Cam Top, Risk ve Ödül, Titan...).',
+          'Kılıç ve çekiç savaşçıları artık yalnızca silahlara yarayan kartları (delme, şarjör, bomba...) görmez.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.25',
     date: '2026-10-21',
     text: {
