@@ -10,6 +10,9 @@ import { ACTIONS } from './input';
 import { THEMES } from './render/arena';
 import { universalCardTexts } from './cardText';
 import { MODS_CSS, modsPanel, modsRow } from './modsUi';
+import { achWords, markSeen, unreadCount } from './achievements';
+import { ACH_CSS, achPage, runAchievementsHtml } from './achUi';
+import type { AchievementDef } from '@wrh/shared';
 import { EXTRA } from './i18n';
 import { renderGameOver, type RunExtras } from './gameOver';
 import { renderControlsSheet, renderSettingsPanel } from './settingsPanel';
@@ -781,6 +784,7 @@ const CSS_BASE = `
 .wrh-ui button.wrh-diff.on{background:#fff;border-color:#d8362e;box-shadow:0 0 0 2px rgba(216,54,46,.2)}
 .wrh-sk-row{display:inline-flex;gap:2px;align-items:center}
 ${MODS_CSS}
+${ACH_CSS}
 .wrh-skull{display:block}
 .wrh-ro{display:flex;gap:10px;align-items:center;margin:6px 0 10px;font-size:13px}
 .wrh-thumb-s{width:84px;aspect-ratio:3/2;border-radius:7px;object-fit:cover}
@@ -1613,6 +1617,8 @@ export class Ui {
       joinLabel: t.join,
       onlineLabel: t.online,
       settingsLabel: t.settings,
+      achLabel: achWords(this.lang).title,
+      achUnread: unreadCount(profile.ach),
       closeLabel: t.close,
       rejoinHtml: rejoin ? `<button id="wrh-rejoin" class="wrh-big alt">${icon('hud_link', 28)}<span>${t.rejoin} (${esc(rejoin.code)})</span></button>` : '',
       codeLabel: t.code,
@@ -1661,6 +1667,7 @@ export class Ui {
       if ((e as KeyboardEvent).key === 'Escape') openOnline(false);
     };
     q('wrh-open-settings').onclick = () => this.toggleSettings();
+    q('wrh-open-ach').onclick = () => this.showAchievements();
     if (inviteCode) {
       // an invite link: the online panel is open with the code filled in and Join is the main button
       openOnline(true);
@@ -2171,7 +2178,26 @@ export class Ui {
   private goStop: (() => void) | null = null;
 
   /** The game-over page: the run in numbers, revealed one card at a time (a click shows them all). */
-  showGameOver(world: World, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[] }, extras: RunExtras = { clicks: 0, keys: 0, bestCombo: 0 }, instant = false, slot = 0): void {
+  /** The full-screen achievements page. Opening it counts as having seen everything earned so far (the red badge goes away). */
+  showAchievements(): void {
+    const page = document.createElement('div');
+    page.className = 'wrh-ach';
+    page.innerHTML = achPage(this.lang, loadProfile().ach);
+    markSeen();
+    this.screen.querySelector('#wrh-ach-badge')?.remove();
+    const close = (): void => {
+      page.remove();
+      window.removeEventListener('keydown', onKey);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.code === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKey);
+    page.querySelector<HTMLElement>('#wrh-ach-close')!.onclick = close;
+    document.body.appendChild(page);
+  }
+
+  showGameOver(world: World, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[]; ach?: readonly AchievementDef[] }, extras: RunExtras = { clicks: 0, keys: 0, bestCombo: 0 }, instant = false, slot = 0): void {
     this.redraw = () => this.showGameOver(world, rec, extras, true, slot);
     this.lobbyCode = '';
     this.goStop?.();
@@ -2191,7 +2217,7 @@ export class Ui {
       slotColor: this.slotColor,
       weaponName: (id) => names[WEAPON_IDS[id]!] ?? '',
       head,
-      foot: `<button id="wrh-again">${t.again}</button>`,
+      foot: `${runAchievementsHtml(this.lang, rec?.ach ?? [])}<button id="wrh-again">${t.again}</button>`,
       tick: (_i, last) => this.h.onUiSound(last ? 'confirm' : 'click'),
       instant,
       extras: { ...extras, slot },

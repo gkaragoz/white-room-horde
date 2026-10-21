@@ -30,6 +30,7 @@ import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
 import { runScore } from './modsUi';
+import { recordAchievements } from './achievements';
 import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
 import { BUILD, mountVersionBadge } from './buildinfo';
 import { Ui, UI_STRINGS, type Settings } from './ui';
@@ -713,7 +714,7 @@ function handleEvent(e: SimEvent): void {
       over = true;
       setTimeout(() => audio.stopMusic(), 4000);
       {
-        const rec = world && !playback ? recordGame(world.wave, world.kills, runScore(world).final) : undefined;
+        const rec = world && !playback ? { ...recordGame(world.wave, world.kills, runScore(world).final), ach: recordAchievements(world, localSlot) } : undefined;
         clearRejoin();
         ui.playerNames = names;
         setTimeout(() => world && ui.showGameOver(world, rec, { clicks: runClicks, keys: runKeys, bestCombo }, false, localSlot), 1800);
