@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.19.1 (2026-10-21)
+
 - The version number in the corner is clickable: it opens a window with the release notes in plain words, in the interface language (and it follows the language when you change it while it is open). Esc or a click outside closes it.
 
 ## v0.19.0 (2026-10-20)
