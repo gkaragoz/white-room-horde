@@ -16,7 +16,7 @@ function check(w: World, label: string): string | null {
     if (w.pLayer[s] === 1 && !deckWalkable(map, w.pX[s]!, w.pY[s]!)) return `${label}: player ${s} on a deck layer in the air at ${w.pX[s]!.toFixed(1)},${w.pY[s]!.toFixed(1)}`;
     if (!Number.isFinite(heightAt(map, w.pX[s]!, w.pY[s]!, w.pLayer[s]!))) return `${label}: no height for player ${s}`;
     if (w.pSpecCd[s]! < 0 || w.pSpecT[s]! < 0 || w.pStun[s]! < 0 || w.pCharge[s]! < 0) return `${label}: negative timer on player ${s}`;
-    if (w.pAmmo[s]! < -1 || w.pGren[s]! < 0) return `${label}: ammo ${w.pAmmo[s]} grenades ${w.pGren[s]}`;
+    if (w.pGren[s]! < 0) return `${label}: grenades ${w.pGren[s]}`;
   }
   let live = 0;
   for (let i = 0; i < MAX_ENEMIES; i++) {

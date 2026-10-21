@@ -12,7 +12,7 @@ function check(w: World, label: string): string | null {
     if (Math.abs(w.pX[s]!) > ARENA_HALF_W + 0.01 || Math.abs(w.pY[s]!) > ARENA_HALF_H + 0.01) return `${label}: player ${s} left the arena`;
     if (w.pHp[s]! > w.pMaxHp[s]! + 1e-9) return `${label}: player ${s} hp ${w.pHp[s]} above max ${w.pMaxHp[s]}`;
     if (w.pHp[s]! < 0) return `${label}: negative hp`;
-    if (w.pAmmo[s]! < -1) return `${label}: ammo ${w.pAmmo[s]}`;
+    if (w.pMag[s]! < 0) return `${label}: magazine ${w.pMag[s]}`;
     if (w.pGren[s]! < 0 || w.pGren[s]! > BALANCE.grenade.max + 3) return `${label}: grenades ${w.pGren[s]}`;
   }
   let live = 0;

@@ -7,6 +7,12 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Unlimited ammo and click-to-pick weapons (rules change: update the server and reload the page)**
+
+- Ammo is unlimited: only the magazine and the reload count. Ammo crates, reserves, low-ammo drop bonus and automatic weapon switching are gone; the Full magazines card is now Speed loader (reload 20% faster).
+- The weapon is picked by clicking or tapping its row in the list above the minimap (gamepad: D-pad up/down). Number keys, Q and the touch switch button no longer exist. The input is 11 bytes: the weapon choice is the WEAPON_IDS index plus one.
+- Every weapon keeps its own magazine and its own reload progress; switching does not skip a reload.
+
 ## v0.23.1 (2026-10-21)
 
 - Online: after a long pause (about 10 s or more) nobody could shoot or move any more. The pages kept numbering their inputs while the relay's clock stood still, so after the resume every input was refused as too early, for ever. Pages now send nothing while paused, pull their numbering back by themselves, and the relay drops inputs that run ahead during a pause.

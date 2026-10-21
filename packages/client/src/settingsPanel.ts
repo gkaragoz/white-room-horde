@@ -83,10 +83,8 @@ const EN = {
   ctlGrenadeTip: 'Thrown along your aim, explodes after a short fuse',
   ctlReload: 'Reload',
   ctlReloadTip: 'Also happens by itself when the magazine is empty',
-  ctlSwitch: 'Switch weapon',
-  ctlSwitchTip: 'The next stronger weapon with ammo; from the strongest it goes back to the weakest',
   ctlWeapons: 'Pick weapon',
-  ctlWeaponsTip: 'Fixed numbers, weakest to strongest (the HUD list shows them); the last four weapons only with Q. A weapon without ammo cannot be picked',
+  ctlWeaponsTip: 'Click or tap the weapon in the list above the minimap. Ammo is unlimited; each weapon keeps its own magazine and its own reload',
   ctlDash: 'Dash',
   ctlDashTip: 'A quick burst of speed with a moment of invulnerability',
   ctlSpecial: 'Class ability',
@@ -108,7 +106,7 @@ const EN = {
   padReload: 'B: reload',
   padDash: 'A: dash',
   padRevive: 'X: revive',
-  padSwitch: 'Y: switch weapon',
+  padSwitch: 'D-pad up/down: weapon list',
   padCards: 'D-pad: pick a card',
   padPause: 'Start: pause',
   mouseLeft: 'Left button',
@@ -194,10 +192,8 @@ const TR: Partial<typeof EN> = {
   ctlGrenadeTip: 'Nişan yönüne atılır, kısa fitilden sonra patlar',
   ctlReload: 'Şarjör doldur',
   ctlReloadTip: 'Şarjör boşalınca kendiliğinden de başlar',
-  ctlSwitch: 'Silah değiştir',
-  ctlSwitchTip: 'Mermisi olan bir sonraki güçlü silah; en güçlüden sonra en zayıfa döner',
   ctlWeapons: 'Silah seç',
-  ctlWeaponsTip: 'Sabit numaralar, en zayıftan en güçlüye (HUD listesinde yazıyor); son dört silah yalnızca Q ile. Mermisi olmayan silah seçilemez',
+  ctlWeaponsTip: 'Mini haritanın üstündeki listede silaha tıkla ya da dokun. Mermi sınırsız; her silah kendi şarjörünü ve kendi doldurmasını taşır',
   ctlDash: 'Atıl',
   ctlDashTip: 'Kısa süreli hız patlaması ve anlık dokunulmazlık',
   ctlSpecial: 'Sınıf yeteneği',
@@ -219,7 +215,7 @@ const TR: Partial<typeof EN> = {
   padReload: 'B: şarjör doldur',
   padDash: 'A: atıl',
   padRevive: 'X: kaldır',
-  padSwitch: 'Y: silah değiştir',
+  padSwitch: 'Yön tuşları yukarı/aşağı: silah listesi',
   padCards: 'Yön tuşları: kart seç',
   padPause: 'Start: duraklat',
   mouseLeft: 'Sol tuş',
@@ -550,10 +546,9 @@ export function renderControlsSheet(host: HTMLElement, c: Pick<PanelContext, 'la
   gren.append(el('em', undefined, '/'), caps(b('grenade')));
   body.append(line(gren, t.ctlGrenade, t.ctlGrenadeTip));
   body.append(line(caps(b('reload')), t.ctlReload, t.ctlReloadTip));
-  const nums = el('span', 'wrh-keys-row');
-  ['1', '2', '3', '4', '5', '6', '7', '8', '9'].forEach((k) => nums.append(keycap(k)));
-  body.append(line(nums, t.ctlWeapons, t.ctlWeaponsTip));
-  body.append(line(caps(b('switch')), t.ctlSwitch, t.ctlSwitchTip));
+  const pick = el('span', 'wrh-ctl-mouse');
+  pick.innerHTML = `${MOUSE_SVG(true, false)}<small>${t.mouseLeft}</small>`;
+  body.append(line(pick, t.ctlWeapons, t.ctlWeaponsTip));
   body.append(line(caps(b('dash')), t.ctlDash, t.ctlDashTip));
   body.append(line(caps(b('special')), t.ctlSpecial, t.ctlSpecialTip));
   body.append(line(caps(b('revive')), t.ctlRevive, t.ctlReviveTip));

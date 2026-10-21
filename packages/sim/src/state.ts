@@ -12,7 +12,7 @@ export type SimEvent =
   | { type: 'enemyHit'; id: number; etype: number; x: number; y: number; damage: number; by: number }
   | { type: 'enemyDeath'; id: number; etype: number; x: number; y: number; dx: number; dy: number; power: number }
   | { type: 'playerHit'; slot: number; x: number; y: number; damage: number }
-  | { type: 'weaponSwitch'; slot: number; weapon: number; auto: boolean }
+  | { type: 'weaponSwitch'; slot: number; weapon: number }
   | { type: 'weaponGet'; slot: number; weapon: number; fresh: boolean }
   | { type: 'secondWind'; slot: number }
   | { type: 'barrelHit'; x: number; y: number }
@@ -121,11 +121,10 @@ export interface World {
   pCooldown: Float64Array;
   pIFrames: Float64Array;
   pWeapon: Int32Array;
-  pAmmo: Int32Array;
-  /** Inventory: bitmask of the weapons (indices into WEAPON_IDS) a player owns for good, and the magazine / reserve of every weapon that is not in the hands (`pMag`/`pAmmo` hold the one that is). */
+  /** Inventory: bitmask of the weapons (indices into WEAPON_IDS) a player owns for good, and the magazine / reload progress of every weapon that is not in the hands (`pMag`/`pReload` hold the one that is). Ammo itself is unlimited. */
   pOwned: Int32Array;
   pInvMag: Int32Array;
-  pInvAmmo: Int32Array;
+  pInvReload: Float64Array;
   pMoving: Uint8Array;
   /** Rounds in the magazine, reload countdown (s), dash ticks left / cooldown (s) / direction, personal card multipliers. */
   pMag: Int32Array;
@@ -331,10 +330,9 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pCooldown: new Float64Array(MAX_PLAYERS),
     pIFrames: new Float64Array(MAX_PLAYERS),
     pWeapon: new Int32Array(MAX_PLAYERS),
-    pAmmo: new Int32Array(MAX_PLAYERS),
     pOwned: new Int32Array(MAX_PLAYERS),
     pInvMag: new Int32Array(MAX_PLAYERS * WEAPON_IDS.length),
-    pInvAmmo: new Int32Array(MAX_PLAYERS * WEAPON_IDS.length),
+    pInvReload: new Float64Array(MAX_PLAYERS * WEAPON_IDS.length),
     pMoving: new Uint8Array(MAX_PLAYERS),
     pMag: new Int32Array(MAX_PLAYERS),
     pReload: new Float64Array(MAX_PLAYERS),

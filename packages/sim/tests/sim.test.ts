@@ -67,7 +67,7 @@ describe('sim rules', () => {
     }
     expect(shots).toBeGreaterThanOrEqual(3);
     expect(shots).toBeLessThanOrEqual(4);
-    expect(w.pAmmo[0]).toBe(-1);
+    expect(w.pMag[0]).toBeGreaterThanOrEqual(0);
   });
 
   it('bullets are removed after their range and never exceed the pool', () => {

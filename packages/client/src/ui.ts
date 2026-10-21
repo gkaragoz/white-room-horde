@@ -115,7 +115,7 @@ const BASE_STRINGS = {
     high: 'High',
     desync: 'Desync detected!',
     connecting: 'Connecting...',
-    controls: 'WASD move · auto aim · click fire · R reload · 1-9 / Q weapons · Shift dash · F class ability · right-click grenade at the cursor · E revive · 1-3 cards',
+    controls: 'WASD move · auto aim · click fire · R reload · click the weapon list to pick a weapon · Shift dash · F class ability · right-click grenade at the cursor · E revive · 1-3 cards',
     weapon: 'Starting weapon',
     arena: 'Arena',
     difficulty: 'Difficulty',
@@ -164,7 +164,7 @@ const BASE_STRINGS = {
     controlsTitle: 'Controls',
     pressKey: 'press a key...',
     resetKeys: 'Reset keys',
-    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', special: 'Class ability', switch: 'Switch weapon', hostpause: 'Pause (host)', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
+    actions: { up: 'Move up', down: 'Move down', left: 'Move left', right: 'Move right', fire: 'Fire', grenade: 'Grenade', revive: 'Revive', reload: 'Reload', dash: 'Dash', special: 'Class ability', hostpause: 'Pause (host)', card1: 'Card 1', card2: 'Card 2', card3: 'Card 3', pause: 'Pause' },
     fpsCap: 'Frame limit',
     unlimited: 'Display rate',
     texture: 'Texture detail',
@@ -196,7 +196,7 @@ const BASE_STRINGS = {
       sharp: ['Sharpshooter', '+30% damage'],
       sprint: ['Sprinter', '+20% move speed'],
       bulk: ['Bulk up', '+40 max HP'],
-      ammo: ['Full magazines', 'Everyone refills magazine and reserve'],
+      ammo: ['Speed loader', 'Reload 20% faster'],
       grenades: ['Grenade crate', '+2 grenades for everyone'],
       medic: ['Field medics', 'Revive 30% faster'],
       magnet: ['Loot magnet', 'Pickups fly to you from further away'],
@@ -334,7 +334,7 @@ const BASE_STRINGS = {
     high: 'Yüksek',
     desync: 'Senkron bozuldu!',
     connecting: 'Bağlanıyor...',
-    controls: 'WASD hareket · otomatik nişan · tık ateş · R doldur · 1-9 / Q silahlar · Shift atıl · F sınıf yeteneği · sağ tık imlece bomba · E kaldır · 1-3 kart',
+    controls: 'WASD hareket · otomatik nişan · tık ateş · R doldur · silah listesine tıkla · Shift atıl · F sınıf yeteneği · sağ tık imlece bomba · E kaldır · 1-3 kart',
     weapon: 'Başlangıç silahı',
     arena: 'Arena',
     difficulty: 'Zorluk',
@@ -383,7 +383,7 @@ const BASE_STRINGS = {
     controlsTitle: 'Kontroller',
     pressKey: 'bir tuşa bas...',
     resetKeys: 'Tuşları sıfırla',
-    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', special: 'Sınıf yeteneği', switch: 'Silah değiştir', hostpause: 'Duraklat (host)', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
+    actions: { up: 'Yukarı', down: 'Aşağı', left: 'Sola', right: 'Sağa', fire: 'Ateş', grenade: 'El bombası', revive: 'Kaldır', reload: 'Doldur', dash: 'Atıl', special: 'Sınıf yeteneği', hostpause: 'Duraklat (host)', card1: 'Kart 1', card2: 'Kart 2', card3: 'Kart 3', pause: 'Duraklat' },
     fpsCap: 'Kare sınırı',
     unlimited: 'Ekran hızı',
     texture: 'Doku detayı',
@@ -415,7 +415,7 @@ const BASE_STRINGS = {
       sharp: ['Keskin nişancı', '+%30 hasar'],
       sprint: ['Koşucu', '+%20 hız'],
       bulk: ['Kalın deri', '+40 azami can'],
-      ammo: ['Dolu şarjörler', 'Herkesin şarjörü ve yedeği dolar'],
+      ammo: ['Hızlı şarjör', 'Yeniden doldurma %20 daha hızlı'],
       grenades: ['Bomba sandığı', 'Herkese +2 el bombası'],
       medic: ['Saha sağlıkçıları', 'Kaldırma %30 daha hızlı'],
       magnet: ['Ganimet mıknatısı', 'Kutular daha uzaktan sana uçar'],
@@ -491,8 +491,8 @@ export interface UiHandlers {
   onJoin(name: string, code: string, server: string, password: string): void;
   onRejoin(): void;
   onWeapon(weapon: WeaponId): void;
-  /** A weapon of the in-game list was clicked (its key number, 1-9, or 14 for the next one). */
-  onSlot(rank: number): void;
+  /** A weapon of the in-game list was clicked (its WEAPON_IDS index + 1). */
+  onSlot(wsel: number): void;
   onLook(acc: number, color: number, cls: number): void;
   getBindings(): Record<string, string[]>;
   onRebind(action: string, done: () => void): void;
@@ -818,12 +818,11 @@ const CSS_BASE = `
 .wrh-ui .wrh-langpop button.on{background:#1fa2ff;color:#fff}
 .wrh-inv{position:absolute;right:14px;bottom:182px;width:236px;display:flex;flex-direction:column;gap:3px;z-index:5;pointer-events:none}
 .wrh-inv .row{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px 0 4px;border-radius:9px;border:2px solid transparent;background:rgba(251,246,234,.82);box-shadow:0 1px 4px rgba(20,28,44,.14);font-size:12px;font-weight:700;color:#2b3a52}
-.wrh-inv kbd{min-width:19px;height:19px;line-height:19px;border-radius:5px;background:#2b3a52;color:#fff;text-align:center;font:800 11px/19px system-ui,sans-serif}
 .wrh-inv img{width:46px;height:22px;object-fit:contain;flex:none}
 .wrh-inv .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wrh-inv b{font-variant-numeric:tabular-nums;font-size:11px}
 .wrh-inv .row.cur{border-color:#ffd21f;background:rgba(255,248,214,.97);box-shadow:0 0 0 1px rgba(255,210,31,.55),0 0 10px rgba(255,210,31,.5)}
-.wrh-inv .row.dry{opacity:.4}
+.wrh-inv .row.reload{opacity:.6}
 .wrh-go{width:min(860px,94vw);max-height:92vh;overflow:auto}
 .wrh-go-title{margin:12px 0 6px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;font-size:13px;opacity:.7}
 .wrh-go-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;text-align:left}
@@ -1165,11 +1164,11 @@ export class Ui {
     });
     // the weapon list: a click picks the weapon, and never fires a shot behind it
     this.hud.addEventListener('pointerdown', (e) => {
-      const row = (e.target as HTMLElement).closest<HTMLElement>('.wrh-inv [data-rank]');
+      const row = (e.target as HTMLElement).closest<HTMLElement>('.wrh-inv [data-w]');
       if (!row) return;
       e.preventDefault();
       e.stopPropagation();
-      this.h.onSlot(Number(row.dataset.rank));
+      this.h.onSlot(Number(row.dataset.w));
     });
     // the round buttons at the top right say what they are in one word
     this.toolbar.addEventListener('mouseover', (e) => {
@@ -1403,7 +1402,6 @@ export class Ui {
       { icon: 'stat_mag', label: t.statMag, frac: s.mag / max((x) => x.mag), text: String(s.mag) },
       { icon: 'stat_reload', label: t.statReload, frac: 1 - s.reload / (max((x) => x.reload) * 1.2), text: `${s.reload}s` },
       { icon: s.blast ? 'stat_blast' : 'stat_pierce', label: s.blast ? t.statBlast : t.statPierce, frac: s.blast ? s.blast / 3 : Math.min(1, s.pierce / 5), text: s.blast ? String(s.blast) : String(s.pierce) },
-      { icon: 'stat_ammo', label: t.statAmmo, frac: s.ammo < 0 ? 1 : s.ammo / max((x) => (x.ammo < 0 ? 0 : x.ammo)), text: s.ammo < 0 ? '&infin;' : String(s.ammo) },
     ];
     return rows
       .map((r) => `<div class="wrh-stat"><span class="ic">${icon(r.icon, 20)}</span><span class="nm">${r.label}</span><span class="bar"><i style="width:${Math.max(4, Math.min(100, Math.round(r.frac * 100)))}%"></i></span><b>${r.text}</b></div>`)
@@ -1894,7 +1892,7 @@ export class Ui {
     });
   }
 
-  /** The weapon list above the minimap: key, icon, name and ammo of every owned weapon, the one in the hands outlined in yellow, the empty ones faded. */
+  /** The weapon list above the minimap: icon, name and magazine of every owned weapon (a click picks it), the one in the hands outlined in yellow. */
   /** Drone UI: the card of the active drone (icon, name, level, experience) and, opened by a click, the list of the drones owned. */
   private droneOpen = false;
   private droneLevels = new Map<number, number>();
@@ -1944,16 +1942,14 @@ export class Ui {
     const names = this.t.weapons as Record<string, string>;
     const cur = world.pWeapon[slot]!;
     let rows = '';
-    WEAPON_RANK.forEach((id, rank) => {
+    WEAPON_RANK.forEach((id) => {
       const idx = WEAPON_IDS.indexOf(id);
       if (((world.pOwned[slot]! >> idx) & 1) === 0) return;
       const st = BALANCE.weapons[id];
       const live = idx === cur;
       const mag = live ? world.pMag[slot]! : world.pInvMag[slot * WEAPON_IDS.length + idx]!;
-      const reserve = live ? world.pAmmo[slot]! : world.pInvAmmo[slot * WEAPON_IDS.length + idx]!;
-      const dry = st.ammo >= 0 && mag <= 0 && reserve <= 0;
-      const key = rank < 9 ? String(rank + 1) : 'Q';
-      rows += `<div class="row${live ? ' cur' : ''}${dry ? ' dry' : ''}" data-rank="${rank < 9 ? rank + 1 : 14}"><kbd>${key}</kbd><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${st.melee ? '&infin;' : `${mag}/${st.ammo < 0 ? '&infin;' : reserve}`}</b></div>`;
+      const reloading = live ? world.pReload[slot]! > 0 : world.pInvReload[slot * WEAPON_IDS.length + idx]! > 0;
+      rows += `<div class="row${live ? ' cur' : ''}${reloading ? ' reload' : ''}" data-w="${idx + 1}"><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${st.melee ? '&infin;' : `${mag}/${st.mag}`}</b></div>`;
     });
     return rows;
   }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Buttons, TeleEffect, TeleShape, ZoneKind, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS, WEAPON_RANK } from '@wrh/shared';
+import { Buttons, TeleEffect, TeleShape, ZoneKind, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS } from '@wrh/shared';
 import { addPlayer, addTelegraph, addZone, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
 import { AimSolver, TargetLock, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
@@ -200,19 +200,18 @@ export const moreTests: QaTest[] = [
       if (!(input.sample(0, 0).input.buttons & Buttons.Reload)) problems.push('rebound reload key does nothing');
       input.debugKeys(['KeyR']);
       if (input.sample(0, 0).input.buttons & Buttons.Reload) problems.push('old reload key still works');
-      // weapon keys are one-shot presses: a digit picks that rank, Q the next weapon, holding repeats nothing
+      // the weapon is chosen by a click on the list only (queued once); the number keys and Q do nothing to it
       input.resetBindings();
       input.debugKeys([]);
       const press = (code: string, repeat = false): void => {
         window.dispatchEvent(new KeyboardEvent('keydown', { code, repeat }));
       };
+      input.queueWeapon(5);
+      if (input.sample(0, 0).input.wsel !== 5) problems.push('a click on the list does not queue the weapon');
+      if (input.sample(0, 0).input.wsel !== 0) problems.push('a weapon choice is sent more than once');
       press('Digit3');
-      if (input.sample(0, 0).input.wsel !== 3) problems.push('digit 3 does not queue weapon rank 3');
-      if (input.sample(0, 0).input.wsel !== 0) problems.push('a weapon key press is sent more than once');
       press('KeyQ');
-      if (input.sample(0, 0).input.wsel !== 14) problems.push('Q does not queue the next weapon');
-      press('KeyQ', true);
-      if (input.sample(0, 0).input.wsel !== 0) problems.push('a held Q keeps cycling weapons');
+      if (input.sample(0, 0).input.wsel !== 0) problems.push('a number key or Q still picks a weapon');
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyQ' }));
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Digit3' }));
       // auto-aim moves the shot direction but the cursor keeps steering grenades
@@ -895,7 +894,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'ui.inventory',
-    title: 'The weapon list above the minimap: key labels, ammo, a yellow outline on the selected weapon, faded empty weapons',
+    title: 'The weapon list above the minimap: one clickable row per owned weapon, the magazine, a yellow outline on the selected weapon',
     async run() {
       const problems: string[] = [];
       const host = document.createElement('div');
@@ -915,25 +914,23 @@ export const moreTests: QaTest[] = [
         giveWeapon(w, 0, WEAPON_IDS.indexOf('sniper'));
         giveWeapon(w, 0, WEAPON_IDS.indexOf('minigun'));
         w.pInvMag[WEAPON_IDS.indexOf('sniper')] = 0;
-        w.pInvAmmo[WEAPON_IDS.indexOf('sniper')] = 0;
         ui.update(w, 0, 0, 1000, ['p']);
         const rows = [...host.querySelectorAll<HTMLElement>('.wrh-inv .row')];
         const expected = ['pistol', 'ar', 'sniper', 'minigun'].length;
         if (rows.length !== expected) problems.push(`${rows.length} rows, expected ${expected}`);
-        const keys = rows.map((r) => r.querySelector('kbd')?.textContent);
-        const rankKey = (id: (typeof WEAPON_RANK)[number]): string => (WEAPON_RANK.indexOf(id) < 9 ? String(WEAPON_RANK.indexOf(id) + 1) : 'Q');
-        if (keys.join(',') !== ['pistol', 'ar', 'sniper', 'minigun'].map((id) => rankKey(id as (typeof WEAPON_RANK)[number])).join(',')) problems.push(`keys ${keys.join(',')} are not the fixed ranks`);
+        if (rows.some((r) => r.querySelector('kbd'))) problems.push('the rows still show key labels');
+        const wsels = rows.map((r) => r.dataset.w);
+        if (wsels.join(',') !== ['pistol', 'ar', 'sniper', 'minigun'].map((id) => String(WEAPON_IDS.indexOf(id as (typeof WEAPON_IDS)[number]) + 1)).join(',')) problems.push(`row targets ${wsels.join(',')} are not the weapon indices`);
         const cur = rows.filter((r) => r.classList.contains('cur'));
         if (cur.length !== 1 || !cur[0]!.textContent?.includes('Assault')) problems.push('the weapon in the hands is not the single outlined row');
         else if (!getComputedStyle(cur[0]!).borderTopColor.includes('255, 210, 31')) problems.push('the selected row has no yellow outline');
-        const dry = rows.filter((r) => r.classList.contains('dry'));
-        if (dry.length !== 1 || !dry[0]!.textContent?.includes('Sniper')) problems.push('the empty sniper is not the one faded row');
-        else if (Number(getComputedStyle(dry[0]!).opacity) > 0.6) problems.push('the empty weapon is not see-through');
-        if (!rows[0]!.textContent?.includes('\u221e')) problems.push('the pistol does not show an infinite reserve');
+        const sniperRow = rows.find((r) => r.textContent?.includes('Sniper'));
+        if (!sniperRow?.textContent?.includes('0/')) problems.push('the empty sniper magazine is not shown as 0/N');
+        if (rows.some((r) => r.textContent?.includes('∞'))) problems.push('a gun still shows an infinite reserve');
       } finally {
         host.remove();
       }
-      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'list, keys, outline and faded empty rows are right' };
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'list, targets, magazines and outline are right' };
     },
   },
   {

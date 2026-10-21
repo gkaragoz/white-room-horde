@@ -12,7 +12,7 @@ export interface PlayerInput {
   buttons: number;
   /** Distance to the cursor in quarter units (0 = not given: grenades fly their normal range). */
   aimDist?: number;
-  /** Weapon choice: 0 = none, 1..9 = the weapon of that rank (WEAPON_RANK), 14 = the next usable weapon. */
+  /** Weapon choice: 0 = none, otherwise the index in WEAPON_IDS plus one (a click on the weapon list). */
   wsel?: number;
   /** Direction the grenade is thrown (same scale as `aim`); defaults to `aim`. Auto-aim moves `aim`, the cursor keeps `gAim`. */
   gAim?: number;

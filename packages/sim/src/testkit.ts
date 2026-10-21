@@ -18,9 +18,9 @@ export function scriptedInput(t: number, slot: number): PlayerInput {
   if (card === 5) buttons |= Buttons.Card1;
   else if (card === 150) buttons |= Buttons.Card2;
   else if (card === 250) buttons |= Buttons.Card3;
-  // now and then reach for another weapon: a number key (rank 1-9) or Q (14)
+  // now and then click another weapon in the list (index + 1)
   const pick = phase % 83;
-  const wsel = pick === 7 ? 1 + ((phase >> 3) % 9) : pick === 41 ? 14 : 0;
+  const wsel = pick === 7 || pick === 41 ? 1 + ((phase >> 3) % 25) : 0;
   return {
     moveX: Math.round(sin(phase * 0.05) * 127),
     moveY: Math.round(cos(phase * 0.031) * 127),

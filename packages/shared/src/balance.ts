@@ -5,7 +5,6 @@ export interface WeaponStats {
   damage: number;
   rate: number;
   pellets: number;
-  ammo: number;
   spread: number;
   bulletSpeed: number;
   range: number;
@@ -81,7 +80,7 @@ export interface WaveConfig {
 export interface CardTuning {
   damage: number; rate: number; speed: number; hp: number; pierce: number;
   grenades: number; medic: number; medicMin: number; magnet: number; magnetMax: number; luck: number; luckMax: number;
-  scholar: number; blast: number; blastMax: number; quickhands: number; quickMin: number; roll: number; rollMin: number;
+  scholar: number; blast: number; blastMax: number; quickhands: number; quickMin: number; loader: number; roll: number; rollMin: number;
   armor: number; armorMin: number; crit: number; critMax: number;
   sharp: number; sprint: number; bulk: number; vampire: number; tempo: number; marksman: number; ironskin: number; ironMin: number;
 }
@@ -101,7 +100,7 @@ export interface ProgressionConfig {
 export const BALANCE = data as unknown as {
   dash: { seconds: number; speedMul: number; cooldown: number; iFrames: number };
   difficulty: { hp: number[]; count: number[]; damage: number[] };
-  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; hasteSeconds: number; quadSeconds: number; shieldAmount: number; freezeSeconds: number; nukeDamage: number; chance: { ammo: number; health: number; grenade: number; weapon: number; shield: number; haste: number; quad: number; nuke: number; freeze: number; drone: number }; eliteDrone: number; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number; drone: number } };
+  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; hasteSeconds: number; quadSeconds: number; shieldAmount: number; freezeSeconds: number; nukeDamage: number; chance: { health: number; grenade: number; weapon: number; shield: number; haste: number; quad: number; nuke: number; freeze: number; drone: number }; eliteDrone: number; healthAmount: number; bossDrops: { health: number; grenade: number; drone: number } };
   grenade: { maxRange: number; minRange: number; max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
   spit: { speed: number; life: number; radius: number };
   shielder: { frontDot: number; frontMul: number };

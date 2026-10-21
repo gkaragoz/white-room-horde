@@ -110,7 +110,7 @@ describe('every card does what it says, for the character that picked it', () =>
     });
   }
 
-  it('the team cards help everybody: heal, ammo and grenades reach both players, luck is the squad\'s', () => {
+  it('the team cards help everybody: heal and grenades reach both players, luck is the squad\'s', () => {
     const w = quiet(12);
     addPlayer(w, 0, 0, 0, 'smg');
     addPlayer(w, 1, 5, 0, 'smg');
@@ -118,10 +118,6 @@ describe('every card does what it says, for the character that picked it', () =>
     w.pHp[1] = 20;
     pick(w, 'heal');
     expect([w.pHp[0], w.pHp[1]]).toEqual([w.pMaxHp[0], w.pMaxHp[1]]);
-    w.pAmmo[0] = 0;
-    w.pAmmo[1] = 0;
-    pick(w, 'ammo', 1);
-    expect([w.pAmmo[0], w.pAmmo[1]]).toEqual([BALANCE.weapons.smg.ammo, BALANCE.weapons.smg.ammo]);
     const g = [w.pGren[0]!, w.pGren[1]!];
     pick(w, 'grenades');
     expect([w.pGren[0], w.pGren[1]]).toEqual([g[0]! + c.grenades, g[1]! + c.grenades]);
@@ -287,8 +283,8 @@ describe('card effects in play', () => {
   it('magnet pulls loot from further away; luck makes drops more common; medic revives faster; blast grows explosions', () => {
     const w = quiet(24);
     addPlayer(w, 0, 0, 0, 'ar');
-    w.pAmmo[0] = 1;
-    spawnPickup(w, PickupType.Ammo, BALANCE.pickups.magnetRadius + 1, 0);
+    w.pGren[0] = 0;
+    spawnPickup(w, PickupType.Grenade, BALANCE.pickups.magnetRadius + 1, 0);
     step(w, [NONE]);
     expect(w.kX[0]).toBe(BALANCE.pickups.magnetRadius + 1); // out of the normal pull
     w.modMagnet[0] = 2;

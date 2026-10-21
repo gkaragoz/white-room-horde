@@ -163,17 +163,15 @@ describe('melee classes', () => {
     }
   });
 
-  it('gun and ammo crates stay on the floor for a blade: it cannot take them, so the others can', () => {
+  it('gun crates stay on the floor for a blade: it cannot take them, so the others can', () => {
     const w = arena(cid('swordsman'), 10);
     w.pHp[0] = 40;
     w.pGren[0] = 0;
     spawnPickup(w, PickupType.Weapon, w.pX[0]!, w.pY[0]!, WEAPON_IDS.indexOf('ar'));
-    spawnPickup(w, PickupType.Ammo, w.pX[0]!, w.pY[0]!);
     run(w, 10);
     expect(w.pHp[0]).toBeLessThan(60);
     expect(owns(w, 0, WEAPON_IDS.indexOf('ar'))).toBe(false);
-    expect(w.pGren[0]).toBe(0);
-    expect(w.kActive.reduce((n, a) => n + a, 0)).toBe(2);
+    expect(w.kActive.reduce((n, a) => n + a, 0)).toBe(1);
   });
 
   it('a squad of blades alone never drops guns or bullets', () => {

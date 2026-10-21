@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { Buttons, type PlayerInput } from '@wrh/shared';
 import { SCREEN_RIGHT, SCREEN_UP, encodeAim, keysToMove } from './controls';
 
-export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'special' | 'card1' | 'card2' | 'card3' | 'switch' | 'hostpause' | 'pause';
-export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'special', 'switch', 'hostpause', 'card1', 'card2', 'card3', 'pause'];
+export type Action = 'up' | 'down' | 'left' | 'right' | 'fire' | 'grenade' | 'revive' | 'reload' | 'dash' | 'special' | 'card1' | 'card2' | 'card3' | 'hostpause' | 'pause';
+export const ACTIONS: readonly Action[] = ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'special', 'hostpause', 'card1', 'card2', 'card3', 'pause'];
 
 export type Bindings = Record<Action, string[]>;
 
@@ -18,7 +18,6 @@ export const DEFAULT_BINDINGS: Bindings = {
   reload: ['KeyR'],
   dash: ['ShiftLeft', 'ShiftRight'],
   special: ['KeyF'],
-  switch: ['KeyQ'],
   card1: ['Digit1'],
   card2: ['Digit2'],
   card3: ['Digit3'],
@@ -93,24 +92,31 @@ export class Input {
   private touchMove: TouchStick | null = null;
   private touchAim: TouchStick | null = null;
   private touchButtons = 0;
-  private touchSwitch = false;
-  /** Weapon choice of the last key press (1-9 = rank, 14 = next), sent once with the next sample. */
+  /** Weapon choice of the last click on the weapon list (WEAPON_IDS index + 1), sent once with the next sample. */
   private queuedWeapon = 0;
+  /** The gamepad's D-pad walks the weapon list: -1 / +1 since the last look (the game resolves it against the owned weapons). */
+  private padWeaponStep = 0;
   private queuedDrone = 0;
 
   /** Switch to a drone (DRONE_TYPES index + 1) with the next input. */
   queueDrone(n: number): void {
     if (this.enabled) this.queuedDrone = n;
   }
-  /** Select a weapon by the key number it has in the list (1-9), or 14 for the next one (the in-game list is clickable). */
-  queueWeapon(rank: number): void {
-    if (this.enabled) this.queuedWeapon = rank;
+  /** Select a weapon (WEAPON_IDS index + 1) with the next input. */
+  queueWeapon(wsel: number): void {
+    if (this.enabled) this.queuedWeapon = wsel;
+  }
+  /** The D-pad steps since the last call (-1 up the list, +1 down), then cleared. */
+  takeWeaponStep(): number {
+    const s = this.padWeaponStep;
+    this.padWeaponStep = 0;
+    return s;
   }
   /** The shot direction of the last sample, and whether a stick (pad, phone) is aiming. */
   lastShot = 0;
   stickAiming = false;
-  private padSwitchHeld = false;
-  private touchSwitchHeld = false;
+  private padUpHeld = false;
+  private padDownHeld = false;
   private touchLayer: HTMLElement | null = null;
 
   constructor(
@@ -127,11 +133,6 @@ export class Input {
         return;
       }
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return; // typing in a text box
-      if (!e.repeat && this.enabled) {
-        const digit = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
-        if (digit) this.queuedWeapon = Number(digit[1]);
-        else if (this.bindings.switch.includes(e.code)) this.queuedWeapon = 14;
-      }
       this.keys.add(e.code);
       if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
     });
@@ -262,12 +263,13 @@ export class Input {
     if (this.held('reload')) buttons |= Buttons.Reload;
     if (this.held('dash')) buttons |= Buttons.Dash;
     if (this.held('special')) buttons |= Buttons.Special;
-    // weapon choice: 1-9 and Q (next) are one-shot presses queued by the key handler; the pad's Y and the touch button too
-    const padSwitch = !!this.pad()?.buttons[3]?.pressed;
-    if (padSwitch && !this.padSwitchHeld) this.queuedWeapon = 14;
-    this.padSwitchHeld = padSwitch;
-    if (this.touchSwitch && !this.touchSwitchHeld) this.queuedWeapon = 14;
-    this.touchSwitchHeld = this.touchSwitch;
+    // weapon choice: a click on the list, or the pad's D-pad up / down through it
+    const padUp = !!this.pad()?.buttons[12]?.pressed;
+    const padDown = !!this.pad()?.buttons[13]?.pressed;
+    if (this.enabled && padUp && !this.padUpHeld) this.padWeaponStep = -1;
+    if (this.enabled && padDown && !this.padDownHeld) this.padWeaponStep = 1;
+    this.padUpHeld = padUp;
+    this.padDownHeld = padDown;
     if (this.held('card1')) buttons |= Buttons.Card1;
     if (this.held('card2')) buttons |= Buttons.Card2;
     if (this.held('card3')) buttons |= Buttons.Card3;
@@ -453,15 +455,6 @@ export class Input {
     button('★', Buttons.Special, 162, 200);
     button('↻', Buttons.Reload, 18, 130);
     button('+', Buttons.Revive, 90, 130);
-    const sw = document.createElement('div');
-    sw.textContent = '\u21C4';
-    sw.style.cssText = 'position:absolute;right:162px;bottom:130px;width:60px;height:60px;border-radius:50%;background:rgba(250,244,232,.75);border:2px solid #cdbfa5;display:flex;align-items:center;justify-content:center;font-size:26px;color:#3a352d;touch-action:none;user-select:none';
-    sw.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this.touchSwitch = true;
-    });
-    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) sw.addEventListener(ev, () => (this.touchSwitch = false));
-    layer.appendChild(sw);
   }
 
   get hasTouchControls(): boolean {

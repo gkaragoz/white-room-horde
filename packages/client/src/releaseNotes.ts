@@ -23,6 +23,30 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.24',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: 'Unlimited ammo, pick weapons by clicking',
+        items: [
+          'Ammo is unlimited now: only the magazine and the reload count. Ammo crates and reserves are gone; the old Full magazines card became Speed loader (reload 20% faster).',
+          'Pick a weapon by clicking or tapping it in the list above the minimap (gamepad: D-pad up/down). The number keys and Q no longer touch your weapon, and nothing switches by itself.',
+          'Every weapon keeps its own magazine and its own reload: switching does not skip a reload.',
+          'A late fix: after a long pause nobody could shoot any more. Pages now stay level with the relay.',
+        ],
+      },
+      tr: {
+        title: 'Sınırsız mermi, silahı tıklayarak seç',
+        items: [
+          'Mermi artık sınırsız: yalnızca şarjör ve doldurma süresi sayılır. Mermi sandıkları ve yedekler kalktı; eski Dolu şarjörler kartı Hızlı şarjör oldu (doldurma %20 daha hızlı).',
+          'Silahı mini haritanın üstündeki listeden tıklayarak ya da dokunarak seç (gamepad: yön tuşları yukarı/aşağı). Sayı tuşları ve Q artık silahına karışmaz, hiçbir şey kendiliğinden değişmez.',
+          'Her silah kendi şarjörünü ve kendi doldurmasını taşır: silah değiştirerek doldurma atlanamaz.',
+          'Geç gelen düzeltme: uzun bir duraklamadan sonra kimse ateş edemiyordu. Sayfalar artık rölenin hizasında kalıyor.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.23',
     date: '2026-10-21',
     text: {

@@ -87,7 +87,7 @@ describe('replay', () => {
     const res = playReplay(back);
     expect(res.mismatch).toBe(-1);
     expect(res.hash).toBe(hashWorld(w));
-    expect(bytes.length).toBeLessThan(650 * 30 + 200);
+    expect(bytes.length).toBeLessThan(650 * 33 + 200);
   });
 
   it('detects a tampered input stream', () => {

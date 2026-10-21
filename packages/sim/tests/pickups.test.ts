@@ -13,13 +13,13 @@ function quiet(seed: number): ReturnType<typeof createWorld> {
 }
 
 describe('pickups', () => {
-  it('ammo crate refills a finite weapon on contact', () => {
+  it('an old ammo crate is worth a grenade now (ammo is unlimited)', () => {
     const w = quiet(1);
     addPlayer(w, 0, 0, 0, 'ar');
-    w.pAmmo[0] = 3;
+    w.pGren[0] = 0;
     spawnPickup(w, PickupType.Ammo, 0.5, 0);
     step(w, [NONE]);
-    expect(w.pAmmo[0]).toBe(BALANCE.weapons.ar.ammo);
+    expect(w.pGren[0]).toBe(1);
     expect(w.events.some((e) => e.type === 'pickup')).toBe(true);
     expect(w.kActive.reduce((a, b) => a + b, 0)).toBe(0);
   });
@@ -40,8 +40,8 @@ describe('pickups', () => {
   it('drifts toward a player who needs it and expires after its lifetime', () => {
     const w = quiet(3);
     addPlayer(w, 0, 0, 0, 'ar');
-    w.pAmmo[0] = 1;
-    spawnPickup(w, PickupType.Ammo, 2.2, 0);
+    w.pGren[0] = 0;
+    spawnPickup(w, PickupType.Grenade, 2.2, 0);
     const x0 = w.kX[0]!;
     step(w, [NONE]);
     expect(w.kX[0]).toBeLessThan(x0);
@@ -65,7 +65,7 @@ describe('pickups', () => {
     expect(drops).toBeLessThan(120);
     w.kActive.fill(0);
     dropLoot(w, 0, 0, true);
-    const n = BALANCE.pickups.bossDrops.ammo + BALANCE.pickups.bossDrops.health + BALANCE.pickups.bossDrops.grenade;
+    const n = BALANCE.pickups.bossDrops.health + BALANCE.pickups.bossDrops.grenade;
     const dropped = w.kActive.reduce((a, b) => a + b, 0);
     expect(dropped === n || dropped === n + 1).toBe(true); // plus a drone core now and then
     // elites carry drone cores now and then, other kills never do
@@ -84,7 +84,6 @@ describe('pickups', () => {
     for (let seed = 1; seed <= 60 && !collected; seed++) {
       const w = quiet(seed);
       addPlayer(w, 0, 0, 0, 'ar');
-      w.pAmmo[0] = 5;
       for (let k = 0; k < 6; k++) {
         const i = spawnEnemy(w, ENEMY_TYPES.indexOf('grunt'), 1.2 + k * 0.3, 0, false);
         w.eHp[i] = 1;

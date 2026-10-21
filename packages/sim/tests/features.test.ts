@@ -16,12 +16,11 @@ function quiet(seed: number, map = 0, difficulty = 1): ReturnType<typeof createW
 }
 
 describe('magazines and reloading', () => {
-  it('a magazine empties, reloads on its own while firing, takes time and uses the reserve', () => {
+  it('a magazine empties, reloads on its own while firing and takes time (ammo is unlimited)', () => {
     const w = quiet(1);
     addPlayer(w, 0, 0, 0, 'ar');
     const mag = BALANCE.weapons.ar.mag;
     expect(w.pMag[0]).toBe(mag);
-    const reserve = w.pAmmo[0]!;
     let reloads = 0;
     let shots = 0;
     for (let t = 0; t < 400; t++) {
@@ -33,10 +32,9 @@ describe('magazines and reloading', () => {
     }
     expect(reloads).toBeGreaterThanOrEqual(1);
     expect(shots).toBeGreaterThan(mag);
-    expect(w.pAmmo[0]!).toBeLessThan(reserve);
   });
 
-  it('cannot fire during a reload; manual reload tops the magazine up from the reserve', () => {
+  it('cannot fire during a reload; manual reload tops the magazine up', () => {
     const w = quiet(2);
     addPlayer(w, 0, 0, 0, 'smg');
     for (let t = 0; t < 10; t++) step(w, [{ ...NONE, buttons: Buttons.Fire }]);
@@ -54,20 +52,17 @@ describe('magazines and reloading', () => {
     expect(w.pMag[0]).toBe(BALANCE.weapons.smg.mag);
   });
 
-  it('infinite pistol reloads forever; an empty reserve leaves the gun dry', () => {
-    const w = quiet(3);
-    addPlayer(w, 0, 0, 0, 'pistol');
-    expect(w.pAmmo[0]).toBe(-1);
-    for (let t = 0; t < 600; t++) step(w, [{ ...NONE, buttons: Buttons.Fire }]);
-    expect(w.pAmmo[0]).toBe(-1);
-    const w2 = quiet(4);
-    addPlayer(w2, 0, 0, 0, 'shotgun');
-    w2.pAmmo[0] = 0;
-    w2.pMag[0] = 0;
-    w2.pOwned[0] = 1 << WEAPON_IDS.indexOf('shotgun'); // nothing else to fall back to
-    for (let t = 0; t < 120; t++) step(w2, [{ ...NONE, buttons: Buttons.Fire }]);
-    expect(w2.pMag[0]).toBe(0);
-    expect(w2.pReload[0]).toBe(0);
+  it('every gun reloads forever: nothing runs dry', () => {
+    for (const id of ['pistol', 'shotgun'] as const) {
+      const w = quiet(3);
+      addPlayer(w, 0, 0, 0, id);
+      let shots = 0;
+      for (let t = 0; t < 900; t++) {
+        step(w, [{ ...NONE, buttons: Buttons.Fire }]);
+        shots += w.events.filter((e) => e.type === 'shot').length;
+      }
+      expect(shots, id).toBeGreaterThan(BALANCE.weapons[id].mag * 2);
+    }
   });
 });
 

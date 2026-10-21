@@ -115,16 +115,19 @@ try {
     const w = window.__wrh.world;
     w.pOwned[0] |= (1 << 8) | (1 << 3); // mp and shotgun (indices in WEAPON_IDS)
     w.pInvMag[8] = 20;
-    w.pInvAmmo[8] = 100;
     w.pInvMag[3] = 6;
-    w.pInvAmmo[3] = 24;
   });
-  await hold(['Digit2'], 4);
-  check('key 2 takes the weapon of rank 2 (MP)', (await state()).weapon === 8, `weapon ${(await state()).weapon}`);
-  await hold(['KeyQ'], 4);
-  check('Q takes the next stronger weapon (shotgun)', (await state()).weapon === 3, `weapon ${(await state()).weapon}`);
-  await hold(['Digit1'], 4);
-  check('key 1 takes the pistol', (await state()).weapon === 0, `weapon ${(await state()).weapon}`);
+  await hold(['Digit2', 'KeyQ'], 4);
+  check('number keys and Q no longer pick a weapon', (await state()).weapon === 0, `weapon ${(await state()).weapon}`);
+  await page.click('.wrh-inv .row[data-w="9"]');
+  await sleep(300);
+  check('a click on the MP row takes the MP', (await state()).weapon === 8, `weapon ${(await state()).weapon}`);
+  await page.click('.wrh-inv .row[data-w="4"]');
+  await sleep(300);
+  check('a click on the shotgun row takes the shotgun', (await state()).weapon === 3, `weapon ${(await state()).weapon}`);
+  await page.click('.wrh-inv .row[data-w="1"]');
+  await sleep(300);
+  check('a click on the pistol row takes the pistol', (await state()).weapon === 0, `weapon ${(await state()).weapon}`);
   const inv = await page.evaluate(() => document.querySelectorAll('.wrh-inv .row').length);
   check('the weapon list shows the owned weapons', inv === 3, `${inv} rows`);
 

@@ -30,7 +30,7 @@ import { KNOCK_DECAY, updateHazards } from './hazards';
 import { chargeStep, charging, meleeAttack, updateAbilities } from './abilities';
 import { updateCards } from './progression';
 import { droneReviveHelp, resetDrones, updateDrones } from './drones';
-import { ensureUsable, equipLoadout, selectByRank, selectNext } from './loadout';
+import { equipLoadout, selectWeapon } from './loadout';
 import { abilityRate, abilityRateFrom, applyClass, bulletVsBarrels, damageMul, droneCredit, hooks, perk, placeBarrels, resetPerks, setPerk, speedMul, speedMulFrom, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
 
@@ -449,23 +449,19 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
     meleeAttack(w, s, inp, angle, stats);
     return;
   }
-  const infinite = stats.ammo < 0;
   w.pCooldown[s] = w.pCooldown[s]! - TICK_DT;
-  // reloading: nothing fires until the timer runs out, then the magazine is refilled from the reserve
+  // reloading: nothing fires until the timer runs out, then the magazine is full again (ammo is unlimited)
   if (w.pReload[s]! > 0) {
     w.pReload[s] = w.pReload[s]! - TICK_DT;
     if (w.pReload[s]! <= 0) {
       w.pReload[s] = 0;
-      const need = stats.mag - w.pMag[s]!;
-      const take = infinite ? need : need < w.pAmmo[s]! ? need : w.pAmmo[s]!;
-      w.pMag[s] = w.pMag[s]! + take;
-      if (!infinite) w.pAmmo[s] = w.pAmmo[s]! - take;
+      w.pMag[s] = stats.mag;
       w.events.push({ type: 'reloadDone', slot: s });
     }
     if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
     return;
   }
-  const canReload = w.pMag[s]! < stats.mag && (infinite || w.pAmmo[s]! > 0);
+  const canReload = w.pMag[s]! < stats.mag;
   if ((inp.buttons & Buttons.Reload) !== 0 && canReload) {
     startReload(w, s, stats);
     return;
@@ -492,11 +488,7 @@ function fireWeapon(w: World, s: number, inp: PlayerInput, angle: number): void 
   }
   if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
   // an empty magazine reloads by itself when the player keeps pulling the trigger
-  if (w.pMag[s]! === 0 && canReloadNow(w, s, stats.ammo) && (inp.buttons & Buttons.Fire) !== 0) startReload(w, s, stats);
-}
-
-function canReloadNow(w: World, s: number, ammo: number): boolean {
-  return ammo < 0 || w.pAmmo[s]! > 0;
+  if (w.pMag[s]! === 0 && (inp.buttons & Buttons.Fire) !== 0) startReload(w, s, stats);
 }
 
 /** Is a downed teammate within reviving range of player `s`? */
@@ -617,13 +609,8 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
       movePlayer(w, s, inp, BALANCE.player.crawlSpeed, false);
       continue;
     }
-    // the number keys (rank 1-9) and Q (next) pick a weapon while no card offer is open (the digits choose cards then)
-    if (w.pOffer[s * 3]! < 0 && inp.wsel) {
-      if (inp.wsel === 14) selectNext(w, s);
-      else selectByRank(w, s, inp.wsel);
-    }
-    // a weapon that cannot shoot any more never stays in the hands
-    ensureUsable(w, s);
+    // a click on the weapon list picks a weapon (index + 1) while no card offer is open; nothing ever switches by itself
+    if (w.pOffer[s * 3]! < 0 && inp.wsel) selectWeapon(w, s, inp.wsel - 1);
     // a helper holding Revive next to a downed teammate is busy: slower, no shooting (moving off interrupts the revive)
     const busy = (inp.buttons & Buttons.Revive) !== 0 && downedNear(w, s);
     const angle = movePlayer(w, s, inp, BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]! * speedMul(w, s) * (busy ? BALANCE.player.reviveMoveMul : 1) * (w.pCharge[s]! > 0 ? 0.45 : 1), !busy);
@@ -705,7 +692,7 @@ export function hashWorld(w: World): number {
   c.typed(w.kActive).typed(w.kData).typed(w.kLayer).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
   c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
   c.typed(w.pPerk).typed(w.pStat).typed(w.pWpnTime).typed(w.eMod).typed(w.eShield).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pLayer).typed(w.eLayer).typed(w.bLayer).typed(w.sLayer).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
-  c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
+  c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvReload);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
   c.typed(w.pDrone).typed(w.pDLv).typed(w.pDXp).typed(w.pDWarm).typed(w.pAway).typed(w.dX).typed(w.dY).typed(w.dAim).typed(w.dCd).typed(w.dBeam).typed(w.dN).typed(w.eSlow).typed(w.eSlowP).typed(w.bSrc).typed(w.bBlastR).typed(w.bBlastD);

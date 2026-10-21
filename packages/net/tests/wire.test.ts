@@ -3,9 +3,9 @@ import { decodeBundle, encodeBundle } from '../src/protocol';
 import { describe, expect, it } from 'vitest';
 
 describe('wire format', () => {
-  it('an input is 10 bytes and keeps all nine button bits, the weapon choice and the grenade angle', () => {
-    expect(INPUT_BYTES).toBe(10);
-    const i: PlayerInput = { moveX: -100, moveY: 77, aim: 54321, buttons: Buttons.Fire | Buttons.Special | Buttons.Card3 | Buttons.Dash, aimDist: 33, wsel: 14, gAim: 1234 };
+  it('an input is 11 bytes and keeps all nine button bits, the weapon choice (up to the last weapon), the drone choice and the grenade angle', () => {
+    expect(INPUT_BYTES).toBe(11);
+    const i: PlayerInput = { moveX: -100, moveY: 77, aim: 54321, buttons: Buttons.Fire | Buttons.Special | Buttons.Card3 | Buttons.Dash, aimDist: 33, wsel: WEAPON_IDS.length, dsel: 7, gAim: 1234 };
     const back = decodeTick(encodeTick([undefined, i]), 2).inputs[1]!;
     expect(back).toEqual(clampInput(i));
     expect(back.buttons & Buttons.Special).toBe(Buttons.Special);

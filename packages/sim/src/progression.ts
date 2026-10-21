@@ -2,7 +2,7 @@ import { grantDrone } from './drones';
 import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, FloorPhase, MAX_PLAYERS, MISC, PlayerState, RARITY_WEIGHT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { PERK } from '@wrh/shared';
 import { addPerk, perk, setPerk } from './features';
-import { giveWeapon, nextMissing, refillAll, selectWeapon } from './loadout';
+import { giveWeapon, nextMissing, selectWeapon } from './loadout';
 import type { World } from './state';
 
 const CARDS = CARD_IDS.length;
@@ -87,7 +87,7 @@ function applyCard(w: World, card: number, by: number): void {
         if (gift >= 0) {
           giveWeapon(w, by, gift);
           selectWeapon(w, by, gift);
-        } else refillAll(w, by);
+        } else w.modReload[by] = Math.max(c.quickMin, w.modReload[by]! * c.loader);
       }
       break;
     case 'sharp':
@@ -103,7 +103,8 @@ function applyCard(w: World, card: number, by: number): void {
       }
       break;
     case 'ammo':
-      for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) refillAll(w, s);
+      // the old ammo card is a speed loader now: ammo is unlimited, reloading is the only cost
+      w.modReload[by] = Math.max(c.quickMin, w.modReload[by]! * c.loader);
       break;
     case 'grenades':
       for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) w.pGren[s] = w.pGren[s]! + c.grenades;

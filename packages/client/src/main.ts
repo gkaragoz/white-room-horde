@@ -548,15 +548,9 @@ function handleEvent(e: SimEvent): void {
       ui.hurtFrom(Math.atan2(-(_p.y - py), _p.x - px));
     }
   }
-  if (e.type === 'weaponSwitch' && e.slot === localSlot && e.auto) {
-    const L = UI_STRINGS[ui.lang];
-    const n = (L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!];
-    ui.warn(`${L.switched} ${n}`);
-  }
   if (e.type === 'weaponGet' && e.slot === localSlot && e.fresh) {
     const L = UI_STRINGS[ui.lang];
-    const rank = WEAPON_RANK.indexOf(WEAPON_IDS[e.weapon]!);
-    ui.banner(`${L.newWeapon}: ${(L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!]}`, rank < 9 ? `[${rank + 1}]` : '[Q]', 1800);
+    ui.banner(`${L.newWeapon}: ${(L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!]}`, '', 1800);
   }
   if (catchingUp) return;
   fx.onEvent(e, localSlot);
@@ -1049,8 +1043,20 @@ function cursorFix(x: number, y: number): number {
   return aimSolver.cursorAngle(w, localSlot, x, y);
 }
 
+/** The pad's D-pad walks the weapon list (the order of the HUD list): the next owned weapon up or down. */
+function padWeaponStep(): void {
+  const step = input.takeWeaponStep();
+  const w = world;
+  if (!step || !w) return;
+  const owned = WEAPON_RANK.map((id) => WEAPON_IDS.indexOf(id)).filter((idx) => ((w.pOwned[localSlot]! >> idx) & 1) === 1);
+  const at = owned.indexOf(w.pWeapon[localSlot]!);
+  const next = owned[(at + step + owned.length) % owned.length];
+  if (next !== undefined) input.queueWeapon(next + 1);
+}
+
 function sampleLocal(): PlayerInput {
   if (dev.auto && mode === 'solo') return scriptedInput(world!.tick, 0);
+  padWeaponStep();
   const s = input.sample(curX[localSlot]!, curY[localSlot]!, lockOn, settings.autoAim, cursorFix);
   if (!input.shooting) {
     // standing without shooting: no lock, no target mark, the character stays as it is
