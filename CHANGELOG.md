@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**90 class cards (rules change: update the server and reload the page)**
+
+- Ten cards per class (`tools/cards/classes.py`), offered only to that class. They tune the class ability through new per-player factors: cooldown, duration, damage, radius and extra shots (`modAb*`).
+- `CARD_CLASS` is now a mask over the class ids.
+
 ## v0.26.0 (2026-10-21)
 
 **Level queue and 50 universal cards (rules change: update the server and reload the page)**

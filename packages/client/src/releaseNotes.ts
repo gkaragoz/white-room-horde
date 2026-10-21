@@ -23,6 +23,26 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.27',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: '90 class cards',
+        items: [
+          'Every class has 10 cards of its own that only that class is offered: longer or stronger abilities, shorter cooldowns, bigger radius, more rockets or arrows.',
+          'Class cards mix with the 50 universal ones: you see them often, but never only them.',
+        ],
+      },
+      tr: {
+        title: '90 sınıf kartı',
+        items: [
+          'Her sınıfın yalnızca kendisine sunulan 10 özel kartı var: daha uzun ya da güçlü yetenek, daha kısa bekleme, daha geniş alan, daha çok roket ya da ok.',
+          'Sınıf kartları 50 evrensel kartla karışık gelir: sık görürsün ama yalnızca onları değil.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.26',
     date: '2026-10-21',
     text: {
