@@ -1410,6 +1410,9 @@ function frame(nowMs: number): void {
           } else aimAng = ang + 0.5; // resting: the weapon held a little out to the side
         }
         c.applyAim(dir.set(Math.cos(aimAng), 0, -Math.sin(aimAng)));
+      } else if (w.pState[s] !== PlayerState.Dead) {
+        // reload, throw, revive and hit clips bring the hand up to the face: keep the weapon out of the head
+        c.clearWeaponFromHead(dir.set(Math.cos(ang), 0, -Math.sin(ang)));
       }
     }
     power.end();

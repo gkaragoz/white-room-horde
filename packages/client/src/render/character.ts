@@ -19,6 +19,12 @@ export function loadGLB(url: string): Promise<GLTF> {
 export const PLAYER_SCALE = 1.5;
 
 /** Weapon grip placement on the right hand bone (tuned visually, see docs/DESIGN.md "Silah tutusu ve IK"). */
+/**
+ * Clips in which the character's hands are busy with something else (the grenade arm swings over the head, both hands work on a
+ * downed mate, getting up, being hit while down): the gun is not in the hand there, so it can never pass through the head.
+ */
+export const WEAPON_HIDDEN_CLIPS: ReadonlySet<string> = new Set(['throw', 'throw_run', 'revive_giver', 'revive_taker', 'get_up', 'hit_down', 'down_idle']);
+
 export const HAND_ATTACH = { position: new THREE.Vector3(0, 0.1, 0), rotation: new THREE.Euler(-Math.PI / 2, 0, 0) };
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -287,8 +293,10 @@ export class Character {
     for (const p of pts) box.expandByPoint(p);
     box.getCenter(centre);
     const size = box.getSize(new THREE.Vector3());
-    // an ellipsoid in reality; as a sphere take the horizontal half-width so a rifle above the chin is not blamed
-    const radius = Math.max(size.x, size.z) / 2;
+    // an ellipsoid in reality; as a sphere take the equator (horizontal reach) so a rifle above the chin is not blamed. The 90th percentile of
+    // the horizontal distances does not change when the head turns (the half-width of its bounding box does: up to 40 % more at 45 degrees).
+    const hd = pts.map((q) => Math.hypot(q.x - centre.x, q.z - centre.z)).sort((m, n) => m - n);
+    const radius = hd[Math.floor(hd.length * 0.9)] ?? Math.max(size.x, size.z) / 2;
     this.lastHeadBox = size;
     return { centre, radius };
   }
@@ -303,8 +311,14 @@ export class Character {
 
   /** Deepest the weapon reaches into a sphere of radius `r` around `centre` (0 = clear). Samples the weapon's vertices. */
   weaponPenetration(centre: THREE.Vector3, r: number): number {
+    return this.deepestWeaponPoint(centre, r, 1).depth;
+  }
+
+  /** The weapon vertex deepest inside the sphere (`stride` samples every n-th vertex) and how deep it is (0 = clear). */
+  private deepestWeaponPoint(centre: THREE.Vector3, r: number, stride: number): { depth: number; point: THREE.Vector3 } {
+    const point = new THREE.Vector3();
     const node = this.weaponNode();
-    if (!node) return 0;
+    if (!node) return { depth: 0, point };
     node.updateWorldMatrix(true, true);
     const v = new THREE.Vector3();
     let worst = 0;
@@ -312,13 +326,130 @@ export class Character {
       const m = o as THREE.Mesh;
       if (!m.isMesh || o.userData.ghost) return;
       const pos = m.geometry.getAttribute('position');
-      for (let i = 0; i < pos.count; i++) {
+      for (let i = 0; i < pos.count; i += stride) {
         v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
         const d = r - v.distanceTo(centre);
-        if (d > worst) worst = d;
+        if (d > worst) {
+          worst = d;
+          point.copy(v);
+        }
       }
     });
-    return worst;
+    return { depth: worst, point };
+  }
+
+  /** The skull as an ellipsoid fitted in the head bone's own space (it follows every bob, lean and turn): centre and half extents. */
+  private skullFit: { c: THREE.Vector3; h: THREE.Vector3 } | null = null;
+
+  private fitSkull(): { c: THREE.Vector3; h: THREE.Vector3 } {
+    if (this.skullFit) return this.skullFit;
+    const headBone = this.bones.get('head')!;
+    this.headSphere(); // builds the list of vertices that follow the head
+    const { mesh, ids } = this.headVerts!;
+    mesh.updateWorldMatrix(true, false);
+    mesh.skeleton.update();
+    headBone.updateWorldMatrix(true, false);
+    const inv = headBone.matrixWorld.clone().invert();
+    const v = new THREE.Vector3();
+    const box = new THREE.Box3();
+    for (const i of ids) {
+      mesh.getVertexPosition(i, v);
+      box.expandByPoint(v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inv));
+    }
+    const c = box.getCenter(new THREE.Vector3());
+    const h = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+    this.skullFit = { c, h };
+    return this.skullFit;
+  }
+
+  /**
+   * How far the weapon reaches into the skull ellipsoid (inflated by `margin` world units; 0 = clear) and the world direction to push it out:
+   * the deepest vertex's way out (the ellipsoid's surface normal there). `stride` samples every n-th vertex.
+   */
+  skullPenetration(margin = 0, stride = 1): { depth: number; dir: THREE.Vector3 } {
+    const dir = new THREE.Vector3(0, 1, 0);
+    const node = this.weaponNode();
+    const headBone = this.bones.get('head');
+    if (!node || !headBone) return { depth: 0, dir };
+    const { c, h } = this.fitSkull();
+    node.updateWorldMatrix(true, true);
+    headBone.updateWorldMatrix(true, false);
+    const scale = new THREE.Vector3().setFromMatrixScale(headBone.matrixWorld).x;
+    const he = h.clone().addScalar(margin / scale);
+    const hMin = Math.min(he.x, he.y, he.z);
+    const inv = headBone.matrixWorld.clone().invert();
+    const toLocal = new THREE.Matrix4();
+    const v = new THREE.Vector3();
+    const n = new THREE.Vector3();
+    let worst = 0;
+    node.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || o.userData.ghost) return;
+      toLocal.multiplyMatrices(inv, m.matrixWorld);
+      const pos = m.geometry.getAttribute('position');
+      for (let i = 0; i < pos.count; i += stride) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(toLocal).sub(c);
+        const q = Math.hypot(v.x / he.x, v.y / he.y, v.z / he.z);
+        if (q >= 1) continue;
+        const d = (1 - q) * hMin * scale;
+        if (d > worst) {
+          worst = d;
+          n.set(v.x / (he.x * he.x), v.y / (he.y * he.y), v.z / (he.z * he.z));
+        }
+      }
+    });
+    if (worst > 0) dir.copy(n.lengthSq() > 1e-12 ? n.normalize() : dir).transformDirection(headBone.matrixWorld);
+    return { depth: worst, dir };
+  }
+
+  /**
+   * Poses driven by a clip (reload ...) can bring the gun into the skull. Where it would, fade the arms from the clip into the aim pose
+   * (`applyAim`) by how deep the gun sits, then push out whatever is left: no pops, and the clip shows fully while the gun is clear.
+   */
+  clearWeaponFromHead(dir: THREE.Vector3): void {
+    const weapon = this.weaponNode();
+    if (!weapon || !this.bones.get('head')) return;
+    weapon.position.copy(HAND_ATTACH.position);
+    this.root.updateMatrixWorld(true);
+    const depth = this.skullPenetration(0.04, 2).depth;
+    if (depth <= 0.005) return;
+    const t = Math.min(1, depth / 0.2);
+    const names = ['armR', 'handR', 'armL', 'handL'];
+    const saved = names.map((n) => this.bones.get(n)?.quaternion.clone());
+    const savedPos = weapon.position.clone();
+    this.applyAim(dir);
+    names.forEach((n, i) => {
+      const b = this.bones.get(n);
+      const q = saved[i];
+      if (b && q) b.quaternion.copy(q).slerp(b.quaternion.clone(), t);
+    });
+    weapon.position.lerpVectors(savedPos, weapon.position.clone(), t);
+    this.root.updateMatrixWorld(true);
+    this.pushWeaponOutOfHead(false);
+  }
+
+  /**
+   * Whatever pose the arm is in (an aim, a reload or a throw clip that lifts the hand to the face), the weapon must never sit inside the skull:
+   * push it out along the skull's surface normal at its deepest vertex, a few passes, by at most `maxMove` in total. With `reset` the weapon
+   * first goes back to its plain place in the hand (poses driven by a clip, where `applyAim` did not seat it). Returns how far it was moved.
+   */
+  pushWeaponOutOfHead(reset: boolean, margin = 0.04, maxMove = 0.7): number {
+    const weapon = this.weaponNode();
+    const hand = weapon?.parent;
+    if (!weapon || !hand || !this.bones.get('head')) return 0;
+    if (reset) weapon.position.copy(HAND_ATTACH.position);
+    this.root.updateMatrixWorld(true);
+    let moved = 0;
+    for (let pass = 0; pass < 6 && moved < maxMove; pass++) {
+      const { depth, dir } = this.skullPenetration(margin, 2);
+      if (depth <= 0.004) break;
+      const away = dir.multiplyScalar(Math.min(depth, maxMove - moved));
+      const wp = weapon.getWorldPosition(new THREE.Vector3()).add(away);
+      weapon.position.copy(hand.worldToLocal(wp));
+      moved += away.length();
+      this.root.updateMatrixWorld(true);
+    }
+    return moved;
   }
 
   /** World position of a named weapon node (`grip`, `muzzle`, `grip_l`). */
@@ -353,7 +484,7 @@ export class Character {
    * along `dir` (a horizontal world direction), keep the weapon upright, and reach the left hand to the weapon's `grip_l`.
    * The clip only supplies the body motion; this makes the held angle match where the shot leaves (docs/DESIGN.md IK note).
    */
-  applyAim(dir: THREE.Vector3): void {
+  applyAim(dir: THREE.Vector3, clearHead = true): void {
     const armR = this.bones.get('armR');
     const handR = this.bones.get('handR');
     const weapon = this.weaponNode();
@@ -386,6 +517,8 @@ export class Character {
       weapon.position.copy(hand.worldToLocal(wp));
       this.root.updateMatrixWorld(true);
     }
+    // the pose may still leave a scope or stock in the skull: push it clear before the support hand reaches for it
+    if (clearHead) this.pushWeaponOutOfHead(false, 0.02);
     // support hand to grip_l
     const armL = this.bones.get('armL');
     const handL = this.bones.get('handL');
@@ -421,6 +554,13 @@ export class Character {
     if (this.current) this.current.crossFadeTo(next, fade, false);
     this.current = next;
     this.currentName = name;
+    this.syncWeapon();
+  }
+
+  /** The gun is shown in the hand except while a clip needs the hands for something else. */
+  private syncWeapon(): void {
+    const w = this.weaponNode();
+    if (w) w.visible = !WEAPON_HIDDEN_CLIPS.has(this.currentName);
   }
 
   /** Play a clip once and hold its last frame (death, get up). */
@@ -434,6 +574,7 @@ export class Character {
     if (this.current) this.current.crossFadeTo(next, fade, false);
     this.current = next;
     this.currentName = name;
+    this.syncWeapon();
   }
 
   private recoil = 0;

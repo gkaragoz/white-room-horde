@@ -51,6 +51,7 @@ for (const name of wanted) {
   console.log(`\n== ${name} ==`);
   for (const [id, r] of Object.entries(report)) {
     console.log(`${r.status.toUpperCase().padEnd(5)} ${id.padEnd(24)} ${String(r.detail).split('\n')[0].slice(0, 150)}`);
+    if (process.env.QA_FULL && r.status === 'fail') for (const line of String(r.detail).split(String.fromCharCode(10)).slice(1)) console.log('      ' + line.slice(0, 200)); // QA_FULL=1 prints every line of a failing test
     if (r.status === 'fail') failed = true;
   }
   if (!Object.keys(report).length) {

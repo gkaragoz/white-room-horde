@@ -96,6 +96,46 @@ export const moreTests: QaTest[] = [
     },
   },
   {
+    id: 'arena.z-fighting',
+    title: 'No surface of a deck, ramp, block or ramp wall flickers: frames a hair apart look the same around every ramp',
+    async run(ctx) {
+      // Two surfaces in the same plane take turns winning the depth test; moving the camera by a few hundredths of a pixel makes them swap,
+      // so the picture changes over whole patches. Normal edges move by less than a pixel and change only a thin line.
+      const problems: string[] = [];
+      const data: Record<string, number> = {};
+      const view = new ArenaView();
+      ctx.stage.scene.add(view.group);
+      try {
+        ctx.stage.setZoom(1);
+        ctx.stage.setShadowQuality(0); // geometry first: shadows are judged separately
+        for (let m = 0; m < MAPS.length; m++) {
+          const def = MAPS[m]!;
+          if (!def.ramps?.length) continue;
+          view.setMap(m);
+          for (const [ri, r] of def.ramps.entries()) {
+            for (const [label, f, h] of [['foot', 0.15, 0.1], ['mid', 0.5, 0.5], ['top', 0.85, 0.9]] as const) {
+              // camera on the ramp at fraction f of its climb
+              const along = r.dir === 0 ? [r.x - r.w / 2 + f * r.w, r.y] : r.dir === 2 ? [r.x + r.w / 2 - f * r.w, r.y] : r.dir === 1 ? [r.x, r.y - r.h / 2 + f * r.h] : [r.x, r.y + r.h / 2 - f * r.h];
+              const shots: Uint8Array[] = [];
+              for (let k = 0; k < 6; k++) {
+                ctx.stage.follow(along[0]! + k * 0.0004, -along[1]! + k * 0.0003, 0, r.z * h);
+                ctx.stage.render();
+                shots.push(grab(ctx, 420));
+              }
+              let worst = 0;
+              for (let k = 1; k < shots.length; k++) worst = Math.max(worst, diffCount(shots[k - 1]!, shots[k]!, 60));
+              data[`${def.id} ramp ${ri} ${label}`] = worst;
+              if (worst > 120) problems.push(`${def.id} ramp ${ri} (${label}): ${worst} px flip between frames a hair apart`);
+            }
+          }
+        }
+      } finally {
+        ctx.stage.scene.remove(view.group);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(String.fromCharCode(10)) : `stable around every ramp (worst frame-to-frame change ${Math.max(...Object.values(data))} px)`, data };
+    },
+  },
+  {
     id: 'arena.layers',
     title: 'Vertical arenas draw their decks and ramps, the roof turns thin over a character walking underneath, and the minimap shows the levels',
     async run(ctx) {

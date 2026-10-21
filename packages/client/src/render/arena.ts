@@ -123,13 +123,16 @@ export class ArenaView {
 
   private addDeck(d: Deck, side: THREE.Material, top: THREE.Material, under: THREE.Material, rim: THREE.Material): void {
     const thick = 0.7;
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(d.w, thick, d.h), [side, side, top, under, side, side]);
-    slab.position.set(d.x, d.z - thick / 2, -d.y);
+    // a hair smaller and lower than the deck footprint: a `block` standing on the same footprint (rampyard, depot, tunnelhub) would
+    // otherwise share its top and sides with this slab and the two would fight for the pixels (worst while the roof fades)
+    const SINK = 0.004;
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(d.w - 0.02, thick - SINK, d.h - 0.02), [side, side, top, under, side, side]);
+    slab.position.set(d.x, d.z - SINK - (thick - SINK) / 2, -d.y);
     slab.castShadow = true;
     slab.receiveShadow = true;
     this.group.add(slab);
     const trim = new THREE.Mesh(new THREE.BoxGeometry(d.w + 0.14, 0.1, d.h + 0.14), rim);
-    trim.position.set(d.x, d.z - thick + 0.05, -d.y);
+    trim.position.set(d.x, d.z - thick + 0.047, -d.y);
     this.group.add(trim);
   }
 
@@ -165,10 +168,20 @@ export class ArenaView {
     const wall = new THREE.MeshStandardMaterial({ color: '#c9a35c', roughness: 0.95, flatShading: true, side: THREE.DoubleSide });
     this.disposables.push(wall);
     const lowHigh = c.map(([x, zz]) => ({ x, zz, h: high(x, zz) }));
+    // The quads sit INSIDE the footprint by a hair: the rampwall boxes next to a ramp (inner face exactly on the ramp's side) and the deck
+    // or block at its top end (face exactly on the back) would share their plane and flicker against these quads.
+    const INSET = 0.02;
     const addQuad = (a: number, b: number): void => {
       const A = lowHigh[a]!;
       const B = lowHigh[b]!;
-      const q = [A.x, 0, A.zz, B.x, 0, B.zz, B.x, B.h ? r.z : 0, B.zz, A.x, A.h ? r.z : 0, A.zz];
+      if (!A.h && !B.h) return; // the low end has no height: nothing to draw
+      // inward normal of this edge (towards the footprint centre)
+      const mx = (A.x + B.x) / 2;
+      const mz = (A.zz + B.zz) / 2;
+      const nlen = Math.hypot(r.x - mx, -r.y - mz) || 1;
+      const ox = ((r.x - mx) / nlen) * INSET;
+      const oz = ((-r.y - mz) / nlen) * INSET;
+      const q = [A.x + ox, 0, A.zz + oz, B.x + ox, 0, B.zz + oz, B.x + ox, B.h ? r.z : 0, B.zz + oz, A.x + ox, A.h ? r.z : 0, A.zz + oz];
       const gg = new THREE.BufferGeometry();
       gg.setAttribute('position', new THREE.Float32BufferAttribute(q, 3));
       gg.setIndex([0, 1, 2, 0, 2, 3]);
@@ -189,7 +202,7 @@ export class ArenaView {
       const px = r.dir === 0 ? r.x - hw + along : r.dir === 2 ? r.x + hw - along : r.x;
       const py = r.dir === 1 ? r.y - hh + along : r.dir === 3 ? r.y + hh - along : r.y;
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(r.dir === 0 || r.dir === 2 ? 0.14 : across * 0.9, 0.04, r.dir === 0 || r.dir === 2 ? across * 0.9 : 0.14), rim);
-      stripe.position.set(px, zAt + 0.03, -py);
+      stripe.position.set(px, zAt + 0.05, -py);
       // follow the slope
       const slope = Math.atan2(r.z, len);
       if (r.dir === 0) stripe.rotation.z = slope;

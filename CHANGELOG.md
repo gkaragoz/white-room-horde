@@ -7,6 +7,13 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Flicker on the ramp maps and weapons in the head (client only; nothing changes in the rules or on the wire)**
+
+- Z-fighting (flicker) on the layered maps (overpass, depot, rampyard, tunnelhub, mezzanine): the ramp's side and back quads lay exactly in the planes of the ramp walls and the deck/block faces, and a deck slab shared its footprint with a block (they fought most while the roof faded). The quads now sit a hair inside the footprint, the deck slab is a hair smaller and lower than the block under it, the ramp stripes sit higher above the slope.
+- Shadows on slopes: the sun's focus now moves in whole shadow texels (the shadow edges stopped crawling as you move) and the low shadow setting has a larger normal bias (no acne on ramps).
+- Weapons in the head: the skull is now measured as an ellipsoid fitted to the head mesh in the head bone's space. The aim pose pushes a weapon out of it (running with a heavy or long weapon used to bring it 0.2 to 0.45 units into the head), reload clips fade into the aim pose where the gun would enter the head, and the gun is not in the hand during throw, revive and get-up clips (the grenade arm swings over the head). `muzzleH` of the heavy machine gun, minigun, marksman rifle and arc thrower follow the new hold (visual only; the shot origin in the simulation did not change).
+- Tests: `arena.z-fighting` (frames a hair apart must look the same around every ramp; the old geometry changes 200 to 1400 px, now under 70), `weapon.head-clearance-poses` (every gun, clip, phase and aim angle, body turned away from the aim, reload clips); `QA_FULL=1` prints every line of a failing QA test.
+
 ## v0.22.0 (2026-10-21)
 
 **Drone companions (rules and wire format change: update the server and reload the page)**

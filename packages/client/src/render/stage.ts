@@ -19,6 +19,8 @@ export interface StageOptions {
 }
 
 /** Everything that is not a character: renderer, iso camera, warm sun, painted floor (docs/DESIGN.md sections 3b, 4, 5). */
+const SUN_UP = new THREE.Vector3(0, 1, 0);
+
 export class Stage {
   /** WebGLRenderer or WebGPURenderer (typed as the former; WebGL-only calls are never made on the WebGPU path). */
   readonly renderer: THREE.WebGLRenderer;
@@ -312,6 +314,8 @@ export class Stage {
     this.renderer.shadowMap.enabled = q > 0;
     this.sun.castShadow = q > 0;
     const size = q >= 2 ? 2048 : 1024;
+    // a texel of the low map is wider than the high-quality normal bias: slopes (ramps) would show acne
+    this.sun.shadow.normalBias = q >= 2 ? 0.04 : 0.08;
     if (this.sun.shadow.mapSize.x !== size) {
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
@@ -364,10 +368,27 @@ export class Stage {
     const t = new THREE.Vector3(x + (Math.random() - 0.5) * shake * 0.5, 0.6 + height, z + (Math.random() - 0.5) * shake * 0.5);
     this.camera.position.copy(t).add(this.camOffset);
     this.camera.lookAt(t);
-    this.sun.position.set(x, height, z).add(this.sunOffset);
-    this.sun.target.position.set(x, height, z);
+    // Snap the light's focus to whole shadow texels in light space: a sun that slides smoothly with the player makes every shadow edge
+    // crawl and flicker (worst on ramps); stepping it by exact texels keeps the edges still.
+    const texel = (this.sun.shadow.camera.right - this.sun.shadow.camera.left) / this.sun.shadow.mapSize.x;
+    const f = this.sunDir.set(-this.sunOffset.x, -this.sunOffset.y, -this.sunOffset.z).normalize();
+    const r = this.sunRight.crossVectors(f, SUN_UP).normalize();
+    const u = this.sunUp.crossVectors(r, f).normalize();
+    const px = x * r.x + height * r.y + z * r.z;
+    const py = x * u.x + height * u.y + z * u.z;
+    const dx = Math.round(px / texel) * texel - px;
+    const dy = Math.round(py / texel) * texel - py;
+    const sx = x + r.x * dx + u.x * dy;
+    const sy = height + r.y * dx + u.y * dy;
+    const sz = z + r.z * dx + u.z * dy;
+    this.sun.position.set(sx, sy, sz).add(this.sunOffset);
+    this.sun.target.position.set(sx, sy, sz);
     this.sun.target.updateMatrixWorld();
   }
+
+  private readonly sunDir = new THREE.Vector3();
+  private readonly sunRight = new THREE.Vector3();
+  private readonly sunUp = new THREE.Vector3();
 
   setBounce(on: boolean): void {
     this.bounce.visible = on;

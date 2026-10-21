@@ -83,7 +83,7 @@
       "range": 28,
       "muzzleFwd": 3.66,
       "muzzleSide": 0.29,
-      "muzzleH": 0.72,
+      "muzzleH": 0.46,
       "pierce": 2,
       "mag": 60,
       "reload": 2.4
@@ -100,7 +100,7 @@
       "spinDown": 0.8,
       "muzzleFwd": 3.6,
       "muzzleSide": 0.29,
-      "muzzleH": 0.66,
+      "muzzleH": 0.35,
       "pierce": 1,
       "mag": 120,
       "reload": 3.2
@@ -175,7 +175,7 @@
       "range": 52,
       "muzzleFwd": 3.27,
       "muzzleSide": 0.29,
-      "muzzleH": 0.69,
+      "muzzleH": 0.38,
       "pierce": 2,
       "mag": 10,
       "reload": 2.0
@@ -404,7 +404,7 @@
       "range": 11,
       "muzzleFwd": 2.67,
       "muzzleSide": 0.29,
-      "muzzleH": 0.72,
+      "muzzleH": 0.36,
       "pierce": 2,
       "mag": 55,
       "reload": 2.2
