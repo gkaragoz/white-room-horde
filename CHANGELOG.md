@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.29.0 (2026-10-21)
+
 **100 achievements (rules change: update the server and reload the page)**
 
 - `tools/cards/achievements.py` is the table (90 open, 10 hidden): running totals and best runs live in the profile (`ach`), special conditions are checked at the end of a run. New sim statistics: elite kills (`STAT.EliteKills`) and kills per weapon (`pWpnKills`).
