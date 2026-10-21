@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**100 achievements (rules change: update the server and reload the page)**
+
+- `tools/cards/achievements.py` is the table (90 open, 10 hidden): running totals and best runs live in the profile (`ach`), special conditions are checked at the end of a run. New sim statistics: elite kills (`STAT.EliteKills`) and kills per weapon (`pWpnKills`).
+- Full-screen page with progress bars and numbers, hover text, a red badge on the menu button until opened, and the achievements of a run on the game over screen. Replays do not count.
+
 ## v0.28.2 (2026-10-21)
 
 - Graphics settings apply at once: texture detail (floor and blood canvases are repainted, the blood already on the floor stays) and SMAA / off no longer reload the page. Settings that only a new renderer can apply (WebGL2 / WebGPU, MSAA) show a note under the row, "Applies when you reload the page", with a "Reload now" button.

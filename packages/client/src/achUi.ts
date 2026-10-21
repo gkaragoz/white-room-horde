@@ -8,6 +8,8 @@ export const ACH_CSS = `
 @keyframes wrhbadge{from{transform:scale(1)}to{transform:scale(1.15)}}
 #wrh-open-ach{position:relative}
 .wrh-ach{position:fixed;inset:0;z-index:70;background:linear-gradient(180deg,#fbf6ea,#efe4cc);overflow:auto;padding:clamp(14px,3vh,34px) clamp(14px,4vw,64px);color:#2b3a52}
+.wrh-ach button,.wrh-modfoot button{padding:9px 22px;border-radius:11px;border:0;background:#1fa2ff;color:#fff;font:800 15px system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 0 #0f78c4}
+.wrh-modfoot button.alt{background:#8b97ab;box-shadow:0 3px 0 #66718a}
 .wrh-ach h1{margin:0 0 4px;font-size:clamp(26px,4vw,38px)}
 .wrh-ach .top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px}
 .wrh-ach .top .count{font-weight:800;font-size:18px;flex:1}

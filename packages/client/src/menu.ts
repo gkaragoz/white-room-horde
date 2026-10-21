@@ -4,6 +4,7 @@
  * exactly where they were (#wrh-solo, #wrh-host, #wrh-join, #wrh-code, #wrh-name, .wrh-class[data-cls], ...).
  */
 import { icon } from './icons';
+import { asset } from './assets';
 
 export interface MenuParts {
   title: string;
@@ -55,7 +56,7 @@ export function menuMarkup(p: MenuParts): string {
         <button id="wrh-solo" class="wrh-play">${icon('hud_right', 34)}<span>${p.soloLabel}</span></button>
         <button id="wrh-online" class="wrh-big alt">${icon('tb_lang', 30)}<span>${p.onlineLabel}</span></button>
         ${p.rejoinHtml}
-        <button id="wrh-open-ach" class="wrh-big alt">${icon('hud_star', 30)}<span>${p.achLabel}</span>${p.achUnread > 0 ? '<em class="wrh-badge" id="wrh-ach-badge">!</em>' : ''}</button>
+        <button id="wrh-open-ach" class="wrh-big alt"><img src="${asset('ui/ach_menu.webp')}" width="30" height="30" alt="" draggable="false"><span>${p.achLabel}</span>${p.achUnread > 0 ? '<em class="wrh-badge" id="wrh-ach-badge">!</em>' : ''}</button>
         <button id="wrh-open-settings" class="wrh-big alt">${icon('tb_set', 30)}<span>${p.settingsLabel}</span></button>
         <label>${p.weaponLabel}</label>
         <div class="wrh-weapons" id="wrh-weapons">${p.weaponsHtml}</div>

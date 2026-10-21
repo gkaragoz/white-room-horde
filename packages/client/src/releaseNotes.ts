@@ -23,6 +23,28 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.29',
+    date: '2026-10-22',
+    text: {
+      en: {
+        title: '100 achievements',
+        items: [
+          'A full-screen Achievements page with 100 achievements (10 of them hidden until you earn them): each has its own badge, a progress bar with numbers like 533,223 / 1,000,000, and says how to get it when you hover it.',
+          'A red ! on the menu button shows there is something new; it comes back whenever you earn another one.',
+          'The game over screen lists the achievements that run earned, right under the statistics. Solo and online runs count (your own numbers); replays do not.',
+        ],
+      },
+      tr: {
+        title: '100 başarım',
+        items: [
+          'Tam ekran Başarımlar sayfası: 100 başarım (10 tanesi kazanana kadar gizli); her birinin kendi rozeti, 533.223 / 1.000.000 gibi sayılı ilerleme çubuğu var ve üzerine gelince nasıl kazanılacağını söyler.',
+          'Menü düğmesindeki kırmızı ! yeni bir şey olduğunu gösterir; her yeni başarımda yeniden çıkar.',
+          'Oyun sonu ekranı, istatistiklerin hemen altında o oyunda kazanılan başarımları listeler. Solo ve çevrimiçi oyunlar sayılır (kendi sayıların); tekrarlar sayılmaz.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.28',
     date: '2026-10-22',
     text: {
