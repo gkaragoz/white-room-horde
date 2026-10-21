@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.21.0 (2026-10-21)
+
 **A roomier main menu and a new icon set (client only; nothing changes in the rules or on the wire)**
 
 - The main menu is now full screen: the name and big Play solo / Play online / Settings buttons on the left, the 3D character stage with the nine classes in the middle, arenas and difficulty on the right, the starting weapons as icon tiles. Online play (host, room code, password, server) moved into its own window; an invite link opens it with the code filled in. Calm white-room background with slow drifting bubbles. Phone layouts (portrait and landscape) with touch-sized buttons. The markup and styles live in `packages/client/src/menu.ts`, the element ids the QA scripts use stayed the same.
