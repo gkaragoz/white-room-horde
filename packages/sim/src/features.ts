@@ -76,9 +76,14 @@ export function damageMul(w: World, s: number): number {
 /** Move speed multiplier from haste and adrenaline. */
 /** Class abilities: the buffs a running ability puts on a character (see abilities.ts for the abilities themselves). */
 export function abilitySpeed(w: World, s: number): number {
+  return abilitySpeedFrom(w, s, w.pRally[s]!, w.pSpecT[s]!);
+}
+
+/** The same with the timers given (the client's prediction runs them down on its own copy). */
+export function abilitySpeedFrom(w: World, s: number, rally: number, specT: number): number {
   const a = BALANCE.abilities;
-  let m = w.pRally[s]! > 0 ? a.soldier!.speed! : 1;
-  if (w.pSpecT[s]! > 0) {
+  let m = rally > 0 ? a.soldier!.speed! : 1;
+  if (specT > 0) {
     const cls = perk(w, s, PERK.Class);
     m *= cls === 2 ? a.heavy!.speed! : cls === 3 ? a.scout!.speed! : cls === 6 ? a.berserker!.speed! : cls === 7 ? a.swordsman!.speed! : 1;
   }
@@ -87,6 +92,11 @@ export function abilitySpeed(w: World, s: number): number {
 
 export function abilityRate(w: World, s: number): number {
   return w.pRally[s]! > 0 ? BALANCE.abilities.soldier!.rate! : 1;
+}
+
+/** The fire-rate buff of a rally with the timer given. */
+export function abilityRateFrom(rally: number): number {
+  return rally > 0 ? BALANCE.abilities.soldier!.rate! : 1;
 }
 
 export function abilityDamage(w: World, s: number): number {
@@ -109,9 +119,14 @@ export function stunImmune(w: World, s: number): boolean {
 }
 
 export function speedMul(w: World, s: number): number {
-  let m = abilitySpeed(w, s);
-  if (perk(w, s, PERK.Haste) > 0) m = 1.4;
-  if (perk(w, s, PERK.Adren) > 0 && BALANCE.perks.adrenSpeed > m) m = BALANCE.perks.adrenSpeed;
+  return speedMulFrom(w, s, w.pRally[s]!, w.pSpecT[s]!, perk(w, s, PERK.Haste), perk(w, s, PERK.Adren));
+}
+
+/** Move speed multiplier with the buff timers given: what the client's prediction needs while the timers run down. */
+export function speedMulFrom(w: World, s: number, rally: number, specT: number, haste: number, adren: number): number {
+  let m = abilitySpeedFrom(w, s, rally, specT);
+  if (haste > 0) m = 1.4;
+  if (adren > 0 && BALANCE.perks.adrenSpeed > m) m = BALANCE.perks.adrenSpeed;
   return m;
 }
 

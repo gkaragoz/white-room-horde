@@ -34,12 +34,16 @@ export class Hub {
     this.nextTick = Date.now();
     this.timer = setInterval(() => {
       const now = Date.now();
-      if (now - this.nextTick > period * 5) this.nextTick = now - period * 5;
-      while (now >= this.nextTick) {
+      // a late timer makes up at most two ticks per firing (no burst of bundles for the clients to absorb); further behind
+      // than three ticks, the schedule is re-anchored and the clients' pacing follows
+      let n = 0;
+      while (now >= this.nextTick && n < 2) {
         this.stats.record(now - this.nextTick);
         this.manager.tick();
         this.nextTick += period;
+        n++;
       }
+      if (now - this.nextTick > period * 3) this.nextTick = now - period;
     }, 8);
   }
 

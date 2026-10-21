@@ -23,6 +23,40 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.20',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: 'Smooth movement online',
+        items: [
+          'Your own character no longer stutters while you move in an online game, most of all with the hammer (the slow-down while it charges is now predicted exactly) and when you use an ability.',
+          'The character is drawn on the same clock your inputs are sent on, and a correction from the server glides in instead of popping.',
+          'A weak connection hurts less: every message repeats your last few moves, the delay adapts without flapping, and the game speeds up or slows down gently instead of in jerks.',
+          'Press F4 for a network report: it now also shows how smooth your character was drawn.',
+          'Everybody needs the new version: reload the page.',
+        ],
+      },
+      tr: {
+        title: 'Online oyunda akıcı hareket',
+        items: [
+          'Online oyunda kendi karakterin artık hareket ederken takılmıyor; özellikle çekiçle (şarj sırasındaki yavaşlama artık tam olarak tahmin ediliyor) ve yetenek kullanırken.',
+          'Karakter, hareketlerinin gönderildiği saatle çiziliyor; sunucudan gelen düzeltme bir anda zıplamak yerine yumuşakça kayıyor.',
+          'Zayıf internet daha az sorun çıkarıyor: her mesaj son birkaç hareketini tekrar ediyor, gecikme ayarı titremiyor, oyun hızı sarsılmadan yavaşça ayarlanıyor.',
+          'F4 ile ağ raporu alabilirsin; artık karakterinin ne kadar akıcı çizildiğini de gösteriyor.',
+          'Herkesin yeni sürümü kullanması gerekiyor: sayfayı yenile.',
+        ],
+      },
+      de: {
+        title: 'Flüssige Bewegung online',
+        items: [
+          'Deine Figur ruckelt online nicht mehr beim Laufen, besonders mit dem Hammer und bei Fähigkeiten.',
+          'Schwache Verbindungen machen weniger aus: jede Nachricht wiederholt deine letzten Eingaben.',
+          'Alle brauchen die neue Version: Seite neu laden.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.19',
     date: '2026-10-21',
     text: {

@@ -19,6 +19,16 @@ export interface DiagSample {
   hidden: boolean;
   inputsSent: number;
   stepsPerSecond: number;
+  /** Local character as drawn: frames that moved against the direction of travel, and the 99th percentile of the speed it was drawn at (units/s). */
+  backward: number;
+  drawP99: number;
+  /** Prediction corrections absorbed, hard snaps, the biggest pending error (units), the input lead (ticks) and inputs that were late by more than a tick (ms, worst). */
+  corrections: number;
+  snaps: number;
+  maxErr: number;
+  lead: number;
+  lateMax: number;
+  coalesced: number;
 }
 
 export interface DiagInfo {
@@ -27,6 +37,10 @@ export interface DiagInfo {
   backlog: number;
   playout: number;
   bufferedBytes: number;
+  lead?: number;
+  corrections?: number;
+  snaps?: number;
+  maxErr?: number;
 }
 
 const STALL_MS = 250;
@@ -40,6 +54,20 @@ export class NetDiag {
   private longTasks: number[] = [];
   private inputs = 0;
   private steps = 0;
+  private drawSpeeds: number[] = [];
+  private backward = 0;
+  private lastDx = 0;
+  private lastDy = 0;
+  private lastX = NaN;
+  private lastY = NaN;
+  private lateMax = 0;
+  private lastCorr = 0;
+  private lastSnaps = 0;
+  /** Input ticks the page swallowed because they arrived back to back after a hitch. */
+  coalesced = 0;
+  private coalescedSec = 0;
+  /** Totals since the page loaded (read by scripts through window.__wrh.netstats()). */
+  readonly totals = { frames: 0, backward: 0, maxDrawSpeed: 0, corrections: 0, snaps: 0, lateMax: 0, speeds: [] as number[] };
   private hiddenAt = -1e9;
   private lastBundleStall = -1e9;
   /** Page errors, unhandled promise rejections and console errors/warnings, newest last. */
@@ -98,6 +126,40 @@ export class NetDiag {
     if (this.errors.length > 80) this.errors.shift();
   }
 
+  /** The local input left this many ms later than its slot in the 30 Hz schedule (a hitch on the page). */
+  inputLate(ms: number): void {
+    if (ms > this.lateMax) this.lateMax = ms;
+    if (ms > this.totals.lateMax) this.totals.lateMax = ms;
+  }
+
+  /** Once per frame: where the local character is drawn. Counts steps against the direction of travel and keeps the speeds. */
+  drawFrame(x: number, y: number, dt: number): void {
+    if (Number.isFinite(this.lastX) && dt > 0 && dt < 0.25) {
+      const dx = x - this.lastX;
+      const dy = y - this.lastY;
+      const sp = Math.hypot(dx, dy) / dt;
+      this.drawSpeeds.push(sp);
+      this.totals.frames++;
+      if (sp > this.totals.maxDrawSpeed) this.totals.maxDrawSpeed = sp;
+      const t = this.totals.speeds;
+      t.push(sp);
+      if (t.length > 3000) t.shift();
+      if (dx * this.lastDx + dy * this.lastDy < 0 && Math.hypot(dx, dy) > 0.01 && Math.hypot(this.lastDx, this.lastDy) > 0.01) {
+        this.backward++;
+        this.totals.backward++;
+      }
+      this.lastDx = dx;
+      this.lastDy = dy;
+    }
+    this.lastX = x;
+    this.lastY = y;
+  }
+
+  /** The prediction view was reset (the local character left the world for a moment). */
+  drawReset(): void {
+    this.lastX = NaN;
+  }
+
   /** The local input went out. */
   input(): void {
     this.inputs++;
@@ -130,7 +192,23 @@ export class NetDiag {
       hidden: document.hidden,
       inputsSent: this.inputs,
       stepsPerSecond: this.steps,
+      backward: this.backward,
+      drawP99: Math.round([...this.drawSpeeds].sort((a, b) => a - b)[Math.floor(this.drawSpeeds.length * 0.99)] ?? 0),
+      corrections: (info.corrections ?? 0) - this.lastCorr,
+      snaps: (info.snaps ?? 0) - this.lastSnaps,
+      maxErr: Math.round((info.maxErr ?? 0) * 100) / 100,
+      lead: info.lead ?? 0,
+      lateMax: Math.round(this.lateMax),
+      coalesced: this.coalesced - this.coalescedSec,
     });
+    this.totals.corrections = info.corrections ?? 0;
+    this.totals.snaps = info.snaps ?? 0;
+    this.lastCorr = info.corrections ?? 0;
+    this.lastSnaps = info.snaps ?? 0;
+    this.coalescedSec = this.coalesced;
+    this.drawSpeeds = [];
+    this.backward = 0;
+    this.lateMax = 0;
     if (this.samples.length > KEEP) this.samples.shift();
     this.frames = [];
     this.longTasks = [];

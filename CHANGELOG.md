@@ -7,6 +7,15 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Online movement without stutter (the input message changes: update the server and reload the page)**
+
+- Fixed the stutter of the local character in online games, worst with the hammerer. Causes: the client's prediction ignored the slow-down of a charging hammer (and the Special button, and buffs running out inside the lead window) so it overshot and was pulled back on every confirmed tick; the predicted position was drawn on the clock of the received bundles instead of the clock of the sent inputs, which made it jump back and forth by a tick of movement about thirty times a second; and the smoothing filter passed most of each jump through.
+- `predictPlayer` now shares its charge/cooldown logic (`chargeStep`) and buff arithmetic with the simulation, and a test proves it equals the simulation tick for tick for all classes on a flat and a layered map, with Fire held and released, dashes, revive, the Special button and expiring buffs.
+- New `PredictedView` (packages/net/src/smoothing.ts): the local character is drawn between the positions after its last two sent inputs on the input clock; a misprediction is turned into an error offset that eases out in about 0.1 s; only a big error (over 2.5 units) snaps.
+- Network layer: input tags are strictly increasing (two inputs can no longer share a tag), every input message repeats the last four inputs and the room fills only the ticks it is missing (a lost or late message no longer changes what your character does), the input lead follows round trip and jitter with hysteresis (up at once, down one tick per 3 s) and has one more tick of margin, the playout buffer and the playback speed are smoothed (no more +-12% saw-tooth), a hitch that delivers the page's input timer ticks back to back sends one input instead of a burst, the host serialises a snapshot after the message handler instead of inside it, and the relay and the Node server make up at most two ticks per timer firing and re-anchor when more than three behind.
+- Diagnostics: the F4 report and `window.__wrh.netstats()` show corrections, snaps, the biggest error, the input lead, input lateness, backward steps and the 99th percentile of the speed the local character was drawn at.
+- New `tools/ci/net-stutter.mjs`: two browsers against the local server through a delaying proxy (latency, jitter, stalls), a hammerer walking with the fire button held.
+
 ## v0.19.1 (2026-10-21)
 
 - The version number in the corner is clickable: it opens a window with the release notes in plain words, in the interface language (and it follows the language when you change it while it is open). Esc or a click outside closes it.

@@ -1,5 +1,5 @@
 import { GAME_VERSION, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { Bin, decodeInputMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
+import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
 export interface Conn {
@@ -220,6 +220,25 @@ export class Room {
     m.pending.set(tick, clampInput(input));
   }
 
+  /** The newest input of a message and the repeated older ones: an older one only fills a tick that has no input yet. */
+  inputs(slot: number, tick: number, list: readonly PlayerInput[]): void {
+    const m = this.members[slot];
+    if (!m) return;
+    const n = list.length;
+    for (let i = 0; i < n; i++) {
+      const t = tick - (n - 1 - i);
+      if (t < this.tick || t > this.tick + MAX_AHEAD_TICKS) continue;
+      if (i === n - 1) m.pending.set(t, clampInput(list[i]!));
+      else if (!m.pending.has(t)) {
+        m.pending.set(t, clampInput(list[i]!));
+        this.repairs++;
+      }
+    }
+  }
+
+  /** Inputs that arrived only through the repeats of a later message (a lost or late message made good). */
+  repairs = 0;
+
   hash(slot: number, tick: number, hash: number): void {
     let v = this.votes.get(tick);
     if (!v) {
@@ -399,6 +418,9 @@ export class RoomManager {
       if (data[0] === Bin.Input && data.length === 5 + INPUT_BYTES) {
         const { tick, input } = decodeInputMsg(data);
         if (Number.isFinite(tick)) a.room.input(a.slot, tick, input);
+      } else if (data[0] === Bin.Inputs) {
+        const d = decodeInputsMsg(data);
+        if (d && Number.isFinite(d.tick)) a.room.inputs(a.slot, d.tick, d.inputs);
       } else if (data[0] === Bin.Snapshot) {
         a.room.snapshot(a.slot, data);
       }

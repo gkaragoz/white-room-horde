@@ -1,7 +1,10 @@
 import { INPUT_BYTES, decodeTick, encodeTick, type PlayerInput, type WeaponId } from '@wrh/shared';
 
 /** First byte of every binary message. */
-export const Bin = { Input: 1, Bundle: 2, Snapshot: 3, SnapshotDeliver: 4 } as const;
+export const Bin = { Input: 1, Bundle: 2, Snapshot: 3, SnapshotDeliver: 4, Inputs: 5 } as const;
+
+/** How many of the latest inputs every input message repeats, so a lost or late message does not cost a tick. */
+export const INPUT_REDUNDANCY = 4;
 
 export interface PlayerInfo {
   slot: number;
@@ -77,6 +80,36 @@ export function encodeInputMsg(tick: number, input: PlayerInput): Uint8Array {
   // single-input wire form: skip the slot mask, one input record
   out.set(body.subarray(2), 5);
   return out;
+}
+
+/**
+ * Client to server: the newest input is for `tick`, the ones before it (oldest first) for the ticks just before. The
+ * server only takes the older ones for ticks it has no input for yet.
+ */
+export function encodeInputsMsg(tick: number, inputs: readonly PlayerInput[]): Uint8Array {
+  const n = Math.min(INPUT_REDUNDANCY, inputs.length);
+  const out = new Uint8Array(6 + n * INPUT_BYTES);
+  out[0] = Bin.Inputs;
+  new DataView(out.buffer).setUint32(1, tick, true);
+  out[5] = n;
+  for (let i = 0; i < n; i++) out.set(encodeTick([inputs[inputs.length - n + i]!]).subarray(2), 6 + i * INPUT_BYTES);
+  return out;
+}
+
+export function decodeInputsMsg(buf: Uint8Array): { tick: number; inputs: PlayerInput[] } | null {
+  if (buf.length < 6) return null;
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const tick = dv.getUint32(1, true);
+  const n = buf[5]!;
+  if (n < 1 || n > INPUT_REDUNDANCY || buf.length !== 6 + n * INPUT_BYTES) return null;
+  const inputs: PlayerInput[] = [];
+  for (let i = 0; i < n; i++) {
+    const rec = new Uint8Array(2 + INPUT_BYTES);
+    rec[0] = 1;
+    rec.set(buf.subarray(6 + i * INPUT_BYTES, 6 + (i + 1) * INPUT_BYTES), 2);
+    inputs.push(decodeTick(rec, 1).inputs[0]!);
+  }
+  return { tick, inputs };
 }
 
 export function decodeInputMsg(buf: Uint8Array): { tick: number; input: PlayerInput } {

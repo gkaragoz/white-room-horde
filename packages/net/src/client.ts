@@ -1,6 +1,6 @@
 import { GAME_VERSION, INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, restoreWorld, serializeWorld, step, type World } from '@wrh/sim';
-import { Bin, decodeBundle, decodeSnapshot, encodeInputMsg, encodeSnapshot, type Bundle, type ClientMsg, type JoinOpts, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
+import { Bin, decodeBundle, decodeSnapshot, encodeInputsMsg, encodeSnapshot, INPUT_REDUNDANCY, type Bundle, type ClientMsg, type JoinOpts, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 export interface Transport {
   send(data: string | Uint8Array): void;
@@ -29,6 +29,8 @@ export class NetSession {
   error = '';
   /** Slots reported as diverged by the server (desync detection). */
   desyncTicks: number[] = [];
+  /** Donate snapshots on the next turn of the event loop (the browser page); tests that run on virtual time set this off. */
+  deferDonation = typeof (globalThis as { document?: unknown }).document !== 'undefined';
   rttMs = 60;
   private rttSamples = 0;
   /** Last confirmed tick applied to the world. */
@@ -145,6 +147,8 @@ export class NetSession {
         this.bundles.clear();
         this.received = -1;
         this.applied = -1;
+        this.sent.clear();
+        this.maxSent = -1;
         this.state = 'playing';
         break;
       case 'desync':
@@ -155,7 +159,14 @@ export class NetSession {
         }
         break;
       case 'snapshotRequest':
-        if (this.world && this.state === 'playing') this.transport.send(encodeSnapshot(Bin.Snapshot, this.world.tick, serializeWorld(this.world)));
+        // serialised right after the message handler, not inside it: the frame that is running does not wait for it
+        if (this.world && this.state === 'playing') {
+          const donate = (): void => {
+            if (this.world && this.state === 'playing') this.transport.send(encodeSnapshot(Bin.Snapshot, this.world.tick, serializeWorld(this.world)));
+          };
+          if (this.deferDonation) setTimeout(donate, 0);
+          else donate();
+        }
         break;
       case 'paused':
         this.paused = m.on === true;
@@ -174,21 +185,59 @@ export class NetSession {
     }
   }
 
-  /** The tick a new local input should be tagged with so it arrives in time. */
+  /** Input lead in ticks: follows the measured round trip and jitter, up at once and down slowly (no flapping at tick boundaries). */
+  lead = INPUT_DELAY_TICKS + 1;
+  private leadChangedAt = 0;
+  /** How many times the lead changed (diagnostics). */
+  leadChanges = 0;
+
+  private updateLead(): void {
+    const want = Math.min(15, Math.max(INPUT_DELAY_TICKS, Math.ceil((this.rttMs + 2 * this.jitterMs) / (TICK_DT * 1000)) + 3));
+    const now = this.clock();
+    if (want > this.lead) {
+      this.lead = want;
+      this.leadChangedAt = now;
+      this.leadChanges++;
+    } else if (want < this.lead && now - this.leadChangedAt > 3000) {
+      this.lead--;
+      this.leadChangedAt = now;
+      this.leadChanges++;
+    }
+  }
+
+  /** The tick a new local input should be tagged with so it arrives in time: never one that was used before. */
   inputTick(): number {
-    const lead = Math.min(15, Math.max(INPUT_DELAY_TICKS, Math.ceil(this.rttMs / (TICK_DT * 1000)) + 2));
-    return Math.max(this.received, this.applied) + lead;
+    this.updateLead();
+    return Math.max(this.maxSent + 1, Math.max(this.received, this.applied) + this.lead);
+  }
+
+  /** Wall-clock time (performance.now milliseconds) of the last input sent: the clock the local character is drawn on. */
+  lastSendAt = 0;
+  /** Tag of the newest input sent. */
+  get sentTick(): number {
+    return this.maxSent;
   }
 
   sendInput(input: PlayerInput): void {
     if (this.state !== 'playing') return;
     const tick = this.inputTick();
-    this.transport.send(encodeInputMsg(tick, input));
     this.sent.set(tick, input);
-    this.maxSent = Math.max(this.maxSent, tick);
+    this.maxSent = tick;
+    this.lastSendAt = typeof performance !== 'undefined' ? performance.now() : this.clock();
+    // the newest input and the ones just before it (a tick without its own input of ours carries the one before)
+    const recent = this.recentList;
+    recent.length = 0;
+    let carry: PlayerInput | undefined;
+    for (let t = tick - INPUT_REDUNDANCY + 1; t <= tick && !carry; t++) carry = this.sent.get(t);
+    for (let t = tick - INPUT_REDUNDANCY + 1; t <= tick; t++) {
+      carry = this.sent.get(t) ?? carry;
+      if (carry) recent.push(carry);
+    }
+    this.transport.send(encodeInputsMsg(tick, recent));
     if (this.sent.size > 64) for (const t of this.sent.keys()) if (t < this.applied) this.sent.delete(t);
   }
 
+  private readonly recentList: PlayerInput[] = [];
   private readonly sent = new Map<number, PlayerInput>();
   private maxSent = -1;
   private readonly pendingList: PlayerInput[] = [];
@@ -263,10 +312,27 @@ export class NetSession {
     return n;
   }
 
-  /** How many confirmed ticks to keep in hand: enough to ride out the measured jitter, 1 to 5. */
+  private playout = 2;
+  private playoutChangedAt = 0;
+
+  /** How many confirmed ticks to keep in hand: enough to ride out the measured jitter, 1 to 5. Up at once, down one step per 2 s. */
   get playoutTicks(): number {
-    return Math.max(1, Math.min(5, Math.round(1 + this.jitterMs / 14)));
+    const want = Math.max(1, Math.min(5, Math.round(1 + this.jitterMs / 14)));
+    const now = this.clock();
+    if (want > this.playout) {
+      this.playout = want;
+      this.playoutChangedAt = now;
+    } else if (want < this.playout && now - this.playoutChangedAt > 2000) {
+      this.playout--;
+      this.playoutChangedAt = now;
+    }
+    return this.playout;
   }
+
+  /** Smoothed number of confirmed ticks in hand (the pacing controller steers this towards `playoutTicks`). */
+  behindAvg = 2;
+  /** The playback speed the pacing controller chose for the last call of `drive`. */
+  playRate = 1;
 
   /** Fraction of the next tick that has elapsed (0..1) for drawing between two simulated ticks. */
   get playFraction(): number {
@@ -301,8 +367,14 @@ export class NetSession {
       return n;
     }
     this.catchingUp = false;
+    // the clock follows the *smoothed* buffer level: a bundle more or less in hand this frame must not speed the game up or slow it down
     const target = this.playoutTicks;
-    const rate = Math.max(0.6, Math.min(2, 1 + (behind - target) * 0.12));
+    this.behindAvg += (behind - this.behindAvg) * (1 - Math.exp(-dtSec / 0.5));
+    const err = this.behindAvg - target;
+    let adj = err * 0.05;
+    if (err > 8) adj += (err - 8) * 0.03; // a real backlog drains faster
+    const rate = 1 + Math.max(-0.15, Math.min(0.6, adj));
+    this.playRate = rate;
     this.playAcc += dtSec * rate;
     while (this.playAcc >= TICK_DT && n < 8) {
       const b = this.bundles.get(this.applied + 1);

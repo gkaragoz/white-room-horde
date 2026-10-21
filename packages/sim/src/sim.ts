@@ -27,10 +27,10 @@ import { Crc32 } from './hash';
 import { addStat } from './stats';
 import { updatePickups } from './pickups';
 import { KNOCK_DECAY, updateHazards } from './hazards';
-import { meleeAttack, updateAbilities } from './abilities';
+import { chargeStep, charging, meleeAttack, updateAbilities } from './abilities';
 import { updateCards } from './progression';
 import { ensureUsable, equipLoadout, selectByRank, selectNext } from './loadout';
-import { abilityRate, applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, updateBarrels, updatePlayerPerks } from './features';
+import { abilityRate, abilityRateFrom, applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, speedMulFrom, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
@@ -298,7 +298,20 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
   const downed = w.pState[s] === PlayerState.Downed;
   const dc = BALANCE.dash;
   const r = BALANCE.player.radius;
-  const base = alive ? BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]! * speedMul(w, s) : BALANCE.player.crawlSpeed;
+  const speedBase = BALANCE.player.speed * w.modSpeed[s]! * w.pModSpeed[s]!;
+  // what runs down while the inputs are replayed: the buffs that change the speed, and the hammer's charge
+  let rally = w.pRally[s]!;
+  let specT = w.pSpecT[s]!;
+  let specCd = w.pSpecCd[s]!;
+  const cls = perk(w, s, PERK.Class);
+  const AB = BALANCE.abilities;
+  let haste = perk(w, s, PERK.Haste);
+  let adren = perk(w, s, PERK.Adren);
+  const wst = BALANCE.weapons[WEAPON_IDS[w.pWeapon[s]!]!]!;
+  const chargeMax = wst.melee ? wst.melee.charge : 0;
+  let charge = w.pCharge[s]!;
+  let cooldown = w.pCooldown[s]!;
+  const rateBase = wst.rate * w.modRate[s]! * w.pModRate[s]!;
   const dashFull = (dc.cooldown * w.modDash[s]!) / perk(w, s, PERK.DashRate);
   const busyNear = alive && downedNear(w, s);
   let prevX = x;
@@ -349,7 +362,7 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
     } else {
       moving = !stunned && len > 0.05;
     }
-    const speed = downed ? BALANCE.player.crawlSpeed : base * (busy ? BALANCE.player.reviveMoveMul : 1);
+    const speed = downed || !alive ? BALANCE.player.crawlSpeed : speedBase * speedMulFrom(w, s, rally, specT, haste, adren) * (busy ? BALANCE.player.reviveMoveMul : 1) * (charge > 0 ? 0.45 : 1);
     const oldX = x;
     const oldY = y;
     const sp2 = map.ramps ? speed * slopeFactor(map, x, y, mx, my) : speed;
@@ -367,6 +380,32 @@ export function predictPlayer(w: World, s: number, inputs: ReadonlyArray<PlayerI
         y = oldY;
       }
       layer = nextLayer(map, x, y, layer);
+    }
+    // after the move, as in step: a charged swing builds up or is released, then the buffs run down a tick
+    if (alive && !busy && stun === 0 && chargeMax > 0) {
+      charging.charge = charge;
+      charging.cooldown = cooldown;
+      chargeStep((inp.buttons & Buttons.Fire) !== 0, chargeMax, 1 / (rateBase * abilityRateFrom(rally)));
+      charge = charging.charge;
+      cooldown = charging.cooldown;
+    }
+    if (specCd > 0) specCd = specCd - TICK_DT > 0 ? specCd - TICK_DT : 0;
+    if (rally > 0) rally = rally - TICK_DT > 0 ? rally - TICK_DT : 0;
+    if (alive) {
+      if (specT > 0) specT = specT - TICK_DT > 0 ? specT - TICK_DT : 0;
+      // the ability button: the ones that change the pace (the rest do not matter for where the character stands)
+      if ((inp.buttons & Buttons.Special) !== 0 && specCd <= 0 && stun === 0) {
+        if (cls === 0) rally = AB.soldier!.seconds!;
+        else if (cls === 2) specT = AB.heavy!.seconds!;
+        else if (cls === 3) {
+          specT = AB.scout!.seconds!;
+          dashCd = 0;
+        } else if (cls === 6) specT = AB.berserker!.seconds!;
+        else if (cls === 7) specT = AB.swordsman!.seconds!;
+        if (cls <= 8) specCd = AB[['soldier', 'medic', 'heavy', 'scout', 'demolisher', 'ranger', 'berserker', 'swordsman', 'hammerer'][cls]!]!.cd!;
+      }
+      if (haste > 0) haste = haste - TICK_DT > 0 ? haste - TICK_DT : 0;
+      if (adren > 0) adren = adren - TICK_DT > 0 ? adren - TICK_DT : 0;
     }
   }
   predicted.x = x;

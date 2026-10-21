@@ -1,7 +1,7 @@
-import { BALANCE, FloorPhase, MISC, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Buttons, FloorPhase, MISC, type PlayerInput } from '@wrh/shared';
 import { hashWorld, predictPlayer, scriptedInput } from '@wrh/sim';
 import { describe, expect, it } from 'vitest';
-import { NetSession, RoomManager, type Conn, type ManagerOptions } from '../src';
+import { Bin, NetSession, RoomManager, type Conn, type ManagerOptions } from '../src';
 
 /** Virtual-time network: every message is delayed by latency + jitter; per-link ordering is preserved (TCP-like). */
 class Net {
@@ -64,6 +64,13 @@ class Client {
   /** A frozen page: nothing is sent and nothing is simulated while true. */
   muted = false;
   readonly stepTimes: number[] = [];
+  /** Where the inputs come from (default: the scripted walk). */
+  inputFn: ((n: number, slot: number) => PlayerInput) | null = null;
+  /** Share of the input messages the link loses (a lossy path; the real WebSocket delays instead, but a proxy or a mobile hand-over can drop). */
+  lossUp = 0;
+  /** Drops every n-th input message (never two in a row for n >= 2). */
+  dropEvery = 0;
+  private upCount = 0;
 
   constructor(
     private readonly net: Net,
@@ -75,6 +82,8 @@ class Client {
   }
 
   private link(dir: 'up' | 'down', d: string | Uint8Array): void {
+    if (dir === 'up' && this.dropEvery > 0 && typeof d !== 'string' && d[0] === Bin.Inputs && ++this.upCount % this.dropEvery === 0) return;
+    if (dir === 'up' && this.lossUp > 0 && typeof d !== 'string' && d[0] === Bin.Inputs && this.net.rand() < this.lossUp) return;
     const last = dir === 'up' ? this.upLast : this.downLast;
     const at = Math.max(this.net.now + this.latency + this.net.rand() * this.jitter, last);
     if (dir === 'up') this.upLast = at;
@@ -88,7 +97,7 @@ class Client {
     if (this.acc >= 1000 / 30) {
       this.acc -= 1000 / 30;
       if (this.session.state === 'playing') {
-        const inp: PlayerInput = scriptedInput(this.localTick++, this.session.slot);
+        const inp: PlayerInput = (this.inputFn ?? scriptedInput)(this.localTick++, this.session.slot);
         this.session.sendInput(inp);
       }
     }
@@ -405,7 +414,74 @@ describe('robustness of the room server', () => {
     }
     expect(checked).toBeGreaterThan(100);
     expect(maxLead).toBeGreaterThanOrEqual(3); // there is a delay to hide
-    expect(exact / checked).toBeGreaterThan(0.9);
+    expect(exact).toBe(checked);
+  });
+
+
+  /** A hammerer who holds the fire button (the charge slows the walk) and walks: the prediction has to know the slowdown. */
+  function hammerPredictionRun(lossUp: number, jitter: number, latency: number, dropEvery = 0): { checked: number; exact: number; worst: number } {
+    const net = new Net();
+    const host = net.addClient(30, 5);
+    const me = net.addClient(latency, jitter);
+    host.session.create('host');
+    net.advance(300);
+    me.session.join(host.session.code, 'me', 'hammer');
+    net.advance(400);
+    me.session.setLook(0, -1, 8);
+    net.advance(100);
+    me.useDrive = true;
+    host.useDrive = true;
+    me.lossUp = lossUp;
+    me.dropEvery = dropEvery;
+    me.inputFn = (n) => {
+      // walk in a slow circle, hold fire for 25 ticks of every 60, tap dash now and then
+      const a = n * 0.05;
+      const hold = n % 60 < 25;
+      return { moveX: Math.round(Math.cos(a) * 127), moveY: Math.round(Math.sin(a) * 127), aim: (n * 3) & 255, buttons: (hold ? Buttons.Fire : 0) | (n % 97 === 0 ? Buttons.Dash : 0) };
+    };
+    host.session.start();
+    net.advance(1500);
+    const asked = new Map<number, { x: number; y: number }>();
+    let checked = 0;
+    let exact = 0;
+    let worst = 0;
+    for (let ms = 0; ms < 6000; ms++) {
+      net.advance(1);
+      const w = me.session.world;
+      if (!w || me.session.catchingUp) continue;
+      const slot = me.session.slot;
+      const done = asked.get(w.tick);
+      if (done && w.pState[slot] === 0) {
+        checked++;
+        const err = Math.hypot(done.x - w.pX[slot]!, done.y - w.pY[slot]!);
+        worst = Math.max(worst, err);
+        if (err < 1e-9) exact++;
+        asked.delete(w.tick);
+      }
+      const list = me.session.pendingInputs();
+      if (list.length) {
+        const p = predictPlayer(w, slot, list);
+        asked.set(w.tick + list.length, { x: p.x, y: p.y });
+      }
+    }
+    return { checked, exact, worst };
+  }
+
+  it('a hammerer who charges while walking is predicted exactly', () => {
+    const r = hammerPredictionRun(0, 10, 70);
+    expect(r.checked).toBeGreaterThan(100);
+    expect(r.exact).toBe(r.checked);
+  });
+
+  it('a lossy link: the inputs repeated in later messages keep the prediction exact', () => {
+    const r = hammerPredictionRun(0.1, 10, 70);
+    expect(r.checked).toBeGreaterThan(100);
+    expect(r.exact / r.checked).toBeGreaterThan(0.9);
+    expect(r.worst).toBeLessThan(2);
+    // every third message lost (never two in a row): the repeats in the next message always make it good
+    const steady = hammerPredictionRun(0, 10, 70, 3);
+    expect(steady.checked).toBeGreaterThan(100);
+    expect(steady.exact).toBe(steady.checked);
   });
 
   it('a late joiner into a long game gets a snapshot instead of the whole history, and converges', () => {

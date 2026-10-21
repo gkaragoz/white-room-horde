@@ -73,12 +73,15 @@ export async function startServer(opts: { port: number; staticRoot?: string; man
   let nextTick = performance.now();
   const timer = setInterval(() => {
     const now = performance.now();
-    if (now - nextTick > periodMs * 5) nextTick = now - periodMs * 5;
-    while (now >= nextTick) {
+    // at most two catch-up ticks per firing, and a schedule that is more than three ticks behind is re-anchored
+    let n = 0;
+    while (now >= nextTick && n < 2) {
       loop.record(now - nextTick);
       manager.tick();
       nextTick += periodMs;
+      n++;
     }
+    if (now - nextTick > periodMs * 3) nextTick = now - periodMs;
   }, 8);
 
   await new Promise<void>((resolve) => http.listen(opts.port, resolve));

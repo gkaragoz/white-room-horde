@@ -5,7 +5,7 @@ import { GIB_COLORS } from './render/fx';
 import { heightAt } from '@wrh/shared';
 import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
-import { NetSession } from '@wrh/net';
+import { NetSession, PredictedView } from '@wrh/net';
 import { Audio } from './audio';
 import { Input, type Action } from './input';
 import { ArenaView } from './render/arena';
@@ -402,7 +402,7 @@ let catchingUp = false;
 let catchupPeak = 0;
 let joinedLate = false;
 let reconnecting = false;
-let predSmX = 0, predSmY = 0, predReady = false;
+const predView = new PredictedView();
 
 function beforeStep(w: World): void {
   for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -1012,6 +1012,13 @@ let diagLastSample = 0;
 /** One input per simulation tick, sent from the worker timer whatever the page is doing. */
 function onlineInputTick(): void {
   if (mode !== 'online' || !session || session.state !== 'playing' || !world) return;
+  // after a hitch the worker's ticks arrive back to back: one input per tick of real time, not a burst of the same sample
+  const nowMs = performance.now();
+  if (nowMs - session.lastSendAt < (TICK_DT * 1000) * 0.45) {
+    diag.coalesced++;
+    return;
+  }
+  diag.inputLate(nowMs - session.lastSendAt - TICK_DT * 1000);
   session.sendInput(sampleLocal());
   diag.input();
 }
@@ -1195,26 +1202,32 @@ function frame(nowMs: number): void {
       const list = session.pendingInputs();
       if (list.length) {
         const p = predictPlayer(w, localSlot, list);
-        const tx = p.prevX + (p.x - p.prevX) * alpha;
-        const ty = p.prevY + (p.y - p.prevY) * alpha;
-        const jump = Math.hypot(tx - predSmX, ty - predSmY);
-        if (!predReady || jump > 3) {
-          predSmX = tx;
-          predSmY = ty;
-          predReady = true;
-        } else {
-          // a misprediction (a shove, a late input) is eased out instead of popping
-          const k = 1 - Math.exp(-dt * 70);
-          predSmX += (tx - predSmX) * k;
-          predSmY += (ty - predSmY) * k;
-        }
-        vx[localSlot] = predSmX;
-        vy[localSlot] = predSmY;
+        // drawn on the input clock: the position after the last two sent inputs, and how far the next send is away
+        const sentTick = session.sentTick;
+        predView.update({
+          tickPrev: sentTick - 1,
+          tickCur: sentTick,
+          prevX: p.prevX,
+          prevY: p.prevY,
+          curX: p.x,
+          curY: p.y,
+          phase: (performance.now() - session.lastSendAt) / (TICK_DT * 1000),
+          dt,
+        });
+        vx[localSlot] = predView.x;
+        vy[localSlot] = predView.y;
+        diag.drawFrame(predView.x, predView.y, dt);
         predictedAngle = p.angle;
         predictedSpeed = Math.hypot(p.x - p.prevX, p.y - p.prevY) / TICK_DT;
         if (predictedSpeed > 0.5) moveAngle[localSlot] = Math.atan2(p.y - p.prevY, p.x - p.prevX);
-      } else predReady = false;
-    } else predReady = false;
+      } else {
+        predView.reset();
+        diag.drawReset();
+      }
+    } else {
+      predView.reset();
+      diag.drawReset();
+    }
     const mapDef = MAPS[w.map] ?? MAPS[0]!;
     for (let s = 0; s < MAX_PLAYERS; s++) vz[s] = w.pActive[s] ? heightAt(mapDef, vx[s]!, vy[s]!, w.pLayer[s]!) : 0;
     input.setPlaneHeight(vz[localSlot]!);
@@ -1544,7 +1557,8 @@ function frame(nowMs: number): void {
     }
     if (nowMs - diagLastSample >= 1000) {
       diagLastSample = nowMs;
-      diag.sample(nowMs, { rtt: session?.rttMs ?? 0, jitter: session?.jitterMs ?? 0, backlog: session?.backlog ?? 0, playout: session?.playoutTicks ?? 0, bufferedBytes: ws?.bufferedAmount ?? 0 });
+      diag.sample(nowMs, { rtt: session?.rttMs ?? 0, jitter: session?.jitterMs ?? 0, backlog: session?.backlog ?? 0, playout: session?.playoutTicks ?? 0, bufferedBytes: ws?.bufferedAmount ?? 0, lead: session?.lead ?? 0, corrections: predView.corrections, snaps: predView.snaps, maxErr: predView.maxErr });
+      predView.maxErr = 0;
     }
   }
   if (fpsT >= 0.5) {
@@ -1599,6 +1613,15 @@ setTimeout(() => stage.warmFlight(), 800);
   crowd,
   fx,
   perf,
+  pace: BALANCE.player.speed,
+  netstats: () => {
+    const sp = [...diag.totals.speeds].sort((a, b) => a - b);
+    return { ...diag.totals, speeds: undefined, p50: sp[Math.floor(sp.length * 0.5)] ?? 0, p99: sp[Math.floor(sp.length * 0.99)] ?? 0, lead: session?.lead ?? 0, leadChanges: session?.leadChanges ?? 0, playRate: session?.playRate ?? 1, resyncs: session?.resyncs ?? 0, desyncs: session?.desyncTicks.length ?? 0 };
+  },
+  resetNetstats: () => {
+    diag.totals.frames = diag.totals.backward = diag.totals.maxDrawSpeed = diag.totals.lateMax = 0;
+    diag.totals.speeds.length = 0;
+  },
   ui,
   ragdolls,
   goreParts,

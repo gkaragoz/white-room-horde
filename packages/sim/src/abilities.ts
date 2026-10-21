@@ -95,19 +95,39 @@ function sweep(w: World, s: number, angle: number, arc: number, radius: number, 
  * The hammer can also be charged: hold the trigger, the character slows down and the hammer builds up, let go and it spins
  * all the way round, harder and wider the longer it was held.
  */
+/** The timers of a charged swing (the hammer); the simulation and the client's prediction both run exactly this. */
+export const charging = { charge: 0, cooldown: 0, released: 0 };
+
+/**
+ * One tick of a charged swing: the cooldown runs down; held and ready, the charge builds up to `max`; let go with a charge,
+ * it is released (`charging.released` > 0) and the cooldown starts. Reads and writes the `charging` scratch object.
+ */
+export function chargeStep(held: boolean, max: number, interval: number): void {
+  charging.released = 0;
+  charging.cooldown -= TICK_DT;
+  if (charging.cooldown < 0) charging.cooldown = 0;
+  if (held && charging.cooldown <= 0) {
+    charging.charge = Math.min(max, charging.charge + TICK_DT);
+  } else if (!held && charging.charge > 0) {
+    charging.released = charging.charge;
+    charging.charge = 0;
+    charging.cooldown = interval * (charging.released < 0.25 ? 1 : 1.3);
+  }
+}
+
 export function meleeAttack(w: World, s: number, inp: PlayerInput, angle: number, stats: WeaponStats): void {
   const m = stats.melee!;
   const weaponIndex = w.pWeapon[s]!;
-  w.pCooldown[s] = w.pCooldown[s]! - TICK_DT;
-  if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
   const held = (inp.buttons & Buttons.Fire) !== 0;
   const interval = 1 / (stats.rate * w.modRate[s]! * w.pModRate[s]! * abilityRate(w, s));
   if (m.charge > 0) {
-    if (held && w.pCooldown[s]! <= 0) {
-      w.pCharge[s] = Math.min(m.charge, w.pCharge[s]! + TICK_DT);
-    } else if (!held && w.pCharge[s]! > 0) {
-      const c = w.pCharge[s]!;
-      w.pCharge[s] = 0;
+    charging.charge = w.pCharge[s]!;
+    charging.cooldown = w.pCooldown[s]!;
+    chargeStep(held, m.charge, interval);
+    w.pCharge[s] = charging.charge;
+    w.pCooldown[s] = charging.cooldown;
+    const c = charging.released;
+    if (c > 0) {
       const frac = c / m.charge;
       if (c < 0.25) sweep(w, s, angle, m.arc, m.radius, stats.damage, m.knock, false, weaponIndex);
       else sweep(w, s, angle, m.arc, m.radius * (1 + 0.5 * frac), stats.damage * (1 + 2.4 * frac), m.knock * (1 + frac), true, weaponIndex, frac);
@@ -115,6 +135,8 @@ export function meleeAttack(w: World, s: number, inp: PlayerInput, angle: number
     }
     return;
   }
+  w.pCooldown[s] = w.pCooldown[s]! - TICK_DT;
+  if (w.pCooldown[s]! < 0) w.pCooldown[s] = 0;
   if (held && w.pCooldown[s]! <= 0) {
     sweep(w, s, angle, m.arc, m.radius, stats.damage, m.knock, false, weaponIndex);
     w.pCooldown[s] = interval;
