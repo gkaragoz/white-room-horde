@@ -72,10 +72,14 @@ export class Fx {
   light: (x: number, y: number, z: number, color: string, intensity: number, life: number, distance?: number) => void = () => undefined;
 
   /** The blood layer is cut into tiles: a splat only re-uploads the one or two small textures it touches. */
-  private readonly decalTiles: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; mat: THREE.MeshBasicMaterial; x0: number; y0: number; dirty: boolean }[] = [];
+  private readonly decalTiles: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; mat: THREE.MeshBasicMaterial; x0: number; y0: number; dirty: boolean; live: boolean; lastSplat: number; fadedAt: number }[] = [];
   private decalW = 0;
   private decalH = 0;
   private decalAge = 0;
+  private decalNext = 0;
+  private clock = 0;
+  /** Seconds a puddle takes to dissolve (scaled by the corpse-time setting; set by main). */
+  bloodLife = 20;
   private readonly flashes: { mesh: THREE.Mesh; life: number; max: number; grow: number; ring: boolean }[] = [];
   private readonly flashGeo = new THREE.SphereGeometry(1, 10, 8);
   private readonly dummy = new THREE.Object3D();
@@ -148,7 +152,7 @@ export class Fx {
         mesh.position.set(x0 + tw / 2, 0.012, -(y0 - th / 2));
         mesh.renderOrder = 1;
         this.group.add(mesh);
-        this.decalTiles.push({ canvas, ctx: canvas.getContext('2d')!, tex, mat, x0, y0, dirty: false });
+        this.decalTiles.push({ canvas, ctx: canvas.getContext('2d')!, tex, mat, x0, y0, dirty: false, live: false, lastSplat: 0, fadedAt: 0 });
       }
     }
 
@@ -199,6 +203,7 @@ export class Fx {
       t.ctx.clearRect(0, 0, t.canvas.width, t.canvas.height);
       t.tex.needsUpdate = true;
       t.dirty = false;
+      t.live = false;
     }
     this.holeCount = 0;
     this.holeNext = 0;
@@ -266,7 +271,7 @@ export class Fx {
 
   private readonly splatBlobs = new Float32Array(3 * 8);
 
-  private splat(x: number, y: number, radius: number, color: string, alpha = 0.7): void {
+  private splat(x: number, y: number, radius: number, color: string, alpha = 0.5): void {
     const blobs = 3 + Math.floor(Math.random() * 4);
     const bl = this.splatBlobs;
     let minX = 1e9;
@@ -298,6 +303,9 @@ export class Fx {
         ctx.fill();
       }
       t.dirty = true;
+      if (!t.live) t.fadedAt = this.clock;
+      t.live = true;
+      t.lastSplat = this.clock;
     }
   }
 
@@ -398,18 +406,18 @@ export class Fx {
 
   /** A single drop of blood shed by a flying part. */
   drip(x: number, y: number, h: number): void {
-    this.burst(Kind.Blood, x, y, h, 1, 1.2, 0, 0, 6.28, 0.5, 0.06, '#9b121a');
+    this.burst(Kind.Blood, x, y, h, 1, 1.2, 0, 0, 6.28, 0.5, 0.06, '#5a1a22');
   }
 
   /** The blood that lands where a part hits the floor. */
   gorePatch(x: number, y: number, r: number): void {
-    this.splat(x, y, r, '#7d0d14', 0.65);
-    this.burst(Kind.Blood, x, y, 0.2, 7, 4, 0, 0, 6.28, 0.5, 0.07, '#a3141c');
+    this.splat(x, y, r, '#4a1218', 0.45);
+    this.burst(Kind.Blood, x, y, 0.2, 7, 4, 0, 0, 6.28, 0.5, 0.07, '#5c1a22');
   }
 
   /** Blood pumping out of a stump: a few droplets thrown up and out, weaker as `k` falls from 1 to 0. */
   spurt(x: number, y: number, h: number, dirX: number, dirY: number, k: number): void {
-    this.burst(Kind.Blood, x, y, h, Math.max(1, Math.round(5 * k)), 3 + 4 * k, dirX, dirY, 1.2, 0.7, 0.07, '#b3161f');
+    this.burst(Kind.Blood, x, y, h, Math.max(1, Math.round(5 * k)), 3 + 4 * k, dirX, dirY, 1.2, 0.7, 0.07, '#64202a');
   }
 
   /** Particle amount and blood/gib amount multipliers (settings). */
@@ -487,20 +495,20 @@ export class Fx {
       }
       case 'enemyHit':
         // the harder the blow, the more blood, and a spray of fine droplets
-        this.burst(Kind.Blood, e.x, e.y, 0.9, 6 + Math.min(14, Math.round(e.damage * 0.12)), 4 + Math.min(4, e.damage * 0.03), 0, 0, 6.28, 0.55, 0.075, '#8c1018');
-        if (e.damage >= 18) this.burst(Kind.Blood, e.x, e.y, 1.1, Math.min(16, Math.round(e.damage * 0.1)), 7.5, 0, 0, 6.28, 0.4, 0.04, '#b3161f');
-        if (e.damage >= 45) this.splat(e.x, e.y, 0.5 + Math.min(0.6, e.damage * 0.004), '#7d0d14', 0.55);
+        this.burst(Kind.Blood, e.x, e.y, 0.9, 6 + Math.min(14, Math.round(e.damage * 0.12)), 4 + Math.min(4, e.damage * 0.03), 0, 0, 6.28, 0.55, 0.075, '#52161d');
+        if (e.damage >= 18) this.burst(Kind.Blood, e.x, e.y, 1.1, Math.min(16, Math.round(e.damage * 0.1)), 7.5, 0, 0, 6.28, 0.4, 0.04, '#64202a');
+        if (e.damage >= 45) this.splat(e.x, e.y, 0.5 + Math.min(0.6, e.damage * 0.004), '#4a1218', 0.4);
         if (e.damage >= 30) this.shockRing(e.x, e.y, e.damage >= 80 ? '#ffe9a0' : '#ffffff', 0.9 + Math.min(1.4, e.damage * 0.01));
         break;
       case 'enemyDeath': {
         const power = Math.min(1.6, 0.6 + e.power * 0.01);
         const type = ENEMY_TYPES[e.etype]!;
         if (type === 'exploder') break; // the explosion event covers it
-        this.burst(Kind.Blood, e.x, e.y, 0.8, Math.round(38 * power), 9 * power, e.dx, e.dy, 1.8, 0.95, 0.1, '#a3141c');
-        this.burst(Kind.Blood, e.x, e.y, 0.9, Math.round(18 * power), 5, 0, 0, 6.28, 0.7, 0.08, '#8c1018');
+        this.burst(Kind.Blood, e.x, e.y, 0.8, Math.round(38 * power), 9 * power, e.dx, e.dy, 1.8, 0.95, 0.1, '#5c1a22');
+        this.burst(Kind.Blood, e.x, e.y, 0.9, Math.round(18 * power), 5, 0, 0, 6.28, 0.7, 0.08, '#52161d');
         this.burst(Kind.Gib, e.x, e.y, 0.8, 6 + Math.round(9 * power), 7.5 * power, e.dx, e.dy, 2.8, 1.9, 0.18, GIB_COLORS[type] ?? '#aaa');
-        this.splat(e.x + e.dx * 0.5, e.y + e.dy * 0.5, 0.95 * power, '#7d0d14');
-        this.splat(e.x + e.dx * 1.6, e.y + e.dy * 1.6, 0.6 * power, '#6a0a10', 0.6);
+        this.splat(e.x + e.dx * 0.5, e.y + e.dy * 0.5, 0.95 * power, '#4a1218');
+        this.splat(e.x + e.dx * 1.6, e.y + e.dy * 1.6, 0.6 * power, '#3d1016', 0.42);
         break;
       }
       case 'explosion':
@@ -527,7 +535,7 @@ export class Fx {
         this.burst(Kind.Spark, e.x, e.y, 0.8, 5, 4, 0, 0, 6.28, 0.25, 0.05, '#ff9a4a');
         break;
       case 'playerHit':
-        this.burst(Kind.Blood, e.x, e.y, 1.0, 8, 4, 0, 0, 6.28, 0.6, 0.08, '#c01822');
+        this.burst(Kind.Blood, e.x, e.y, 1.0, 8, 4, 0, 0, 6.28, 0.6, 0.08, '#6a2229');
         if (e.slot === localSlot) {
           this.hurt = 1;
           this.shake = Math.min(0.5, this.shake + 0.12);
@@ -591,8 +599,8 @@ export class Fx {
         this.burst(Kind.Spark, e.x, e.y, 0.6, 8, 4, 0, 0, 6.28, 0.35, 0.07, e.kind === 1 ? '#6dff9a' : e.kind === 3 ? '#d79bff' : '#ffe27a');
         break;
       case 'playerDown':
-        this.burst(Kind.Blood, e.x, e.y, 0.9, 20, 5, 0, 0, 6.28, 0.9, 0.1, '#a3141c');
-        this.splat(e.x, e.y, 0.9, '#7d0d14');
+        this.burst(Kind.Blood, e.x, e.y, 0.9, 20, 5, 0, 0, 6.28, 0.9, 0.1, '#5c1a22');
+        this.splat(e.x, e.y, 0.9, '#4a1218');
         break;
       default:
         break;
@@ -616,12 +624,31 @@ export class Fx {
     }
     this.hurt = Math.max(0, this.hurt - dt * 2.2);
     this.decalAge += dt;
+    this.clock += dt;
     if (this.decalAge > 0.12) {
-      // one small tile per interval: a fight never uploads the whole floor at once
-      for (const t of this.decalTiles) {
-        if (!t.dirty) continue;
+      // one small tile per interval: a fight never uploads the whole floor at once. Blood is dark and dissolves: each live
+      // tile is eroded with destination-out in proportion to the time since its last pass (about 95% gone after bloodLife).
+      const n = this.decalTiles.length;
+      for (let k = 0; k < n; k++) {
+        const t = this.decalTiles[(this.decalNext + k) % n]!;
+        if (!t.dirty && !t.live) continue;
+        if (t.live) {
+          const el = this.clock - t.fadedAt;
+          t.fadedAt = this.clock;
+          if (this.clock - t.lastSplat > this.bloodLife * 1.25) {
+            t.ctx.clearRect(0, 0, t.canvas.width, t.canvas.height);
+            t.live = false;
+          } else if (el > 0) {
+            t.ctx.globalCompositeOperation = 'destination-out';
+            t.ctx.globalAlpha = 1 - Math.exp((-Math.log(20) * el) / Math.max(1, this.bloodLife));
+            t.ctx.fillStyle = '#000';
+            t.ctx.fillRect(0, 0, t.canvas.width, t.canvas.height);
+            t.ctx.globalCompositeOperation = 'source-over';
+          }
+        }
         t.tex.needsUpdate = true;
         t.dirty = false;
+        this.decalNext = (this.decalNext + k + 1) % n;
         this.decalAge = 0;
         break;
       }
@@ -644,7 +671,7 @@ export class Fx {
       this.life[i] = this.life[i]! - dt;
       const kind = this.kind[i]!;
       if (this.life[i]! <= 0) {
-        if (kind === Kind.Blood && this.py[i]! < 0.1) this.splat(this.px[i]!, -this.pz[i]!, 0.18, '#7d0d14', 0.6);
+        if (kind === Kind.Blood && this.py[i]! < 0.1) this.splat(this.px[i]!, -this.pz[i]!, 0.18, '#4a1218', 0.42);
         this.remove(i);
         i--;
         continue;
@@ -657,7 +684,7 @@ export class Fx {
       if (this.py[i]! <= 0.05 && (kind === Kind.Blood || kind === Kind.Gib)) {
         this.py[i] = 0.05;
         if (kind === Kind.Blood) {
-          this.splat(this.px[i]!, -this.pz[i]!, 0.14 + Math.random() * 0.1, '#7d0d14', 0.55);
+          this.splat(this.px[i]!, -this.pz[i]!, 0.14 + Math.random() * 0.1, '#4a1218', 0.4);
           this.remove(i);
           i--;
           continue;

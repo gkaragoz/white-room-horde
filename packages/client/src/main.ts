@@ -109,6 +109,7 @@ await ragdolls.preload([...ENEMY_TYPES]);
 worldReady = true;
 crowd.corpseLife = [2.5, 5, 14][settings.corpseTime]!;
 ragdolls.restLife = [1.2, 3.2, 10][settings.corpseTime]!;
+fx.bloodLife = [10, 20, 50][settings.corpseTime]!;
 stage.scene.add(ragdolls.group);
 const goreParts = new GoreParts();
 stage.scene.add(goreParts.group);
@@ -231,6 +232,7 @@ function applySettings(): void {
   if (worldReady) {
     crowd.corpseLife = [2.5, 5, 14][settings.corpseTime]!;
     ragdolls.restLife = [1.2, 3.2, 10][settings.corpseTime]!;
+    fx.bloodLife = [10, 20, 50][settings.corpseTime]!;
   }
   ui.applySettings(settings);
   try {
