@@ -7,6 +7,15 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Online: pause, dropped connections and coming back (rules change: update the server and reload the page)**
+
+- A host pause of a minute no longer cuts everybody's connection: the silence watchdog saw the pause as a dead line the moment the game resumed (no tick for 58 s) and both pages reconnected at once. The silence clock now restarts when a pause starts and ends, and the watchdog waits 3 s after a resume.
+- A page that reconnects no longer crashes: the relay sent `start` before `room`, so the page began playing with slot -1 and threw (`reading 'mag'`), which killed its render loop. The relay now sends `room` first, the page knows its slot from the first frame, a bad frame can no longer end the loop (it is logged and the next one is drawn), and the ammo ring tolerates an unknown weapon.
+- Coming back without replaying the game: a dropped page keeps its world and sends the last tick it applied (`rejoin.have`); the relay sends only the ticks after it (`NetSession.adopt`). A reloaded page (F5) still rebuilds, from a donor's snapshot or the history, now sent a few hundred bundles per relay tick instead of 10 000 messages in one burst. A snapshot donor that stays silent for 5 s is given up on (the history follows), snapshot jobs are matched to their donor and dropped when it leaves, and the snapshot cap is 900 000 bytes (under the 1 MiB WebSocket message limit).
+- Reconnecting backs off (0.6 s, 1.2 s, 2.4 s ... at most 8 s, with jitter, up to 8 tries) and a connection that dies at once no longer resets the counter. Rejoin failures say why (`room_gone`, `bad_token`, `version`) in six texts; the saved way back is forgotten when it cannot work, and the menu hides it for another version.
+- A player whose page is gone or silent is **protected for 60 s** (`balance.player.awayProtectSeconds`): untouchable, and a downed one does not bleed out. The relay marks a silent connected player with the new `Buttons.Away` flag (clients cannot send it) and a missing connection has no input at all; real input ends the protection at once. New state array `pAway` in the snapshot and the hash.
+- Tests: `rejoin.test.ts` (net: pause then resume never trips the watchdog, `room` before `start`, resume with `have`, adopted session stays on the same hash, paced history, a silent donor, error codes, the Away flag), `away.test.ts` (sim), and `tools/ci/rejoin-check.mjs` with two real pages (pause and resume, a dropped socket, a reload); it runs in the `qa-full` workflow.
+
 ## v0.22.1 (2026-10-21)
 
 **Flicker on the ramp maps and weapons in the head (client only; nothing changes in the rules or on the wire)**

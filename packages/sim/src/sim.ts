@@ -70,6 +70,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   equipLoadout(w, slot, WEAPON_IDS.indexOf(meleeWeapon ?? weapon), meleeWeapon !== null);
   w.pMoving[slot] = 0;
   w.pIFrames[slot] = 0;
+  w.pAway[slot] = 0;
   w.pGren[slot] = BALANCE.grenade.max;
   w.pGrenCharge[slot] = 0;
   w.pGrenCd[slot] = 0;
@@ -510,6 +511,31 @@ function downedNear(w: World, s: number): boolean {
   return false;
 }
 
+/** Is this player away and still inside the protected minute (untouchable, no bleeding out)? */
+export function awayProtected(w: World, s: number): boolean {
+  return w.pAway[s]! > 0 && w.pAway[s]! <= BALANCE.player.awayProtectSeconds * TICK_RATE;
+}
+
+/**
+ * A player whose page is gone (no input in the bundle) or silent (the relay's Away flag) is protected for `awayProtectSeconds`: a lost
+ * connection or a dead tab is not a death sentence. Real input resets the clock; after the minute the game is as hard as ever.
+ * Counted on the inputs as they came (the lift between floors blanks the buttons, and the flag with them).
+ */
+function updateAway(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): void {
+  const limit = BALANCE.player.awayProtectSeconds * TICK_RATE;
+  for (let s = 0; s < MAX_PLAYERS; s++) {
+    if (!w.pActive[s]) continue;
+    const inp = inputs[s];
+    const away = !inp || (inp.buttons & Buttons.Away) !== 0;
+    if (!away) {
+      w.pAway[s] = 0;
+      continue;
+    }
+    if (w.pAway[s]! <= limit) w.pAway[s] = w.pAway[s]! + 1;
+    if (w.pAway[s]! <= limit && w.pState[s] === PlayerState.Alive && w.pIFrames[s]! < 0.2) w.pIFrames[s] = 0.2;
+  }
+}
+
 /** Downed players crawl; a living teammate holding Revive nearby brings them back. */
 function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>): void {
   const range2 = BALANCE.player.reviveRange * BALANCE.player.reviveRange;
@@ -554,7 +580,7 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
     } else {
       // interrupted (let go of the key or moved away): the progress drains, so a short slip does not cost everything
       w.pRevive[d] = Math.max(0, w.pRevive[d]! - TICK_DT * BALANCE.player.reviveDrain);
-      w.pTimer[d] = w.pTimer[d]! - TICK_DT;
+      if (!awayProtected(w, d)) w.pTimer[d] = w.pTimer[d]! - TICK_DT; // an away player does not bleed out inside the protected minute
       if (w.pTimer[d]! <= 0) {
         w.pState[d] = PlayerState.Dead;
         w.events.push({ type: 'playerDead', slot: d });
@@ -576,6 +602,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
     return;
   }
   for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pIFrames[s]! > 0) w.pIFrames[s] = w.pIFrames[s]! - TICK_DT;
+  updateAway(w, inputsIn);
   // while the party is lifted to the next floor nobody can move, shoot or throw: only the aim is kept
   if (w.misc[MISC.Phase] === FloorPhase.Ascend || w.tick < w.misc[MISC.Cine]!) inputs = inputs.map((i) => (i ? { moveX: 0, moveY: 0, aim: i.aim, buttons: 0, ...(i.aimDist !== undefined ? { aimDist: i.aimDist } : {}), ...(i.gAim !== undefined ? { gAim: i.gAim } : {}) } : i));
   updateCards(w, inputs);
@@ -681,6 +708,6 @@ export function hashWorld(w: World): number {
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
-  c.typed(w.pDrone).typed(w.pDLv).typed(w.pDXp).typed(w.pDWarm).typed(w.dX).typed(w.dY).typed(w.dAim).typed(w.dCd).typed(w.dBeam).typed(w.dN).typed(w.eSlow).typed(w.eSlowP).typed(w.bSrc).typed(w.bBlastR).typed(w.bBlastD);
+  c.typed(w.pDrone).typed(w.pDLv).typed(w.pDXp).typed(w.pDWarm).typed(w.pAway).typed(w.dX).typed(w.dY).typed(w.dAim).typed(w.dCd).typed(w.dBeam).typed(w.dN).typed(w.eSlow).typed(w.eSlowP).typed(w.bSrc).typed(w.bBlastR).typed(w.bBlastD);
   return c.digest();
 }

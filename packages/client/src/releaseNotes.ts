@@ -23,6 +23,32 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.23',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: 'Stable online play',
+        items: [
+          'Pausing the game no longer drops everybody: a long pause used to look like a dead connection when it ended.',
+          'Coming back after a dropped connection or a page reload works again, and it is much faster: your page keeps the game and only catches up on what it missed.',
+          'If your connection drops, your hero is protected for up to a minute (untouchable, a downed hero does not bleed out) until you are back.',
+          'Clearer messages when you cannot return to a game (it is over, or your seat was given up).',
+          'Everybody needs the new version: reload the page.',
+        ],
+      },
+      tr: {
+        title: 'Daha sağlam çevrimiçi oyun',
+        items: [
+          'Oyunu duraklatmak artık herkesi düşürmüyor: uzun bir duraklatma bittiğinde bağlantı kopmuş sanılıyordu.',
+          'Bağlantı koptuktan ya da sayfa yenilendikten sonra oyuna dönmek yeniden çalışıyor ve çok daha hızlı: sayfan oyunu tutuyor, yalnızca kaçırdıklarını yetişiyor.',
+          'Bağlantın koparsa kahramanın geri dönene kadar en fazla bir dakika korunur (dokunulmaz, yerde yatan kahraman kanamaz).',
+          'Bir oyuna dönemediğinde daha açık mesajlar (oyun bitti ya da yerin başkasına verildi).',
+          'Herkesin yeni sürümü kullanması gerekiyor: sayfayı yenile.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.22',
     date: '2026-10-21',
     text: {

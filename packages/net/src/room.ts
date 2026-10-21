@@ -1,4 +1,4 @@
-import { GAME_VERSION, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { GAME_VERSION, Buttons, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
@@ -29,13 +29,27 @@ interface Member {
   miss?: number;
   /** Round trip time the client measured (ms), reported with its pings: used to pick the snapshot donor. */
   rtt?: number;
+  /** Messages waiting to go out (catch-up history, then the live bundles behind it), drained a few hundred per relay tick. */
+  outbox?: (string | Uint8Array)[];
+  outPos?: number;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 /** Anyone arriving later than this many ticks into the game gets a snapshot instead of the whole history. */
 export const DEFAULT_CATCHUP_LIMIT = 450;
-const MAX_SNAPSHOT_BYTES = 2_000_000;
+/** Under the 1 MiB a Cloudflare WebSocket message may carry (a bigger upload would kill the connection, not just be refused). */
+const MAX_SNAPSHOT_BYTES = 900_000;
+/** Bundles (tiny messages) a returning player is sent per relay tick: a 10 000 tick game takes about a second, not one frozen burst. */
+const DRAIN_PER_TICK = 300;
+/** Ticks a snapshot donor has to answer before the asker is given the whole history instead (5 s). */
+const SNAPSHOT_TIMEOUT_TICKS = 150;
 const MAX_AHEAD_TICKS = 300;
+
+/** A client's input as the relay accepts it: in range, and without the Away flag (only the relay may say a player is away). */
+function cleanInput(i: PlayerInput): PlayerInput {
+  const c = clampInput(i);
+  return { ...c, buttons: c.buttons & ~Buttons.Away };
+}
 
 function randomToken(): string {
   let s = '';
@@ -44,7 +58,11 @@ function randomToken(): string {
 }
 
 interface SnapJob {
+  /** Who asked for it (the target) and who was asked to upload it. */
   slot: number;
+  donor: number;
+  /** Room clock (relay ticks) when it was requested. */
+  at: number;
   /** Also send the bundles after the snapshot (a joiner or returning player); a resync only needs the state. */
   history: boolean;
 }
@@ -67,6 +85,8 @@ export class Room {
   /** Slots whose last hash vote disagreed with the rest (they get a snapshot, and never upload one). */
   readonly diverged = new Set<number>();
   private readonly jobs: SnapJob[] = [];
+  /** Relay ticks seen by this room (also while paused): the clock for snapshot timeouts. */
+  private clockTicks = 0;
   private startPlayers: { slot: number; weapon: WeaponId; cls: number }[] = [];
 
   constructor(
@@ -86,6 +106,11 @@ export class Room {
         send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started, options: this.options, token: m.token, locked: this.password !== '' });
       }
     }
+  }
+
+  /** The room message for one connection (its slot, token and the players): a returning page needs it before anything else. */
+  private sendRoomTo(m: Member): void {
+    if (m.conn) send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started, options: this.options, token: m.token, locked: this.password !== '' });
   }
 
   private sendStart(conn: Conn): void {
@@ -110,12 +135,15 @@ export class Room {
   }
 
   /** A returning player reattaches to the slot their token belongs to. */
-  rejoin(conn: Conn, token: string): Member | null {
+  rejoin(conn: Conn, token: string, have?: number): Member | null {
     const m = this.members.find((x) => x && x.token === token) ?? null;
     if (!m) return null;
     if (m.conn && m.conn !== conn) m.conn.close?.();
     m.conn = conn;
     m.pending.clear();
+    m.outbox = [];
+    m.outPos = 0;
+    this.dropJobs(m.slot);
     if (m.lostHost) {
       // the host who dropped comes back: the temporary host hands the role back
       m.lostHost = false;
@@ -123,10 +151,69 @@ export class Room {
       m.host = true;
     }
     if (this.started) {
-      this.sendStart(conn);
-      this.catchUp(m);
+      this.sendRoomTo(m); // before `start`: the page must know its slot as soon as it has a world
+      const resumable = typeof have === 'number' && Number.isInteger(have) && have >= -1 && have < this.history.length;
+      if (resumable) {
+        // the page kept its world: no new game, only the ticks after the last one it applied
+        if (this.paused) send(conn, { t: 'paused', on: true });
+        this.queueHistory(m, have + 1);
+      } else {
+        this.sendStart(conn);
+        this.catchUp(m);
+      }
     }
     return m;
+  }
+
+  /** A slot's snapshot jobs are void when it leaves or returns; an asker whose donor vanished is given the history instead. */
+  private dropJobs(slot: number): void {
+    for (let i = this.jobs.length - 1; i >= 0; i--) {
+      const j = this.jobs[i]!;
+      if (j.slot !== slot && j.donor !== slot) continue;
+      this.jobs.splice(i, 1);
+      const target = this.members[j.slot];
+      if (j.donor === slot && j.slot !== slot && j.history && target?.conn) this.queueHistory(target, 0);
+    }
+  }
+
+  /** Queue `history[from..]` for a member (sent a few hundred per relay tick, in order, ahead of the live bundles). */
+  private queueHistory(m: Member, from: number): void {
+    const box = (m.outbox ??= []);
+    for (let t = from; t < this.history.length; t++) box.push(this.history[t]!);
+  }
+
+  /** Put one message in a member's line: straight out when nothing is waiting, else behind what is (order is everything here). */
+  private deliver(m: Member, data: string | Uint8Array): void {
+    if (!m.conn) return;
+    if (m.outbox && m.outPos !== undefined && m.outPos < m.outbox.length) m.outbox.push(data);
+    else if (m.outbox && m.outbox.length > 0) m.outbox.push(data);
+    else m.conn.send(data);
+  }
+
+  /** Send a returning player's queue, a few hundred messages per call. */
+  private flush(m: Member): void {
+    const box = m.outbox;
+    if (!box || !m.conn) return;
+    let pos = m.outPos ?? 0;
+    for (let n = 0; n < DRAIN_PER_TICK && pos < box.length; n++) m.conn.send(box[pos++]!);
+    if (pos >= box.length) {
+      box.length = 0;
+      pos = 0;
+    }
+    m.outPos = pos;
+  }
+
+  /** Once per relay tick, paused or not: drain the queues and give up on snapshot donors that stay silent. */
+  drain(): void {
+    this.clockTicks++;
+    for (const m of this.members) if (m?.outbox?.length) this.flush(m);
+    for (let i = this.jobs.length - 1; i >= 0; i--) {
+      const j = this.jobs[i]!;
+      if (this.clockTicks - j.at < SNAPSHOT_TIMEOUT_TICKS) continue;
+      this.jobs.splice(i, 1);
+      const target = this.members[j.slot];
+      if (j.history && target?.conn) this.queueHistory(target, 0); // no donor answered: the whole history, paced
+    }
   }
 
   /**
@@ -151,15 +238,15 @@ export class Room {
   private catchUp(m: Member): void {
     if (!m.conn) return;
     if (this.history.length <= this.catchUpLimit) {
-      for (const b of this.history) m.conn.send(b);
+      this.queueHistory(m, 0);
       return;
     }
     const donor = this.pickDonor(m.slot);
     if (!donor?.conn) {
-      for (const b of this.history) m.conn.send(b);
+      this.queueHistory(m, 0);
       return;
     }
-    this.jobs.push({ slot: m.slot, history: true });
+    this.jobs.push({ slot: m.slot, donor: donor.slot, at: this.clockTicks, history: true });
     send(donor.conn, { t: 'snapshotRequest' });
   }
 
@@ -192,6 +279,9 @@ export class Room {
     m.conn = null;
     m.pending.clear();
     m.last = undefined;
+    m.outbox = [];
+    m.outPos = 0;
+    this.dropJobs(slot);
     if (!this.started) {
       // lobby: free the slot and hand the host role on
       this.members[slot] = null;
@@ -217,7 +307,7 @@ export class Room {
   input(slot: number, tick: number, input: PlayerInput): void {
     const m = this.members[slot];
     if (!m || tick < this.tick || tick > this.tick + MAX_AHEAD_TICKS) return; // too late (the previous input stays) or absurdly early
-    m.pending.set(tick, clampInput(input));
+    m.pending.set(tick, cleanInput(input));
   }
 
   /** The newest input of a message and the repeated older ones: an older one only fills a tick that has no input yet. */
@@ -228,9 +318,9 @@ export class Room {
     for (let i = 0; i < n; i++) {
       const t = tick - (n - 1 - i);
       if (t < this.tick || t > this.tick + MAX_AHEAD_TICKS) continue;
-      if (i === n - 1) m.pending.set(t, clampInput(list[i]!));
+      if (i === n - 1) m.pending.set(t, cleanInput(list[i]!));
       else if (!m.pending.has(t)) {
-        m.pending.set(t, clampInput(list[i]!));
+        m.pending.set(t, cleanInput(list[i]!));
         this.repairs++;
       }
     }
@@ -273,20 +363,22 @@ export class Room {
   resync(slot: number): void {
     const donor = this.pickDonor(slot);
     if (!donor?.conn) return;
-    this.jobs.push({ slot, history: false });
+    if (this.jobs.some((j) => j.slot === slot && !j.history)) return; // one resync at a time per slot
+    this.jobs.push({ slot, donor: donor.slot, at: this.clockTicks, history: false });
     send(donor.conn, { t: 'snapshotRequest' });
   }
 
   snapshot(from: number, data: Uint8Array): void {
     if (data.length > MAX_SNAPSHOT_BYTES || data.length < 6) return;
-    const job = this.jobs.shift();
-    if (!job) return; // nobody asked for one
+    const at = this.jobs.findIndex((j) => j.donor === from); // the answer to the job of THIS donor, not whoever is first in line
+    if (at < 0) return; // nobody asked this one
+    const job = this.jobs.splice(at, 1)[0]!;
     const target = this.members[job.slot];
     if (!target?.conn || from === job.slot) return;
     const { tick, data: world } = decodeSnapshot(data);
-    target.conn.send(encodeSnapshot(Bin.SnapshotDeliver, tick, world));
+    this.deliver(target, encodeSnapshot(Bin.SnapshotDeliver, tick, world));
     this.diverged.delete(job.slot);
-    if (job.history) for (let t = tick; t < this.history.length; t++) target.conn.send(this.history[t]!);
+    if (job.history) this.queueHistory(target, tick);
   }
 
   /** Produce and broadcast the confirmed inputs for the current tick. Called at the tick rate. */
@@ -315,7 +407,7 @@ export class Room {
       } else {
         m.miss = (m.miss ?? 0) + 1;
         // a short gap repeats the last input (smooth); a long one means the player is gone for now: stand still, keep aim
-        inp = m.last && m.miss <= 12 ? { ...m.last } : { ...NO_INPUT, aim: m.last?.aim ?? 0 };
+        inp = m.last && m.miss <= 12 ? { ...m.last } : { ...NO_INPUT, aim: m.last?.aim ?? 0, buttons: Buttons.Away };
       }
       for (const t of m.pending.keys()) if (t <= this.tick) m.pending.delete(t);
       inputs.push(inp);
@@ -324,7 +416,7 @@ export class Room {
     const bundle = encodeBundle({ tick: this.tick, joins: this.pendingJoins, inputs });
     this.pendingJoins = [];
     this.history.push(bundle);
-    for (const m of this.members) if (m?.conn) m.conn.send(bundle);
+    for (const m of this.members) if (m?.conn) this.deliver(m, bundle);
     this.tick++;
   }
 }
@@ -375,7 +467,7 @@ export class RoomManager {
   /** A client with another game version would simulate different rules and desync at once: say so instead. */
   private versionOk(conn: Conn, v: unknown): boolean {
     if (typeof v === 'string' && compatibleVersions(v, this.opts.version)) return true;
-    send(conn, { t: 'error', message: `version mismatch: this server runs ${this.opts.version}, your game is ${typeof v === 'string' ? v : 'unknown'}. Reload the page (or update) and try again.` });
+    send(conn, { t: 'error', code: 'version', message: `version mismatch: this server runs ${this.opts.version}, your game is ${typeof v === 'string' ? v : 'unknown'}. Reload the page (or update) and try again.` });
     return false;
   }
 
@@ -470,8 +562,9 @@ export class RoomManager {
         if (a) return;
         if (!this.versionOk(conn, msg.v)) return;
         const room = this.rooms.get(String(msg.code).toUpperCase());
-        const m = room && typeof msg.token === 'string' ? room.rejoin(conn, msg.token) : null;
-        if (!room || !m) return send(conn, { t: 'error', message: 'cannot rejoin' });
+        if (!room) return send(conn, { t: 'error', message: 'cannot rejoin: the room is gone', code: 'room_gone' });
+        const m = typeof msg.token === 'string' ? room.rejoin(conn, msg.token, typeof msg.have === 'number' ? msg.have : undefined) : null;
+        if (!m) return send(conn, { t: 'error', message: 'cannot rejoin: this seat was given up', code: 'bad_token' });
         room.lastActive = this.now;
         this.attached.set(conn, { room, slot: m.slot });
         room.broadcastRoom();
@@ -536,7 +629,10 @@ export class RoomManager {
   /** Advance every running room by one tick and now and then drop rooms nobody is in. */
   tick(): void {
     this.now++;
-    for (const r of this.rooms.values()) r.advance();
+    for (const r of this.rooms.values()) {
+      r.drain();
+      r.advance();
+    }
     if (this.now % (TICK_RATE * 15) === 0) {
       for (const [code, r] of this.rooms) {
         if (r.empty && this.now - r.lastActive > this.opts.idleSeconds * TICK_RATE) this.rooms.delete(code);

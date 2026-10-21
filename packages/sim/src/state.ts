@@ -198,6 +198,8 @@ export interface World {
   pDXp: Float64Array;
   /** Seconds before a just-switched drone acts, its position and facing, two timers (action, second effect) and the beam targets (healer, up to 4). */
   pDWarm: Float64Array;
+  /** Ticks in a row the player has been away (no input, or the relay's Away flag); 0 while they play. */
+  pAway: Int32Array;
   dX: Float64Array;
   dY: Float64Array;
   dAim: Float64Array;
@@ -390,6 +392,7 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pDLv: new Uint8Array(MAX_PLAYERS * DRONE_TYPES.length),
     pDXp: new Float64Array(MAX_PLAYERS * DRONE_TYPES.length),
     pDWarm: new Float64Array(MAX_PLAYERS),
+    pAway: new Int32Array(MAX_PLAYERS),
     dX: new Float64Array(MAX_PLAYERS),
     dY: new Float64Array(MAX_PLAYERS),
     dAim: new Float64Array(MAX_PLAYERS),

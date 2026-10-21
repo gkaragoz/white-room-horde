@@ -49,6 +49,10 @@ jobs:
           - name: menu and drone shots
             browsers: chromium
             run: node tools/ci/menu-shots.mjs && node tools/ci/drone-shots.mjs
+          # two pages and the local server: pause and resume, a dropped connection, a reload
+          - name: rejoin
+            browsers: chromium
+            run: node tools/ci/rejoin-check.mjs
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

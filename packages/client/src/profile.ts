@@ -66,6 +66,8 @@ export interface RejoinInfo {
   server: string;
   code: string;
   token: string;
+  /** Game version it was saved with: another major.minor cannot rejoin (the relay refuses), so the menu hides the button. */
+  v?: string;
   at: number;
 }
 

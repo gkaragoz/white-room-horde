@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
 import { GoreParts, Part } from './render/gore';
 import { GIB_COLORS } from './render/fx';
-import { heightAt } from '@wrh/shared';
+import { GAME_VERSION, heightAt } from '@wrh/shared';
 import { BALANCE, nextLayer, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession, PredictedView } from '@wrh/net';
@@ -911,31 +911,40 @@ function connect(name: string, rawServer: string, code: string | null, password 
   }
   mode = 'online';
   if (!world) ui.showConnecting();
+  // a dropped game keeps its world: the new session carries on from the old one (same slot from the first frame, no replay from tick 0)
+  const prev = rejoinToken && world && session && session.world === world ? session : null;
   const sock = new WebSocket(server);
   sock.binaryType = 'arraybuffer';
   ws = sock;
   const sess = new NetSession({ send: (d) => sock.readyState === WebSocket.OPEN && sock.send(d) });
+  if (prev) sess.adopt(prev);
   session = sess;
+  let openedAt = 0;
   watchdogFired = false;
   sock.onopen = () => {
     diag.event(`socket open${rejoinToken ? ' (rejoin)' : ''}`);
-    reconnectTries = 0;
+    openedAt = performance.now();
     if (code) joinedLate = true;
-    if (rejoinToken && code) sess.rejoin(code, rejoinToken);
+    if (rejoinToken && code) sess.rejoin(code, rejoinToken, sess.adopted ? sess.applied : undefined);
     else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
     else sess.create(name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
   };
   sock.onmessage = (ev) => {
     sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
-    if (sess.token && sess.code) saveRejoin({ server, code: sess.code, token: sess.token });
+    if (sess.token && sess.code) saveRejoin({ server, code: sess.code, token: sess.token, v: GAME_VERSION });
   };
   sock.onclose = (ev) => {
     diag.event(`socket closed code ${ev?.code ?? '?'}${ev?.reason ? ` ${ev.reason}` : ''}`);
     if (over || session !== sess) return;
-    if (world && sess.token && reconnectTries < 6) {
+    // a connection that held for a while was a good one: the next failure starts the backoff again; one that dies at once does not
+    if (openedAt > 0 && performance.now() - openedAt > 10000) reconnectTries = 0;
+    if (world && sess.token && reconnectTries < 8) {
+      // exponential backoff with jitter (0.6 s, 1.2 s, 2.4 s ... at most 8 s), so two players dropped together do not come back in step
+      const delay = Math.round(Math.min(8000, 600 * 2 ** reconnectTries) * (0.75 + Math.random() * 0.5));
       reconnectTries++;
       reconnecting = true;
-      setTimeout(() => connect(name, server, sess.code, '', sess.token), 800 * reconnectTries);
+      diag.event(`reconnect try ${reconnectTries} in ${delay} ms`);
+      setTimeout(() => connect(name, server, sess.code, '', sess.token), delay);
       return;
     }
     mode = 'menu';
@@ -1164,7 +1173,23 @@ function adaptScale(currentFps: number, seconds: number): void {
   }
 }
 
+let frameErrors = 0;
+
+/** One frame must never end the loop: an exception is logged (the first few) and the next frame is scheduled all the same. */
 function frame(nowMs: number): void {
+  try {
+    frameInner(nowMs);
+  } catch (e) {
+    frameErrors++;
+    if (frameErrors <= 5) {
+      diag.event(`frame error: ${String(e).slice(0, 160)}`);
+      console.error(e);
+    }
+    requestAnimationFrame(frame);
+  }
+}
+
+function frameInner(nowMs: number): void {
   if (settings.fpsCap > 0 && nowMs - lastDrawn < 1000 / settings.fpsCap - 1.5) {
     requestAnimationFrame(frame);
     return;
@@ -1206,12 +1231,14 @@ function frame(nowMs: number): void {
         for (const p of session.players) names[p.slot] = p.name;
         ui.showLobby(session.code, session.players, session.players.find((p) => p.slot === sess0.slot)?.host ?? false, session.options, session.locked);
       }
-    } else if (session.state === 'playing' && session.world && session.world !== world) {
+    } else if (session.state === 'playing' && session.world && session.world !== world && session.slot >= 0) {
       for (const p of session.players) names[p.slot] = p.name;
       beginPlaying(session.world, session.slot);
     }
     if (session.error && !world) {
-      ui.showMenu(session.error);
+      // the room is gone or the seat was given up: the saved way back is useless, forget it so the button does not keep failing
+      if (session.errorCode === 'room_gone' || session.errorCode === 'bad_token') clearRejoin();
+      ui.showMenu(session.errorCode === 'room_gone' ? ui.tr('rejoinGone') : session.errorCode === 'bad_token' ? ui.tr('rejoinSeat') : session.error);
       session.error = '';
       mode = 'menu';
     } else if (session.error && world && reconnecting) {
@@ -1450,7 +1477,7 @@ function frame(nowMs: number): void {
       stage.setFlashlight(lx, -ly, Math.cos(a), -Math.sin(a), w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive);
       // ammo ring around the feet: green full, red empty, rounds left beside it
       const alive = w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive;
-      const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[me]!]!];
+      const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[me]!] ?? 'pistol']!;
       const reloading = w.pReload[me]! > 0;
       _p.set(lx, 0.02, -ly).project(stage.camera);
       const ppu = app.clientWidth / CAMERA.orthoWidth;
@@ -1650,7 +1677,7 @@ function frame(nowMs: number): void {
     if (mode === 'online' && session && session.state === 'playing' && !session.paused) {
       diag.bundleGap(session.sinceBundleMs, nowMs);
       // a socket that went silent without ever closing (half-open) is cut and re-established like a dropped one
-      if (session.sinceBundleMs > 4000 && !watchdogFired && ws) {
+      if (session.sinceBundleMs > 4000 && session.sinceResumeMs > 3000 && !watchdogFired && ws) {
         watchdogFired = true;
         diag.event(`watchdog: no server tick for ${Math.round(session.sinceBundleMs)} ms, reconnecting`);
         const dead = ws;

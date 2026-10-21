@@ -31,6 +31,11 @@ export const Buttons = {
   Card3: 1 << 7,
   /** The class ability (see abilities.ts in the sim). */
   Special: 1 << 8,
+  /**
+   * Set by the relay (never by a player: it strips the bit from what clients send) on the input of a member who is connected but silent.
+   * A member with no connection has no input at all. Either way the player is away: the simulation protects them for a while.
+   */
+  Away: 1 << 9,
 } as const;
 
 export const NO_INPUT: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };

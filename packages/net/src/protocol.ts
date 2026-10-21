@@ -39,7 +39,8 @@ export interface JoinOpts {
 export type ClientMsg =
   | ({ t: 'create'; name: string; weapon?: WeaponId } & JoinOpts)
   | ({ t: 'join'; code: string; name: string; weapon?: WeaponId } & JoinOpts)
-  | { t: 'rejoin'; code: string; token: string; v?: string }
+  /** `have`: the last tick the page already applied to a world it still has (resume without replaying the game). */
+  | { t: 'rejoin'; code: string; token: string; v?: string; have?: number }
   | { t: 'start' }
   | { t: 'hash'; tick: number; hash: number }
   | { t: 'ping'; ts: number; rtt?: number }
@@ -58,7 +59,8 @@ export type ServerMsg =
   | { t: 'pong'; ts: number }
   | { t: 'paused'; on: boolean }
   | { t: 'snapshotRequest' }
-  | { t: 'error'; message: string };
+  /** `code`: a short reason a page can act on (room_gone, bad_token, version); `message` is for people. */
+  | { t: 'error'; message: string; code?: string };
 
 export interface Join {
   slot: number;

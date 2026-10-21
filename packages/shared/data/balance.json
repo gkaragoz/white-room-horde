@@ -4,6 +4,7 @@
     "hp": 100,
     "speed": 12,
     "iFrames": 0.4,
+    "awayProtectSeconds": 60,
     "downedSeconds": 25,
     "crawlSpeed": 3,
     "reviveSeconds": 3,

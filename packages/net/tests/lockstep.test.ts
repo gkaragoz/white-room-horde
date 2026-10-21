@@ -363,7 +363,8 @@ describe('robustness of the room server', () => {
     const bad = net.addClient(30, 10);
     bad.session.rejoin(net.clients[0]!.session.code, 'NOPE');
     net.advance(500);
-    expect(bad.session.error).toBe('cannot rejoin');
+    expect(bad.session.error).toContain('cannot rejoin');
+    expect(bad.session.errorCode).toBe('bad_token');
   });
 
   it('the host who dropped gets the host role back on rejoining', () => {

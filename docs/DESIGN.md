@@ -154,6 +154,10 @@ Silah sayıları `packages/shared/data/balance.json` içinde; yeni silahlar baş
 **Geç katılım**
 - Odaya girişte host snapshot (tick T) + sonraki bundle'lar yollar; client yetişince oyuna girer. Girerken yeni oyuncu için spawn noktası ve kısa dokunulmazlık.
 
+**Bağlantı kopması, duraklatma ve geri dönüş (v0.23)**
+- Host duraklatınca röle tick üretmeyi bırakır ve herkese `paused` yollar; sessizlik saati (watchdog) duraklatma bitince de yeniden başlar (devam ettikten sonra 3 sn bekler). Kopan sayfa aynı dünyada devam eder: `NetSession.adopt` eski oturumun dünyasını, geçmişini ve slotunu alır, `rejoin` mesajı `have` (uygulanan son tick) taşır ve röle yalnızca `have+1` sonrasını yollar, baştan oynatma yok. Sayfa yenilenirse (F5) dünya yoktur: snapshot (donör) ya da tüm geçmiş, tick başına en çok 300 mesajla sırayla gönderilir. Yanıt vermeyen donör 5 sn sonra bırakılır, geçmiş gönderilir. Röle önce `room`, sonra `start` yollar (sayfa slotunu dünyadan önce bilir). Hata kodları: `room_gone`, `bad_token`, `version`.
+- Bağlantısı kopan ya da sessiz oyuncu (girdi yok ya da rölenin `Buttons.Away` bayrağı; istemciden gelen bayrak temizlenir) `balance.player.awayProtectSeconds` (60 sn) boyunca ölümsüzdür ve yerde yatıyorsa kanamaz (`pAway` sayacı, snapshot ve hash'te). Gerçek girdi sayacı sıfırlar.
+
 **Host migration**
 - Her client tam durumu taşıdığı için host düşerse en düşük gecikmeli (RTT) oyuncu devralır. Sinyal sunucusu devri koordine eder; yeni host son ortak doğrulanmış tick'ten (hash ile onaylı checkpoint, ~1 sn) devam eder, bundle'ları yeniden yayınlamaya başlar. Hedef kesinti < 2 sn.
 - Host da oyuncudur; host'a özel avantaj yok (girdileri sadece sıralar).

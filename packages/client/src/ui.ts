@@ -3,7 +3,7 @@ import { MENU_CSS, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
 import { droneNeed } from '@wrh/sim';
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, GAME_VERSION, compatibleVersions, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -172,6 +172,8 @@ const BASE_STRINGS = {
     noServer: 'Enter the server address first',
     noConnect: 'Could not connect to',
     connLost: 'Connection lost',
+    rejoinGone: 'That game is over: the room no longer exists',
+    rejoinSeat: 'Your seat in that game was given up',
     ammo: 'Ammo',
     reloading: 'Reloading...',
     dashReady: 'Dash',
@@ -389,6 +391,8 @@ const BASE_STRINGS = {
     noServer: 'Önce sunucu adresini gir',
     noConnect: 'Bağlanılamadı:',
     connLost: 'Bağlantı koptu',
+    rejoinGone: 'O oyun bitti: oda artık yok',
+    rejoinSeat: 'O oyundaki yerin başkasına verildi',
     ammo: 'Mermi',
     reloading: 'Dolduruyor...',
     dashReady: 'Atılma',
@@ -1315,7 +1319,7 @@ export class Ui {
   }
 
   /** Translate a UI string key (for messages the game shows outside the UI module). */
-  tr(key: 'noServer' | 'noConnect' | 'connLost' | 'desync' | 'reconnecting' | 'syncing' | 'joining'): string {
+  tr(key: 'noServer' | 'noConnect' | 'connLost' | 'rejoinGone' | 'rejoinSeat' | 'desync' | 'reconnecting' | 'syncing' | 'joining'): string {
     return (this.t as unknown as Record<string, string>)[key]!;
   }
 
@@ -1586,7 +1590,9 @@ export class Ui {
     const inviteCode = (params.get('join') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     const hosted = location.hostname.endsWith('github.io');
     const defServer = fromParam ?? (stored || (hosted ? '' : location.port === '5173' ? `ws://${location.hostname}:8787/ws` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`));
-    const rejoin = loadRejoin();
+    const saved0 = loadRejoin();
+    // a saved game of another major.minor cannot be rejoined (the relay turns it away): do not offer it
+    const rejoin = saved0 && (saved0.v === undefined || compatibleVersions(saved0.v, GAME_VERSION)) ? saved0 : null;
     this.screen.innerHTML = menuMarkup({
       title: t.title,
       tag: t.tag,

@@ -27,6 +27,8 @@ export class NetSession {
   locked = false;
   world: World | null = null;
   error = '';
+  /** Machine readable reason of the last error (room_gone, bad_token, version), empty when the relay gave none. */
+  errorCode = '';
   /** Slots reported as diverged by the server (desync detection). */
   desyncTicks: number[] = [];
   /** Donate snapshots on the next turn of the event loop (the browser page); tests that run on virtual time set this off. */
@@ -75,9 +77,39 @@ export class NetSession {
   }
 
   /** Reattach to a slot after the connection dropped (token from an earlier `room` message). */
-  rejoin(code: string, token: string): void {
-    this.sendJson({ t: 'rejoin', code, token, v: GAME_VERSION });
+  rejoin(code: string, token: string, have?: number): void {
+    this.sendJson({ t: 'rejoin', code, token, v: GAME_VERSION, ...(have !== undefined && have >= -1 ? { have } : {}) });
   }
+
+  /**
+   * Carry on from the session of a dropped connection: the same world, history and slot, so that nothing restarts at tick 0 and the page
+   * knows its slot from the first frame. The relay then only sends the ticks after `applied`.
+   */
+  adopt(prev: NetSession): void {
+    if (!prev.world || prev.state !== 'playing') return;
+    this.world = prev.world;
+    this.state = 'playing';
+    this.code = prev.code;
+    this.slot = prev.slot;
+    this.players = prev.players;
+    this.options = prev.options;
+    this.token = prev.token;
+    this.locked = prev.locked;
+    this.applied = prev.applied;
+    this.received = prev.applied; // bundles that never got applied are asked for again
+    for (const [t, b] of prev.history) this.history.set(t, b);
+    for (const [t, i] of prev.sent) this.sent.set(t, i);
+    this.maxSent = prev.maxSent;
+    this.resyncs = prev.resyncs;
+    this.rttMs = prev.rttMs;
+    this.rttSamples = prev.rttSamples;
+    this.lead = prev.lead;
+    this.lastArrival = this.clock(); // the silence watchdog counts from here
+    this.adopted = true;
+  }
+
+  /** True when this session carries on from an earlier one (see `adopt`). */
+  adopted = false;
 
   /** Host only, before the game starts. */
   setOptions(map: number, difficulty: number): void {
@@ -141,6 +173,7 @@ export class NetSession {
         break;
       case 'start':
         this.paused = false;
+        this.adopted = false; // the relay could not resume us: a new world from tick 0, as for a new player
         this.pendingStart = { seed: m.seed, players: m.players };
         this.world = createGame({ seed: m.seed, players: m.players, map: m.map, difficulty: m.difficulty });
         this.history.clear();
@@ -169,6 +202,12 @@ export class NetSession {
         }
         break;
       case 'paused':
+        if (this.paused !== (m.on === true)) {
+          // no bundles arrive while the game is paused: the silence clock restarts at both ends, or the first frame after the resume would
+          // see a minute without a tick and cut a healthy connection
+          this.lastArrival = this.clock();
+          if (!m.on) this.resumedAt = this.clock();
+        }
         this.paused = m.on === true;
         break;
       case 'pong':
@@ -181,6 +220,7 @@ export class NetSession {
         break;
       case 'error':
         this.error = m.message;
+        this.errorCode = m.code ?? '';
         break;
     }
   }
@@ -390,6 +430,13 @@ export class NetSession {
     }
     this.lastSteps = n;
     return n;
+  }
+
+  private resumedAt = 0;
+
+  /** Milliseconds since the host resumed a paused game (a large number when it never was). */
+  get sinceResumeMs(): number {
+    return this.resumedAt ? this.clock() - this.resumedAt : 1e9;
   }
 
   /** Milliseconds since the last server tick arrived (0 before the first). */

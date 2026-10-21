@@ -110,7 +110,7 @@ export const BALANCE = data as unknown as {
   waves: WaveConfig;
   /** The climb between floors: countdown after a clear, charge + lift, countdown on arrival, hp of those brought back. */
   floors: { clearedSeconds: number; ascendSeconds: number; chargeSeconds: number; arriveSeconds: number; reviveHp: number; finisherSeconds: number };
-  player: { reviveMoveMul: number; reviveDrain: number; hp: number; speed: number; iFrames: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };
+  player: { reviveMoveMul: number; reviveDrain: number; hp: number; speed: number; iFrames: number; /** Seconds a player whose page is gone or silent stays untouchable (and does not bleed out). */ awayProtectSeconds: number; downedSeconds: number; crawlSpeed: number; reviveSeconds: number; reviveRange: number; radius: number };
   weapons: Record<WeaponId, WeaponStats>;
   classes: ClassStats[];
   perks: Record<PerkKey, number>;
