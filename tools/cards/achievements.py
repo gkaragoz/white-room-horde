@@ -73,7 +73,7 @@ def rows():
 
 
 def q(text):
-    return "'" + text.replace("\\", "\\\\").replace("'", "\'") + "'"
+    return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
 def ts():
