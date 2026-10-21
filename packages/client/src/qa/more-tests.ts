@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { BALANCE, Buttons, FloorPhase, MISC, TeleEffect, TeleShape, ZoneKind, CARD_IDS, CARD_RARITY, ENEMY_TYPES, MAPS, TEAM_CARDS, WEAPON_IDS } from '@wrh/shared';
 import { addPlayer, addTelegraph, addZone, createWorld, giveWeapon, spawnEnemy, step } from '@wrh/sim';
+import { ACHIEVEMENTS } from '@wrh/shared';
+import { achPage, runAchievementsHtml } from '../achUi';
+import { applyRun, fmtNum, unreadCount } from '../achievements';
+import { emptyStore } from '../profile';
 import { AimSolver, TargetLock, pickTarget } from '../autoAim';
 import { ACTIONS, DEFAULT_BINDINGS, Input } from '../input';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, recordGame, saveProfile } from '../profile';
@@ -549,6 +553,48 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'grid, toggles, multiplier, guest view and summary are right' };
+    },
+  },
+  {
+    id: 'achievements',
+    title: 'Achievements: 100 of them (10 hidden), totals add up, best runs keep the maximum, earned ones are listed, the page shows bars with numbers, hidden ones read ???, unread count',
+    async run() {
+      const problems: string[] = [];
+      if (ACHIEVEMENTS.length !== 100) problems.push(`${ACHIEVEMENTS.length} achievements, expected 100`);
+      if (ACHIEVEMENTS.filter((a) => a.hidden).length !== 10) problems.push('expected 10 hidden achievements');
+      const store = emptyStore();
+      const noFlags = Object.fromEntries(ACHIEVEMENTS.filter((a) => a.kind === 'flag').map((a) => [a.stat, false]));
+      let earned = applyRun(store, { totals: { kills: 60, runKills: 60, floor: 3, games: 1 }, flags: noFlags }, 1000).map((a) => a.id);
+      if (!earned.includes('games_1')) problems.push('the first game did not earn Welcome');
+      if (earned.includes('kills_1')) problems.push('60 kills earned the 100-kill achievement');
+      earned = applyRun(store, { totals: { kills: 60, runKills: 40, floor: 6, games: 1 }, flags: noFlags }, 2000).map((a) => a.id);
+      if (store.life.kills !== 120 || store.best.runKills !== 60) problems.push(`totals ${store.life.kills}/${store.best.runKills}`);
+      if (!earned.includes('kills_1') || !earned.includes('floor_1')) problems.push(`second run did not earn the 100 kills and floor 5 (${earned.join(',')})`);
+      if (earned.includes('floor_1') && store.got.floor_1 !== 2000) problems.push('the time of earning is not kept');
+      const again = applyRun(store, { totals: { kills: 5, games: 1 }, flags: noFlags }, 3000);
+      if (again.length) problems.push('an earned achievement was earned twice');
+      const flagged = applyRun(store, { totals: {}, flags: { ...noFlags, quickDeath: true } }, 4000).map((a) => a.id);
+      if (!flagged.includes('speedrun_loss')) problems.push('a hidden flag achievement was not earned');
+      if (unreadCount(store) !== Object.keys(store.got).length) problems.push('unread count is wrong before looking');
+      // the page
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      try {
+        host.innerHTML = achPage('en', store);
+        const cards = host.querySelectorAll('.wrh-achc');
+        if (cards.length !== 100) problems.push(`${cards.length} cards on the page`);
+        const k = host.querySelector('.wrh-achc[data-id="kills_3"] .num')?.textContent ?? '';
+        if (k !== '125 / 10,000') problems.push(`progress text "${k}"`);
+        const hid = [...host.querySelectorAll('.wrh-achc')].filter((c) => c.querySelector('b')?.textContent === '???').length;
+        if (hid !== 9) problems.push(`${hid} hidden cards read ???, expected 9 (one is earned)`);
+        if (!host.querySelector('.wrh-achc[data-id="kills_1"] .tip')?.textContent?.includes('100 enemies')) problems.push('no how-to text on the card');
+        if (fmtNum(533223, 'tr') !== '533.223') problems.push(`fmtNum tr ${fmtNum(533223, 'tr')}`);
+        if (runAchievementsHtml('en', ACHIEVEMENTS.slice(0, 2)).split('class="one"').length !== 3) problems.push('the game over list does not show the earned achievements');
+      } finally {
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : '100 achievements, totals, bests, flags, page and hidden cards are right' };
     },
   },
   {

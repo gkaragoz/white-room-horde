@@ -3,6 +3,7 @@ export * from './types';
 export * from './cards-universal';
 export * from './cards-class';
 export * from './mods';
+export * from './achievements';
 export * from './balance';
 export * from './codec';
 export * from './version';

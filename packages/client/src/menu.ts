@@ -23,6 +23,9 @@ export interface MenuParts {
   joinLabel: string;
   onlineLabel: string;
   settingsLabel: string;
+  achLabel: string;
+  /** Earned achievements the player has not looked at yet (a red badge on the button). */
+  achUnread: number;
   closeLabel: string;
   rejoinHtml: string;
   codeLabel: string;
@@ -52,6 +55,7 @@ export function menuMarkup(p: MenuParts): string {
         <button id="wrh-solo" class="wrh-play">${icon('hud_right', 34)}<span>${p.soloLabel}</span></button>
         <button id="wrh-online" class="wrh-big alt">${icon('tb_lang', 30)}<span>${p.onlineLabel}</span></button>
         ${p.rejoinHtml}
+        <button id="wrh-open-ach" class="wrh-big alt">${icon('hud_star', 30)}<span>${p.achLabel}</span>${p.achUnread > 0 ? '<em class="wrh-badge" id="wrh-ach-badge">!</em>' : ''}</button>
         <button id="wrh-open-settings" class="wrh-big alt">${icon('tb_set', 30)}<span>${p.settingsLabel}</span></button>
         <label>${p.weaponLabel}</label>
         <div class="wrh-weapons" id="wrh-weapons">${p.weaponsHtml}</div>

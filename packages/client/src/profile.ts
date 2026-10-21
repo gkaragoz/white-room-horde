@@ -1,5 +1,15 @@
 import type { WeaponId } from '@wrh/shared';
 
+/** What the game remembers about the achievements: running totals, best runs, when each was earned, which the player has looked at. */
+export interface AchStore {
+  life: Record<string, number>;
+  best: Record<string, number>;
+  got: Record<string, number>;
+  seen: Record<string, 1>;
+}
+
+export const emptyStore = (): AchStore => ({ life: {}, best: {}, got: {}, seen: {} });
+
 /** Everything the game remembers about the player between sessions (local only). */
 export interface Profile {
   bestWave: number;
@@ -18,6 +28,7 @@ export interface Profile {
   mods: number;
   /** Best final score (floors, kills, bosses and time, times the multiplier). */
   bestScore: number;
+  ach: AchStore;
 }
 
 export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headphones', 'acc_helmet', 'acc_crown', 'acc_horns', 'acc_tophat', 'acc_cowboy', 'acc_ninja', 'acc_mohawk', 'acc_bunny', 'acc_visor',
@@ -27,11 +38,17 @@ export const ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles', 'acc_headph
 export const WEAPON_UNLOCK: Record<WeaponId, number> = { pistol: 0, smg: 0, ar: 0, shotgun: 3, hmg: 5, sniper: 7, minigun: 9, revolver: 2, mp: 4, dbl: 6, dmr: 8, flamer: 10, gl: 12, sword: 0, hammer: 0, akimbo: 6, nailgun: 9, crossbow: 12, arcthrower: 15, autoshotgun: 18, plasma: 21, frostgun: 24, sawlauncher: 28, rocket: 32, railgun: 38 };
 
 const KEY = 'wrh.profile';
-const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, color: -1, cls: 0, map: -1, mods: 0, bestScore: 0 };
+const DEFAULT: Profile = { bestWave: 1, bestKills: 0, games: 0, totalKills: 0, acc: 0, color: -1, cls: 0, map: -1, mods: 0, bestScore: 0, ach: emptyStore() };
 
 export function loadProfile(): Profile {
   try {
-    return { ...DEFAULT, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Profile>) };
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Profile>;
+    const ach = emptyStore();
+    Object.assign(ach.life, saved.ach?.life);
+    Object.assign(ach.best, saved.ach?.best);
+    Object.assign(ach.got, saved.ach?.got);
+    Object.assign(ach.seen, saved.ach?.seen);
+    return { ...DEFAULT, ...saved, ach };
   } catch {
     return { ...DEFAULT };
   }
