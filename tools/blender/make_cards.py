@@ -7,7 +7,8 @@
 
 Every card is built from a handful of primitives in the game's flat-shaded toy look and rendered with a transparent
 background at 256x256 (the UI puts it on a rarity coloured plate). Decorations that face the viewer sit at negative Y,
-the camera looks from the front-right. The script checks that each image really has content and fails otherwise.
+the camera looks from the front-right. The 50 universal cards and the wide LEVEL UP badge (ONLY=levelup,
+-> public/ui/levelup.png, 512x192) live in the last batch; their PNGs were palette-quantized (96 colours, ~8 KB each) after rendering. The script checks that each image really has content and fails otherwise.
 """
 import bpy, bmesh, os, math, sys
 from mathutils import Vector, Euler
@@ -15,6 +16,8 @@ from mathutils import Vector, Euler
 HERE = os.path.dirname(os.path.abspath(globals().get("__file__", "tools/blender/make_cards.py")))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(REPO, "packages", "client", "public", "cards")
+UI_DIR = os.path.join(REPO, "packages", "client", "public", "ui")
+WIDE = {"levelup": (512, 192)}  # non-card art: name -> pixel size, written to public/ui (or OUT_DIR)
 ONLY = [x for x in os.environ.get("ONLY", "").split(",") if x] or None
 SIZE = 256
 
@@ -663,6 +666,808 @@ def icon_drone():
 ICONS += ["drone"]
 
 
+# ------------------------------------------------------------------------------------------------ third batch: the 50 universal cards
+GOLD, BROWN, BROWN2, SKY = "#ffc933", "#9a6a3a", "#6b4226", "#7fd4ff"
+
+
+def new_since(before):
+    return [o for o in coll.objects if o not in before]
+
+
+def disc(r, h, m, loc, verts=24):
+    """A round plate facing the camera."""
+    return cyl(r, h, m, loc, (90, 0, 0), verts)
+
+
+def plus(x, z, s, y=-0.4, c=RED):
+    box(s * 0.34, 0.14, s, mat(c), (x, y, z), bevel=0.03)
+    box(s, 0.14, s * 0.34, mat(c), (x, y, z), bevel=0.03)
+
+
+def sparkle(x, z, s=0.25, y=-0.3, c=YELLOW):
+    prism(star_points(4, s, s * 0.3), 0.06, mat(c, emit=0.6), (x, y, z), (90, 0, 0), 0.0)
+
+
+def gear(x, z, y, r, n, m, hole=True):
+    disc(r, 0.22, m, (x, y, z), n * 2)
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        box(r * 0.42, 0.22, r * 0.34, m, (x + math.cos(a) * r, y, z + math.sin(a) * r), (0, -math.degrees(a), 0), 0.0)
+    if hole:
+        disc(r * 0.35, 0.26, mat(DARK), (x, y - 0.02, z), 12)
+
+
+def coin(x, z, y, r, thick=0.16, c=GOLD):
+    disc(r, thick, mat(c, 0.3, 0.8), (x, y, z), 20)
+    torus(r * 0.72, r * 0.07, mat("#e0a21f", 0.3, 0.7), (x, y - thick / 2, z), (90, 0, 0), maj=20, mnr=5)
+
+
+def arc(R, r, m, loc, start, sweep, maj=48, mnr=6):
+    """An arc of a ring facing the camera, starting at `start` degrees (0 = +X, 90 = up) and sweeping counter-clockwise."""
+    t = torus(R, r, m, loc, (0, 0, 0), maj, mnr, arc=sweep)
+    t.rotation_mode = "XZY"
+    t.rotation_euler = (math.radians(90), 0, math.radians(-start))
+    return t
+
+
+def tilt(objs, deg, about=(0, 0)):
+    """Rotate a group in the camera plane (around Y) about a point (x, z)."""
+    for o in objs:
+        o.location.x -= about[0]
+        o.location.z -= about[1]
+    rotate_group(objs, deg)
+    for o in objs:
+        o.location.x += about[0]
+        o.location.z += about[1]
+
+
+def icon_glasscannon():
+    gl = glass("#8fd8ff", 0.6, emit=0.2)
+    before = set(coll.objects)
+    cyl(0.55, 2.0, gl, (0, 0, 0), (0, 90, 0), 18)
+    torus(0.58, 0.1, glass("#d8f4ff", 0.8, emit=0.4), (1.0, 0, 0), (0, 90, 0), maj=18, mnr=6)
+    sphere(0.6, gl, (-1.0, 0, 0), seg=14, rings=10)
+    box(1.3, 0.7, 0.2, mat(BROWN, 0.6), (-0.1, 0, -0.55), bevel=0.04)
+    tilt(new_since(before), 18, (0, 0))
+    disc(0.62, 0.22, mat(BROWN2, 0.6), (-0.1, -0.5, -0.78), 16)
+    disc(0.12, 0.26, mat(BRASS, 0.3, 0.8), (-0.1, -0.52, -0.78), 8)
+    crack = [(0.0, 0.5), (-0.22, 0.25), (0.05, 0.1), (-0.3, -0.2), (-0.08, -0.22), (-0.35, -0.55), (-0.18, -0.2), (0.12, -0.05), (-0.12, 0.18), (0.14, 0.32)]
+    prism(crack, 0.06, mat(DARK), (0.15, -0.58, 0.3), (90, 0, 0), 0.0)
+    for (x, z, a) in ((1.5, 1.3, 20), (-1.4, 0.8, 100), (1.7, -0.5, 200)):
+        prism([(0, 0.2), (0.14, -0.12), (-0.14, -0.12)], 0.05, glass("#bfeaff", 0.8, emit=0.3), (x, -0.2, z), (90, 0, a), 0.0)
+    sparkle(1.1, 1.5, 0.25, c="#ffffff")
+
+
+def icon_padding():
+    pk = mat("#f7a8c4", 0.7)
+    vest = [(-0.5, 1.0), (-0.95, 0.8), (-1.15, 0.0), (-1.0, -1.0), (1.0, -1.0), (1.15, 0.0), (0.95, 0.8), (0.5, 1.0), (0.0, 0.45)]
+    prism(vest, 0.5, pk, (0, 0, 0), (90, 0, 0), 0.12)
+    for z in (0.35, -0.15, -0.65):
+        box(2.0, 0.06, 0.06, mat("#d9729a"), (0, -0.28, z), bevel=0.0)
+    for x in (-0.65, 0.0, 0.65):
+        box(0.06, 0.06, 1.7, mat("#d9729a"), (x, -0.28, -0.1), bevel=0.0)
+    for x in (-0.35, 0.35):
+        for z in (0.1, -0.4):
+            sphere(0.09, mat(YELLOW, 0.4), (x, -0.33, z), seg=8, rings=6)
+    box(0.12, 0.06, 1.35, mat(WHITE), (0, -0.3, -0.35), bevel=0.0)
+
+
+def icon_lightfoot():
+    fm = mat(WHITE, 0.6)
+    before = set(coll.objects)
+    box(0.12, 0.08, 2.5, mat("#b9d3ec"), (0, 0, 0), bevel=0.0)
+    for k in range(9):
+        z = -1.0 + k * 0.28
+        w = 0.95 - abs(z - 0.1) * 0.25
+        for s in (-1, 1):
+            prism([(0, 0), (s * w, 0.28), (s * w * 0.95, -0.02), (0, -0.2)], 0.07, fm if k % 2 else mat("#e8f1fb"), (0, 0, z), (90, 0, 0), 0.0)
+    tilt(new_since(before), -35, (0, 0))
+    sk = mat("#ffd9b0")
+    sphere(0.4, sk, (1.15, 0.0, -0.95), (1, 0.5, 1.3), seg=10, rings=8)
+    for (x, z, r) in ((0.9, -0.5, 0.11), (1.1, -0.45, 0.11), (1.3, -0.45, 0.1), (1.45, -0.55, 0.09)):
+        sphere(r, sk, (x, -0.08, z), seg=8, rings=6)
+    for z in (-0.8, -0.3, 0.2):
+        box(0.7, 0.05, 0.07, mat(SKY), (-1.45, -0.2, z - 0.2), bevel=0.0)
+
+
+def icon_snack():
+    ck = mat("#d99a52", 0.7)
+    disc(1.15, 0.38, ck, (0, 0, 0), 22)
+    disc(1.0, 0.1, mat("#e6ad66", 0.7), (0, -0.2, 0), 22)
+    cc = mat("#4a2a18", 0.5)
+    for (x, z) in ((-0.4, 0.4), (0.3, 0.5), (-0.15, -0.2), (0.45, -0.25), (-0.6, -0.5), (0.0, -0.7), (0.65, 0.15)):
+        box(0.22, 0.1, 0.18, cc, (x, -0.3, z), (0, 0, 20 * x), 0.02)
+    for (x, z) in ((-1.4, -0.8), (1.45, -0.7), (1.2, -1.05)):
+        sphere(0.1, ck, (x, -0.1, z), seg=6, rings=4)
+    plus(1.15, 1.05, 0.5, -0.3, "#47b86a")
+
+
+def icon_hoarder():
+    sk = mat("#b58a56", 0.8)
+    sphere(1.0, sk, (0, 0, -0.35), (1.05, 0.85, 0.95), seg=14, rings=10)
+    cyl(0.4, 0.5, sk, (0, 0, 0.55), (0, 0, 0), 12, r2=0.28)
+    torus(0.33, 0.07, mat(RED), (0, 0, 0.52), (0, 0, 0), maj=14, mnr=6)
+    for sx in (-1, 1):
+        prism([(0, 0), (sx * 0.4, 0.2), (sx * 0.3, -0.2)], 0.08, mat(RED), (sx * 0.12, 0.0, 0.5), (90, 0, 0), 0.0)
+    disc(0.35, 0.1, mat("#d1a572"), (0, -0.78, -0.35), 4)
+    for (x, z, r) in ((-0.45, 0.85, 0.3), (0.1, 0.95, 0.26), (0.5, 0.78, 0.28)):
+        coin(x, z, -0.15, r)
+    coin(1.35, -1.1, -0.3, 0.38)
+    coin(-1.4, -1.05, -0.3, 0.34)
+    sparkle(1.4, 0.8, 0.28)
+
+
+def icon_quickstep():
+    disc(0.95, 0.3, mat(WHITE, 0.3), (0, 0, -0.1), 28)
+    torus(0.95, 0.12, mat(RED, 0.4), (0, -0.15, -0.1), (90, 0, 0), maj=28, mnr=6)
+    box(0.3, 0.3, 0.2, mat(RED, 0.4), (0, 0, 1.02), bevel=0.03)
+    box(0.12, 0.24, 0.26, mat(STEEL, 0.3, 0.8), (0.0, 0, 0.82))
+    for k in range(12):
+        a = math.radians(k * 30)
+        box(0.08, 0.05, 0.2 if k % 3 == 0 else 0.1, mat(DARK), (math.sin(a) * 0.75, -0.17, -0.1 + math.cos(a) * 0.75), (0, -k * 30, 0), 0.0)
+    nd = prism([(0, 0), (0.1, 0.62), (-0.1, 0.62)], 0.05, mat(RED), (0, -0.2, -0.1), (90, 0, 0), 0.0)
+    rotate_group([nd], 35)
+    for z in (-0.7, -0.1, 0.5):
+        box(0.8, 0.07, 0.1, mat(YELLOW), (-1.6, -0.1, z), bevel=0.0)
+
+
+def icon_bookworm():
+    box(2.2, 0.3, 1.5, mat("#3b6fb8"), (0, 0.15, -0.55), bevel=0.05)
+    box(2.0, 0.34, 1.3, mat(WHITE), (0.02, 0.0, -0.55), bevel=0.03)
+    for z in (-0.3, -0.6, -0.9):
+        box(1.6, 0.36, 0.04, mat("#d8d0bd"), (0.0, 0.0, z), bevel=0.0)
+    g = mat("#5fd16a", 0.45)
+    pts = [(-0.85, 0.05), (-0.45, 0.2), (-0.05, 0.1), (0.35, 0.3), (0.7, 0.2)]
+    for i, (x, z) in enumerate(pts):
+        sphere(0.34 - i * 0.015, g, (x, -0.1, z + 0.1), seg=12, rings=8)
+    head = (0.72, -0.1, 0.62)
+    sphere(0.46, g, head, seg=14, rings=10)
+    for sx in (-1, 1):
+        torus(0.17, 0.035, mat(DARK), (head[0] + sx * 0.2, -0.46, head[2] + 0.05), (90, 0, 0), maj=14, mnr=5)
+        sphere(0.06, mat(DARK), (head[0] + sx * 0.2, -0.47, head[2] + 0.05), seg=6, rings=4)
+    box(0.18, 0.04, 0.04, mat(DARK), (head[0], -0.46, head[2] + 0.06), bevel=0.0)
+    box(0.34, 0.04, 0.07, mat(RED), (head[0], -0.5, head[2] - 0.2), bevel=0.0)
+
+
+def icon_steadyhands():
+    box(2.5, 0.7, 0.55, mat("#ffcf40", 0.4), (0, 0, -0.5), bevel=0.06)
+    box(0.9, 0.72, 0.4, mat("#c9f0ff", 0.1), (0, -0.01, -0.5), bevel=0.04)
+    sphere(0.19, mat("#47d46b", 0.2, emit=0.4), (0.0, -0.36, -0.5), (1.3, 0.4, 1.0), seg=10, rings=6)
+    for x in (-0.55, 0.55):
+        box(0.05, 0.74, 0.4, mat(DARK), (x * 0.9, -0.01, -0.5), bevel=0.0)
+    torus(0.7, 0.07, mat(DARK), (0, -0.1, 0.85), (90, 0, 0), maj=26, mnr=6)
+    for a in (0, 90, 180, 270):
+        r = math.radians(a)
+        box(0.5, 0.1, 0.09, mat(DARK), (math.cos(r) * 0.8, -0.1, 0.85 + math.sin(r) * 0.8), (0, -a, 0), 0.0)
+    sphere(0.14, mat(RED, emit=0.7), (0, -0.1, 0.85), seg=8, rings=6)
+
+
+def icon_bruiser():
+    rm = mat("#e03a2e", 0.4)
+    sphere(1.0, rm, (0, 0, 0.2), (1.1, 0.95, 0.95), seg=16, rings=10)
+    sphere(0.5, rm, (0.7, -0.15, -0.1), (1.1, 0.9, 0.8), seg=10, rings=8)
+    sphere(0.42, mat("#f0594a", 0.4), (-0.35, -0.7, 0.6), (1.0, 0.5, 0.85), seg=10, rings=8)
+    box(1.4, 1.0, 0.65, mat(WHITE, 0.5), (-0.05, 0.0, -0.95), bevel=0.1)
+    box(1.45, 1.05, 0.14, mat("#2f3a56"), (-0.05, 0.0, -0.78), bevel=0.03)
+    for (x, z) in ((-1.55, 0.8), (-1.65, 0.1), (-1.55, -0.6)):
+        box(0.55, 0.07, 0.1, mat(YELLOW), (x, -0.2, z), bevel=0.0)
+    burst(mat(YELLOW, emit=0.5), (0.9, 0.7, 1.0), 8, 0.3, 0.6, 0.06)
+
+
+def icon_patience():
+    shell = mat("#e8a04a", 0.5)
+    sphere(1.0, shell, (-0.15, 0, 0.45), (1.0, 0.65, 1.0), seg=14, rings=10)
+    for R, c in ((0.78, "#c47a2c"), (0.5, "#e8a04a"), (0.25, "#c47a2c")):
+        torus(R, 0.07, mat(c, 0.5), (-0.15, -0.5, 0.45), (90, 0, 0), maj=22, mnr=5)
+    body = mat("#9bd36a", 0.5)
+    box(2.3, 0.7, 0.4, body, (0.1, 0, -0.55), bevel=0.19)
+    sphere(0.4, body, (1.25, 0, -0.35), (1.0, 0.9, 1.15), seg=10, rings=8)
+    for sx in (0.0, 1.0):
+        cyl(0.04, 0.8, body, (1.1 + sx * 0.4, 0.0, 0.15), (0, 0, 0), 6)
+        sphere(0.11, body, (1.1 + sx * 0.4, 0, 0.58), seg=8, rings=6)
+        sphere(0.04, mat(DARK), (1.1 + sx * 0.4, -0.08, 0.6), seg=6, rings=4)
+    box(0.24, 0.04, 0.05, mat(DARK), (1.55, -0.34, -0.45), (0, 0, -20), 0.0)
+    prism(heart_pts(0.5), 0.06, mat(PINK), (-1.3, -0.1, 1.2), (90, 0, 0), 0.0)
+
+
+def icon_grit():
+    sphere(1.15, mat("#ffd23a", 0.5), (0, 0.1, 0), (1.05, 0.9, 1.0), seg=18, rings=12)
+    box(1.35, 0.2, 0.62, mat("#2a1f22"), (0, -0.78, -0.4), bevel=0.1)
+    wt = mat(WHITE, 0.4)
+    for i in range(5):
+        x = -0.52 + i * 0.26
+        box(0.22, 0.12, 0.26, wt, (x, -0.9, -0.28), bevel=0.03)
+        box(0.22, 0.12, 0.26, wt, (x, -0.9, -0.52), bevel=0.03)
+    for sx in (-1, 1):
+        sphere(0.17, mat(DARK), (0.42 * sx, -0.95, 0.3), (1, 0.4, 1.2), seg=8, rings=6)
+        box(0.6, 0.12, 0.16, mat(DARK), (0.42 * sx, -0.95, 0.62), (0, 0, -24 * sx), 0.02)
+    for (x, z) in ((1.55, 0.9), (-1.55, 0.9)):
+        box(0.4, 0.06, 0.08, mat(RED, emit=0.5), (x, -0.4, z), (0, 0, 50 * (1 if x > 0 else -1)), 0.0)
+
+
+def icon_scrappile():
+    gear(-0.45, -0.1, -0.1, 0.85, 8, mat("#8f98a8", 0.4, 0.8))
+    gear(0.9, 0.55, -0.35, 0.5, 6, mat(BRASS, 0.35, 0.8))
+    gear(0.95, -0.75, -0.2, 0.4, 6, mat("#c0603a", 0.4, 0.6))
+    for (x, z, a) in ((-1.45, -0.85, 30), (-0.2, -1.1, -10)):
+        cyl(0.07, 0.8, mat(STEEL, 0.3, 0.9), (x, -0.5, z), (0, 90, a), 6)
+        cyl(0.17, 0.12, mat(STEEL, 0.3, 0.9), (x + 0.4, -0.5, z), (0, 90, a), 6)
+    box(0.3, 0.3, 0.3, mat(STEEL, 0.3, 0.9), (-1.1, -0.5, 0.75), (20, 0, 30), 0.02)
+    cyl(0.16, 0.5, mat(GREEN, 0.5), (0.2, -0.65, -1.15), (0, 90, 0), 8)
+    sparkle(1.55, 1.2, 0.28, c=BRASS)
+
+
+def icon_tinker():
+    steel = mat(STEEL, 0.3, 0.9)
+    before = set(coll.objects)
+    box(0.34, 0.2, 2.5, steel, (0, 0, 0), bevel=0.06)
+    torus(0.5, 0.2, steel, (0, 0, 1.3), (90, 0, 0), maj=18, mnr=6, arc=300)
+    box(0.34, 0.24, 0.5, mat(RED), (0, 0, -0.9), bevel=0.04)
+    tilt(new_since(before), 35, (0, 0))
+    before = set(coll.objects)
+    box(0.26, 0.2, 2.1, mat(YELLOW, 0.4), (0, -0.15, -0.2), bevel=0.06)
+    cyl(0.08, 0.9, steel, (0, -0.15, 1.2), (0, 0, 0), 8, r2=0.03)
+    box(0.18, 0.1, 0.18, mat(DARK), (0, -0.15, 1.65))
+    tilt(new_since(before), -35, (0, 0))
+    gear(0, -0.4, -0.3, 0.38, 8, mat(BRASS, 0.3, 0.8))
+
+
+def icon_sprinter():
+    cyl(0.07, 3.0, mat(STEEL, 0.3, 0.9), (-1.1, 0, 0), (0, 0, 0), 8)
+    sphere(0.12, mat(YELLOW, 0.3, 0.7), (-1.1, 0, 1.55), seg=8, rings=6)
+    for r in range(4):
+        for c in range(5):
+            col = DARK if (r + c) % 2 == 0 else WHITE
+            box(0.42, 0.06, 0.38, mat(col, 0.5), (-0.85 + c * 0.42 + r * 0.03, 0.0, 1.35 - r * 0.38), (0, 0, 0), 0.0)
+    for k, z in enumerate((-0.2, -0.65, -1.1)):
+        for dx in (0.3, 0.9):
+            prism([(0, 0), (0.55, 0.28), (0, 0.56), (0.15, 0.28)], 0.12, mat(RED if k % 2 else ORANGE), (dx + k * 0.5, -0.1, z), (90, 0, 0), 0.0)
+    for z in (-0.4, -0.9):
+        box(0.8, 0.06, 0.07, mat(YELLOW), (-1.6, -0.2, z), bevel=0.0)
+
+
+def icon_itchytrigger():
+    g = mat("#4a5568", 0.4, 0.5)
+    box(1.6, 0.55, 0.5, g, (0.1, 0, 0.55), bevel=0.06)
+    box(0.7, 0.45, 0.3, mat(DARK, 0.4, 0.6), (1.2, 0, 0.6), bevel=0.04)
+    box(0.5, 0.5, 1.1, g, (-0.45, 0, -0.1), (0, 15, 0), 0.06)
+    torus(0.38, 0.06, g, (0.35, 0, 0.0), (90, 0, 0), maj=20, mnr=6)
+    box(0.12, 0.2, 0.42, mat(RED, 0.4), (0.35, 0, 0.1), (0, -20, 0), 0.02)
+    fm = mat("#ffd0a8", 0.6)
+    sphere(0.3, fm, (0.55, -0.1, -0.45), (1.0, 0.8, 1.6), seg=10, rings=8)
+    box(0.22, 0.05, 0.1, mat("#ffe6d0"), (0.55, -0.4, -0.3), bevel=0.0)
+    for (x, z) in ((1.3, 0.1), (1.55, -0.2), (1.1, -0.45)):
+        drop(mat("#6fd8ff", 0.2, emit=0.35), (x, -0.4, z), 0.9)
+    for k in (-1, 1):
+        box(0.4, 0.06, 0.07, mat(YELLOW), (0.85 + 0.25 * k, -0.4, -0.95), (0, 0, 60 * k), 0.0)
+
+
+def icon_stout():
+    wd = mat(BROWN, 0.7)
+    sphere(1.1, wd, (0, 0, 0), (0.95, 0.95, 1.05), seg=14, rings=10)
+    cyl(0.95, 0.12, mat(BROWN2), (0, 0, 1.12), (0, 0, 0), 16)
+    for z, w in ((-0.55, 0.78), (0.55, 0.78), (0.0, 1.03)):
+        torus(w * 1.07, 0.07, mat(STEEL, 0.3, 0.9), (0, 0, z), (0, 0, 0), maj=22, mnr=6)
+    for x in (-0.55, -0.2, 0.2, 0.55):
+        box(0.04, 0.04, 1.9, mat(BROWN2), (x, -0.9, 0.0), bevel=0.0)
+    disc(0.35, 0.08, mat(CREAM, 0.5), (0, -1.04, 0.0), 16)
+    plus(0, 0, 0.42, -1.1, "#47b86a")
+
+
+def icon_luckypenny():
+    coin(0, 0, 0, 1.2, 0.3)
+    prism(star_points(5, 0.62, 0.28), 0.1, mat(YELLOW, 0.3, 0.3, emit=0.4), (0, -0.2, 0), (90, 0, 0), 0.0)
+    torus(0.98, 0.04, mat("#e0a21f"), (0, -0.16, 0), (90, 0, 0), maj=26, mnr=4)
+    for (x, z, s) in ((1.5, 1.1, 0.34), (-1.5, 0.9, 0.25), (1.4, -1.05, 0.2), (-1.35, -1.0, 0.3)):
+        sparkle(x, z, s, c="#ffffff")
+
+
+def icon_helpinghand():
+    gm = mat(WHITE, 0.55)
+    box(1.2, 0.6, 1.2, gm, (0, 0, -0.2), bevel=0.12)
+    for i, (x, h) in enumerate(((-0.45, 1.0), (-0.15, 1.2), (0.15, 1.15), (0.45, 0.95))):
+        box(0.26, 0.5, h, gm, (x, 0, 0.4 + h / 2 - 0.2), bevel=0.08)
+    box(0.34, 0.5, 0.8, gm, (-0.88, 0, 0.1), (0, 0, -40), 0.08)
+    box(1.35, 0.7, 0.4, mat(RED, 0.5), (0, 0, -0.95), bevel=0.06)
+    prism(heart_pts(0.6), 0.1, mat(RED, 0.4), (0, -0.35, -0.15), (90, 0, 0), 0.0)
+    sparkle(-1.4, 1.2, 0.3, c=PINK)
+    sparkle(1.3, 1.45, 0.25, c=YELLOW)
+
+
+def icon_shortfuse():
+    for i, x in enumerate((-0.65, 0.0, 0.65)):
+        cyl(0.33, 2.0, mat(RED if i != 1 else "#e8503a", 0.5), (x, 0, -0.1), (0, 0, 0), 12)
+        cyl(0.34, 0.12, mat(CREAM), (x, 0, 0.5), (0, 0, 0), 12)
+        cyl(0.34, 0.12, mat(CREAM), (x, 0, -0.7), (0, 0, 0), 12)
+    box(2.0, 0.76, 0.2, mat(BROWN2), (0, 0, -0.1), bevel=0.04)
+    cyl(0.05, 0.4, mat("#3a352d"), (0, 0, 1.15), (0, 0, 0), 6)
+    burst(mat(ORANGE, emit=1.0), (0, -0.2, 1.5), 8, 0.2, 0.55, 0.06)
+    burst(mat(YELLOW, emit=1.2), (0, -0.25, 1.5), 8, 0.1, 0.32, 0.06)
+
+
+def icon_peptalk():
+    before = set(coll.objects)
+    cyl(0.9, 1.3, mat(RED, 0.4), (0.35, 0, 0), (0, 90, 0), 18, r2=0.3)
+    cyl(0.32, 0.9, mat(DARK, 0.4), (-0.7, 0, 0), (0, 90, 0), 14)
+    box(0.34, 0.3, 0.8, mat(DARK, 0.4), (-0.3, 0, -0.6), (0, 0, 0), 0.05)
+    torus(0.92, 0.08, mat(WHITE), (1.0, 0, 0), (0, 90, 0), maj=18, mnr=6)
+    tilt(new_since(before), 20, (0, 0))
+    for k, r in enumerate((0.8, 1.15, 1.5)):
+        arc(r, 0.06, mat(YELLOW, emit=0.4), (1.5, -0.1, 0.4), -35, 70, 24, 5)
+    sparkle(-1.2, 1.1, 0.35)
+    sparkle(1.9, -0.7, 0.25, c=ORANGE)
+
+
+def icon_overclock():
+    disc(1.25, 0.34, mat("#2a2f3a", 0.4, 0.5), (0, 0, 0), 28)
+    disc(1.08, 0.1, mat("#e8eef7", 0.5), (0, -0.2, 0), 28)
+    for k, (a0, a1, c) in enumerate(((-130, -30, "#47b86a"), (-30, 40, YELLOW), (40, 130, RED))):
+        arc(0.92, 0.09, mat(c, emit=0.4), (0, -0.26, 0), 90 - a1, a1 - a0, 64, 5)
+    for k in range(9):
+        a = math.radians(-130 + k * 32.5)
+        box(0.05, 0.05, 0.22, mat(DARK), (math.sin(a) * 0.62, -0.26, math.cos(a) * 0.62), (0, -math.degrees(a), 0), 0.0)
+    nd = prism([(0, 0.0), (0.07, 0.1), (0.0, 0.85), (-0.07, 0.1)], 0.06, mat(RED, emit=0.6), (0, -0.3, 0), (90, 0, 0), 0.0)
+    rotate_group([nd], 50)
+    disc(0.15, 0.12, mat(DARK), (0, -0.34, 0), 10)
+    burst(mat(ORANGE, emit=0.6), (0.95, -0.4, 1.05), 6, 0.12, 0.34, 0.05)
+    sparkle(-1.2, 1.1, 0.25)
+
+
+def icon_heavyhitter():
+    before = set(coll.objects)
+    cyl(0.1, 3.0, mat(BROWN, 0.6), (0, 0, -0.1), (0, 0, 0), 8)
+    box(1.7, 0.95, 0.95, mat("#7c8696", 0.3, 0.9), (0, 0, 1.2), bevel=0.08)
+    box(0.35, 1.0, 1.0, mat(RED, 0.4), (0.0, 0, 1.2), bevel=0.04)
+    box(0.15, 0.2, 0.2, mat(DARK), (0, 0, -1.55), bevel=0.0)
+    tilt(new_since(before), -35, (0, 0))
+    burst(mat(YELLOW, emit=0.5), (-0.9, 0.7, -0.9), 9, 0.55, 1.05, 0.1)
+    burst(mat(ORANGE, emit=0.4), (-0.9, 0.6, -0.9), 9, 0.3, 0.8, 0.1)
+
+
+def icon_reinforced():
+    steel = mat(STEEL, 0.3, 0.9)
+    disc(1.25, 0.3, mat("#7c8aa3", 0.3, 0.8), (0, 0.05, 0), 24)
+    disc(1.0, 0.16, mat(BLUE, 0.4), (0, -0.2, 0), 24)
+    torus(1.25, 0.1, steel, (0, -0.2, 0), (90, 0, 0), maj=26, mnr=6)
+    for a in (45, 135):
+        box(2.3, 0.14, 0.26, steel, (0, -0.32, 0), (0, -a, 0), 0.03)
+    sphere(0.3, mat(BRASS, 0.3, 0.8), (0, -0.4, 0), (1, 0.6, 1), seg=10, rings=6)
+    for k in range(8):
+        a = math.radians(k * 45 + 22)
+        sphere(0.08, mat(BRASS, 0.3, 0.8), (math.cos(a) * 1.12, -0.36, math.sin(a) * 1.12), seg=6, rings=4)
+    plus(1.2, 1.0, 0.55, -0.1, "#47b86a")
+
+
+def icon_lifeline():
+    torus(0.95, 0.35, mat(WHITE, 0.5), (0, 0, 0), (90, 0, 0), maj=32, mnr=10)
+    for k in range(4):
+        a = k * 90 + 45
+        r = math.radians(a)
+        box(0.5, 0.62, 0.72, mat(RED, 0.5), (math.cos(r) * 0.95, 0, math.sin(r) * 0.95), (0, -(a + 90), 0), 0.08)
+    cyl(0.04, 1.8, mat(YELLOW, 0.7), (1.3, 0, -1.0), (0, 0, 0), 6)
+    torus(0.45, 0.06, mat(CREAM, 0.7), (1.45, -0.1, -1.55), (90, 0, 0), maj=20, mnr=5)
+    prism(heart_pts(0.45), 0.08, mat(PINK), (0, -0.45, 0), (90, 0, 0), 0.0)
+    sparkle(-1.4, 1.3, 0.28)
+
+
+def icon_sharpeyes():
+    sphere(1.05, mat(WHITE, 0.3), (0, 0, 0), (1.45, 0.65, 0.9), seg=18, rings=12)
+    disc(0.62, 0.12, mat("#2f8fe8", 0.3), (0, -0.62, 0), 22)
+    disc(0.4, 0.14, mat(DARK, 0.2), (0, -0.66, 0), 18)
+    torus(0.78, 0.04, mat(RED, emit=0.7), (0, -0.7, 0), (90, 0, 0), maj=24, mnr=4)
+    for a in (0, 90, 180, 270):
+        r = math.radians(a)
+        box(0.34, 0.06, 0.06, mat(RED, emit=0.7), (math.cos(r) * 0.83, -0.7, math.sin(r) * 0.83), (0, -a, 0), 0.0)
+    sphere(0.1, mat(WHITE, emit=0.9), (-0.14, -0.74, 0.14), seg=6, rings=4)
+    for k in range(5):
+        a = math.radians(-60 + k * 30)
+        box(0.1, 0.1, 0.45, mat(DARK), (math.sin(a) * 1.0, -0.1, 0.95 + math.cos(a) * 0.35), (0, -math.degrees(a), 0), 0.0)
+
+
+def icon_windrunner():
+    sky = mat("#7fd4ff", 0.4, emit=0.15)
+    for (R, z, c) in ((1.2, 0.5, "#7fd4ff"), (0.8, -0.3, "#b8ecff"), (0.5, -1.0, "#7fd4ff")):
+        arc(R, 0.12, mat(c, 0.4, emit=0.25), (0.0, 0, z), -20 - R * 20, 240, 40, 6)
+    for (x, z) in ((1.3, 0.95), (-1.35, -0.4)):
+        sphere(0.2, sky, (x, 0, z), seg=8, rings=6)
+    lf = mat("#5fd16a")
+    prism([(0, 0), (0.45, 0.22), (0.9, 0), (0.45, -0.22)], 0.07, lf, (-0.6, -0.1, 0.6), (90, 0, 35), 0.0)
+    box(0.5, 0.05, 0.05, mat("#2f7e49"), (-0.5, -0.15, 0.6), (0, 35, 0), 0.0)
+    sparkle(1.4, -0.6, 0.25, c="#ffffff")
+
+
+def icon_mender():
+    pt = mat("#d9b27c", 0.8)
+    box(1.8, 0.28, 1.8, pt, (0, 0, 0), (0, 0, 8), 0.08)
+    for x in (-0.4, 0.0, 0.4):
+        box(0.07, 0.3, 0.9, mat("#b58a56"), (x, -0.02, 0.0), (0, 0, 8), 0.0)
+    sk = mat("#ff4f6d", 0.4)
+    for (x, z) in ((-0.55, 0.65), (-0.55, -0.65), (0.55, 0.65), (0.55, -0.65)):
+        for a in (45, 135):
+            box(0.4, 0.07, 0.07, sk, (x, -0.2, z), (0, -a, 0), 0.0)
+    before = set(coll.objects)
+    box(0.07, 0.07, 2.4, mat(STEEL, 0.2, 1.0), (0, -0.3, 0), bevel=0.0)
+    torus(0.1, 0.03, mat(STEEL, 0.2, 1.0), (0, -0.3, 1.1), (90, 0, 0), maj=12, mnr=4)
+    cyl(0.07, 0.3, mat(STEEL, 0.2, 1.0), (0, -0.3, -1.3), (0, 0, 0), 6, r2=0.0)
+    tilt(new_since(before), 40, (0, 0))
+    arc(0.5, 0.025, sk, (1.0, -0.3, -0.9), 0, 260, 20, 4)
+    plus(-1.15, 1.1, 0.5, -0.1, "#47b86a")
+
+
+def icon_magnetic():
+    torus(0.5, 0.08, mat(STEEL, 0.3, 0.9), (0, 0, 1.4), (90, 0, 0), maj=20, mnr=6)
+    disc(1.05, 0.28, mat(BRASS, 0.3, 0.8), (0, 0, -0.1), 26)
+    torus(1.05, 0.1, mat("#f0c25e", 0.3, 0.8), (0, -0.14, -0.1), (90, 0, 0), maj=26, mnr=6)
+    torus(0.42, 0.18, mat(RED, 0.35, 0.3), (0, -0.2, -0.0), (90, 0, 0), maj=24, mnr=8, arc=180)
+    for sx in (-1, 1):
+        box(0.34, 0.2, 0.3, mat(STEEL, 0.3, 0.9), (0.42 * sx, -0.2, -0.28), bevel=0.02)
+    for (x, z) in ((-1.4, -0.9), (1.45, -0.75), (-1.2, 0.8), (1.3, 0.85)):
+        sphere(0.12, mat(DARK, 0.4, 0.8), (x, -0.1, z), seg=8, rings=6)
+    sparkle(1.6, 1.4, 0.3, c="#7fd4ff")
+
+
+def icon_prospector():
+    before = set(coll.objects)
+    cyl(0.09, 2.7, mat(BROWN, 0.6), (0, 0, -0.5), (0, 0, 0), 8)
+    arc(0.95, 0.14, mat(STEEL, 0.3, 0.9), (0, 0, 0.5), 20, 140, 26, 6)
+    cyl(0.14, 0.4, mat(STEEL, 0.3, 0.9), (0.9, 0, 0.2), (0, 150, 0), 6, r2=0.0)
+    cyl(0.14, 0.4, mat(STEEL, 0.3, 0.9), (-0.9, 0, 0.2), (0, -150, 0), 6, r2=0.0)
+    tilt(new_since(before), -25, (0, 0))
+    ng = mat(GOLD, 0.25, 0.9)
+    for (x, z, s) in ((0.9, -1.0, 0.45), (1.45, -1.15, 0.38), (1.15, -0.55, 0.36), (0.45, -1.2, 0.3)):
+        sphere(s, ng, (x, -0.2, z), (1, 0.8, 0.8), seg=7, rings=5)
+    sparkle(1.5, -0.2, 0.3, c="#ffffff")
+    sparkle(0.6, -0.5, 0.2, c="#ffffff")
+
+
+def icon_grenadepouch():
+    gm = mat("#6e7a45", 0.7)
+    box(1.8, 0.9, 1.5, gm, (0, 0, -0.35), bevel=0.15)
+    prism([(-0.9, 0.0), (0.9, 0.0), (0.9, -0.5), (0.0, -0.95), (-0.9, -0.5)], 0.95, mat("#59622f", 0.7), (0, 0, 0.6), (90, 0, 0), 0.06)
+    box(0.34, 0.1, 0.4, mat(BRASS, 0.3, 0.8), (0, -0.55, 0.28), bevel=0.02)
+    sphere(0.48, mat(GREEN, 0.5), (-0.35, 0.0, 1.0), (1, 1, 1.1), seg=10, rings=8)
+    cyl(0.16, 0.25, mat(STEEL, 0.4, 0.8), (-0.35, 0.0, 1.55), (0, 0, 0), 8)
+    torus(0.2, 0.04, mat(STEEL, 0.4, 0.8), (-0.12, 0, 1.65), (90, 0, 0), maj=12, mnr=4)
+    box(2.0, 0.06, 0.2, mat(BROWN2), (0, -0.46, -0.1), (0, 0, 0), 0.0)
+    plus(1.35, 1.1, 0.5, -0.1, ORANGE)
+    sphere(0.4, mat(GREEN, 0.5), (0.65, 0.15, 1.0), (1, 1, 1.1), seg=10, rings=8)
+
+
+def icon_forcefield():
+    cyl(1.1, 0.25, mat("#2a3a55", 0.4, 0.5), (0, 0, -1.0), (0, 0, 0), 20)
+    cyl(0.5, 0.35, mat(STEEL, 0.3, 0.8), (0, 0, -0.78), (0, 0, 0), 14)
+    sphere(1.45, glass("#5fd9ff", 0.28, emit=0.5), (0, 0, 0.15), seg=22, rings=14)
+    for k, (z, R) in enumerate(((-0.55, 1.18), (-0.05, 1.45), (0.5, 1.36), (1.0, 1.0))):
+        torus(R, 0.07, glass("#bff4ff", 0.85, emit=0.8), (0, 0, z + 0.15), (0, 0, 0), maj=32, mnr=6)
+    sphere(0.38, mat(YELLOW, 0.3, emit=1.4), (0, 0, 0.1), seg=12, rings=8)
+    prism(star_points(8, 0.7, 0.4), 0.08, mat("#fff7c2", emit=1.0), (0, -0.2, 0.1), (90, 0, 0), 0.0)
+    for (x, z) in ((-1.55, 1.2), (1.5, 1.15), (1.6, -0.3)):
+        sparkle(x, z, 0.25, c="#bff4ff")
+
+
+def icon_spikedarmor():
+    pts = [(-0.5, 1.05), (-1.0, 0.8), (-1.25, -0.1), (-1.0, -1.05), (1.0, -1.05), (1.25, -0.1), (1.0, 0.8), (0.5, 1.05), (0.0, 0.6)]
+    prism(pts, 0.5, mat(STEEL, 0.3, 0.9), (0, 0, 0), (90, 0, 0), 0.08)
+    prism([(x * 0.8, y * 0.8 - 0.02) for x, y in pts], 0.2, mat("#6f7b92", 0.3, 0.9), (0, -0.28, 0), (90, 0, 0), 0.04)
+    box(0.18, 0.1, 1.4, mat(RED), (0, -0.4, -0.15), bevel=0.02)
+    sp = mat("#ffe39a", 0.3, 0.3, emit=0.2)
+    for (x, z) in ((-0.55, 0.4), (0.55, 0.4), (-0.6, -0.4), (0.6, -0.4), (0.0, -0.8), (0.0, 0.7)):
+        cyl(0.17, 0.55, sp, (x, -0.55, z), (90, 0, 0), 8, r2=0.0)
+    spike(sp, (-1.1, 0.0, 0.8), 130, 0.18, 0.55)
+    spike(sp, (1.1, 0.0, 0.8), 50, 0.18, 0.55)
+    spike(sp, (-1.2, 0.0, -0.1), 180, 0.18, 0.5)
+    spike(sp, (1.2, 0.0, -0.1), 0, 0.18, 0.5)
+
+
+def icon_quickstudy():
+    gl = glass("#fff2a0", 0.75, emit=0.6)
+    sphere(0.85, gl, (0, 0, 0.5), seg=16, rings=12)
+    cyl(0.42, 0.35, mat(STEEL, 0.4, 0.8), (0, 0, -0.5), (0, 0, 0), 12, r2=0.3)
+    cyl(0.3, 0.2, mat(DARK, 0.4), (0, 0, -0.78), (0, 0, 0), 12)
+    bolt = [(0.12, 0.6), (-0.3, -0.05), (-0.04, -0.05), (-0.16, -0.6), (0.3, 0.1), (0.04, 0.1), (0.24, 0.6)]
+    prism(bolt, 0.14, mat(ORANGE, emit=0.7), (0, -0.3, 0.55), (90, 0, 0), 0.0)
+    for a in range(0, 360, 45):
+        if a in (225, 270, 315):
+            continue
+        r = math.radians(a)
+        box(0.35, 0.06, 0.07, mat(YELLOW, emit=0.8), (math.cos(r) * 1.3, -0.1, 0.5 + math.sin(r) * 1.3), (0, -a, 0), 0.0)
+    before = set(coll.objects)
+    box(0.22, 0.22, 1.5, mat(YELLOW, 0.5), (0, 0, 0), bevel=0.03)
+    cyl(0.14, 0.4, mat("#ffdcb0"), (0, 0, -0.95), (0, 0, 0), 6, r2=0.0)
+    box(0.24, 0.24, 0.2, mat(PINK), (0, 0, 0.82), bevel=0.03)
+    pen = new_since(before)
+    tilt(pen, 50, (0, 0))
+    for o in pen:
+        o.location += Vector((1.35, -0.2, -0.55))
+
+
+def icon_fieldmedic():
+    sphere(1.15, mat(OLIVE, 0.6), (0, 0, 0.1), (1.0, 0.95, 0.95), seg=18, rings=12)
+    box(2.5, 1.5, 0.12, mat("#59622f", 0.6), (0, 0, -0.55), bevel=0.06)
+    box(2.3, 0.1, 0.18, mat(DARK, 0.5), (0, -0.7, -0.3), bevel=0.0)
+    disc(0.52, 0.12, mat(WHITE, 0.4), (0, -1.0, 0.25), 20)
+    plus(0, 0.25, 0.72, -1.08)
+    sparkle(-1.45, 1.2, 0.28, c="#ffffff")
+    sparkle(1.5, 0.9, 0.22, c="#47b86a")
+
+
+def icon_dashmaster():
+    before = set(coll.objects)
+    box(1.0, 0.8, 1.7, mat(RED, 0.5), (0, 0, 0.35), bevel=0.1)
+    box(1.1, 0.82, 0.25, mat(WHITE, 0.5), (0, 0, 1.15), bevel=0.04)
+    box(1.9, 0.82, 0.55, mat("#2a2f3a", 0.5), (0.45, 0, -0.75), bevel=0.12)
+    tilt(new_since(before), -20, (0, 0))
+    for k, (x, z, s) in enumerate(((-1.2, -0.95, 1.1), (-1.5, -0.45, 0.8), (-1.0, -1.35, 0.7))):
+        burst(mat([ORANGE, YELLOW, RED][k], emit=0.9), (x, 0.6 - k * 0.1, z), 7, 0.15 * s, 0.5 * s, 0.1)
+    for z in (-0.1, 0.5, 1.1):
+        box(0.8, 0.06, 0.08, mat(YELLOW), (-1.7, -0.3, z + 0.2), bevel=0.0)
+
+
+def icon_demolition():
+    steel = mat(STEEL, 0.3, 0.9)
+    box(2.4, 0.4, 0.25, mat(YELLOW, 0.5), (-0.4, 0, 1.45), bevel=0.04)
+    for k in range(5):
+        torus(0.17, 0.05, steel, (0.5, 0, 1.2 - k * 0.3), (90 * (k % 2), 90 * ((k + 1) % 2), 0), maj=10, mnr=4)
+    sphere(0.9, mat("#2f2b3d", 0.35, 0.6), (0.5, 0, -0.55), seg=16, rings=12)
+    box(0.5, 0.06, 0.1, mat("#ffffff", 0.2), (0.15, -0.88, -0.2), (0, 0, 40), 0.0)
+    brick = mat("#c46a3a", 0.7)
+    for (x, z, a) in ((-1.2, -1.0, 15), (-0.7, -0.4, -25), (1.7, -1.2, 30), (1.9, -0.5, -10), (-1.5, -0.2, 40)):
+        box(0.4, 0.28, 0.26, brick, (x, -0.2, z), (0, a, 0), 0.02)
+    burst(mat(ORANGE, emit=0.5), (0.5, 0.7, -0.55), 10, 1.0, 1.5, 0.08)
+
+
+def icon_riskreward():
+    steel = mat(STEEL, 0.3, 0.9)
+    cyl(0.1, 2.2, steel, (0, 0, -0.1), (0, 0, 0), 8)
+    cyl(0.6, 0.15, steel, (0, 0, -1.2), (0, 0, 0), 14)
+    sphere(0.16, mat(BRASS, 0.3, 0.8), (0, 0, 1.0), seg=8, rings=6)
+    before = set(coll.objects)
+    box(2.6, 0.14, 0.14, steel, (0, 0, 1.0), bevel=0.02)
+    tilt(new_since(before), 10, (0, 1.0))
+    for sx, dz in ((-1, -0.22), (1, 0.22)):
+        x, z = 1.28 * sx, 1.0 + dz
+        for dx in (-0.4, 0.4):
+            box(0.03, 0.03, 0.8, steel, (x + dx * 0.9, 0, z - 0.45), bevel=0.0)
+        cyl(0.62, 0.1, mat(BRASS, 0.3, 0.8), (x, 0, z - 0.9), (0, 0, 0), 16)
+    for k in range(3):
+        coin(-1.28, -0.2 + k * 0.2, 0.0, 0.42, 0.16)
+    sphere(0.4, mat("#2f2b3d", 0.35, 0.4), (1.28, 0, 0.35), seg=12, rings=8)
+    cyl(0.1, 0.16, steel, (1.28, 0, 0.75), (0, 0, 0), 8)
+    sphere(0.07, mat(YELLOW, emit=1.2), (1.38, 0, 0.93), seg=6, rings=4)
+
+
+def icon_stalwart():
+    pts = [(-0.85, 1.25), (0.85, 1.25), (1.0, 1.0), (1.0, -0.6), (0.0, -1.3), (-1.0, -0.6), (-1.0, 1.0)]
+    prism(pts, 0.4, mat("#7c8aa3", 0.3, 0.8), (0, 0, 0), (90, 0, 0), 0.08)
+    prism([(x * 0.84, y * 0.86 + 0.02) for x, y in pts], 0.16, mat("#3d6fb5", 0.4), (0, -0.25, 0), (90, 0, 0), 0.04)
+    box(0.14, 0.12, 1.9, mat(YELLOW, 0.4), (0, -0.38, 0.0), bevel=0.02)
+    box(1.7, 0.12, 0.14, mat(YELLOW, 0.4), (0, -0.38, 0.15), bevel=0.02)
+    sphere(0.38, mat(STEEL, 0.3, 0.9), (0, -0.42, 0.15), (1, 0.55, 1), seg=12, rings=8)
+    for sx in (-1, 1):
+        sphere(0.11, mat(BRASS, 0.3, 0.8), (0.6 * sx, -0.4, 0.95), seg=8, rings=6)
+        sphere(0.11, mat(BRASS, 0.3, 0.8), (0.6 * sx, -0.4, -0.5), seg=8, rings=6)
+
+
+def icon_armorpiercer():
+    pl = mat("#7c8696", 0.3, 0.9)
+    box(2.4, 0.45, 2.2, pl, (0, 0.3, 0), bevel=0.06)
+    box(2.0, 0.1, 1.8, mat("#9aa5b8", 0.3, 0.9), (0, 0.04, 0), bevel=0.03)
+    disc(0.55, 0.1, mat("#15121a"), (0, -0.04, 0), 16)
+    for a in range(0, 360, 40):
+        r = math.radians(a)
+        L = 0.75 + (a % 80) / 160
+        box(L, 0.05, 0.07, mat(DARK), (math.cos(r) * (0.55 + L / 2), -0.04, math.sin(r) * (0.55 + L / 2)), (0, -a, 0), 0.0)
+    cyl(0.28, 1.0, mat(BRASS, 0.3, 0.9), (0, -0.9, 0), (90, 0, 0), 14)
+    cyl(0.28, 0.8, mat("#2a2f3a", 0.3, 0.8), (0, -1.75, 0), (90, 0, 0), 14, r2=0.05)
+    cyl(0.32, 0.14, mat(BRASS, 0.3, 0.9), (0, -0.4, 0), (90, 0, 0), 14)
+    sparkle(1.4, 1.3, 0.3, c="#ffffff")
+
+
+def icon_rapidreload():
+    box(0.9, 0.55, 1.7, mat("#3a4350", 0.4, 0.7), (-0.1, 0, -0.2), (0, 0, 8), 0.07)
+    for k in range(4):
+        box(0.8, 0.57, 0.1, mat(STEEL, 0.4, 0.8), (-0.1 + 0.03 * k, 0, -0.9 + k * 0.38), (0, 0, 8), 0.0)
+    for k in range(2):
+        bullet(mat(BRASS, 0.3, 0.9), mat(RED), (-0.35 + k * 0.35, 0.0, 0.6), (0, 0, 8), 0.5)
+    for (a, y) in ((20, -0.4), (200, -0.4)):
+        arc(1.3, 0.12, mat(YELLOW, 0.4, emit=0.5), (0, y, -0.1), a, 100, 48, 6)
+        e = math.radians(a + 100)
+        tx, tz = -math.sin(e), math.cos(e)
+        cyl(0.3, 0.42, mat(YELLOW, 0.4, emit=0.5), (math.cos(e) * 1.3 + tx * 0.16, y, math.sin(e) * 1.3 + tz * 0.16 - 0.1), (0, math.degrees(math.atan2(tx, tz)), 0), 3, r2=0.0)
+    sparkle(0.9, 1.3, 0.25)
+
+
+def icon_juggernaut():
+    st = mat("#7c8aa3", 0.3, 0.9)
+    box(1.7, 1.2, 1.6, st, (0, 0.1, -0.2), bevel=0.2)
+    sphere(0.75, st, (0, 0, 0.2), (1.1, 0.95, 1.0), seg=16, rings=10)
+    box(1.25, 0.3, 0.2, mat(DARK), (0, -0.7, 0.1), bevel=0.0)
+    box(0.12, 0.3, 0.8, st, (0, -0.72, -0.1), bevel=0.02)
+    box(0.9, 0.12, 0.1, mat("#ff4f3a", emit=0.9), (0, -0.78, 0.1), bevel=0.0)
+    box(0.35, 0.9, 0.3, mat(RED, 0.5), (0, 0, 1.0), bevel=0.06)
+    for sx in (-1, 1):
+        sphere(0.55, mat("#aab4c8", 0.3, 0.9), (1.25 * sx, 0, -0.35), (1, 1, 0.75), seg=12, rings=8)
+        spike(mat("#ffe39a", 0.3, 0.3), (1.25 * sx, -0.1, -0.1), 90, 0.14, 0.4)
+    for x in (-0.6, 0.6):
+        sphere(0.09, mat(BRASS, 0.3, 0.8), (x, -0.7, -0.6), seg=6, rings=4)
+
+
+def icon_executioner():
+    before = set(coll.objects)
+    cyl(0.1, 3.0, mat(BROWN, 0.6), (0, 0, -0.1), (0, 0, 0), 8)
+    blade = [(0, 0.55), (0.25, 0.7), (1.3, 1.2), (1.5, 0.3), (1.3, -0.6), (0.25, -0.35), (0, -0.45)]
+    prism(blade, 0.12, mat("#c8cfdb", 0.2, 1.0), (0, 0, 0.9), (90, 0, 0), 0.02)
+    prism([(0.3, 0.45), (1.2, 0.85), (1.3, 0.3), (1.2, -0.4), (0.3, -0.25)], 0.14, mat("#8f98a8", 0.25, 0.9), (0.05, -0.02, 0.9), (90, 0, 0), 0.0)
+    tilt(new_since(before), 25, (0, 0))
+    box(1.6, 1.1, 0.8, mat(BROWN2, 0.7), (0.0, 0, -1.2), bevel=0.05)
+    disc(0.55, 0.06, mat(BROWN, 0.7), (0.0, -0.56, -1.2), 14)
+    sparkle(1.7, 0.6, 0.3, c="#ffffff")
+    drop(mat(RED, 0.3), (-1.4, -0.3, -0.8), 1.2)
+
+
+def icon_blitz():
+    before = set(coll.objects)
+    cyl(0.42, 2.0, mat(RED, 0.4), (0, 0, 0), (0, 0, 0), 14)
+    cyl(0.42, 0.9, mat(WHITE, 0.4), (0, 0, 1.4), (0, 0, 0), 14, r2=0.02)
+    torus(0.43, 0.06, mat(YELLOW), (0, 0, 0.45), (0, 0, 0), maj=14, mnr=5)
+    disc(0.16, 0.1, mat(SKY, 0.1, emit=0.5), (0, -0.4, 0.4), 10)
+    for a in (0, 90, 180, 270):
+        prism([(0, 0), (0.6, -0.5), (0.6, -1.0), (0, -0.7)], 0.08, mat(BLUE, 0.4), (0, 0, 0), (0, 0, 0), 0.0).rotation_euler = Euler((math.radians(90), 0, math.radians(a)), "XYZ")
+    cyl(0.3, 0.5, mat(DARK, 0.4), (0, 0, -1.1), (0, 0, 0), 12, r2=0.4)
+    cyl(0.25, 1.0, mat(ORANGE, emit=1.0), (0, 0, -1.7), (180, 0, 0), 10, r2=0.02)
+    cyl(0.12, 0.8, mat(YELLOW, emit=1.3), (0, 0, -1.55), (180, 0, 0), 8, r2=0.02)
+    tilt(new_since(before), -50, (0, 0))
+    bolt = [(0.15, 0.5), (-0.35, -0.05), (-0.05, -0.05), (-0.2, -0.55), (0.35, 0.1), (0.05, 0.1), (0.3, 0.5)]
+    prism(bolt, 0.1, mat(YELLOW, emit=0.7), (-1.35, -0.4, 1.0), (90, 0, 0), 0.0)
+    for z in (-0.3, 0.2):
+        box(0.7, 0.06, 0.08, mat(YELLOW), (-1.7, -0.3, z - 0.9), bevel=0.0)
+
+
+def icon_bloodthirst():
+    gd = mat(GOLD, 0.25, 0.9)
+    cyl(0.14, 0.9, gd, (0, 0, -0.5), (0, 0, 0), 8)
+    cyl(0.6, 0.18, gd, (0, 0, -1.1), (0, 0, 0), 14)
+    sphere(0.2, gd, (0, 0, -0.5), seg=8, rings=6)
+    cyl(0.95, 1.1, gd, (0, 0, 0.55), (180, 0, 0), 18, r2=0.55)
+    cyl(0.9, 0.04, mat("#b0141c", 0.15, emit=0.3), (0, 0, 1.08), (0, 0, 0), 18)
+    torus(0.95, 0.06, mat("#f0c25e", 0.3, 0.9), (0, 0, 1.1), (0, 0, 0), maj=22, mnr=5)
+    dm = mat(RED, 0.2, emit=0.2)
+    drop(dm, (0.78, -0.2, 0.2), 2.0)
+    drop(dm, (-1.25, -0.2, 0.8), 1.5)
+    drop(dm, (1.25, -0.2, -0.5), 1.1)
+
+
+def icon_fortress():
+    st = mat("#b9b3a5", 0.8)
+    st2 = mat("#9a948a", 0.8)
+    box(2.5, 1.0, 1.1, st, (0, 0, -0.65), bevel=0.04)
+    for sx in (-1, 1):
+        box(0.85, 1.05, 2.1, st2, (1.05 * sx, 0, 0.0), bevel=0.04)
+        for dx in (-0.3, 0.0, 0.3):
+            box(0.2, 0.3, 0.3, st2, (1.05 * sx + dx, 0, 1.2), bevel=0.02)
+        box(0.12, 0.08, 0.5, mat(DARK), (1.05 * sx, -0.53, 0.3), bevel=0.0)
+    for x in (-0.5, 0.0, 0.5):
+        box(0.28, 0.9, 0.28, st, (x, 0, 0.0), bevel=0.02)
+    prism([(-0.4, -1.1), (-0.4, -0.25), (0, 0.1), (0.4, -0.25), (0.4, -1.1)], 0.1, mat(BROWN2, 0.7), (0, -0.52, -0.1), (90, 0, 0), 0.0)
+    cyl(0.04, 0.8, mat(DARK), (-1.05, 0, 2.0), (0, 0, 0), 6)
+    prism([(0, 0), (0.55, 0.15), (0, 0.3)], 0.04, mat(RED), (-0.78, 0, 2.18), (90, 0, 0), 0.0)
+
+
+def icon_chainreaction():
+    burst(mat(ORANGE, emit=0.6), (-0.1, 0.7, 0.2), 12, 1.1, 1.7, 0.08)
+    burst(mat(YELLOW, emit=0.8), (-0.1, 0.6, 0.2), 12, 0.6, 1.05, 0.08)
+    for k, (x, z, s) in enumerate(((-1.15, -0.55, 0.62), (0.15, -0.35, 0.5), (1.3, -0.1, 0.4))):
+        sphere(s, mat("#2f2b3d", 0.35, 0.4), (x, -0.2, z), seg=14, rings=10)
+        cyl(s * 0.3, s * 0.35, mat(STEEL, 0.4, 0.8), (x, -0.2, z + s * 0.95), (0, 0, 0), 10)
+        sphere(0.1, mat(YELLOW, emit=1.4), (x + 0.12, -0.2, z + s * 1.35), seg=6, rings=4)
+        prism(star_points(4, 0.25, 0.08), 0.05, mat(ORANGE, emit=1.0), (x + 0.12, -0.25, z + s * 1.35), (90, 0, 0), 0.0)
+    bolt = [(0.1, 0.3), (-0.2, -0.03), (-0.02, -0.03), (-0.1, -0.3), (0.2, 0.05), (0.03, 0.05), (0.15, 0.3)]
+    for (x, z) in ((-0.5, -0.1), (0.7, 0.0)):
+        prism(bolt, 0.08, mat(YELLOW, emit=0.9), (x, -0.55, z - 0.1), (90, 0, 0), 0.0)
+
+
+def icon_treasurehunter():
+    wd = mat(BROWN, 0.7)
+    box(1.7, 1.1, 0.9, wd, (-0.2, 0, -0.55), bevel=0.06)
+    cyl(0.55, 1.7, wd, (-0.2, 0, 0.0), (0, 90, 0), 16)
+    box(1.75, 1.15, 0.12, mat(STEEL, 0.3, 0.9), (-0.2, 0, -0.1), bevel=0.02)
+    for x in (-0.85, 0.45):
+        box(0.16, 1.14, 1.4, mat(STEEL, 0.3, 0.9), (x, 0, -0.2), bevel=0.02)
+    box(0.3, 0.12, 0.34, mat(GOLD, 0.3, 0.9), (-0.2, -0.58, -0.1), bevel=0.02)
+    sphere(0.65, mat(GOLD, 0.25, 0.9), (-0.2, 0.0, 0.1), (1.2, 0.8, 0.5), seg=10, rings=6)
+    for (x, z) in ((-0.55, 0.35), (0.05, 0.4)):
+        coin(x, z, -0.45, 0.22, 0.1)
+    # magnifier
+    mx, mz = 1.3, 0.75
+    torus(0.6, 0.1, mat(DARK, 0.4), (mx, -0.5, mz), (90, 0, 0), maj=22, mnr=6)
+    disc(0.58, 0.05, glass("#c9f0ff", 0.55, emit=0.2), (mx, -0.5, mz), 22)
+    h = box(0.18, 0.18, 0.9, mat(BROWN2, 0.6), (mx + 0.55, -0.5, mz - 0.95), (0, -40, 0), 0.03)
+    sparkle(0.9, 1.5, 0.28, c="#ffffff")
+
+
+def icon_sage():
+    pm = mat("#6a4cc4", 0.6)
+    cyl(1.35, 0.14, pm, (0, 0, -0.55), (0, 0, 0), 22)
+    cyl(0.85, 1.9, pm, (0.1, 0, 0.45), (0, 0, 0), 18, r2=0.06)
+    cyl(0.87, 0.28, mat(YELLOW, 0.4), (0, 0, -0.35), (0, 0, 0), 18)
+    prism(star_points(5, 0.34, 0.15), 0.08, mat(YELLOW, emit=0.7), (0.0, -0.85, 0.2), (90, 0, 0), 0.0)
+    sphere(0.16, mat(YELLOW, emit=1.2), (0.35, -0.5, 1.1), seg=8, rings=6)
+    prism(star_points(4, 0.2, 0.07), 0.06, mat(WHITE, emit=0.9), (-0.2, -0.8, 0.8), (90, 0, 0), 0.0)
+    beard = mat(WHITE, 0.7)
+    sphere(0.7, beard, (0, -0.1, -1.05), (1.0, 0.5, 1.0), seg=12, rings=8)
+    cyl(0.4, 0.9, beard, (0, -0.1, -1.55), (180, 0, 0), 10, r2=0.04)
+    for sx in (-1, 1):
+        sphere(0.09, mat(DARK), (0.28 * sx, -0.48, -0.75), seg=6, rings=4)
+    sparkle(1.5, 0.9, 0.3, c="#ffffff")
+
+
+def icon_phantom():
+    wh = mat("#f2f6ff", 0.5, emit=0.15)
+    sphere(0.95, wh, (0.2, 0, 0.45), (1.0, 0.8, 1.0), seg=16, rings=12)
+    cyl(0.95, 1.4, wh, (0.2, 0, -0.35), (0, 0, 0), 16)
+    for k in range(4):
+        sphere(0.26, wh, (0.2 - 0.72 + k * 0.48, 0, -1.08), (1.0, 0.8, 0.9), seg=8, rings=6)
+    for sx in (-1, 1):
+        sphere(0.17, mat(DARK), (0.2 + 0.35 * sx, -0.62, 0.6), (1, 0.4, 1.4), seg=8, rings=6)
+        sphere(0.05, mat("#7fe3ff", emit=1.5), (0.2 + 0.35 * sx, -0.7, 0.67), seg=6, rings=4)
+    sphere(0.14, mat(DARK), (0.2, -0.65, 0.1), (1, 0.4, 1.3), seg=8, rings=6)
+    for k, (z, w) in enumerate(((0.6, 0.9), (0.1, 1.1), (-0.5, 0.8))):
+        box(w, 0.07, 0.12, mat("#9fd4ff", emit=0.6), (-1.35 - w / 2 + 0.5, -0.1, z), bevel=0.0)
+    for (x, z) in ((-1.4, 1.2), (1.6, 1.0)):
+        sparkle(x, z, 0.25, c="#bfe6ff")
+
+
+def icon_titan():
+    st = mat("#8a8f9a", 0.8)
+    st2 = mat("#6e737e", 0.8)
+    box(1.8, 1.0, 1.6, st, (0, 0.1, -0.35), bevel=0.15)
+    box(1.1, 0.9, 0.7, st2, (0, 0, 0.75), bevel=0.1)
+    for sx in (-1, 1):
+        box(0.7, 0.8, 0.8, st2, (1.2 * sx, 0, -0.1), bevel=0.12)
+        box(0.8, 0.9, 0.9, st, (1.35 * sx, -0.15, -1.15), bevel=0.15)
+        for dx in (-0.25, 0.0, 0.25):
+            box(0.16, 0.1, 0.2, st2, (1.35 * sx + dx, -0.6, -1.0), bevel=0.02)
+        sphere(0.12, mat("#ffb12a", emit=2.0), (0.26 * sx, -0.46, 0.8), (1, 0.4, 0.8), seg=8, rings=6)
+    box(0.5, 0.06, 0.1, mat(DARK), (0, -0.46, 0.55), bevel=0.0)
+    mo = mat("#56a357", 0.8)
+    sphere(0.34, mo, (-0.55, -0.45, 0.1), (1.3, 0.4, 0.7), seg=8, rings=6)
+    sphere(0.28, mo, (0.5, -0.5, -0.5), (1.3, 0.4, 0.7), seg=8, rings=6)
+    for a in (-1, 1):
+        sparkle(1.4 * a, 1.2, 0.2, c="#ffffff")
+
+
+def icon_levelup():
+    """The LEVEL UP badge: a gold ribbon with swallow tails, a medal with an up arrow and a few sparkles."""
+    gold, gold2, red2 = mat(GOLD, 0.3, 0.7), mat("#e0a21f", 0.35, 0.7), mat("#b82a24", 0.5)
+    for sx in (-1, 1):
+        # folded back tails behind the ribbon
+        prism([(0, 0.45), (1.0, 0.45), (0.75, 0.0), (1.0, -0.45), (0, -0.45)], 0.2, red2, (sx * 1.75, 0.2, -0.1), (90, 0, 0 if sx > 0 else 180), 0.02)
+    box(3.6, 0.35, 0.95, mat(RED, 0.45), (0, 0, 0), bevel=0.06)
+    box(3.6, 0.37, 0.08, gold, (0, 0, 0.4), bevel=0.0)
+    box(3.6, 0.37, 0.08, gold, (0, 0, -0.4), bevel=0.0)
+    for sx in (-1, 1):
+        for k in range(3):
+            x = sx * (1.1 + k * 0.38)
+            prism([(-0.14, -0.22), (0.14, 0), (-0.14, 0.22), (-0.04, 0)], 0.1, gold, (x, -0.2, 0), (90, 0, 90 if sx > 0 else -90), 0.0)
+        prism(star_points(5, 0.2, 0.09), 0.08, mat(YELLOW, emit=0.5), (sx * 1.5, -0.2, 0.0), (90, 0, 0), 0.0)
+    disc(1.15, 0.4, gold, (0, 0, 0), 28)
+    torus(1.15, 0.14, gold2, (0, -0.2, 0), (90, 0, 0), maj=28, mnr=8)
+    disc(0.9, 0.12, mat("#2f8fe8", 0.35), (0, -0.28, 0), 28)
+    arrow = [(0, 0.8), (0.62, 0.05), (0.26, 0.05), (0.26, -0.7), (-0.26, -0.7), (-0.26, 0.05), (-0.62, 0.05)]
+    prism([(x * 0.82, y * 0.82) for x, y in arrow], 0.14, mat(WHITE, 0.4), (0, -0.4, 0), (90, 0, 0), 0.03)
+    for (x, z, sz) in ((-2.7, 0.75, 0.28), (2.7, 0.8, 0.24), (1.55, 0.95, 0.2), (-1.5, 0.95, 0.17)):
+        prism(star_points(4, sz, sz * 0.3), 0.06, mat(YELLOW, emit=0.7), (x, -0.4, z), (90, 0, 0), 0.0)
+
+
+ICONS += [
+    "glasscannon", "padding", "lightfoot", "snack", "hoarder", "quickstep", "bookworm", "steadyhands", "bruiser", "patience",
+    "grit", "scrappile", "tinker", "sprinter", "itchytrigger", "stout", "luckypenny", "helpinghand", "shortfuse", "peptalk",
+    "overclock", "heavyhitter", "reinforced", "lifeline", "sharpeyes", "windrunner", "mender", "magnetic", "prospector", "grenadepouch",
+    "forcefield", "spikedarmor", "quickstudy", "fieldmedic", "dashmaster", "demolition", "riskreward", "stalwart", "armorpiercer", "rapidreload",
+    "juggernaut", "executioner", "blitz", "bloodthirst", "fortress", "chainreaction", "treasurehunter", "sage", "phantom", "titan",
+]
+
+
 # ------------------------------------------------------------------------------------------------ rendering
 
 def setup_scene():
@@ -671,7 +1476,6 @@ def setup_scene():
         sc.render.engine = "BLENDER_EEVEE"
     except TypeError:
         sc.render.engine = "BLENDER_EEVEE_NEXT"
-    sc.render.resolution_x = sc.render.resolution_y = SIZE
     sc.render.resolution_percentage = 100
     sc.render.film_transparent = True
     sc.render.image_settings.file_format = "PNG"
@@ -702,6 +1506,9 @@ def setup_scene():
 
 def frame_and_render(name):
     sc = bpy.context.scene
+    w_px, h_px = WIDE.get(name, (SIZE, SIZE))
+    sc.render.resolution_x, sc.render.resolution_y = w_px, h_px
+    sc.render.resolution_percentage = 100
     objs = [o for o in bpy.data.objects if o.type == "MESH"]
     for o in [o for o in bpy.data.objects if o.type in ("LIGHT", "CAMERA")]:
         bpy.data.objects.remove(o, do_unlink=True)
@@ -738,10 +1545,11 @@ def frame_and_render(name):
     cx = (max(xs) + min(xs)) / 2
     cy = (max(ys) + min(ys)) / 2
     cam.location = ctr + right * cx + up * cy + view * 12
-    cam.data.ortho_scale = max(max(xs) - min(xs), max(ys) - min(ys)) * 1.22
+    cam.data.ortho_scale = max(max(xs) - min(xs), (max(ys) - min(ys)) * w_px / h_px) * 1.12
     cam.data.clip_end = 60
-    os.makedirs(OUT_DIR, exist_ok=True)
-    path = os.path.join(OUT_DIR, name + ".png")
+    out_dir = (os.environ.get("OUT_DIR") or UI_DIR) if name in WIDE else OUT_DIR
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, name + ".png")
     sc.render.filepath = path
     bpy.ops.render.render(write_still=True)
     return path
@@ -782,6 +1590,7 @@ def run():
     setup_scene()
     report = {}
     names = [n for n in ICONS if not ONLY or n in ONLY]
+    names += [n for n in WIDE if ONLY and n in ONLY]
     for name in names:
         reset()
         _mats.clear()
@@ -790,11 +1599,13 @@ def run():
         cov = coverage(path)
         report[name] = round(cov, 3)
         print("card %-11s coverage %.0f%%" % (name, cov * 100))
+        if name in WIDE:
+            continue
         if cov < 0.08 or cov > 0.92:
             raise ValueError("card %s looks wrong: %.0f%% of the image is covered" % (name, cov * 100))
     sheet_path = os.environ.get("SHEET")
     if sheet_path:
-        contact_sheet(sheet_path, names)
+        contact_sheet(sheet_path, [n for n in names if n not in WIDE])
     return report
 
 
