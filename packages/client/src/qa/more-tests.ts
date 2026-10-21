@@ -291,7 +291,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'ui.strings',
-    title: 'Both languages have every string: same keys, every card, weapon, map, difficulty and key action',
+    title: 'Both languages have every string: same keys, every card, weapon, map, mods and key action',
     async run() {
       const problems: string[] = [];
       const keys = (o: unknown, prefix = ''): string[] =>
@@ -318,7 +318,7 @@ export const moreTests: QaTest[] = [
         for (const wp of WEAPON_IDS) if (!t.weapons![wp]) problems.push(`${lang}: weapon ${wp} has no name`);
         for (const id of ['-1', ...MAPS.map((_, i) => String(i))]) if (!t.maps![id]) problems.push(`${lang}: map ${id} has no name`);
         for (const a of ['up', 'down', 'left', 'right', 'fire', 'grenade', 'revive', 'reload', 'dash', 'card1', 'card2', 'card3', 'pause']) if (!t.actions![a]) problems.push(`${lang}: action ${a} has no label`);
-        if ((UI_STRINGS[lang].diffs as readonly string[]).length !== 3) problems.push(`${lang}: needs three difficulty names`);
+        if ((UI_STRINGS[lang].diffs as readonly string[]).length !== 3) problems.push(`${lang}: needs three mods names`);
         if ((UI_STRINGS[lang].accs as readonly string[]).length !== ACCESSORIES.length) problems.push(`${lang}: needs a name for each of the ${ACCESSORIES.length} accessories`);
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 12).join(' | ') : `${en.length} strings in six languages` };
@@ -503,6 +503,51 @@ export const moreTests: QaTest[] = [
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 8).join(' | ') : 'all 25 cards render with art, text and rarity in English and Turkish' };
+    },
+  },
+  {
+    id: 'ui.mods',
+    title: 'The difficulty multipliers: a summary button opens the 20-card grid, toggles change the score multiplier, a guest can only look, the lobby follows the host',
+    async run() {
+      const problems: string[] = [];
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:1000px;height:700px';
+      document.body.appendChild(host);
+      const settings: Settings = { fpsCap: 0, texture: 1, autoScale: true, music: 0, renderer: 'webgl', aa: 'off', bounce: false, time: 'day', dynLights: true, weather: true, colorblind: false, textSize: 0, shake: 1, hitStop: true, damageNumbers: true, announcer: true, autoAim: true, ammoRing: true, nameTags: true, minimap: true, showFps: false, particles: 1, gore: 1, corpseTime: 1, sfxVolume: 1, voiceVolume: 1, uiSounds: true, volume: 0, shadows: 0, scale: 1, lang: 'en' };
+      const noop = (): void => undefined;
+      const sent: [number, number][] = [];
+      const ui = new Ui(host, {
+        onSolo: noop, onHost: noop, onJoin: noop, onRejoin: noop, onWeapon: noop, onLook: noop, getBindings: () => ({}), onRebind: noop, onResetKeys: noop, onOptions: (m, d) => sent.push([m, d]),
+        onStart: noop, onLeave: noop, onCard: noop, onAgain: noop, onResume: noop, onSlot: noop, onUiSound: noop, onSetting: noop, onResetSettings: noop,
+      }, settings);
+      try {
+        const p = (slot: number, name: string): { slot: number; name: string; host: boolean; connected: boolean; weapon: 'pistol'; acc: number; color: number } => ({ slot, name, host: slot === 0, connected: true, weapon: 'pistol', acc: 0, color: 0 });
+        ui.showLobby('ABCD', [p(0, 'host')], true, { map: 0, mods: 0 }, false);
+        host.querySelector<HTMLElement>('#wrh-mods-open')?.click();
+        const grid = document.querySelectorAll<HTMLElement>('.wrh-modal .wrh-mod');
+        if (grid.length !== 20) problems.push(`${grid.length} multipliers in the grid, expected 20`);
+        grid[0]?.click();
+        grid[3]?.click();
+        const last = sent[sent.length - 1];
+        if (!last || last[1] !== (1 | 8)) problems.push(`the host's choice did not reach the handler (${JSON.stringify(sent)})`);
+        const mult = document.querySelector('#wrh-mods-mult')?.textContent ?? '';
+        if (!/^×1\.2[0-9]$/.test(mult)) problems.push(`score multiplier shows ${mult}`);
+        document.querySelector<HTMLElement>('#wrh-mods-close')?.click();
+        if (document.querySelector('.wrh-modal')) problems.push('the grid did not close');
+        if (!host.querySelector('#wrh-modsrow .strip img')) problems.push('the summary does not show the chosen icons');
+        // a guest sees the host's choice and cannot change it
+        ui.showLobby('ABCE', [p(0, 'host'), p(1, 'guest')], false, { map: 0, mods: 1 | 8 | 16 }, false);
+        host.querySelector<HTMLElement>('#wrh-mods-open')?.click();
+        const before = sent.length;
+        document.querySelectorAll<HTMLElement>('.wrh-modal .wrh-mod')[5]?.click();
+        if (sent.length !== before) problems.push('a guest changed the multipliers');
+        if (document.querySelectorAll('.wrh-modal .wrh-mod.on').length !== 3) problems.push('the guest does not see the three chosen multipliers');
+        document.querySelector<HTMLElement>('#wrh-mods-close')?.click();
+      } finally {
+        document.querySelector('.wrh-modal')?.remove();
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'grid, toggles, multiplier, guest view and summary are right' };
     },
   },
   {
@@ -1104,7 +1149,7 @@ export const moreTests: QaTest[] = [
         };
         ui.showMenu();
         check('menu');
-        ui.showLobby('ABCD', [{ slot: 0, name: 'a', host: true, connected: true, weapon: 'pistol', acc: 0, color: 0 }], true, { map: 0, difficulty: 1 }, false);
+        ui.showLobby('ABCD', [{ slot: 0, name: 'a', host: true, connected: true, weapon: 'pistol', acc: 0, color: 0 }], true, { map: 0, mods: 1 }, false);
         check('lobby');
         const w = createWorld(1);
         addPlayer(w, 0, 0, 0);
@@ -1153,7 +1198,7 @@ export const moreTests: QaTest[] = [
       }, settings);
       const p = (slot: number, name: string, weapon: (typeof WEAPON_IDS)[number] = 'pistol') => ({ slot, name, host: slot === 0, connected: true, weapon, acc: 0, color: slot });
       try {
-        ui.showLobby('ABCD', [p(0, 'host')], false, { map: 0, difficulty: 1 }, false);
+        ui.showLobby('ABCD', [p(0, 'host')], false, { map: 0, mods: 1 }, false);
         const panel = host.querySelector<HTMLElement>('#wrh-lobby');
         const stage = host.querySelector('.wrh-prev');
         if (!panel || !stage) throw new Error('the lobby did not draw');
@@ -1161,8 +1206,8 @@ export const moreTests: QaTest[] = [
         panel.style.overflow = 'auto';
         panel.scrollTop = 120;
         const before = panel.scrollTop;
-        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'ar')], false, { map: 0, difficulty: 1 }, false);
-        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'smg'), p(2, 'third')], false, { map: 2, difficulty: 2 }, false);
+        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'ar')], false, { map: 0, mods: 1 }, false);
+        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'smg'), p(2, 'third')], false, { map: 2, mods: 2 }, false);
         if (host.querySelector('#wrh-lobby') !== panel) problems.push('the lobby panel was replaced by an update');
         if (host.querySelector('.wrh-prev') !== stage) problems.push('the preview was rebuilt by an update');
         if (panel.scrollTop !== before) problems.push(`the scroll position moved from ${before} to ${panel.scrollTop}`);

@@ -348,7 +348,7 @@ describe('life cycle', () => {
 
 describe('determinism', () => {
   const scenario = (seed: number): World => {
-    const w = createGame({ seed, players: [{ slot: 0, weapon: 'smg', cls: 0 }, { slot: 1, weapon: 'ar', cls: 1 }], map: 0, difficulty: 1 });
+    const w = createGame({ seed, players: [{ slot: 0, weapon: 'smg', cls: 0 }, { slot: 1, weapon: 'ar', cls: 1 }], map: 0, mods: 1 });
     for (let s = 0; s < 2; s++) {
       w.pHp[s] = w.pMaxHp[s] = 1e6;
       for (let t = 0; t < T; t++) grantDrone(w, s, (t + s * 3) % T);

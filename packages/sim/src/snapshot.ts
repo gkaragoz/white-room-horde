@@ -31,7 +31,7 @@ export function serializeWorld(w: World): Uint8Array {
   for (const a of list) size += a.byteLength;
   const out = new Uint8Array(size);
   const dv = new DataView(out.buffer);
-  const sc = [w.difficulty, w.map, w.tick, w.wave, w.waveTick, w.countMul, w.hpMul, w.kills, w.enemyCount, w.gameOver, w.modLoot];
+  const sc = [w.mods, w.map, w.tick, w.wave, w.waveTick, w.countMul, w.hpMul, w.kills, w.enemyCount, w.gameOver, w.modLoot];
   sc.forEach((v, i) => dv.setFloat64(i * 8, v, true));
   const rs = w.rng.getState();
   for (let i = 0; i < 4; i++) dv.setUint32(SCALARS * 8 + i * 4, rs[i]!, true);
@@ -48,7 +48,7 @@ export function restoreWorld(w: World, buf: Uint8Array): void {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   const sc: number[] = [];
   for (let i = 0; i < SCALARS; i++) sc.push(dv.getFloat64(i * 8, true));
-  [w.difficulty, w.map, w.tick, w.wave, w.waveTick, w.countMul, w.hpMul, w.kills, w.enemyCount, w.gameOver, w.modLoot] = sc as [number, number, number, number, number, number, number, number, number, number, number];
+  [w.mods, w.map, w.tick, w.wave, w.waveTick, w.countMul, w.hpMul, w.kills, w.enemyCount, w.gameOver, w.modLoot] = sc as [number, number, number, number, number, number, number, number, number, number, number];
   applyObstacles(w.field, w.map, 0);
   applyObstacles(w.field1, w.map, 1);
   w.rng.setState([dv.getUint32(SCALARS * 8, true), dv.getUint32(SCALARS * 8 + 4, true), dv.getUint32(SCALARS * 8 + 8, true), dv.getUint32(SCALARS * 8 + 12, true)]);

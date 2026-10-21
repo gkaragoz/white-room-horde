@@ -328,19 +328,19 @@ describe('lockstep over a laggy network', () => {
 });
 
 describe('robustness of the room server', () => {
-  it('options (map, difficulty) reach every client and the world', () => {
+  it('options (map, mods) reach every client and the world', () => {
     const net = lobby([20, 20]);
     net.clients[0]!.session.setOptions(2, 2);
     net.advance(300);
-    expect(net.clients[1]!.session.options).toEqual({ map: 2, difficulty: 2 });
+    expect(net.clients[1]!.session.options).toEqual({ map: 2, mods: 2 });
     // non-hosts cannot change them
     net.clients[1]!.session.setOptions(1, 0);
     net.advance(300);
-    expect(net.clients[0]!.session.options).toEqual({ map: 2, difficulty: 2 });
+    expect(net.clients[0]!.session.options).toEqual({ map: 2, mods: 2 });
     net.clients[0]!.session.start();
     net.advance(800);
     expect(net.clients[1]!.session.world!.map).toBe(2);
-    expect(net.clients[1]!.session.world!.difficulty).toBe(2);
+    expect(net.clients[1]!.session.world!.mods).toBe(2);
   });
 
   it('a dropped player rejoins the same slot with their token and catches up', () => {
@@ -518,7 +518,7 @@ describe('robustness of the room server', () => {
   it('ignores malformed messages and rate-limits floods without crashing', async () => {
     const net = lobby([10, 10], 0, { rate: 100 });
     const conn = net.clients[0]!.serverConn;
-    for (const junk of ['{', 'null', '[]', '{"t":5}', '{"t":"join","code":{}}', '{"t":"hash","tick":"x","hash":1}', 'x'.repeat(2000), '{"t":"options","map":99,"difficulty":-4}']) net.manager.handle(conn, junk);
+    for (const junk of ['{', 'null', '[]', '{"t":5}', '{"t":"join","code":{}}', '{"t":"hash","tick":"x","hash":1}', 'x'.repeat(2000), '{"t":"options","map":99,"mods":-4}']) net.manager.handle(conn, junk);
     net.manager.handle(conn, new Uint8Array([1, 2, 3]));
     net.manager.handle(conn, new Uint8Array(10).fill(255));
     expect(net.clients[0]!.session.options.map).toBeLessThan(4);

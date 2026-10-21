@@ -3,6 +3,7 @@ import { addStat, heal } from './stats';
 import { sqrt } from './detmath';
 import { out, pushOut } from './obstacles';
 import type { World } from './state';
+import { fxOf } from './mods';
 
 /**
  * Classes, perks, elite enemies, wave modifiers, explosive barrels and the power-ups. Everything here is part of the
@@ -65,7 +66,13 @@ export function resetPerks(w: World, s: number): void {
 export function applyClass(w: World, s: number, cls: number): void {
   const c = BALANCE.classes[cls] ?? BALANCE.classes[0]!;
   setPerk(w, s, PERK.Class, BALANCE.classes[cls] ? cls : 0);
-  w.pMaxHp[s] = Math.max(30, w.pMaxHp[s]! + c.hp);
+  const fx = fxOf(w);
+  w.pMaxHp[s] = Math.max(30, Math.round((w.pMaxHp[s]! + c.hp) * fx.playerHp));
+  w.modSpeed[s] = w.modSpeed[s]! * fx.playerSpeed;
+  w.modRate[s] = w.modRate[s]! * fx.playerRate;
+  w.modDamage[s] = w.modDamage[s]! * fx.playerDamage;
+  w.modReload[s] = w.modReload[s]! * fx.playerReload;
+  w.modXp[s] = w.modXp[s]! / fx.xpNeed;
   w.pHp[s] = w.pMaxHp[s]!;
   w.pModSpeed[s] = w.pModSpeed[s]! * c.speed;
   w.pModDmg[s] = w.pModDmg[s]! * c.damage;
@@ -73,7 +80,7 @@ export function applyClass(w: World, s: number, cls: number): void {
   w.pModArmor[s] = w.pModArmor[s]! * c.armor;
   w.pModPierce[s] = w.pModPierce[s]! + c.pierce;
   w.pLifesteal[s] = w.pLifesteal[s]! + c.lifesteal;
-  w.pGren[s] = w.pGren[s]! + c.grenades;
+  w.pGren[s] = fxOf(w).noGrenades ? 0 : w.pGren[s]! + c.grenades;
   addPerk(w, s, PERK.Regen, c.regen);
   addPerk(w, s, PERK.Aura, c.aura);
   setPerk(w, s, PERK.Blast, c.blast);
@@ -208,7 +215,7 @@ export function eliteChance(w: World): number {
 
 /** Maybe turn a freshly spawned enemy into an elite (draws from the world's random stream). */
 export function rollElite(w: World, i: number): void {
-  const chance = eliteChance(w);
+  const chance = eliteChance(w) * fxOf(w).eliteChance;
   if (chance <= 0 || w.rng.float() >= chance) return;
   const mod = 1 + w.rng.int(11);
   w.eMod[i] = mod;
@@ -225,7 +232,7 @@ export function enemySpeedMul(w: World, i: number): number {
   if (mod === ELITE.Swift) m = c.swiftSpeed;
   else if (mod === ELITE.Giant) m = c.giantSpeed;
   if (waveModOf(w.wave) === 3) m *= 1.25;
-  return m;
+  return m * fxOf(w).enemySpeed;
 }
 
 export function enemyRadiusMul(w: World, i: number): number {

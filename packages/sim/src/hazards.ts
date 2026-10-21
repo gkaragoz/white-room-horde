@@ -3,6 +3,7 @@ import { atan2, cos, sin, sqrt } from './detmath';
 import { absorb, stunImmune } from './features';
 import { blastFrom, hurtPlayer } from './enemies';
 import type { World } from './state';
+import { fxOf } from './mods';
 
 /** Slowing of a knocked-back player's push per tick. */
 export const KNOCK_DECAY = 0.9;
@@ -37,7 +38,7 @@ export function addTelegraph(w: World, shape: number, effect: number, x: number,
     w.tY[i] = y;
     w.tA[i] = angle;
     // the danger areas of the enemies are bigger than they used to be (the same arrays draw the warning)
-    w.tW[i] = effect === TeleEffect.Hurt ? size * BALANCE.hitbox.enemyMul : size;
+    w.tW[i] = effect === TeleEffect.Hurt ? size * BALANCE.hitbox.enemyMul * fxOf(w).areaMul : size;
     w.tL[i] = length;
     w.tAmt[i] = amount;
     w.tLeft[i] = w.tTotal[i] = Math.max(1, Math.round(delay * TICK_RATE));
@@ -63,7 +64,7 @@ export function launchPlayer(w: World, s: number, kx: number, ky: number, stunSe
 /** Damage over time (no invulnerability frames, no popups): what standing in acid or fire does. */
 function burn(w: World, s: number, dps: number): void {
   if (w.pIFrames[s]! > 0) return;
-  const dmg = absorb(w, s, dps * TICK_DT * BALANCE.enemyDamageMul * BALANCE.difficulty.damage[w.difficulty]! * w.modArmor[s]! * w.pModArmor[s]!);
+  const dmg = absorb(w, s, dps * TICK_DT * BALANCE.enemyDamageMul * fxOf(w).enemyDamage * w.modArmor[s]! * w.pModArmor[s]!);
   const hp = w.pHp[s]! - dmg;
   w.pHp[s] = hp > 0 ? hp : 0;
   // one hurt flash a few times a second instead of one per tick

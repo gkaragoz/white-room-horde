@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, decodeReplay, encodeReplay, Recorder, scriptedInput, step, verifyReplay } from '../src';
 
-function record(seed: number, ticks: number, map: number, difficulty: number): Recorder {
-  const setup = { seed, map, difficulty, players: [{ slot: 0, weapon: 'smg' as const, cls: 3 }, { slot: 1, weapon: 'dbl' as const, cls: 1 }] };
+function record(seed: number, ticks: number, map: number, mods: number): Recorder {
+  const setup = { seed, map, mods, players: [{ slot: 0, weapon: 'smg' as const, cls: 3 }, { slot: 1, weapon: 'dbl' as const, cls: 1 }] };
   const w = createGame(setup);
   const rec = new Recorder(setup);
   for (let t = 0; t < ticks; t++) {
@@ -14,11 +14,11 @@ function record(seed: number, ticks: number, map: number, difficulty: number): R
 }
 
 describe('replay verification', () => {
-  it('a recorded game on another map, difficulty and with classes survives the file format and verifies', () => {
+  it('a recorded game on another map, mods and with classes survives the file format and verifies', () => {
     const rec = record(11, 600, 4, 2);
     const back = decodeReplay(encodeReplay(rec.replay));
     expect(back.setup.map).toBe(4);
-    expect(back.setup.difficulty).toBe(2);
+    expect(back.setup.mods).toBe(2);
     expect(back.setup.players[0]!.cls).toBe(3);
     expect(back.setup.players[1]!.weapon).toBe('dbl');
     const v = verifyReplay(back);

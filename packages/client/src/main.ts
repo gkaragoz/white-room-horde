@@ -29,6 +29,7 @@ import { InputTimer } from './inputTimer';
 import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
+import { runScore } from './modsUi';
 import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
 import { BUILD, mountVersionBadge } from './buildinfo';
 import { Ui, UI_STRINGS, type Settings } from './ui';
@@ -292,7 +293,7 @@ const ui = new Ui(
         done();
       }),
     onResetKeys: () => input.resetBindings(),
-    onOptions: (map, difficulty) => session?.setOptions(map, difficulty),
+    onOptions: (map, mods) => session?.setOptions(map, mods),
     onDrone: (t) => input.queueDrone(t + 1),
     onWeapon: (wp) => {
       startWeapon = wp;
@@ -712,7 +713,7 @@ function handleEvent(e: SimEvent): void {
       over = true;
       setTimeout(() => audio.stopMusic(), 4000);
       {
-        const rec = world && !playback ? recordGame(world.wave, world.kills) : undefined;
+        const rec = world && !playback ? recordGame(world.wave, world.kills, runScore(world).final) : undefined;
         clearRejoin();
         ui.playerNames = names;
         setTimeout(() => world && ui.showGameOver(world, rec, { clicks: runClicks, keys: runKeys, bestCombo }, false, localSlot), 1800);
@@ -860,7 +861,7 @@ function startSolo(name: string): void {
     names[b] = 'Bot ' + b;
   }
   const map = params.has('map') ? Number(params.get('map')) : ui.map >= 0 ? ui.map : Math.floor(Math.random() * MAPS.length);
-  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map, difficulty: params.has('difficulty') ? Number(params.get('difficulty')) : ui.difficulty };
+  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map, mods: params.has('mods') ? Number(params.get('mods')) : ui.mods };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
   beginPlaying(w, 0);

@@ -3,12 +3,13 @@ import { MENU_CSS, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
 import { droneNeed } from '@wrh/sim';
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, GAME_VERSION, compatibleVersions, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
-import { xpForNext, type World } from '@wrh/sim';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MOD_COUNT as MODS_N, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, GAME_VERSION, compatibleVersions, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
+import { modFx, xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
 import { THEMES } from './render/arena';
 import { universalCardTexts } from './cardText';
+import { MODS_CSS, modsPanel, modsRow } from './modsUi';
 import { EXTRA } from './i18n';
 import { renderGameOver, type RunExtras } from './gameOver';
 import { renderControlsSheet, renderSettingsPanel } from './settingsPanel';
@@ -503,7 +504,7 @@ export interface UiHandlers {
   getBindings(): Record<string, string[]>;
   onRebind(action: string, done: () => void): void;
   onResetKeys(): void;
-  onOptions(map: number, difficulty: number): void;
+  onOptions(map: number, mods: number): void;
   onStart(): void;
   onLeave(): void;
   onCard(index: number): void;
@@ -779,6 +780,7 @@ const CSS_BASE = `
 .wrh-ui button.wrh-diff{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;margin:0;border-radius:11px;background:#efe7d6;color:#3a352d;border:3px solid transparent;font-size:13px;box-shadow:0 2px 5px rgba(60,45,20,.15)}
 .wrh-ui button.wrh-diff.on{background:#fff;border-color:#d8362e;box-shadow:0 0 0 2px rgba(216,54,46,.2)}
 .wrh-sk-row{display:inline-flex;gap:2px;align-items:center}
+${MODS_CSS}
 .wrh-skull{display:block}
 .wrh-ro{display:flex;gap:10px;align-items:center;margin:6px 0 10px;font-size:13px}
 .wrh-thumb-s{width:84px;aspect-ratio:3/2;border-radius:7px;object-fit:cover}
@@ -974,11 +976,6 @@ function arenaThumb(index: number): string {
   return url;
 }
 
-/** A skull icon: lit for the difficulty level, faint when not. */
-function skull(lit: boolean, size = 22): string {
-  return `<span class="wrh-skull${lit ? '' : ' off'}">${icon('diff_skull', size)}</span>`;
-}
-
 export class Ui {
   readonly root = document.createElement('div');
   lang: Lang = 'en';
@@ -986,7 +983,7 @@ export class Ui {
   weapon: WeaponId = 'pistol';
   /** Arena (-1 random) and difficulty picked for solo games. */
   map = -1;
-  difficulty = 1;
+  mods = 0;
   /** Accessory index. */
   acc = 0;
   /** Vest colour index (-1: the slot's own colour). */
@@ -1543,20 +1540,18 @@ export class Ui {
     p.color = this.color;
     p.cls = this.cls;
     p.map = this.map;
-    p.difficulty = this.difficulty;
+    p.mods = this.mods;
     saveProfile(p);
   }
 
   /** Option rows shared by the menu and the lobby: arena and difficulty (host or solo) and the player's look. */
   /** Arena pictures and the skull difficulty row (read-only text for guests in a lobby). */
-  private arenaRows(editable: boolean, map: number, difficulty: number): string {
+  private arenaRows(editable: boolean, map: number, mods: number): string {
     const t = this.t;
     const names = t.maps as Record<string, string>;
-    const diffNames = t.diffs as readonly string[];
-    const skulls = (n: number): string => [0, 1, 2].map((k) => skull(k <= n)).join('');
     if (!editable) {
       const pic = map >= 0 ? `<img class="wrh-thumb-s" src="${arenaThumb(map)}" alt="">` : '<span class="wrh-thumb-s wrh-dice">?</span>';
-      return `<div class="wrh-ro">${pic}<span><b>${names[String(map)]}</b><br><span class="wrh-sk-row">${skulls(difficulty)}</span> <b>${diffNames[difficulty]}</b></span></div>`;
+      return `<div class="wrh-ro">${pic}<span><b>${names[String(map)]}</b></span></div><label>${t.difficulty}</label><div id="wrh-modsrow">${modsRow(this.lang, mods, false)}</div>`;
     }
     const cards = ['-1', ...MAPS.map((_, i) => String(i))]
       .map((id) => {
@@ -1564,10 +1559,7 @@ export class Ui {
         return `<button type="button" class="wrh-arena${id === String(map) ? ' on' : ''}" data-map="${id}">${pic}<span>${names[id]}</span></button>`;
       })
       .join('');
-    const diffs = diffNames
-      .map((label, i) => `<button type="button" class="wrh-diff${i === difficulty ? ' on' : ''}" data-diff="${i}"><span class="wrh-sk-row">${skulls(i)}</span><span>${label}</span></button>`)
-      .join('');
-    return `<label>${t.arena}</label><div class="wrh-arenas">${cards}</div><label>${t.difficulty}</label><div class="wrh-diffs">${diffs}</div>`;
+    return `<label>${t.arena}</label><div class="wrh-arenas">${cards}</div><label>${t.difficulty}</label><div id="wrh-modsrow">${modsRow(this.lang, mods, true)}</div>`;
   }
 
   showMenu(error = ''): void {
@@ -1580,7 +1572,7 @@ export class Ui {
     this.color = profile.color;
     this.cls = profile.cls;
     this.map = profile.map;
-    this.difficulty = profile.difficulty;
+    this.mods = profile.mods;
     const saved = (() => {
       try {
         return localStorage.getItem('wrh.name') ?? '';
@@ -1615,7 +1607,7 @@ export class Ui {
       weaponLabel: t.weapon,
       weaponsHtml: this.weaponButtons(),
       previewHtml: this.previewBlock(),
-      arenaHtml: this.arenaRows(true, this.map, this.difficulty),
+      arenaHtml: this.arenaRows(true, this.map, this.mods),
       soloLabel: t.solo,
       hostLabel: t.host,
       joinLabel: t.join,
@@ -1638,8 +1630,8 @@ export class Ui {
       this.map = Number(id);
       this.persistLook();
     });
-    this.bindGroup('diff', (id) => {
-      this.difficulty = Number(id);
+    this.bindMods(true, () => this.mods, (v) => {
+      this.mods = v;
       this.persistLook();
     });
     const q = <E extends HTMLElement>(id: string): E => this.screen.querySelector<E>('#' + id)!;
@@ -2036,7 +2028,7 @@ export class Ui {
   private lobbyLocked = false;
   private lobbyOpts = '';
   private lobbyMap = 0;
-  private lobbyDifficulty = 1;
+  private lobbyMods = 0;
 
   private lobbyList(players: { slot: number; name: string; host: boolean; weapon: WeaponId; acc: number; color: number }[]): string {
     const t = this.t;
@@ -2052,19 +2044,59 @@ export class Ui {
   private bindArena(): void {
     this.bindGroup('map', (id) => {
       this.lobbyMap = Number(id);
-      this.h.onOptions(this.lobbyMap, this.lobbyDifficulty);
+      this.h.onOptions(this.lobbyMap, this.lobbyMods);
     });
-    this.bindGroup('diff', (id) => {
-      this.lobbyDifficulty = Number(id);
-      this.h.onOptions(this.lobbyMap, this.lobbyDifficulty);
+    this.bindMods(true, () => this.lobbyMods, (v) => {
+      this.lobbyMods = v;
+      this.h.onOptions(this.lobbyMap, this.lobbyMods);
     });
+  }
+
+  /** The multipliers button opens the full-screen grid; the host (or a solo player) toggles, guests only read. */
+  private bindMods(editable: boolean, get: () => number, set: (v: number) => void): void {
+    const open = this.screen.querySelector<HTMLElement>('#wrh-mods-open');
+    if (!open) return;
+    open.onclick = () => this.openMods(editable, get, set);
+  }
+
+  private openMods(editable: boolean, get: () => number, set: (v: number) => void): void {
+    const modal = document.createElement('div');
+    modal.className = 'wrh-modal';
+    const draw = (): void => {
+      modal.innerHTML = modsPanel(this.lang, get(), editable);
+      modal.querySelectorAll<HTMLElement>('.wrh-mod').forEach((b) => {
+        b.onclick = () => {
+          if (!editable) return;
+          set(get() ^ (1 << Number(b.dataset.mod)));
+          draw();
+        };
+      });
+      const all = modal.querySelector<HTMLElement>('#wrh-mods-all');
+      if (all) all.onclick = () => (set(2 ** MODS_N - 1), draw());
+      const none = modal.querySelector<HTMLElement>('#wrh-mods-none');
+      if (none) none.onclick = () => (set(0), draw());
+      modal.querySelector<HTMLElement>('#wrh-mods-close')!.onclick = close;
+    };
+    const close = (): void => {
+      modal.remove();
+      const row = this.screen.querySelector<HTMLElement>('#wrh-modsrow');
+      if (row) {
+        row.innerHTML = modsRow(this.lang, get(), editable);
+        this.bindMods(editable, get, set);
+      }
+    };
+    modal.onclick = (e) => {
+      if (e.target === modal) close();
+    };
+    draw();
+    document.body.appendChild(modal);
   }
 
   showLobby(
     code: string,
     players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId; acc: number; color: number }[],
     iAmHost: boolean,
-    options: { map: number; difficulty: number } = { map: 0, difficulty: 1 },
+    options: { map: number; mods: number } = { map: 0, mods: 0 },
     locked = false,
   ): void {
     this.redraw = () => {
@@ -2077,34 +2109,36 @@ export class Ui {
     if (this.lobbyCode === code && this.lobbyHost === iAmHost && this.lobbyLocked === locked && this.screen.querySelector('#wrh-lobby')) {
       this.screen.querySelector<HTMLElement>('#wrh-plist')!.innerHTML = this.lobbyList(players);
       this.screen.querySelector<HTMLElement>('#wrh-pcount')!.textContent = `${t.players} (${players.length}/${MAX_PLAYERS})`;
-      const key = `${options.map}/${options.difficulty}`;
+      const key = `${options.map}/${options.mods}`;
       if (key !== this.lobbyOpts) {
         this.lobbyOpts = key;
         this.lobbyMap = options.map;
-        this.lobbyDifficulty = options.difficulty;
-        this.screen.querySelector<HTMLElement>('#wrh-arena-wrap')!.innerHTML = this.arenaRows(iAmHost, options.map, options.difficulty);
+        this.lobbyMods = options.mods;
+        this.screen.querySelector<HTMLElement>('#wrh-arena-wrap')!.innerHTML = this.arenaRows(iAmHost, options.map, options.mods);
         if (iAmHost) this.bindArena();
+        else this.bindMods(false, () => this.lobbyMods, () => undefined);
       }
       return;
     }
     this.lobbyCode = code;
     this.lobbyHost = iAmHost;
     this.lobbyLocked = locked;
-    this.lobbyOpts = `${options.map}/${options.difficulty}`;
+    this.lobbyOpts = `${options.map}/${options.mods}`;
     this.lobbyMap = options.map;
-    this.lobbyDifficulty = options.difficulty;
+    this.lobbyMods = options.mods;
     delete document.documentElement.dataset.menu;
     this.screen.innerHTML = `<div class="wrh-panel wrh-center wrh-scroll" id="wrh-lobby">
       <h1>${t.code}: <span style="letter-spacing:4px;color:#1fa2ff">${esc(code)}</span>${locked ? ' ' + icon('hud_lock', 24) : ''}</h1>
       <p class="sub">${iAmHost ? '' : t.waiting}</p>
       <label id="wrh-pcount">${t.players} (${players.length}/${MAX_PLAYERS})</label><ul class="wrh-plist" id="wrh-plist">${this.lobbyList(players)}</ul>
       <label>${t.weapon}</label><div class="wrh-weapons">${this.weaponButtons()}</div>
-      ${this.previewBlock()}<div id="wrh-arena-wrap">${this.arenaRows(iAmHost, options.map, options.difficulty)}</div>
+      ${this.previewBlock()}<div id="wrh-arena-wrap">${this.arenaRows(iAmHost, options.map, options.mods)}</div>
       ${iAmHost ? `<button id="wrh-start">${t.start}</button>` : ''}<button id="wrh-invite" class="alt">${icon('hud_link', 18)} ${t.invite}</button><button id="wrh-leave" class="warn">${t.leave}</button>
     </div>`;
     this.bindWeapons();
     this.bindPreview();
-    this.bindArena();
+    if (iAmHost) this.bindArena();
+    else this.bindMods(false, () => this.lobbyMods, () => undefined);
     const s = this.screen.querySelector<HTMLElement>('#wrh-start');
     if (s) s.onclick = () => this.h.onStart();
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
@@ -2613,7 +2647,7 @@ export class Ui {
       }
       cardsEl.style.display = 'block';
       const ct = cardsEl.querySelector<HTMLElement>('#h-ct');
-      if (ct) ct.style.width = `${Math.max(0, (world.pCardTimer[slot]! / (BALANCE.progression.cardSeconds * TICK_RATE)) * 100)}%`;
+      if (ct) ct.style.width = `${Math.max(0, (world.pCardTimer[slot]! / (BALANCE.progression.cardSeconds * modFx(world.mods).cardSeconds * TICK_RATE)) * 100)}%`;
     } else {
       cardsEl.style.display = 'none';
       this.lastCards = '';

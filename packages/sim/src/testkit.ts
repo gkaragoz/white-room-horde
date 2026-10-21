@@ -33,7 +33,7 @@ export function scriptedInput(t: number, slot: number): PlayerInput {
 
 export interface ScriptOptions {
   map?: number;
-  difficulty?: number;
+  mods?: number;
   /** Start on this wave (more enemy types, bosses). */
   wave?: number;
 }
@@ -42,7 +42,7 @@ export function runScripted(seed: number, ticks: number, players = 4, opts: Scri
   const w = createGame({
     seed,
     map: opts.map ?? 0,
-    difficulty: opts.difficulty ?? 1,
+    mods: opts.mods ?? 0,
     players: Array.from({ length: players }, (_, s) => ({ slot: s, weapon: WEAPON_IDS[s % WEAPON_IDS.length]! })),
   });
   if (opts.wave && opts.wave > 1) setWave(w, opts.wave);

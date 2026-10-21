@@ -23,8 +23,8 @@ export interface PlayerInfo {
 export interface RoomOptions {
   /** Arena layout index, or -1 for a random one when the game starts. */
   map: number;
-  /** 0 easy, 1 normal, 2 hard. */
-  difficulty: number;
+  /** The chosen difficulty multipliers: a bit mask over MODS (0 = none). */
+  mods: number;
 }
 
 export interface JoinOpts {
@@ -46,7 +46,7 @@ export type ClientMsg =
   | { t: 'ping'; ts: number; rtt?: number }
   | { t: 'resync' }
   | { t: 'weapon'; weapon: WeaponId }
-  | { t: 'options'; map: number; difficulty: number }
+  | { t: 'options'; map: number; mods: number }
   | { t: 'look'; acc: number; color?: number; cls?: number }
   /** Host only: stop or resume the game for everybody. */
   | { t: 'pause'; on: boolean }
@@ -54,7 +54,7 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { t: 'room'; code: string; slot: number; players: PlayerInfo[]; started: boolean; options: RoomOptions; token: string; locked: boolean }
-  | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId; cls: number }[]; map: number; difficulty: number }
+  | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId; cls: number }[]; map: number; mods: number }
   | { t: 'desync'; tick: number; slots: number[] }
   | { t: 'pong'; ts: number }
   | { t: 'paused'; on: boolean }
