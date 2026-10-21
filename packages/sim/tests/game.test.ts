@@ -67,7 +67,7 @@ describe('boss', () => {
     addPlayer(w, 0, 0, 0);
     const b = spawnBoss(w);
     expect(w.eBoss[b]).toBeGreaterThan(0);
-    expect(w.eHp[b]).toBeGreaterThan(BALANCE.enemies.tank.hp * 10);
+    expect(w.eHp[b]).toBeGreaterThan(BALANCE.enemies.tank.hp * 8);
     expect(ENEMY_TYPES[w.eType[b]!]).toBe('tank');
   });
 });

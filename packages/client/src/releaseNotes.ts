@@ -23,6 +23,28 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.25',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: 'Harder enemies, weaker bosses',
+        items: [
+          'Every normal enemy attack hurts twice as much as before.',
+          'Bosses hit your squad much harder: their main attacks take 40-60% of a character’s max health (so health cards matter), but boss health is less than half of what it was.',
+          'Danger areas are about 30% bigger (warning circles, explosions, spit, melee reach) and your bullets are wider, so they also hit big bodies more easily.',
+        ],
+      },
+      tr: {
+        title: 'Daha sert düşmanlar, daha zayıf bosslar',
+        items: [
+          'Her normal düşman saldırısı artık iki kat acıtıyor.',
+          'Bosslar takımına çok daha sert vuruyor: ana saldırıları karakterin maksimum canının %40-60’ını alıyor (can kartları önem kazandı), ama boss canı eskisinin yarısından az.',
+          'Tehlike alanları yaklaşık %30 büyüdü (uyarı daireleri, patlamalar, tükürük, yakın dövüş menzili) ve mermilerin daha geniş: büyük gövdelere de daha kolay isabet ediyor.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.24',
     date: '2026-10-21',
     text: {

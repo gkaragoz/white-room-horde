@@ -91,7 +91,7 @@ describe('enemies', () => {
     }
     expect(w.eX[i]).toBeLessThan(2);
     expect(w.pHp[0]).toBeLessThan(BALANCE.player.hp);
-    expect(w.pHp[0]).toBeGreaterThanOrEqual(BALANCE.player.hp - 3 * BALANCE.enemies.grunt.damage);
+    expect(w.pHp[0]).toBeGreaterThanOrEqual(BALANCE.player.hp - 3 * BALANCE.enemies.grunt.damage * BALANCE.enemyDamageMul);
   });
 
   it('bullets kill enemies and emit death events', () => {

@@ -1,4 +1,6 @@
 {
+  "enemyDamageMul": 2,
+  "hitbox": { "enemyMul": 1.3, "bulletR": 0.4, "melee": 0.45 },
   "_comment": "Initial balance (docs/DESIGN.md section 20). Units: 1 = one world unit, times in seconds.",
   "player": {
     "hp": 100,
@@ -733,8 +735,8 @@
     },
     "boss": {
       "everyWaves": 5,
-      "hpMul": 20,
-      "damage": 30,
+      "hpMul": 9,
+      "damage": 0.2,
       "radiusMul": 1.7,
       "summonSeconds": 6,
       "summonCount": 6,
@@ -1092,7 +1094,7 @@
       "every": 7,
       "radius": 7,
       "delay": 1.3,
-      "damage": 38,
+      "damage": 0.55,
       "stun": 0.8,
       "push": 14
     },
@@ -1102,7 +1104,7 @@
       "radius": 3,
       "delay": 1.7,
       "stagger": 0.14,
-      "damage": 46,
+      "damage": 0.5,
       "stun": 0.5,
       "push": 9
     },
@@ -1110,7 +1112,7 @@
       "every": 11,
       "width": 5,
       "delay": 1.5,
-      "damage": 40,
+      "damage": 0.55,
       "stun": 0.6,
       "push": 12
     },
@@ -1130,7 +1132,7 @@
       "every": 6,
       "radius": 7.5,
       "delay": 1.3,
-      "damage": 44,
+      "damage": 0.6,
       "stun": 1.0,
       "push": 16,
       "rocks": 6,
@@ -1142,10 +1144,10 @@
       "count": 4,
       "radius": 2.4,
       "delay": 1.0,
-      "damage": 40,
+      "damage": 0.4,
       "ringEvery": 9,
       "ringRadius": 7,
-      "ringDamage": 34,
+      "ringDamage": 0.4,
       "ringStun": 0.8
     },
     "plague": {
@@ -1161,7 +1163,7 @@
       "minRange": 5,
       "windup": 0.6,
       "radius": 2.6,
-      "damage": 48,
+      "damage": 0.55,
       "stun": 1.0
     },
     "hurl": {
@@ -1170,7 +1172,7 @@
       "pickRadius": 9,
       "radius": 2.8,
       "delay": 1.0,
-      "damage": 40,
+      "damage": 0.45,
       "hornEvery": 15,
       "hornCount": 4
     }

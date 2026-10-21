@@ -7,6 +7,12 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Balance: harder enemies, boss attacks as a share of health (rules change: update the server and reload the page)**
+
+- All flat enemy damage (melee, spit, explosions, acid and fire) is doubled (`enemyDamageMul`).
+- Boss attacks (slam, meteors, sweep, quake, storm, pounce, hurl, contact) now take a share of the victim's max health: main attacks 40-60%, contact 20%. Negative amounts mean a share in `hurtPlayer` and in telegraphs. Boss max health factor 20 -> 9.
+- Danger areas of enemies (warning circles, explosions, spit) grow by 30% and melee enemies strike from 0.45 further; our bullets are 0.4 wide instead of 0.1, and the grid search around a bullet covers the biggest boss.
+
 ## v0.24.0 (2026-10-21)
 
 **Unlimited ammo and click-to-pick weapons (rules change: update the server and reload the page)**

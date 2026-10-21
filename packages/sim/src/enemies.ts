@@ -60,6 +60,9 @@ const sources1 = new Int32Array(MAX_PLAYERS + 16);
 /** Player credited with the damage being dealt right now (-1 for enemies, explosions of exploders). */
 let killer = -1;
 
+/** How far from a bullet's path the grid is searched for bodies (the largest boss radius is about 2.6 with the biggest elite size). */
+const HIT_MARGIN = 3.2;
+
 function rad(w: World, i: number): number {
   const r = RADIUS[w.eType[i]!]! * (w.eMod[i] ? enemyRadiusMul(w, i) : 1);
   return w.eBoss[i] ? r * BALANCE.progression.boss.radiusMul : r;
@@ -658,7 +661,7 @@ function meteorRain(w: World, count: number): void {
     if (s < 0) return;
     const x = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 3.5, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
     const y = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 3.5, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
-    addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, m.radius, 0, m.delay + k * m.stagger, m.damage);
+    addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, m.radius, 0, m.delay + k * m.stagger, -m.damage);
   }
 }
 
@@ -669,7 +672,7 @@ function sweepAt(w: World, x: number, y: number): void {
   if (s < 0) return;
   const a = aimAt(x, y, w.pX[s]!, w.pY[s]!);
   const half = 64;
-  addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + cos(a) * half, y + sin(a) * half, a, sw.width, half, sw.delay, sw.damage);
+  addTelegraph(w, TeleShape.Rect, TeleEffect.Hurt, x + cos(a) * half, y + sin(a) * half, a, sw.width, half, sw.delay, -sw.damage);
 }
 
 /** The purge: a big part of the arena slowly paints red, then everybody still in it loses half their health (all of it on later floors). */
@@ -711,7 +714,7 @@ function bossAbilities(w: World, i: number, x: number, y: number, dist: number):
     w.eStateTick[i] = w.tick;
   };
   const slam = (): void => {
-    addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, ba.slam.radius, 0, ba.slam.delay, ba.slam.damage);
+    addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, ba.slam.radius, 0, ba.slam.delay, -ba.slam.damage);
     w.events.push({ type: 'bossAbility', kind: 'slam', x, y });
     callState();
   };
@@ -769,13 +772,13 @@ function bossAbilities(w: World, i: number, x: number, y: number, dist: number):
     // iron colossus: shakes the floor, charges, slams
     if (every(ba.quake.every, 90) && dist < 14) {
       const q = ba.quake;
-      addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, q.radius, 0, q.delay, q.damage);
+      addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, q.radius, 0, q.delay, -q.damage);
       for (let k = 0; k < q.rocks; k++) {
         const s = pickPlayer(w);
         if (s < 0) break;
         const ox = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 4, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
         const oy = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 4, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
-        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, q.rockRadius, 0, q.rockDelay + k * 0.18, q.damage * 0.7);
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, q.rockRadius, 0, q.rockDelay + k * 0.18, -q.damage * 0.7);
       }
       w.events.push({ type: 'bossAbility', kind: 'quake', x, y });
       callState();
@@ -795,13 +798,13 @@ function bossAbilities(w: World, i: number, x: number, y: number, dist: number):
         if (s < 0) break;
         const ox = clamp(w.pX[s]! + (w.rng.float() * 2 - 1) * 3, -ARENA_HALF_W + 2, ARENA_HALF_W - 2);
         const oy = clamp(w.pY[s]! + (w.rng.float() * 2 - 1) * 3, -ARENA_HALF_H + 2, ARENA_HALF_H - 2);
-        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, st.radius, 0, st.delay + k * 0.15, st.damage);
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, ox, oy, 0, st.radius, 0, st.delay + k * 0.15, -st.damage);
       }
       w.events.push({ type: 'bossAbility', kind: 'storm', x, y });
       callState();
     }
     if (every(st.ringEvery, 120)) {
-      addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, st.ringRadius, 0, 1.2, st.ringDamage);
+      addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, x, y, 0, st.ringRadius, 0, 1.2, -st.ringDamage);
       w.events.push({ type: 'bossAbility', kind: 'storm', x, y });
       callState();
     }
@@ -838,7 +841,7 @@ function bossAbilities(w: World, i: number, x: number, y: number, dist: number):
       if (s >= 0) {
         const px = w.pX[s]!;
         const py = w.pY[s]!;
-        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, px, py, 0, po.radius, 0, AIR_TICKS * TICK_DT, po.damage);
+        addTelegraph(w, TeleShape.Circle, TeleEffect.Hurt, px, py, 0, po.radius, 0, AIR_TICKS * TICK_DT, -po.damage);
         leapTo(w, i, px, py);
         w.events.push({ type: 'bossAbility', kind: 'pounce', x, y });
         callState();
@@ -859,7 +862,7 @@ function bossAbilities(w: World, i: number, x: number, y: number, dist: number):
         const v = pickSmall(w, x, y, hu.pickRadius, i);
         const s = pickPlayer(w);
         if (v < 0 || s < 0) break;
-        hurlAt(w, v, w.pX[s]! + (w.rng.float() * 2 - 1) * 1.5, w.pY[s]! + (w.rng.float() * 2 - 1) * 1.5, hu.radius, hu.damage, 0.1);
+        hurlAt(w, v, w.pX[s]! + (w.rng.float() * 2 - 1) * 1.5, w.pY[s]! + (w.rng.float() * 2 - 1) * 1.5, hu.radius, -hu.damage, 0.1);
         thrown++;
       }
       if (thrown > 0) {
@@ -1077,7 +1080,10 @@ function runWaves(w: World, playerCount: number): void {
 
 export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number, y: number, attacker = -1): boolean {
   if (w.pIFrames[slot]! > 0 || w.pHp[slot]! <= 0) return false;
-  const damage = absorb(w, slot, rawDamage * BALANCE.difficulty.damage[w.difficulty]! * (1 + lateFloors(w) * BALANCE.late.damagePerFloor) * abilityTaken(w, slot) * w.modArmor[slot]! * w.pModArmor[slot]!);
+  // a negative amount is a share of the victim's max health (boss attacks: they scale with the player, not with the floor);
+  // everything else is flat damage that is doubled and grows on late floors
+  const base = rawDamage < 0 ? Math.min(0.95, -rawDamage * BALANCE.difficulty.damage[w.difficulty]!) * w.pMaxHp[slot]! : rawDamage * BALANCE.enemyDamageMul * BALANCE.difficulty.damage[w.difficulty]! * (1 + lateFloors(w) * BALANCE.late.damagePerFloor);
+  const damage = absorb(w, slot, base * abilityTaken(w, slot) * w.modArmor[slot]! * w.pModArmor[slot]!);
   const thorns = perk(w, slot, PERK.Thorns);
   if (thorns > 0 && attacker >= 0 && w.eActive[attacker]) {
     const prev = killer;
@@ -1097,7 +1103,7 @@ export function hurtPlayer(w: World, slot: number, rawDamage: number, x: number,
 function explode(w: World, i: number): void {
   const x = w.eX[i]!;
   const y = w.eY[i]!;
-  const radius = BLAST[T_EXPLODER]!;
+  const radius = BLAST[T_EXPLODER]! * BALANCE.hitbox.enemyMul;
   w.events.push({ type: 'explosion', x, y, radius });
   blastEnemies(w, x, y, radius, DAMAGE[T_EXPLODER]! * 1.5);
   for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -1136,7 +1142,7 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
     // the belly bursts: acid burns whoever is close and a litter of crawlers crawls out
     const bx = w.eX[i]!;
     const by = w.eY[i]!;
-    const r = BLAST[T_BLOATER]!;
+    const r = BLAST[T_BLOATER]! * BALANCE.hitbox.enemyMul;
     w.events.push({ type: 'explosion', x: bx, y: by, radius: r * 0.8 });
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (!w.pActive[s] || w.pHp[s]! <= 0) continue;
@@ -1421,9 +1427,9 @@ export function updateEnemies(w: World): void {
           killEnemy(w, i, tx, ty, 0);
           continue;
         }
-      } else if (!cross && dist <= reach + 0.15) {
+      } else if (!cross && dist <= reach + 0.15 + BALANCE.hitbox.melee) {
         wantMove = false;
-        if (w.eCooldown[i]! <= 0 && hurtPlayer(w, best, boss ? BALANCE.progression.boss.damage : DAMAGE[type]!, w.pX[best]!, w.pY[best]!, i)) {
+        if (w.eCooldown[i]! <= 0 && hurtPlayer(w, best, boss ? -BALANCE.progression.boss.damage : DAMAGE[type]!, w.pX[best]!, w.pY[best]!, i)) {
           w.eCooldown[i] = INTERVAL[type]!;
           w.eState[i] = EnemyState.Attack;
           w.eStateTick[i] = w.tick;
@@ -1523,10 +1529,11 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
   const sx = x1 - x0;
   const sy = y1 - y0;
   const len2 = sx * sx + sy * sy;
-  const minX = (x0 < x1 ? x0 : x1) - 1.4;
-  const maxX = (x0 < x1 ? x1 : x0) + 1.4;
-  const minY = (y0 < y1 ? y0 : y1) - 1.4;
-  const maxY = (y0 < y1 ? y1 : y0) + 1.4;
+  // the biggest body (a boss) plus the bullet's own reach must fit inside the cells that are looked at
+  const minX = (x0 < x1 ? x0 : x1) - HIT_MARGIN;
+  const maxX = (x0 < x1 ? x1 : x0) + HIT_MARGIN;
+  const minY = (y0 < y1 ? y0 : y1) - HIT_MARGIN;
+  const maxY = (y0 < y1 ? y1 : y0) + HIT_MARGIN;
   const cx0 = g.cellX(minX);
   const cx1 = g.cellX(maxX);
   const cy0 = g.cellY(minY);
@@ -1546,7 +1553,7 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
           t = t < 0 ? 0 : t > 1 ? 1 : t;
           const px = ex - sx * t;
           const py = ey - sy * t;
-          const R = rad(w, j) + 0.1;
+          const R = rad(w, j) + BALANCE.hitbox.bulletR;
           if (px * px + py * py <= R * R && t < bestT) {
             bestT = t;
             bestSlot = j;
@@ -1717,7 +1724,8 @@ export function updateProjectiles(w: World): void {
       killer = -1;
     }
   }
-  const r2 = (BALANCE.spit.radius + BALANCE.player.radius) * (BALANCE.spit.radius + BALANCE.player.radius);
+  const spitR = BALANCE.spit.radius * BALANCE.hitbox.enemyMul + BALANCE.player.radius;
+  const r2 = spitR * spitR;
   for (let i = 0; i < MAX_SPIT; i++) {
     if (!w.sActive[i]) continue;
     const x0 = w.sX[i]!;

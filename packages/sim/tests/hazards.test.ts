@@ -25,8 +25,8 @@ describe('ground zones', () => {
     addZone(w, 0, 0, 2, 2, ZoneKind.Acid);
     run(w, 30);
     const burnt = 100 - w.pHp[0]!;
-    expect(burnt).toBeGreaterThan(BALANCE.hazards.acid.dps * 0.6);
-    expect(burnt).toBeLessThan(BALANCE.hazards.acid.dps * 1.4);
+    expect(burnt).toBeGreaterThan(BALANCE.hazards.acid.dps * BALANCE.enemyDamageMul * 0.6);
+    expect(burnt).toBeLessThan(BALANCE.hazards.acid.dps * BALANCE.enemyDamageMul * 1.4);
     run(w, 60);
     expect(w.zActive.some((a) => a === 1)).toBe(false); // gone after its two seconds
     const w2 = quiet(1);
@@ -231,6 +231,7 @@ describe('the new bosses', () => {
     let telegraphs = 0;
     let hits = 0;
     for (let t = 0; t < 30 * 20; t++) {
+      w.pHp[0] = w.pMaxHp[0]!; // the meteors hit hard now: keep the target standing
       step(w, [NONE]);
       for (const e of w.events) {
         if (e.type === 'telegraph') telegraphs++;
@@ -246,6 +247,7 @@ describe('the new bosses', () => {
       const { w } = boss(6, seed);
       let found = false;
       for (let t = 0; t < 30 * 14 && !found; t++) {
+        w.pHp[0] = w.pMaxHp[0]!;
         step(w, [NONE]);
         for (let i = 0; i < w.tActive.length; i++) {
           if (!w.tActive[i] || w.tTotal[i]! < 150) continue;
@@ -266,6 +268,7 @@ describe('the new bosses', () => {
     for (const [w, effect] of [[early, TeleEffect.Half], [late, TeleEffect.Kill]] as const) {
       let got = -1;
       for (let t = 0; t < 30 * 14 && got < 0; t++) {
+        w.pHp[0] = w.pMaxHp[0]!;
         step(w, [NONE]);
         for (let i = 0; i < w.tActive.length; i++) if (w.tActive[i] && w.tTotal[i]! >= 150) got = w.tEffect[i]!;
       }

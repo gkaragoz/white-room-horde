@@ -148,7 +148,7 @@ describe('sledge brute and lamp spinner', () => {
       for (const e of x.events) if (e.type === 'teleHit') radius = e.radius;
     });
     expect(charged).toBe(true);
-    expect(radius).toBeCloseTo(BALANCE.special.lamper!.radius!, 3);
+    expect(radius).toBeCloseTo(BALANCE.special.lamper!.radius! * BALANCE.hitbox.enemyMul, 3);
   });
 });
 
