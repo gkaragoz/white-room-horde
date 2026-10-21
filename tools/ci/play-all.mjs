@@ -164,7 +164,8 @@ try {
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text().slice(0, 200)));
     await page.goto(`${base}/?menu=1`);
-    await page.waitForSelector('#wrh-solo', { timeout: 90000 });
+    await page.waitForSelector('#wrh-solo', { timeout: 90000, state: 'attached' });
+    await page.locator('#wrh-open-loadout').click(); // classes live on the Weapons and Class page
     const n = await page.locator('.wrh-class[data-cls]').count();
     check('the lobby offers nine classes', n === 9, String(n));
     await page.locator('.wrh-class[data-cls="8"]').click();

@@ -100,8 +100,23 @@ export function modsRow(lang: Lang, mods: number, editable: boolean): string {
   return `<button type="button" class="wrh-modsbtn" id="wrh-mods-open" data-ed="${editable ? 1 : 0}">${body}<b>${multText(mods)}</b></button>`;
 }
 
-/** The full-screen grid: every multiplier a toggle with its sentence on hover. */
-export function modsPanel(lang: Lang, mods: number, editable: boolean): string {
+/** "3 chosen · ×1.35" or "None chosen: the normal game" (the Difficulty card of the main menu). */
+export function modsSummary(lang: Lang, mods: number): string {
+  const t = modWords(lang);
+  const n = countMods(mods);
+  return n ? `${n} ${t.chosen} · ${multText(mods)}` : t.none;
+}
+
+/** Up to three of the chosen icons (or the first one, faded, when none is chosen) for the Difficulty card. */
+export function modsCardIcon(mods: number): string {
+  const on: number[] = [];
+  for (let i = 0; i < MOD_COUNT && on.length < 3; i++) if ((mods >> i) & 1) on.push(i);
+  if (!on.length) return `<img src="${modIcon(0)}" alt="" style="opacity:.45;filter:grayscale(.6)">`;
+  return `<span class="strip">${on.map((i) => `<img src="${modIcon(i)}" alt="">`).join('')}</span>`;
+}
+
+/** The grid of every multiplier, a toggle each with its sentence on hover. `page` draws it inside the Difficulty page (no title, no Done button). */
+export function modsPanel(lang: Lang, mods: number, editable: boolean, page = false): string {
   const t = modWords(lang);
   const cards = MODS.map((_, i) => {
     const [name, text] = modText(lang, i);
@@ -109,7 +124,8 @@ export function modsPanel(lang: Lang, mods: number, editable: boolean): string {
     return `<button type="button" class="wrh-mod${on ? ' on' : ''}" data-mod="${i}" aria-pressed="${on ? 'true' : 'false'}"${editable ? '' : ' aria-disabled="true"'}><img src="${modIcon(i)}" alt=""><span>${name}</span><span class="tip">${text}</span></button>`;
   }).join('');
   const tools = editable ? `<button type="button" class="alt" id="wrh-mods-all">${t.all}</button><button type="button" class="alt" id="wrh-mods-none">${t.clear}</button>` : '';
-  return `<div class="wrh-modpanel"><h2>${t.title}</h2><p class="hint">${t.hint}</p><div class="wrh-modgrid">${cards}</div><div class="wrh-modfoot"><span class="mult">${t.score}: <b id="wrh-mods-mult">${multText(mods)}</b></span>${tools}<button type="button" id="wrh-mods-close">${t.close}</button></div></div>`;
+  const done = page ? '' : `<button type="button" id="wrh-mods-close">${t.close}</button>`;
+  return `<div class="wrh-modpanel">${page ? '' : `<h2>${t.title}</h2>`}<p class="hint">${t.hint}</p><div class="wrh-modgrid">${cards}</div><div class="wrh-modfoot"><span class="mult">${t.score}: <b id="wrh-mods-mult">${multText(mods)}</b></span>${tools}${done}</div></div>`;
 }
 
 /** The score of a run: floors, kills, bosses and the time alive, times the multiplier of the chosen difficulty. */

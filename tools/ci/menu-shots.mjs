@@ -1,6 +1,7 @@
-// Screenshots of the full-screen main menu at desktop, laptop and phone sizes, plus layout checks: no horizontal overflow,
-// every element id the rest of the game and the QA scripts rely on is there, the online panel opens and closes, an invite
-// link opens it with the code filled in, and the typed name survives a language change.
+// Screenshots of the main menu (the card hub and each of its full-screen pages) at desktop, laptop and phone sizes, plus layout
+// checks: no horizontal overflow, every element id the rest of the game and the QA scripts rely on is there, each card opens its
+// page and Back / Escape return to the hub, the online panel opens and closes, an invite link opens the Play page with the
+// code filled in, the controls live only inside the settings, and the typed name survives a language change.
 //
 //   pnpm --filter @wrh/client build && node tools/ci/menu-shots.mjs
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
@@ -28,7 +29,8 @@ const check = (label, ok, detail = '') => {
   results.push({ label, ok });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? '  ' + detail : ''}`);
 };
-const IDS = ['wrh-solo', 'wrh-online', 'wrh-host', 'wrh-join', 'wrh-code', 'wrh-pass', 'wrh-server', 'wrh-name', 'wrh-weapons', 'wrh-class-tip', 'wrh-prev-host', 'wrh-prev-name', 'wrh-prev-stats', 'wrh-open-settings', 'tb-lang', 'tb-ctl', 'tb-set'];
+const IDS = ['wrh-solo', 'wrh-online', 'wrh-host', 'wrh-join', 'wrh-code', 'wrh-pass', 'wrh-server', 'wrh-name', 'wrh-weapons', 'wrh-class-tip', 'wrh-prev-host', 'wrh-prev-name', 'wrh-prev-stats', 'wrh-open-settings', 'wrh-open-ach', 'wrh-open-loadout', 'wrh-card-play', 'wrh-card-mods', 'tb-lang', 'tb-set'];
+const PAGES = [['play', '#wrh-card-play'], ['loadout', '#wrh-open-loadout'], ['mods', '#wrh-card-mods']];
 const SIZES = [
   ['desktop', 1920, 1080],
   ['laptop', 1366, 768],
@@ -68,7 +70,8 @@ try {
         overflowX: home.scrollWidth - home.clientWidth,
         classes: document.querySelectorAll('.wrh-class[data-cls]').length,
         emoji: /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(home.innerText),
-        playBox: document.getElementById('wrh-solo').getBoundingClientRect().toJSON(),
+        playBox: document.getElementById('wrh-card-play').getBoundingClientRect().toJSON(),
+        oldControls: !!document.getElementById('tb-ctl') || /WASD/.test(home.innerText),
         broken: [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.src.slice(-40)),
       };
     }, IDS);
@@ -78,7 +81,44 @@ try {
     check(`${label}: nine classes`, info.classes === 9);
     check(`${label}: no emoji left in the menu text`, !info.emoji);
     check(`${label}: no broken images`, info.broken.length === 0, info.broken.join(','));
+    check(`${label}: no separate controls button or hint line`, !info.oldControls);
     if (w < 800) check(`${label}: the play button is a touch target`, info.playBox.height >= 44 && info.playBox.width >= 120, `${Math.round(info.playBox.width)}x${Math.round(info.playBox.height)}`);
+    // every card opens its page, the page fits the width, Back and Escape return to the hub
+    for (const [name, card] of PAGES) {
+      await page.click(card);
+      await page.waitForTimeout(name === 'mods' ? 300 : 900);
+      const shown = await page.evaluate((n) => {
+        const home = document.querySelector('.wrh-home');
+        const pg = home.querySelector(`[data-p="${n}"]`);
+        const r = pg.getBoundingClientRect();
+        return { page: home.dataset.page, visible: getComputedStyle(pg).display !== 'none' && r.height > 100, overflowX: home.scrollWidth - home.clientWidth };
+      }, name);
+      check(`${label}: the ${name} card opens its page`, shown.page === name && shown.visible);
+      check(`${label}: the ${name} page has no horizontal overflow`, shown.overflowX <= 1, `${shown.overflowX}px`);
+      await page.screenshot({ path: join(out, `menu_${label}_${name}.png`) });
+      if (name === 'play') {
+        const canvas = await page.evaluate(() => { const c = document.querySelector('#wrh-stagebox canvas, [data-slot="play"] canvas'); const r = c?.getBoundingClientRect(); return r ? { w: r.width, h: r.height, inPlay: !!document.querySelector('[data-slot="play"] canvas') } : null; });
+        check(`${label}: the 3D character is on the Play page`, !!canvas && canvas.inPlay && canvas.w > 120, JSON.stringify(canvas));
+      }
+      if (name === 'mods') {
+        const grid = await page.locator('#wrh-mods-page .wrh-mod').count();
+        check(`${label}: the difficulty page shows the 20 multipliers`, grid === 20, String(grid));
+      }
+      await page.click(`[data-p="${name}"] .wrh-back`);
+      check(`${label}: Back returns to the hub (${name})`, (await page.evaluate(() => document.querySelector('.wrh-home').dataset.page)) === 'hub');
+      await page.click(card);
+      await page.keyboard.press('Escape');
+      check(`${label}: Escape returns to the hub (${name})`, (await page.evaluate(() => document.querySelector('.wrh-home').dataset.page)) === 'hub');
+    }
+    // the settings: a page of their own with the controls inside
+    await page.click('#wrh-open-settings');
+    await page.waitForSelector('.wrh-set-tabs');
+    await page.screenshot({ path: join(out, `menu_${label}_settings.png`) });
+    await page.click('.wrh-set-tabs button:last-child');
+    check(`${label}: the controls are a tab of the settings`, (await page.locator('.wrh-ctl-row').count()) > 8);
+    await page.screenshot({ path: join(out, `menu_${label}_controls.png`) });
+    await page.keyboard.press('Escape');
+    check(`${label}: Escape closes the settings`, (await page.locator('.wrh-set-tabs').count()) === 0);
     check(`${label}: no page errors`, errors.length === 0, errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
@@ -88,6 +128,7 @@ try {
     const { ctx, page } = await open(1366, 768);
     const visible = () => page.evaluate(() => getComputedStyle(document.getElementById('wrh-online-panel')).display !== 'none');
     check('the online panel starts closed', !(await visible()));
+    await page.click('#wrh-card-play');
     await page.click('#wrh-online');
     check('the Online button opens it', await visible());
     await page.screenshot({ path: join(out, 'menu_online.png') });
@@ -102,6 +143,7 @@ try {
     await page.click('#tb-lang');
     await page.click('#tb-pop [data-lang="tr"]');
     await page.waitForTimeout(400);
+    check('a language change keeps the page', (await page.evaluate(() => document.querySelector('.wrh-home').dataset.page)) === 'play');
     check('the typed name survives a language change', (await page.inputValue('#wrh-name')) === 'Tester');
     check('the labels follow the language', /Çevrimiçi/.test(await page.innerText('#wrh-online')));
     await ctx.close();
@@ -111,6 +153,7 @@ try {
     const { ctx, page } = await open(1366, 768, '?menu=1&join=ABCD');
     const state = await page.evaluate(() => ({ open: getComputedStyle(document.getElementById('wrh-online-panel')).display !== 'none', code: document.getElementById('wrh-code').value }));
     check('an invite link opens the online panel with the code', state.open && state.code === 'ABCD', JSON.stringify(state));
+    check('an invite link opens the Play page', (await page.evaluate(() => document.querySelector('.wrh-home').dataset.page)) === 'play');
     await page.screenshot({ path: join(out, 'menu_invite.png') });
     await ctx.close();
   }

@@ -7,6 +7,14 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**New main menu: a card hub with full-screen pages (client only)**
+
+- The menu opens on a slim top bar (logo, best score, language and settings buttons) and big cards: a wide green **Play** card, **Achievements** (with the red "!" badge), **Weapons and Class**, **Difficulty** (shows the number of multipliers and the score multiplier) and **Settings**. Each card opens a full-screen page with a **Back** button; **Esc** goes back one level.
+- **Play** page: name, the 3D character holding the starting weapon, arena choice, difficulty summary, **Play solo** and **Play online**. **Weapons and Class** page: the weapon list (locked weapons keep their hover tips), class picker, accessory and colour. **Difficulty** page: the 20-multiplier grid, drawn in the page instead of a modal. Invite links (`?join=CODE`) open the Play page with the online dialog; a language change keeps the page you are on.
+- **Settings** is a page of its own: grouped rows and tabs; the controls reference and the key rebinding are the **Controls** tab. The separate controls button, the settings-window controls button and the hint line on the menu are gone.
+- **Online room**: full screen and tidier: players on the left, preview and loadout in the middle, arena, difficulty and **Start game** / **Copy invite link** on the right (a bar at the bottom on narrow screens). It still updates in place while people join.
+- CI scripts: `menu-shots`, `game-smoke`, `rejoin-check`, `net-stutter` and `play-all` open the Play (or Weapons and Class) page first; `menu-shots` also checks every page at desktop and phone sizes.
+
 ## v0.29.0 (2026-10-21)
 
 **100 achievements (rules change: update the server and reload the page)**
