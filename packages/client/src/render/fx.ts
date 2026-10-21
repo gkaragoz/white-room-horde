@@ -86,7 +86,7 @@ export class Fx {
   private readonly c = new THREE.Color();
 
   /** Pixels per world unit on the blood canvas (8 low, 14 high). */
-  private readonly ppu: number;
+  private ppu: number;
 
   constructor(
     private readonly onExplosionShake: (amount: number) => void = () => undefined,
@@ -191,6 +191,30 @@ export class Fx {
   /** The camera the puffs face (set once by main; the iso camera never turns). */
   faceCamera(q: THREE.Quaternion): void {
     this.camQ.copy(q);
+  }
+
+  /** Redraw the blood layer at another detail (8 or 14 pixels per unit) while keeping what is on the floor. */
+  setDecalDetail(detail: 0 | 1): void {
+    const ppu = detail === 1 ? 14 : 8;
+    if (ppu === this.ppu) return;
+    this.ppu = ppu;
+    for (const t of this.decalTiles) {
+      const old = t.canvas;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(this.decalW * ppu);
+      canvas.height = Math.round(this.decalH * ppu);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(old, 0, 0, canvas.width, canvas.height);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      t.tex.dispose();
+      t.mat.map = tex;
+      t.mat.needsUpdate = true;
+      t.canvas = canvas;
+      t.ctx = ctx;
+      t.tex = tex;
+      t.dirty = false;
+    }
   }
 
   /** Wipe the blood and the bullet holes: a new floor starts clean. */

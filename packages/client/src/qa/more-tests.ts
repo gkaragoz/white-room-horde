@@ -13,6 +13,7 @@ import { AmmoRing } from '../render/ammoRing';
 import { RagdollPool } from '../render/ragdoll';
 import { PowerView, strengthOf } from '../render/power';
 import { Character } from '../render/character';
+import { Preview } from '../render/preview';
 import { PlayerAnimator } from '../render/playerAnim';
 import { asset } from '../assets';
 import { BANK_FILES, MUSIC_FILES } from '../audio';
@@ -628,6 +629,16 @@ export const moreTests: QaTest[] = [
         if (q('#wrh-prev-name').textContent === w0) problems.push('weapon name did not change');
         if (!/\d/.test(q('#wrh-prev-stats').textContent ?? '')) problems.push('weapon stats missing');
         await new Promise((r) => setTimeout(r, 1500));
+        const lockedBtn = host.querySelector<HTMLButtonElement>('.wrh-wp.locked[data-w]');
+        if (lockedBtn) {
+          const n = weapons.length;
+          if (lockedBtn.disabled || lockedBtn.getAttribute('aria-disabled') !== 'true') problems.push('a locked weapon is natively disabled or lacks aria-disabled');
+          lockedBtn.click();
+          if (weapons.length !== n) problems.push('clicking a locked weapon picked it');
+          lockedBtn.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+          const tip = host.querySelector<HTMLElement>('.wrh-tip');
+          if (!tip || tip.style.display !== 'block' || !/\d/.test(tip.textContent ?? '')) problems.push('a locked weapon shows no hover tip with its floor');
+        }
         const sw = host.querySelector('[data-sw].on');
         if (!sw) problems.push('selected swatch is not marked');
       } finally {
@@ -636,6 +647,51 @@ export const moreTests: QaTest[] = [
         saveProfile({ ...loadProfile(), acc: 0, color: -1 });
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'preview canvas, accessory/weapon arrows, colour swatches and stats work' };
+    },
+  },
+  {
+    id: 'menu.preview-aim',
+    title: 'The lobby preview holds every weapon pointing the way the character faces, upright, while the turntable spins',
+    async run() {
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-9999px;top:0;width:300px;height:300px';
+      document.body.appendChild(host);
+      let pv: Preview;
+      try {
+        pv = new Preview(120);
+      } catch {
+        host.remove();
+        return { status: 'warn', detail: 'no second WebGL context for the preview' };
+      }
+      host.appendChild(pv.canvas);
+      const problems: string[] = [];
+      const worst = { angle: 0, tilt: 0 };
+      try {
+        for (const wp of WEAPON_IDS) {
+          await pv.set({ mode: 'char', accessory: ACCESSORIES[0]!, color: '#3aa0ff', weapon: wp });
+          for (let i = 0; i < 100 && pv.busy; i++) await new Promise((r) => setTimeout(r, 20));
+          // a few turns of the turntable: the aim has to follow the rotation
+          for (let k = 0; k < 4; k++) {
+            for (let i = 0; i < 20; i++) pv.tick(0.05);
+            const a = pv.weaponAxes();
+            if (!a) {
+              problems.push(`${wp}: no weapon in the preview`);
+              break;
+            }
+            const angle = (Math.acos(Math.max(-1, Math.min(1, a.barrel.dot(a.facing)))) * 180) / Math.PI;
+            const tilt = (Math.acos(Math.max(-1, Math.min(1, a.up.y))) * 180) / Math.PI;
+            worst.angle = Math.max(worst.angle, angle);
+            worst.tilt = Math.max(worst.tilt, tilt);
+            if (angle > 6) problems.push(`${wp}: barrel ${angle.toFixed(1)} deg off the facing`);
+            if (tilt > 12) problems.push(`${wp}: weapon rolled ${tilt.toFixed(1)} deg off upright`);
+            if (problems.length && problems[problems.length - 1]!.startsWith(wp)) break;
+          }
+        }
+      } finally {
+        pv.dispose();
+        host.remove();
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.slice(0, 6).join(' | ') : `${WEAPON_IDS.length} weapons aimed within ${worst.angle.toFixed(1)} deg of the facing, at most ${worst.tilt.toFixed(1)} deg off upright` };
     },
   },
   {
@@ -706,6 +762,8 @@ export const moreTests: QaTest[] = [
           onClose: () => changes.push(['close', true]),
           onControls: () => changes.push(['controls', true]),
           onReport: () => changes.push(['report', true]),
+          needsReload: (k: string) => k === 'aa',
+          onReload: () => changes.push(['reload', true]),
         });
       try {
         draw();
@@ -717,6 +775,12 @@ export const moreTests: QaTest[] = [
         host.querySelector<HTMLInputElement>('.wrh-range')!.dispatchEvent(new Event('change'));
         host.querySelector<HTMLElement>('.wrh-seg button:not(.on)')!.click();
         if (changes.length !== 3) problems.push(`${changes.length} changes reported for a switch, a slider and a choice`);
+        const reloadBtn = host.querySelector<HTMLElement>('.wrh-set-reload button');
+        if (!reloadBtn) problems.push('a setting that needs a reload shows no note and button');
+        else {
+          reloadBtn.click();
+          if (!changes.some((c) => c[0] === 'reload')) problems.push('the reload button does nothing');
+        }
         const reportBtn = [...host.querySelectorAll<HTMLElement>('.wrh-set-row button')].find((b) => /report/i.test(b.textContent ?? ''));
         if (!reportBtn) problems.push('no problem-report button in the settings');
         else {

@@ -88,8 +88,13 @@ export class Preview {
     const changed = !prev || prev.mode !== look.mode || prev.accessory !== look.accessory || prev.color !== look.color || prev.weapon !== look.weapon;
     if (!changed) return;
     const gen = ++this.generation;
-    if (look.mode === 'char') await this.buildCharacter(look, gen);
-    else await this.buildWeapon(look, gen);
+    this.building++;
+    try {
+      if (look.mode === 'char') await this.buildCharacter(look, gen);
+      else await this.buildWeapon(look, gen);
+    } finally {
+      this.building--;
+    }
   }
 
   private clearStage(): void {
@@ -144,13 +149,44 @@ export class Preview {
       return;
     }
     if (!this.look) return;
-    const dt = Math.min(0.05, this.clock.getDelta());
-    if (!this.dragging) this.stage.rotation.y += dt * this.spin;
-    if (this.weaponMesh) this.weaponMesh.position.y = 1 + Math.sin(performance.now() / 700) * 0.04;
-    this.character?.update(dt);
+    this.tick(Math.min(0.05, this.clock.getDelta()));
     this.renderer.render(this.scene, this.camera);
     if (this.character || this.weaponMesh) this.ready = true;
   };
+
+  /** Advance the turntable and the pose by `dt` seconds (the render loop, and QA). */
+  tick(dt: number): void {
+    if (!this.dragging) this.stage.rotation.y += dt * this.spin;
+    if (this.weaponMesh) this.weaponMesh.position.y = 1 + Math.sin(performance.now() / 700) * 0.04;
+    const c = this.character;
+    if (!c) return;
+    c.update(dt);
+    // the clip only supplies the body: the arms are aimed along the way the character faces (the stage turns, so in world space)
+    this.stage.updateMatrixWorld(true);
+    c.applyAim(this.facing(new THREE.Vector3()));
+  }
+
+  /** World direction the character looks at (its forward axis, flat). */
+  private facing(out: THREE.Vector3): THREE.Vector3 {
+    const c = this.character;
+    if (!c) return out.set(0, 0, 1);
+    c.root.updateWorldMatrix(true, false);
+    out.set(0, 0, 1).transformDirection(c.root.matrixWorld);
+    out.y = 0;
+    return out.normalize();
+  }
+
+  /** QA: where the barrel and the weapon's up axis point against the way the character faces (null without a character weapon). */
+  weaponAxes(): { barrel: THREE.Vector3; up: THREE.Vector3; facing: THREE.Vector3 } | null {
+    const a = this.character?.weaponAxes();
+    return a ? { ...a, facing: this.facing(new THREE.Vector3()) } : null;
+  }
+
+  /** QA: resolves when the last `set` has finished building. */
+  get busy(): boolean {
+    return this.building > 0;
+  }
+  private building = 0;
 
   dispose(): void {
     if (this.disposed) return;

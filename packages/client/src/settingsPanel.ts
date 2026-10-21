@@ -69,6 +69,8 @@ const EN = {
   cycle: 'Cycle',
   unlimited: 'Display rate',
   reloads: 'Needs a reload of the page',
+  reloadNote: 'Applies when you reload the page.',
+  reloadNow: 'Reload now',
   keysHint: 'Click a key, then press the new one.',
   resetKeys: 'Reset keys',
   showControls: 'Show the controls sheet',
@@ -178,6 +180,8 @@ const TR: Partial<typeof EN> = {
   cycle: 'Döngü',
   unlimited: 'Ekran hızı',
   reloads: 'Sayfanın yenilenmesi gerekir',
+  reloadNote: 'Sayfayı yeniden yüklediğinizde aktifleşir.',
+  reloadNow: 'Şimdi yenile',
   keysHint: 'Bir tuşa tıkla, sonra yenisine bas.',
   resetKeys: 'Tuşları sıfırla',
   showControls: 'Kontrol sayfasını göster',
@@ -245,6 +249,9 @@ export interface PanelContext {
   onControls(): void;
   /** Download the problem report (frame times, network numbers, errors, settings). */
   onReport(): void;
+  /** The setting differs from what the running renderer was built with (it applies after a reload). */
+  needsReload(key: keyof Settings): boolean;
+  onReload(): void;
 }
 
 type Choice = [value: string | number | boolean, label: string];
@@ -279,11 +286,11 @@ function tabsFor(t: PanelText, c: PanelContext): { id: string; label: string; gr
           title: t.gRender,
           rows: [
             { kind: 'choice', key: 'renderer', label: t.renderer, reload: true, options: [['webgl', 'WebGL2'], ['webgpu', 'WebGPU']] },
-            { kind: 'choice', key: 'aa', label: t.aa, reload: true, options: [['off', t.off], ['msaa', 'MSAA'], ['smaa', 'SMAA']] },
+            { kind: 'choice', key: 'aa', label: t.aa, options: [['off', t.off], ['msaa', 'MSAA'], ['smaa', 'SMAA']] },
             { kind: 'slider', key: 'scale', label: t.scale, min: 0.5, max: 1, step: 0.05, fmt: pct },
             { kind: 'toggle', key: 'autoScale', label: t.autoScale },
             { kind: 'choice', key: 'fpsCap', label: t.fpsCap, options: [[0, t.unlimited], [30, '30'], [60, '60'], [120, '120']] },
-            { kind: 'choice', key: 'texture', label: t.texture, reload: true, options: [[0, t.low], [1, t.high]] },
+            { kind: 'choice', key: 'texture', label: t.texture, options: [[0, t.low], [1, t.high]] },
             { kind: 'choice', key: 'shadows', label: t.shadows, options: [[0, t.off], [1, t.low], [2, t.high]] },
           ],
         },
@@ -476,6 +483,18 @@ function buildRow(r: Row, t: PanelText, c: PanelContext): HTMLElement {
     if (r.reload) {
       label.title = t.reloads;
       label.append(el('small', undefined, ' ↻'));
+    }
+    if (c.needsReload(r.key)) {
+      // a persistent note under the row, with a button for those who want it now
+      const note = el('div', 'wrh-set-reload');
+      note.append(el('span', undefined, t.reloadNote));
+      const b = el('button', 'wrh-set-small', t.reloadNow);
+      b.type = 'button';
+      b.onclick = () => c.onReload();
+      note.append(b);
+      const wrap = el('div', 'wrh-set-rowwrap');
+      wrap.append(row, note);
+      return wrap;
     }
   }
   return row;
