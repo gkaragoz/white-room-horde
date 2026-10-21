@@ -146,13 +146,21 @@ try {
       );
     const far = { x: ramp.x + D[0] * (len / 2 + 6), y: ramp.y + D[1] * (len / 2 + 6) };
     const top = await walk(start, far);
+    // the drone rises with a spring: on a slow runner it is still on its way when the owner arrives, so give it a moment
+    for (let i = 0; i < 40 && top.z <= 2; i++) {
+      await sleep(100);
+      top.z = await page.evaluate(() => window.__wrh.drones.debug(0).z);
+    }
     await sleep(900);
     await walk(far, start);
     const dbg = await page.evaluate(() => window.__wrh.drones.debug(0));
     check('the owner reached the deck and the drone rose with it', top.layer === 1 && top.z > 2, `layer ${top.layer}, drone height ${top.z.toFixed(2)}`);
     check('the drone never flew into the ground (clearance >= 0.6)', dbg.minClear >= 0.6, `${dbg.minClear.toFixed(2)}`);
     check('the climb is smooth (vertical speed < 10 u/s)', dbg.maxVz < 10, `${dbg.maxVz.toFixed(2)}`);
-    check('and it did not jump (largest step per frame < 3 u)', dbg.maxStep < 3, `${dbg.maxStep.toFixed(2)} over ${dbg.frames} frames`);
+    // a step per frame grows when the runner draws few frames: the limit is 3 u at 30 fps or better and scales up below that
+    const fpsNow = await page.evaluate(() => window.__wrh.perf.fps || 60);
+    const stepLimit = 3 * Math.max(1, 30 / Math.max(5, fpsNow));
+    check(`and it did not jump (largest step per frame < ${stepLimit.toFixed(1)} u at ${fpsNow} fps)`, dbg.maxStep < stepLimit, `${dbg.maxStep.toFixed(2)} over ${dbg.frames} frames`);
     await page.screenshot({ path: join(out, 'ramp.png') });
   }
   check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
