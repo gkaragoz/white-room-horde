@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.20.0 (2026-10-21)
+
 **Online movement without stutter (the input message changes: update the server and reload the page)**
 
 - Fixed the stutter of the local character in online games, worst with the hammerer. Causes: the client's prediction ignored the slow-down of a charging hammer (and the Special button, and buffs running out inside the lead window) so it overshot and was pulled back on every confirmed tick; the predicted position was drawn on the clock of the received bundles instead of the clock of the sent inputs, which made it jump back and forth by a tick of movement about thirty times a second; and the smoothing filter passed most of each jump through.
