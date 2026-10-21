@@ -5,7 +5,7 @@ import type { World } from './state';
 function arrays(w: World): ArrayBufferView[] {
   return [
     w.pXp, w.pLevel, w.pPending, w.pOffer, w.pCardTimer, w.pCardLock, w.pCardPrev, w.pCards,
-    w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modRevive, w.modMagnet, w.modXp, w.modBlast, w.modReload, w.modDash, w.modArmor, w.modCrit,
+    w.modDamage, w.modRate, w.modSpeed, w.modPierce, w.modRevive, w.modMagnet, w.modXp, w.modBlast, w.modReload, w.modDash, w.modArmor, w.modCrit, w.modAbCd, w.modAbDur, w.modAbDmg, w.modAbRad, w.modAbExtra,
     w.pActive, w.pX, w.pY, w.pAngle, w.pHp, w.pMaxHp, w.pState, w.pTimer, w.pRevive, w.pCooldown, w.pIFrames, w.pWeapon, w.pOwned, w.pInvMag, w.pInvReload, w.pMoving, w.pMag, w.pReload, w.pDash, w.pDashCd, w.pDashX, w.pDashY, w.pModDmg, w.pModSpeed, w.pModRate, w.pModPierce, w.pModArmor, w.pLifesteal, w.pPerk, w.pStat, w.pWpnTime, w.pGren, w.pGrenCharge, w.pGrenCd,
     w.eActive, w.eType, w.eBoss, w.eAux, w.eState, w.eStateTick, w.eX, w.eY, w.eAngle, w.eHp, w.eCooldown, w.eMod, w.eShield, w.eFrost, w.eAct, w.eActT, w.eAir, w.eVX, w.eVY,
     w.pStun, w.pKnockX, w.pKnockY, w.pAir, w.pLayer, w.eLayer, w.bLayer, w.sLayer, w.pSpecCd, w.pSpecT, w.pRally, w.pCharge, w.pOver,

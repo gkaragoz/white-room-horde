@@ -1,4 +1,5 @@
 import { UNIVERSAL_CARDS } from './cards-universal';
+import { CLASS_CARDS } from './cards-class';
 /**
  * One player's input for one tick. Quantised so it is identical on every client and cheap to send
  * (docs/DESIGN.md section 8: ~6 bytes per player per tick).
@@ -81,9 +82,9 @@ const BASE_CARD_IDS = [
   // appended last so the ids of the older cards (and the offers they roll) do not move
   'drone',
 ] as const;
-export type CardId = (typeof BASE_CARD_IDS)[number] | (typeof UNIVERSAL_CARDS)[number]['id'];
+export type CardId = (typeof BASE_CARD_IDS)[number] | (typeof UNIVERSAL_CARDS)[number]['id'] | (typeof CLASS_CARDS)[number]['id'];
 /** All cards: the first 36 never move (offers and saves use the index); the 50 universal cards follow. */
-export const CARD_IDS: readonly CardId[] = [...BASE_CARD_IDS, ...UNIVERSAL_CARDS.map((c) => c.id)];
+export const CARD_IDS: readonly CardId[] = [...BASE_CARD_IDS, ...UNIVERSAL_CARDS.map((c) => c.id), ...CLASS_CARDS.map((c) => c.id)];
 /** The few cards that help the whole squad; they show up on the info bar with the name of whoever took them. */
 export const TEAM_CARDS: readonly string[] = ['heal', 'grenades', 'luck'];
 /** Cards that only help the character that picked them: all the others. */
@@ -96,7 +97,7 @@ const BASE_RARITY: Record<(typeof BASE_CARD_IDS)[number], 0 | 1 | 2> = {
   regen: 0, scavenger: 0, adrenaline: 0, thorns: 1, shock: 1, frost: 1, barrier: 1, rage: 1, volatile: 2, secondwind: 2,
   drone: 1,
 };
-export const CARD_RARITY = { ...BASE_RARITY, ...Object.fromEntries(UNIVERSAL_CARDS.map((c) => [c.id, c.rarity])) } as Record<CardId, 0 | 1 | 2>;
+export const CARD_RARITY = { ...BASE_RARITY, ...Object.fromEntries(UNIVERSAL_CARDS.map((c) => [c.id, c.rarity])), ...Object.fromEntries(CLASS_CARDS.map((c) => [c.id, c.rarity])) } as Record<CardId, 0 | 1 | 2>;
 /** Who may be offered a card: a mask over the class ids (bit n = class n may). */
 export const ALL_CLASSES = 0x1ff;
 /** The classes that shoot (bullets and magazines) and the two that only swing. */
@@ -107,6 +108,7 @@ export const CARD_CLASS = {
   ...Object.fromEntries(BASE_CARD_IDS.map((id) => [id, ALL_CLASSES])),
   ...Object.fromEntries(['pierce', 'marksman', 'quickhands', 'grenades', 'arsenal', 'ammo', 'scavenger'].map((id) => [id, RANGED_MASK])),
   ...Object.fromEntries(UNIVERSAL_CARDS.map((c) => [c.id, MASK_OF[c.cls]])),
+  ...Object.fromEntries(CLASS_CARDS.map((c) => [c.id, 1 << c.cls])),
 } as Record<CardId, number>;
 /** Offer weights per rarity. */
 export const RARITY_WEIGHT: readonly number[] = [6, 3, 1];

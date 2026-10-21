@@ -106,6 +106,12 @@ export interface World {
   modDash: Float64Array;
   modArmor: Float64Array;
   modCrit: Float64Array;
+  /** Class ability tuning from the class cards: cooldown, duration, damage and radius factors, extra shots / rockets. */
+  modAbCd: Float64Array;
+  modAbDur: Float64Array;
+  modAbDmg: Float64Array;
+  modAbRad: Float64Array;
+  modAbExtra: Float64Array;
   // players
   pActive: Uint8Array;
   pX: Float64Array;
@@ -318,6 +324,11 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     modDash: new Float64Array(MAX_PLAYERS).fill(1),
     modArmor: new Float64Array(MAX_PLAYERS).fill(1),
     modCrit: new Float64Array(MAX_PLAYERS),
+    modAbCd: new Float64Array(MAX_PLAYERS).fill(1),
+    modAbDur: new Float64Array(MAX_PLAYERS).fill(1),
+    modAbDmg: new Float64Array(MAX_PLAYERS).fill(1),
+    modAbRad: new Float64Array(MAX_PLAYERS).fill(1),
+    modAbExtra: new Float64Array(MAX_PLAYERS),
     pActive: new Uint8Array(MAX_PLAYERS),
     pX: new Float64Array(MAX_PLAYERS),
     pY: new Float64Array(MAX_PLAYERS),

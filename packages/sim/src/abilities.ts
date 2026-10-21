@@ -149,16 +149,16 @@ function activate(w: World, s: number, inp: PlayerInput, cls: number): void {
   const angle = w.pAngle[s]!;
   switch (cls) {
     case CLS.soldier:
-      allies(w, s, A.soldier!.radius!, (o) => (w.pRally[o] = A.soldier!.seconds!));
+      allies(w, s, A.soldier!.radius! * w.modAbRad[s]!, (o) => (w.pRally[o] = A.soldier!.seconds! * w.modAbDur[s]!));
       break;
     case CLS.medic:
-      allies(w, s, A.medic!.radius!, (o) => heal(w, o, w.pMaxHp[o]! * A.medic!.heal!));
+      allies(w, s, A.medic!.radius! * w.modAbRad[s]!, (o) => heal(w, o, w.pMaxHp[o]! * A.medic!.heal! * w.modAbDmg[s]!));
       break;
     case CLS.heavy:
-      w.pSpecT[s] = A.heavy!.seconds!;
+      w.pSpecT[s] = A.heavy!.seconds! * w.modAbDur[s]!;
       break;
     case CLS.scout:
-      w.pSpecT[s] = A.scout!.seconds!;
+      w.pSpecT[s] = A.scout!.seconds! * w.modAbDur[s]!;
       w.pDashCd[s] = 0;
       if (w.pIFrames[s]! < 0.5) w.pIFrames[s] = 0.5;
       break;
@@ -167,33 +167,34 @@ function activate(w: World, s: number, inp: PlayerInput, cls: number): void {
       const reach = Math.min(a.reach!, inp.aimDist ? Math.max(5, inp.aimDist * 0.5) : a.reach!);
       const tx = clamp(px + cos(angle) * reach, -ARENA_HALF_W + 1, ARENA_HALF_W - 1);
       const ty = clamp(py + sin(angle) * reach, -ARENA_HALF_H + 1, ARENA_HALF_H - 1);
-      for (let k = 0; k < a.count!; k++) {
+      const count = a.count! + Math.round(w.modAbExtra[s]!);
+      for (let k = 0; k < count; k++) {
         const ox = k === 0 ? 0 : (w.rng.float() * 2 - 1) * a.spread!;
         const oy = k === 0 ? 0 : (w.rng.float() * 2 - 1) * a.spread!;
-        const t = addTelegraph(w, TeleShape.Circle, TeleEffect.Strike, clamp(tx + ox, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(ty + oy, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), 0, a.radius!, 0, a.delay! + k * a.stagger!, blow(w, s, a.damage!));
+        const t = addTelegraph(w, TeleShape.Circle, TeleEffect.Strike, clamp(tx + ox, -ARENA_HALF_W + 1, ARENA_HALF_W - 1), clamp(ty + oy, -ARENA_HALF_H + 1, ARENA_HALF_H - 1), 0, a.radius! * w.modAbRad[s]!, 0, a.delay! + k * a.stagger!, blow(w, s, a.damage! * w.modAbDmg[s]!));
         if (t >= 0) w.tOwner[t] = s;
       }
       break;
     }
     case CLS.ranger:
-      w.pOver[s] = A.ranger!.shots!;
+      w.pOver[s] = A.ranger!.shots! + Math.round(w.modAbExtra[s]!);
       break;
     case CLS.berserker:
-      w.pSpecT[s] = A.berserker!.seconds!;
+      w.pSpecT[s] = A.berserker!.seconds! * w.modAbDur[s]!;
       break;
     case CLS.swordsman:
-      w.pSpecT[s] = A.swordsman!.seconds!;
+      w.pSpecT[s] = A.swordsman!.seconds! * w.modAbDur[s]!;
       break;
     case CLS.hammerer: {
       const a = A.hammerer!;
-      sweep(w, s, angle, 6.2832, a.radius!, BALANCE.weapons.hammer.damage * a.damage!, a.knock!, true, WEAPON_IDS.indexOf('hammer'), 1);
-      w.events.push({ type: 'explosion', x: px, y: py, radius: a.radius! * 0.7 });
+      sweep(w, s, angle, 6.2832, a.radius! * w.modAbRad[s]!, BALANCE.weapons.hammer.damage * a.damage! * w.modAbDmg[s]!, a.knock!, true, WEAPON_IDS.indexOf('hammer'), 1);
+      w.events.push({ type: 'explosion', x: px, y: py, radius: a.radius! * w.modAbRad[s]! * 0.7 });
       break;
     }
     default:
       return;
   }
-  w.pSpecCd[s] = A[CLASS_IDS_BY_INDEX[cls]!]!.cd!;
+  w.pSpecCd[s] = A[CLASS_IDS_BY_INDEX[cls]!]!.cd! * w.modAbCd[s]!;
   w.events.push({ type: 'ability', slot: s, cls, x: px, y: py });
 }
 
@@ -216,7 +217,7 @@ export function updateAbilities(w: World, inputs: ReadonlyArray<PlayerInput | un
       if (cls === CLS.swordsman) {
         const a = A.swordsman!;
         // the blade storm: the blade whirls round the character
-        if (Math.round(w.pSpecT[s]! * 30) % a.every! === 0) sweep(w, s, w.pAngle[s]!, 6.2832, a.radius!, BALANCE.weapons.sword.damage * a.damage!, a.knock!, true, WEAPON_IDS.indexOf('sword'), 1);
+        if (Math.round(w.pSpecT[s]! * 30) % a.every! === 0) sweep(w, s, w.pAngle[s]!, 6.2832, a.radius! * w.modAbRad[s]!, BALANCE.weapons.sword.damage * a.damage! * w.modAbDmg[s]!, a.knock!, true, WEAPON_IDS.indexOf('sword'), 1);
       }
     }
     const inp = inputs[s];
