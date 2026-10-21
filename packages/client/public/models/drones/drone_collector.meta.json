@@ -1,0 +1,17 @@
+{
+ "id": "collector",
+ "tris": 866,
+ "points": {
+  "pull": [
+   0,
+   -0.55,
+   -0.06
+  ]
+ },
+ "halo": true,
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ]
+}

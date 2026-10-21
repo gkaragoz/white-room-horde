@@ -13,6 +13,12 @@ interface Hooks {
   blast(w: World, owner: number, x: number, y: number, radius: number, damage: number): void;
   damage(w: World, i: number, damage: number, dx: number, dy: number, owner: number): void;
   hurt(w: World, slot: number, damage: number, x: number, y: number): void;
+  /** Experience for the active drone of a player (drones.ts). */
+  droneXp(w: World, slot: number, xp: number): void;
+  /** Launch a round on behalf of a player or a drone (sim.ts owns the bullet pool): src 0 = a player's, else drone type + 1. */
+  bullet(w: World, owner: number, ox: number, oy: number, sx: number, sy: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number, src: number, blastR: number, blastD: number): void;
+  /** Called when a floor is cleared (drones.ts hands out the guaranteed core). */
+  floorCleared(w: World, wave: number): void;
 }
 export const hooks: Hooks = {
   blast() {
@@ -24,7 +30,19 @@ export const hooks: Hooks = {
   hurt() {
     /* set by enemies.ts */
   },
+  droneXp() {
+    /* set by drones.ts */
+  },
+  bullet() {
+    /* set by sim.ts */
+  },
+  floorCleared() {
+    /* set by drones.ts */
+  },
 };
+
+/** Which player's drone is the source of the damage being dealt right now (-1: none). killEnemy gives that drone its share of the experience. */
+export const droneCredit = { slot: -1 };
 
 export const perk = (w: World, s: number, k: number): number => w.pPerk[s * PERKS + k]!;
 export const setPerk = (w: World, s: number, k: number, v: number): void => {

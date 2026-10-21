@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BALANCE, WEAPON_IDS, TICK_DT, Buttons, type WeaponId } from '@wrh/shared';
+import { BALANCE, DRONE_TYPES, WEAPON_IDS, TICK_DT, Buttons, type WeaponId } from '@wrh/shared';
 import { addPlayer, createWorld, hashWorld, runScripted, step } from '@wrh/sim';
 import reference from '../../../shared/data/sim-reference.json';
 import { aimDirThree, decodeAim, encodeAim, keysToMove, yawForAim } from '../controls';
@@ -81,6 +81,38 @@ export const tests: QaTest[] = [
         detail: problems.length ? problems.join('\n') : `${chars.length} characters, ${weapons.length} weapons, ${pn.length} player clips, ${en.length} enemy clips`,
         data: { playerClips: pn.length, enemyClips: en.length },
       };
+    },
+  },
+  {
+    id: 'drone.models',
+    title: 'The seven drone models load, with a halo, their effect points and a sane size',
+    async run() {
+      const problems: string[] = [];
+      const points: Record<string, string[]> = { healer: ['muzzle', 'beam'], cryo: ['aura'], rocket: ['muzzle', 'muzzle_l'], gun: ['muzzle'], twin: ['muzzle', 'muzzle_l'], tesla: ['muzzle', 'zap'], collector: ['pull'] };
+      let tris = 0;
+      for (const id of DRONE_TYPES) {
+        const g = await loadGLB(asset(`models/drones/drone_${id}.glb`)).catch(() => null);
+        if (!g) {
+          problems.push('missing drone ' + id);
+          continue;
+        }
+        if (!g.scene.getObjectByName('halo')) problems.push(`drone_${id}: halo missing`);
+        for (const n of points[id] ?? []) if (!g.scene.getObjectByName(n)) problems.push(`drone_${id}: node ${n} missing`);
+        let t = 0;
+        let tinted = false;
+        g.scene.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          t += (m.geometry.index?.count ?? m.geometry.getAttribute('position').count) / 3;
+          for (const mat of Array.isArray(m.material) ? m.material : [m.material]) if (mat.name.includes('tint')) tinted = true;
+        });
+        tris += t;
+        if (t > 2400) problems.push(`drone_${id}: ${t} triangles`);
+        if (!tinted) problems.push(`drone_${id}: no tint material`);
+        const size = new THREE.Box3().setFromObject(g.scene).getSize(new THREE.Vector3());
+        if (size.x < 0.8 || size.x > 2.4 || size.y > 1.6 || size.z < 0.8 || size.z > 3) problems.push(`drone_${id}: odd size ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`);
+      }
+      return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join('\n') : `${DRONE_TYPES.length} drones, ${Math.round(tris)} triangles in all`, data: { tris } };
     },
   },
   {

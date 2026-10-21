@@ -1,0 +1,22 @@
+{
+ "id": "tesla",
+ "tris": 1144,
+ "points": {
+  "muzzle": [
+   0,
+   -0.66,
+   -0.04
+  ],
+  "zap": [
+   0,
+   0.04,
+   0.6
+  ]
+ },
+ "halo": true,
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ]
+}

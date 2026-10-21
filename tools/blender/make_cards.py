@@ -636,6 +636,33 @@ def icon_rage():
 ICONS += ["regen", "thorns", "shock", "volatile", "frost", "scavenger", "adrenaline", "barrier", "secondwind", "rage"]
 
 
+def icon_drone():
+    """A toy quadcopter: pod, visor, four arms with guard rings and rotors, skids and an antenna."""
+    body = mat(WHITE, 0.4)
+    sphere(0.62, body, (0, 0, 0), (1.0, 1.08, 0.66), seg=16, rings=10)
+    sphere(0.62, mat(DARK, 0.45), (0, 0, -0.16), (0.9, 1.0, 0.45), seg=14, rings=8)
+    sphere(0.38, mat(CREAM, 0.45), (0, 0.12, 0.27), (1, 1.05, 0.55), seg=12, rings=8)
+    box(0.74, 0.13, 0.15, mat("#7fe3ff", 0.1, emit=0.9), (0, -0.64, 0.06), bevel=0.04)
+    box(0.5, 0.1, 0.05, mat(GREEN, emit=0.8), (0, -0.66, -0.07), bevel=0.0)
+    for sx, sy in ((1, -1), (-1, -1), (1, 1), (-1, 1)):
+        ax, ay = sx * 1.12, sy * 0.98
+        ang = math.degrees(math.atan2(ay, ax))
+        box(math.hypot(ax, ay) * 0.95, 0.14, 0.12, mat(DARK, 0.4), (ax / 2, ay / 2, 0.06), (0, 0, ang), 0.03)
+        cyl(0.19, 0.22, mat(DARK, 0.4), (ax, ay, 0.1), (0, 0, 0), 12)
+        cyl(0.19, 0.06, mat(RED if sy < 0 else BLUE, 0.4), (ax, ay, 0.0), (0, 0, 0), 12)
+        torus(0.5, 0.035, mat(STEEL, 0.3, 0.8), (ax, ay, 0.24), (0, 0, 0), 28, 6)
+        for r in (0, 90):
+            box(0.92, 0.09, 0.035, mat("#2b3340", 0.5), (ax, ay, 0.3), (0, 0, r + 25 * sx), 0.0)
+    for sx in (-1, 1):
+        box(0.07, 1.3, 0.07, mat(DARK, 0.4), (0.4 * sx, 0.0, -0.62), bevel=0.0)
+        for sy in (-0.45, 0.45):
+            box(0.06, 0.06, 0.32, mat(DARK, 0.4), (0.4 * sx, sy, -0.46), bevel=0.0)
+    cyl(0.025, 0.55, mat(STEEL, 0.3, 0.8), (0, 0.5, 0.55), (-25, 0, 0), 8)
+    sphere(0.06, mat(YELLOW, emit=0.8), (0, 0.6, 0.8), seg=8, rings=6)
+
+ICONS += ["drone"]
+
+
 # ------------------------------------------------------------------------------------------------ rendering
 
 def setup_scene():

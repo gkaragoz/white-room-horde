@@ -9,6 +9,7 @@ function arrays(w: World): ArrayBufferView[] {
     w.pActive, w.pX, w.pY, w.pAngle, w.pHp, w.pMaxHp, w.pState, w.pTimer, w.pRevive, w.pCooldown, w.pIFrames, w.pWeapon, w.pAmmo, w.pOwned, w.pInvMag, w.pInvAmmo, w.pMoving, w.pMag, w.pReload, w.pDash, w.pDashCd, w.pDashX, w.pDashY, w.pModDmg, w.pModSpeed, w.pModRate, w.pModPierce, w.pModArmor, w.pLifesteal, w.pPerk, w.pStat, w.pWpnTime, w.pGren, w.pGrenCharge, w.pGrenCd,
     w.eActive, w.eType, w.eBoss, w.eAux, w.eState, w.eStateTick, w.eX, w.eY, w.eAngle, w.eHp, w.eCooldown, w.eMod, w.eShield, w.eFrost, w.eAct, w.eActT, w.eAir, w.eVX, w.eVY,
     w.pStun, w.pKnockX, w.pKnockY, w.pAir, w.pLayer, w.eLayer, w.bLayer, w.sLayer, w.pSpecCd, w.pSpecT, w.pRally, w.pCharge, w.pOver,
+    w.pDrone, w.pDLv, w.pDXp, w.pDWarm, w.dX, w.dY, w.dAim, w.dCd, w.dBeam, w.dN, w.eSlow, w.eSlowP, w.bSrc, w.bBlastR, w.bBlastD,
     w.zActive, w.zKind, w.zX, w.zY, w.zR, w.zLeft,
     w.tActive, w.tShape, w.tEffect, w.tX, w.tY, w.tA, w.tW, w.tL, w.tAmt, w.tLeft, w.tTotal, w.tOwner,
     w.brActive, w.brX, w.brY, w.brHp, w.brT, w.misc,

@@ -1,0 +1,17 @@
+{
+ "id": "gun",
+ "tris": 835,
+ "points": {
+  "muzzle": [
+   0,
+   -1.22,
+   -0.1
+  ]
+ },
+ "halo": true,
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ]
+}

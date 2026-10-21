@@ -3,7 +3,7 @@ import { Cinematic } from './render/cinematic';
 import { GoreParts, Part } from './render/gore';
 import { GIB_COLORS } from './render/fx';
 import { heightAt } from '@wrh/shared';
-import { BALANCE, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { BALANCE, nextLayer, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession, PredictedView } from '@wrh/net';
 import { Audio } from './audio';
@@ -13,6 +13,7 @@ import { Character } from './render/character';
 import { PlayerAnimator } from './render/playerAnim';
 import { Crowd } from './render/crowd';
 import { PickupView, TIER_COLORS } from './render/pickups';
+import { DroneView } from './render/drones';
 import { RagdollPool } from './render/ragdoll';
 import { Fx } from './render/fx';
 import { AmmoRing } from './render/ammoRing';
@@ -117,6 +118,9 @@ const pickups = new PickupView();
 stage.scene.add(pickups.group);
 void pickups.load();
 void pickups.loadWeapons();
+const drones = new DroneView();
+stage.scene.add(drones.group);
+void drones.load();
 
 const bulletMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.06, 0.8), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), MAX_BULLETS);
 // a soft additive halo around every round so it reads at any distance and glows at night
@@ -156,6 +160,16 @@ const TRACER: Record<WeaponId, { color: THREE.Color; w: number; l: number }> = {
   sawlauncher: { color: new THREE.Color('#e8eef6'), w: 3.0, l: 0.5 },
   arcthrower: { color: new THREE.Color('#ffffa8'), w: 0.7, l: 0.9 },
 };
+/** Rounds of the drones by type (healer, cryo, rocket, gun, twin, tesla, collector): the healer, cryo, tesla and collector fire none. */
+const DRONE_TRACER = [
+  { color: new THREE.Color('#9dffc4'), w: 1, l: 1 },
+  { color: new THREE.Color('#bff4ff'), w: 1, l: 1 },
+  { color: new THREE.Color('#ff9a3a'), w: 2.6, l: 1.7 },
+  { color: new THREE.Color('#ffe27a'), w: 0.9, l: 1.5 },
+  { color: new THREE.Color('#ffd0a0'), w: 0.75, l: 1.0 },
+  { color: new THREE.Color('#e2cfff'), w: 1, l: 1 },
+  { color: new THREE.Color('#ffd27a'), w: 1, l: 1 },
+];
 const tracerScale = new THREE.Vector3();
 const GLOW_SCALE = new THREE.Vector3(1.9, 1.9, 1.25);
 const tracerColor = new THREE.Color();
@@ -279,6 +293,7 @@ const ui = new Ui(
       }),
     onResetKeys: () => input.resetBindings(),
     onOptions: (map, difficulty) => session?.setOptions(map, difficulty),
+    onDrone: (t) => input.queueDrone(t + 1),
     onWeapon: (wp) => {
       startWeapon = wp;
       session?.setWeapon(wp);
@@ -546,6 +561,10 @@ function handleEvent(e: SimEvent): void {
   if (catchingUp) return;
   fx.onEvent(e, localSlot);
   audio.onEvent(e, localSlot);
+  if (world && (e.type === 'droneShot' || e.type === 'droneZap' || e.type === 'dronePulse')) {
+    const at = drones.onEvent(e, world, nowSec, 0);
+    if (at && e.type === 'droneShot') fx.sparkle(at.x, at.z, at.y, e.kind === 2 ? '#ffb060' : '#ffe9a0', e.kind === 2 ? 5 : 2, 3);
+  }
   switch (e.type) {
     case 'enemyHit':
       crowd.hit(e.id);
@@ -592,6 +611,32 @@ function handleEvent(e: SimEvent): void {
     case 'secondWind':
       ui.banner(UI_STRINGS[ui.lang].secondWind, names[e.slot] ?? '', 1600);
       break;
+    case 'droneUnlock': {
+      const L = UI_STRINGS[ui.lang];
+      const nm = (L.droneNames as readonly string[])[e.kind] ?? '';
+      if (e.slot === localSlot) ui.banner(`${L.droneNew}: ${nm}`, e.fresh ? (L.droneTips as readonly string[])[e.kind] ?? '' : '', 2800);
+      const at = drones.positionOf(e.slot);
+      if (at) {
+        fx.shockRing(at.x, at.y, '#7affd6', 2.2);
+        fx.sparkle(at.x, at.y, at.z, '#9ef0cf', 16, 4);
+      }
+      break;
+    }
+    case 'droneLevel': {
+      const L = UI_STRINGS[ui.lang];
+      const nm = (L.droneNames as readonly string[])[e.kind] ?? '';
+      const tier = e.level % 5 === 0;
+      if (e.slot === localSlot) {
+        if (tier) ui.banner(`${nm} ${L.droneUp} ${e.level}`, L.droneTier, 2200);
+        else ui.warn(`${nm} ${L.droneLv} ${e.level}`);
+      }
+      const at = drones.positionOf(e.slot);
+      if (at) {
+        fx.sparkle(at.x, at.y, at.z, tier ? '#ffe27a' : '#9ef0cf', tier ? 22 : 8, tier ? 5 : 3);
+        if (tier) fx.shockRing(at.x, at.y, '#ffe27a', 2.6);
+      }
+      break;
+    }
     case 'pickup':
       if (e.slot === localSlot && e.kind >= 4) ui.banner(UI_STRINGS[ui.lang].powerups[e.kind]!, '', e.kind === 7 ? 1800 : 1300);
       if (e.kind === 7) ui.screenFlash('#ffffff', 700);
@@ -1499,6 +1544,7 @@ function frame(nowMs: number): void {
     ragdolls.update(dt);
     goreParts.update(dt, fx);
     pickups.update(w, nowSec);
+    drones.update(w, vx, vy, vz, lifted.lift, nowSec, dt, colorFor);
     {
       const tags: { px: number; py: number; text: string; color: string }[] = [];
       const names = ui.powerupNames;
@@ -1514,31 +1560,36 @@ function frame(nowMs: number): void {
     strength.length = 0;
     for (let i = 0; i < MAX_BULLETS; i++) {
       if (!w.bActive[i]) continue;
+      const src = w.bSrc[i]!;
       const wid = WEAPON_IDS[w.pWeapon[w.bOwner[i]!]!]!;
-      const tr = TRACER[wid];
+      const tr = src > 0 ? DRONE_TRACER[src - 1]! : TRACER[wid];
       const owner = w.bOwner[i]!;
       if (!strength[owner]) strength[owner] = strengthOf(w, owner);
       const st = strength[owner]!;
       // bullets fly fast now: draw them between the last two simulated positions instead of jumping a whole step
       const back = (1 - alpha) * TICK_DT;
-      dummy.position.set(w.bX[i]! - w.bVx[i]! * back, BALANCE.weapons[wid].muzzleH + heightAt(mapDef, w.bX[i]!, w.bY[i]!, w.bLayer[i]!), -(w.bY[i]! - w.bVy[i]! * back));
+      dummy.position.set(w.bX[i]! - w.bVx[i]! * back, (src > 0 ? 1.45 : BALANCE.weapons[wid].muzzleH) + heightAt(mapDef, w.bX[i]!, w.bY[i]!, w.bLayer[i]!), -(w.bY[i]! - w.bVy[i]! * back));
       q.setFromUnitVectors(fwd, dir.set(w.bVx[i]!, 0, -w.bVy[i]!).normalize());
       dummy.quaternion.copy(q);
       // upgrades show in the rounds: damage fattens and reddens them, piercing stretches them, crits flash gold
-      const fat = 1 + Math.min(0.35, st.damage * 0.5);
-      dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * 1.6 * (1 + Math.min(0.6, st.pierce * 0.2 + st.damage * 0.2))));
+      const fat = src > 0 ? 1 : 1 + Math.min(0.35, st.damage * 0.5);
+      dummy.scale.copy(tracerScale.set(tr.w * fat, tr.w * fat, tr.l * 1.6 * (src > 0 ? 1 : 1 + Math.min(0.6, st.pierce * 0.2 + st.damage * 0.2))));
       dummy.updateMatrix();
       bulletMesh.setMatrixAt(n, dummy.matrix);
       dummy.scale.multiply(GLOW_SCALE);
       dummy.updateMatrix();
       bulletGlow.setMatrixAt(n, dummy.matrix);
-      tracerColor.copy(tr.color).lerp(HOT, Math.min(0.85, st.damage * 1.2));
-      if (st.pierce > 0.2) tracerColor.lerp(COOL, Math.min(0.6, st.pierce * 0.3));
-      if (st.crit > 0 && (i * 7 + w.tick) % 5 === 0) tracerColor.set('#ffd21f');
+      tracerColor.copy(tr.color);
+      if (src === 0) {
+        tracerColor.lerp(HOT, Math.min(0.85, st.damage * 1.2));
+        if (st.pierce > 0.2) tracerColor.lerp(COOL, Math.min(0.6, st.pierce * 0.3));
+        if (st.crit > 0 && (i * 7 + w.tick) % 5 === 0) tracerColor.set('#ffd21f');
+      }
       tracerColor.multiplyScalar(1.25 + stage.night * 0.6);
       bulletMesh.setColorAt(n, tracerColor);
       bulletGlow.setColorAt(n++, tracerColor);
-      if (wid === 'flamer' && (i + w.tick) % 3 === 0) fx.flame(w.bX[i]!, w.bY[i]!, BALANCE.weapons.flamer.muzzleH);
+      if (src === 0 && wid === 'flamer' && (i + w.tick) % 3 === 0) fx.flame(w.bX[i]!, w.bY[i]!, BALANCE.weapons.flamer.muzzleH);
+      else if (src === 3 && (i + w.tick) % 2 === 0) fx.flame(w.bX[i]!, w.bY[i]!, 1.4); // a rocket's exhaust
     }
     dummy.scale.setScalar(1);
     bulletMesh.count = n;
@@ -1668,6 +1719,9 @@ setTimeout(() => stage.warmFlight(), 800);
   crowd,
   fx,
   perf,
+  drones,
+  maps: MAPS,
+  geo: { nextLayer, heightAt },
   pace: BALANCE.player.speed,
   netstats: () => {
     const sp = [...diag.totals.speeds].sort((a, b) => a - b);

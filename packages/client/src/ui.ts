@@ -1,8 +1,9 @@
 import { icon, chipIcon } from './icons';
 import { MENU_CSS, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
+import { droneNeed } from '@wrh/sim';
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
 import { xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -41,6 +42,16 @@ const BASE_STRINGS = {
     host: 'Host game',
     join: 'Join game',
     online: 'Play online',
+    drone: 'Drone',
+    droneNames: ['Medic drone', 'Frost drone', 'Rocket drone', 'Gun drone', 'Twin gun drone', 'Tesla drone', 'Collector drone'],
+    droneTips: ['Heals teammates with a green beam, more of them at once as it levels.', 'Chills a field around it: enemies inside move slower, later it freezes them.', 'Fires rockets that burst into a blast over the crowd.', 'A long-range machine gun with a steady aim.', 'Two (later more) barrels of close-range spray.', 'Lightning that jumps from one enemy to the next.', 'Pulls loot to you from far away.'],
+    droneLv: 'Lv',
+    droneActive: 'Active',
+    droneWarm: 'Warming up',
+    droneNew: 'New drone',
+    droneUp: 'level',
+    droneTier: 'Stronger!',
+    droneInv: 'Drones (click to switch)',
     code: 'Room code',
     server: 'Server',
     start: 'Start game',
@@ -208,6 +219,7 @@ const BASE_STRINGS = {
       barrier: ['Barrier', 'A 45 point shield that recharges'],
       secondwind: ['Second wind', 'Once: get back up at half health instead of going down'],
       rage: ['Rage', 'Up to 70% more damage as your health drops'],
+      drone: ['New drone', 'A new companion for your inventory (or experience for the active one if you own them all)'],
     },
     classNames: ['Soldier', 'Medic', 'Heavy', 'Scout', 'Demolisher', 'Ranger', 'Berserker', 'Swordsman', 'Hammerer'],
     classTips: [
@@ -225,7 +237,7 @@ const BASE_STRINGS = {
     waveMods: ['', 'Swarm!', 'Armored horde!', 'Fast and furious!', 'Bounty wave!', 'Elite storm!'],
     waveModTips: ['', 'Many weaker enemies', 'Enemies are tougher', 'Enemies run faster', 'Twice the loot', 'Many elite enemies'],
     elites: ['', 'Giant', 'Swift', 'Splitter', 'Volatile', 'Regenerating', 'Armored', 'Berserk', 'Vampiric', 'Toxic', 'Phantom', 'Warded'],
-    powerups: ['Ammo', 'Health', 'Grenade', 'Weapon', 'Shield', 'Haste', 'Quad damage', 'NUKE', 'Time freeze'],
+    powerups: ['Ammo', 'Health', 'Grenade', 'Weapon', 'Shield', 'Haste', 'Quad damage', 'NUKE', 'Time freeze', 'Drone core'],
     combos: ['Killing spree!', 'Rampage!', 'Unstoppable!', 'Massacre!', 'Godlike!', 'Apocalypse!'],
     secondWind: 'Second wind!',
     mvp: 'MVP',
@@ -247,6 +259,16 @@ const BASE_STRINGS = {
     host: 'Oda kur',
     join: 'Odaya katıl',
     online: 'Çevrimiçi oyna',
+    drone: 'Dron',
+    droneNames: ['Şifa dronu', 'Buz dronu', 'Roket dronu', 'Makineli dron', 'Çift makineli dron', 'Tesla dronu', 'Toplayıcı dron'],
+    droneTips: ['Yeşil ışınla takım arkadaşlarını iyileştirir, seviye atladıkça aynı anda daha çoğunu.', 'Çevresinde bir alanı dondurur: içindeki düşmanlar yavaşlar, sonra donar.', 'Kalabalığın üstünde patlayan roketler atar.', 'Sabit nişanlı, uzun menzilli makineli tüfek.', 'İki (sonra daha çok) namlu: yakın mesafede yağmur gibi mermi.', 'Düşmandan düşmana atlayan yıldırım.', 'Ganimeti çok uzaktan sana çeker.'],
+    droneLv: 'Sv',
+    droneActive: 'Aktif',
+    droneWarm: 'Isınıyor',
+    droneNew: 'Yeni dron',
+    droneUp: 'seviye',
+    droneTier: 'Güçlendi!',
+    droneInv: 'Dronlar (değiştirmek için tıkla)',
     code: 'Oda kodu',
     server: 'Sunucu',
     start: 'Oyunu başlat',
@@ -414,6 +436,7 @@ const BASE_STRINGS = {
       barrier: ['Bariyer', 'Kendini dolduran 45 puanlık kalkan'],
       secondwind: ['İkinci nefes', 'Bir kez: yere düşmek yerine yarı canla ayağa kalk'],
       rage: ['Öfke', 'Canın azaldıkça %70\'e kadar fazla hasar'],
+      drone: ['Yeni dron', 'Envanterine yeni bir yoldaş eklenir (hepsi varsa aktif drona deneyim verir)'],
     },
     classNames: ['Asker', 'Sağlıkçı', 'Ağır', 'Gözcü', 'Yıkımcı', 'Avcı', 'Çılgın', 'Kılıççı', 'Çekiççi'],
     classTips: [
@@ -431,7 +454,7 @@ const BASE_STRINGS = {
     waveMods: ['', 'Sürü!', 'Zırhlı sürü!', 'Hızlı ve öfkeli!', 'Ganimet dalgası!', 'Elit fırtınası!'],
     waveModTips: ['', 'Çok sayıda zayıf düşman', 'Düşmanlar daha dayanıklı', 'Düşmanlar daha hızlı', 'İki kat ganimet', 'Çok sayıda elit düşman'],
     elites: ['', 'Dev', 'Çevik', 'Bölünen', 'Patlayıcı', 'Yenilenen', 'Zırhlı', 'Öfkeli', 'Vampir', 'Zehirli', 'Hayalet', 'Korumalı'],
-    powerups: ['Mermi', 'Can', 'Bomba', 'Silah', 'Kalkan', 'Hız', 'Dörtlü hasar', 'NÜKLEER', 'Zaman dondurma'],
+    powerups: ['Mermi', 'Can', 'Bomba', 'Silah', 'Kalkan', 'Hız', 'Dörtlü hasar', 'NÜKLEER', 'Zaman dondurma', 'Dron çekirdeği'],
     combos: ['Öldürme serisi!', 'Çılgınlık!', 'Durdurulamaz!', 'Katliam!', 'Tanrısal!', 'Kıyamet!'],
     secondWind: 'İkinci nefes!',
     mvp: 'MVP',
@@ -474,6 +497,8 @@ export interface UiHandlers {
   onStart(): void;
   onLeave(): void;
   onCard(index: number): void;
+  /** The player picked a drone (DRONE_TYPES index) from the inventory list. */
+  onDrone?(type: number): void;
   onAgain(): void;
   onResume(): void;
   onUiSound(name: 'click' | 'confirm' | 'back' | 'error' | 'open' | 'close'): void;
@@ -555,6 +580,28 @@ const CSS_BASE = `
 .wrh-stat{display:flex;align-items:center;gap:6px;margin:2px 0}
 .wrh-stat .ic{width:20px;text-align:center}
 .wrh-skull.off{opacity:.28;filter:grayscale(1)}
+.wrh-drone{position:absolute;left:12px;top:44px;width:250px;z-index:5;zoom:var(--wrh-zoom,1);pointer-events:none;display:flex;flex-direction:column;gap:6px}
+.wrh-drone .dr-card,.wrh-drone .dr-list{pointer-events:auto}
+.wrh-drone .dr-card{display:flex;align-items:center;gap:8px;padding:5px 9px 5px 5px;border-radius:14px;background:rgba(251,246,234,.9);border:2px solid rgba(43,58,82,.2);box-shadow:0 2px 8px rgba(20,28,44,.2);cursor:pointer;color:#2b3a52;transition:transform .1s,border-color .2s}
+.wrh-drone .dr-card:hover{transform:translateX(2px)}
+.wrh-drone .dr-card.open{border-color:#1fa2ff}
+.wrh-drone .dr-card.up{border-color:#ffd21f;box-shadow:0 0 0 2px rgba(255,210,31,.5),0 0 18px rgba(255,210,31,.7);animation:wrh-dr-up 1.4s ease-out}
+.wrh-drone .dr-card.warm .dr-ic{opacity:.55}
+@keyframes wrh-dr-up{0%{transform:scale(1.12)}100%{transform:scale(1)}}
+.wrh-drone .dr-ic{position:relative;flex:none;width:40px;height:40px}
+.wrh-drone .dr-ic em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:900 18px/1 system-ui,sans-serif;color:#fff;text-shadow:0 0 4px #000,0 0 4px #000;font-style:normal}
+.wrh-drone .dr-main,.wrh-drone .dr-row>span{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wrh-drone b{font-size:13px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wrh-drone small{font-size:10.5px;font-weight:700;opacity:.75;letter-spacing:.02em}
+.wrh-drone .bar{display:block;height:6px;border-radius:4px;background:rgba(60,45,20,.18);overflow:hidden}
+.wrh-drone .bar s{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#46c9a0,#9ef0cf);text-decoration:none}
+.wrh-drone .dr-sw{font-size:11px;opacity:.6}
+.wrh-drone .dr-list{display:flex;flex-direction:column;gap:4px;padding:8px;border-radius:14px;background:rgba(251,246,234,.96);border:2px solid #cdbfa5;box-shadow:0 6px 18px rgba(20,28,44,.28)}
+.wrh-drone .dr-list p{margin:0 0 2px;font-size:11px;font-weight:800;opacity:.65}
+.wrh-drone .dr-row{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:10px;border:2px solid transparent;cursor:pointer;color:#2b3a52;background:rgba(255,255,255,.55)}
+.wrh-drone .dr-row:hover{background:#fff;border-color:#1fa2ff}
+.wrh-drone .dr-row.cur{border-color:#ffd21f}
+.wrh-pc .dr-chip{display:inline-flex;align-items:center;gap:2px;margin-left:4px;font-size:10px;font-weight:800;opacity:.85}
 .wrh-ico{display:inline-block;vertical-align:middle;object-fit:contain;pointer-events:none;user-select:none}
 .wrh-stat .nm{width:68px;font-weight:600;opacity:.8}
 .wrh-stat .bar{flex:1;height:8px;border-radius:5px;background:rgba(60,45,20,.18);overflow:hidden}
@@ -1097,6 +1144,20 @@ export class Ui {
         this.hoverTip = null;
         this.tipEl.style.display = 'none';
       }
+    });
+    // the drone card: a click opens the list of drones, a click on one of them switches (and never fires a shot behind it)
+    this.hud.addEventListener('pointerdown', (e) => {
+      const target = e.target as HTMLElement;
+      const row = target.closest<HTMLElement>('.wrh-drone [data-dt]');
+      const card = target.closest<HTMLElement>('.wrh-drone .dr-card');
+      if (!row && !card) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (row) {
+        this.h.onDrone?.(Number(row.dataset.dt));
+        this.droneOpen = false;
+      } else this.droneOpen = !this.droneOpen;
+      this.hudHtml.delete('h-drone');
     });
     // the weapon list: a click picks the weapon, and never fires a shot behind it
     this.hud.addEventListener('pointerdown', (e) => {
@@ -1828,6 +1889,51 @@ export class Ui {
   }
 
   /** The weapon list above the minimap: key, icon, name and ammo of every owned weapon, the one in the hands outlined in yellow, the empty ones faded. */
+  /** Drone UI: the card of the active drone (icon, name, level, experience) and, opened by a click, the list of the drones owned. */
+  private droneOpen = false;
+  private droneLevels = new Map<number, number>();
+  private droneFlashAt = -1e9;
+
+  private droneHtml(world: World, slot: number, now: number): string {
+    const T = DRONE_TYPES.length;
+    const owned: number[] = [];
+    for (let k = 0; k < T; k++) if (world.pDLv[slot * T + k]! > 0) owned.push(k);
+    if (!owned.length || !world.pActive[slot]) {
+      this.droneOpen = false;
+      return '';
+    }
+    const t = this.t;
+    const names = t.droneNames as readonly string[];
+    const act = world.pDrone[slot]! - 1;
+    for (const k of owned) {
+      const lv = world.pDLv[slot * T + k]!;
+      if (k === act && (this.droneLevels.get(k) ?? lv) < lv) this.droneFlashAt = now;
+      this.droneLevels.set(k, lv);
+    }
+    const bar = (k: number): string => {
+      const lv = world.pDLv[slot * T + k]!;
+      const frac = lv >= DRONE_MAX_LEVEL ? 1 : world.pDXp[slot * T + k]! / droneNeed(lv);
+      return `<i class="bar"><s style="width:${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%"></s></i>`;
+    };
+    const warm = world.pDWarm[slot]!;
+    const down = world.pState[slot] !== PlayerState.Alive;
+    let html = '';
+    if (act >= 0) {
+      const lv = world.pDLv[slot * T + act]!;
+      const tier = Math.min(6, Math.floor(lv / DRONE_TIER_LEVELS));
+      html += `<div class="dr-card${this.droneOpen ? ' open' : ''}${now - this.droneFlashAt < 1400 ? ' up' : ''}${warm > 0 || down ? ' warm' : ''}" title="${esc(names[act] + ': ' + (t.droneTips as readonly string[])[act])}">` +
+        `<span class="dr-ic">${icon('drone_' + act, 40)}${warm > 0 && !down ? `<em>${Math.ceil(warm)}</em>` : ''}</span>` +
+        `<span class="dr-main"><b>${esc(names[act]!)}</b><small>${t.droneLv} ${lv}${lv >= DRONE_MAX_LEVEL ? ' MAX' : ''} &middot; ${'&#9679;'.repeat(tier)}${'&#9675;'.repeat(6 - tier)}</small>${bar(act)}</span>` +
+        `${owned.length > 1 ? `<span class="dr-sw">${this.droneOpen ? '&#9660;' : '&#9650;'}</span>` : ''}</div>`;
+    }
+    if (this.droneOpen) {
+      html += `<div class="dr-list"><p>${t.droneInv}</p>` + owned
+        .map((k) => `<div class="dr-row${k === act ? ' cur' : ''}" data-dt="${k}" title="${esc((t.droneTips as readonly string[])[k]!)}">${icon('drone_' + k, 30)}<span><b>${esc(names[k]!)}</b><small>${t.droneLv} ${world.pDLv[slot * T + k]}${k === act ? ' &middot; ' + t.droneActive : ''}</small>${bar(k)}</span></div>`)
+        .join('') + '</div>';
+    }
+    return html;
+  }
+
   private inventoryHtml(world: World, slot: number): string {
     const names = this.t.weapons as Record<string, string>;
     const cur = world.pWeapon[slot]!;
@@ -2060,6 +2166,7 @@ export class Ui {
       <canvas class="wrh-mini" id="h-mini" width="360" height="240"></canvas>
       <div class="wrh-reload" id="h-reload"><i></i></div>
       <div class="wrh-me" id="h-me"></div>
+      <div class="wrh-drone" id="h-drone"></div>
       <div class="wrh-banner" id="h-banner" style="display:none"></div>
       <div class="wrh-cards" id="h-cards" style="display:none"></div>
       <div class="wrh-warn" id="h-warn" style="display:none"></div>
@@ -2389,13 +2496,14 @@ export class Ui {
       if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>${icon('chip_haste', 16)}</i>${Math.ceil(haste)}s</span>`;
       if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>${icon('chip_quad', 16)}</i>${Math.ceil(quad)}s</span>`;
       squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${frac < 0.3 && st === PlayerState.Alive ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
-        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
+        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${world.pDrone[s] ? `<span class="dr-chip">${icon('drone_' + (world.pDrone[s]! - 1), 14)}${world.pDLv[s * DRONE_TYPES.length + world.pDrone[s]! - 1]}</span>` : ''}${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
         `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
         `<div class="stats" data-tip="pc" data-s="${s}"><span>${t.dpsLabel} <b>${Math.round(this.dpsOf(world, s, now))}</b></span><span>${icon('go_kills', 14)} <b>${Math.round(world.pPerk[s * PERKS + PERK.Kills]!)}</b></span></div>` +
         (chips ? `<div class="chips">${chips}</div>` : '') +
         '</div>';
     }
     set('h-squad', squad);
+    set('h-drone', this.droneHtml(world, slot, now));
     if (this.squadTip && this.tipEl.style.display === 'block') this.tipEl.innerHTML = this.squadTipHtml(world);
 
     // local player

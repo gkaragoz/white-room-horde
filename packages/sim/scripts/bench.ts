@@ -4,6 +4,7 @@
  */
 import { createGame, setWave, step } from '../src';
 import { botInput } from '../tests/bot';
+import { grantDrone } from '../src/drones';
 
 const wave = Number(process.argv[2] ?? 12);
 const ticks = Number(process.argv[3] ?? 900);
@@ -11,6 +12,14 @@ const players = Number(process.argv[4] ?? 3);
 const w = createGame({ seed: 7, players: Array.from({ length: players }, (_, i) => ({ slot: i, weapon: 'smg' as const, cls: i % 9 })), map: 0, difficulty: 1 });
 setWave(w, wave);
 for (let s = 0; s < players; s++) w.pHp[s] = w.pMaxHp[s] = 1e7;
+// DRONES=1: every player carries drones (types in turn, all awake and level 12)
+if (process.env.DRONES) {
+  for (let s = 0; s < players; s++) {
+    grantDrone(w, s, s % 7);
+    w.pDLv[s * 7 + (s % 7)] = 12;
+    w.pDWarm[s] = 0;
+  }
+}
 const times: number[] = [];
 let enemies = 0;
 for (let t = 0; t < ticks; t++) {

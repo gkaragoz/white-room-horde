@@ -96,6 +96,12 @@ export class Input {
   private touchSwitch = false;
   /** Weapon choice of the last key press (1-9 = rank, 14 = next), sent once with the next sample. */
   private queuedWeapon = 0;
+  private queuedDrone = 0;
+
+  /** Switch to a drone (DRONE_TYPES index + 1) with the next input. */
+  queueDrone(n: number): void {
+    if (this.enabled) this.queuedDrone = n;
+  }
   /** Select a weapon by the key number it has in the list (1-9), or 14 for the next one (the in-game list is clickable). */
   queueWeapon(rank: number): void {
     if (this.enabled) this.queuedWeapon = rank;
@@ -353,10 +359,12 @@ export class Input {
       buttons: buttons | this.queued,
       aimDist,
       wsel: this.queuedWeapon,
+      dsel: this.queuedDrone,
       gAim: encodeAim(aimAngle),
     };
     this.queued = 0;
     this.queuedWeapon = 0;
+    this.queuedDrone = 0;
     return { input, moveAngle: Math.atan2(m.y, m.x), aimAngle: shotAngle };
   }
 

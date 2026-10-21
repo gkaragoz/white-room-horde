@@ -16,6 +16,8 @@ export interface PlayerInput {
   wsel?: number;
   /** Direction the grenade is thrown (same scale as `aim`); defaults to `aim`. Auto-aim moves `aim`, the cursor keeps `gAim`. */
   gAim?: number;
+  /** Drone choice: 0 = no change, 1..7 = switch the active drone to that type (DRONE_TYPES index + 1). */
+  dsel?: number;
 }
 
 export const Buttons = {
@@ -70,6 +72,8 @@ export const CARD_IDS = [
   // personal
   'sharp', 'sprint', 'bulk', 'vampire', 'tempo', 'marksman', 'ironskin',
   'regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage',
+  // appended last so the ids of the older cards (and the offers they roll) do not move
+  'drone',
 ] as const;
 export type CardId = (typeof CARD_IDS)[number];
 /** The few cards that help the whole squad; they show up on the info bar with the name of whoever took them. */
@@ -82,12 +86,20 @@ export const CARD_RARITY: Record<CardId, 0 | 1 | 2> = {
   pierce: 1, grenades: 1, medic: 1, luck: 1, scholar: 1, roll: 1, quickhands: 1, armor: 1, tempo: 1, marksman: 1, ironskin: 1,
   arsenal: 2, blast: 2, crit: 2, vampire: 2,
   regen: 0, scavenger: 0, adrenaline: 0, thorns: 1, shock: 1, frost: 1, barrier: 1, rage: 1, volatile: 2, secondwind: 2,
+  drone: 1,
 };
 /** Offer weights per rarity. */
 export const RARITY_WEIGHT: readonly number[] = [6, 3, 1];
 
 /** Pickup kinds (kType). */
-export const PickupType = { Ammo: 0, Health: 1, Grenade: 2, Weapon: 3, Shield: 4, Haste: 5, Quad: 6, Nuke: 7, Freeze: 8 } as const;
+export const PickupType = { Ammo: 0, Health: 1, Grenade: 2, Weapon: 3, Shield: 4, Haste: 5, Quad: 6, Nuke: 7, Freeze: 8, Drone: 9 } as const;
+
+/** The drone companions (index = type id in the sim, +1 in pDrone and in PlayerInput.dsel). Models: public/models/drones/drone_<id>.glb. */
+export const DRONE_TYPES = ['healer', 'cryo', 'rocket', 'gun', 'twin', 'tesla', 'collector'] as const;
+export type DroneType = (typeof DRONE_TYPES)[number];
+/** Levels a drone can reach, and how many levels make one power-up tier. */
+export const DRONE_MAX_LEVEL = 30;
+export const DRONE_TIER_LEVELS = 5;
 
 /** Slots of the per-player perk array (pPerk[slot * PERKS + PERK.x]): class passives, card effects and timers. */
 export const PERK = {

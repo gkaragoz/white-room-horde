@@ -199,6 +199,15 @@ ICONS = {
     "go_combo": I(ORANGE, [(FLAME, "g"), (FLAME_IN, "a")], accent=YELLOW),
     # difficulty (one skull each, drawn 1-3 times by the menu)
     "diff_skull": I(DARK, [(SKULL_TOP, "g"), (rect(8.8, 14.6, 6.4, 4.6), "g"), (circ(9.2, 11.2, 1.9), "p"), (circ(14.8, 11.2, 1.9), "p"), (rect(10.6, 15.4, 0.9, 2.6), "p"), (rect(12.5, 15.4, 0.9, 2.6), "p")]),
+        # drones (one badge per type, index = DRONE_TYPES) and the drone button of the HUD
+    "drone_0": I(GREEN, [(circ(12, 12, 6.6), "g"), (rect(10.4, 7.8, 3.2, 8.4), "a"), (rect(7.8, 10.4, 8.4, 3.2), "a")], accent="#e5484d"),
+    "drone_1": I(BLUE, [(poly(rot([(10.8, 4.4), (13.2, 4.4), (13.2, 19.6), (10.8, 19.6)], 12, 12, 0)), "g"), (poly(rot([(10.8, 4.4), (13.2, 4.4), (13.2, 19.6), (10.8, 19.6)], 12, 12, 60)), "g"), (poly(rot([(10.8, 4.4), (13.2, 4.4), (13.2, 19.6), (10.8, 19.6)], 12, 12, 120)), "g"), (circ(12, 12, 2.2), "a")], accent="#bdeaff"),
+    "drone_2": I(ORANGE, [(poly([(12, 3.8), (15.2, 8.2), (15.2, 16.4), (8.8, 16.4), (8.8, 8.2)]), "g"), (poly([(8.8, 12.6), (5.4, 17.4), (8.8, 16.4)]), "a"), (poly([(15.2, 12.6), (18.6, 17.4), (15.2, 16.4)]), "a"), (poly([(10, 16.4), (14, 16.4), (12, 21)]), "a"), (circ(12, 10.4, 1.6), "p")], accent=YELLOW),
+    "drone_3": I(BRASS, [(rrect(5.4, 10.4, 7.6, 4.4, 1), "g"), (rect(12.6, 11.4, 7, 2.4), "g"), (rect(19, 10.8, 2, 3.6), "a"), (rect(7, 14.4, 3.2, 4), "g")], accent=DARK),
+    "drone_4": I("#b8862e", [(rrect(5, 8.6, 7, 3.8, 1), "g"), (rect(12, 9.4, 6.6, 2.2), "g"), (rrect(5, 13.2, 7, 3.8, 1), "g"), (rect(12, 14, 6.6, 2.2), "g"), (rect(18.2, 8.8, 1.8, 3.4), "a"), (rect(18.2, 13.4, 1.8, 3.4), "a")], accent=DARK),
+    "drone_5": I(PURPLE, [(circ(12, 12, 7.6), "g"), (circ(12, 12, 6), "p"), (BOLT, "a")], accent=YELLOW),
+    "drone_6": I(RED, [(MAGNET, "g"), (rect(6, 15, 4, 3.6), "a"), (rect(14, 15, 4, 3.6), "a")], accent=STEEL),
+    "hud_drone": I(NAVY, [(circ(12, 12, 3.4), "g"), (capsule(6.2, 6.2, 17.8, 17.8, 0.9), "g"), (capsule(17.8, 6.2, 6.2, 17.8, 0.9), "g"), (circ(6.4, 6.4, 2.6), "g"), (circ(17.6, 6.4, 2.6), "g"), (circ(6.4, 17.6, 2.6), "g"), (circ(17.6, 17.6, 2.6), "g"), (circ(12, 12, 1.4), "a")], accent=YELLOW),
     "app": I(BLUE, [(SKULL_TOP, "g"), (rect(8.4, 14.6, 7.2, 5), "g"), (circ(9, 11.4, 2.2), "p"), (circ(15, 11.4, 2.2), "p")]),
 }
 

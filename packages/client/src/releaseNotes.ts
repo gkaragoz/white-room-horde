@@ -23,6 +23,64 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.22',
+    date: '2026-10-21',
+    text: {
+      en: {
+        title: 'Drone companions',
+        items: [
+          'Every player can now get a drone that hovers beside them and fights on its own. Seven kinds: medic (heals the team with a green beam), frost (a slowing field), rocket, machine gun, twin machine gun, tesla (chain lightning) and collector (pulls loot to you).',
+          'Find drones on the new rare Drone card, from drone cores (elites and bosses drop them) and as a gift at the end of floor 2. You carry one drone at a time and keep the others: click the drone card at the top left to switch.',
+          'Drones level up while they work (damage, kills, healing, loot) and grow stronger every 5 levels: the medic heals more people at once, rockets come in bigger salvos, the frost field widens and so on. Their levels last for the run.',
+          'They float smoothly after you, over ramps and bridges too. Sounds are real recordings, balanced to sit quietly under the guns.',
+          'Everybody needs the new version: reload the page.',
+        ],
+      },
+      tr: {
+        title: 'Dron arkadaşlar',
+        items: [
+          'Artık her oyuncu yanında süzülen ve kendi kendine savaşan bir dron alabilir. Yedi çeşit: şifa (yeşil ışınla takımı iyileştirir), buz (yavaşlatan alan), roket, makineli, çift makineli, tesla (zincirleme yıldırım) ve toplayıcı (ganimeti sana çeker).',
+          'Dronları yeni nadir Dron kartında, dron çekirdeklerinde (elit ve boss düşmanlar bırakır) ve 2. katın sonunda hediye olarak bulursun. Aynı anda bir dron taşırsın, diğerleri envanterinde durur: değiştirmek için sol üstteki dron kartına tıkla.',
+          'Dronlar çalışırken seviye atlar (hasar, öldürme, iyileştirme, ganimet) ve her 5 seviyede güçlenir: şifa dronu aynı anda daha çok kişiyi iyileştirir, roketler daha büyük salvolarla gelir, buz alanı genişler. Seviyeleri oyun boyunca kalır.',
+          'Seni yumuşakça takip ederler, rampalarda ve köprülerde de. Sesler gerçek kayıtlar ve silahların altında kalacak şekilde dengelendi.',
+          'Herkesin yeni sürümü kullanması gerekiyor: sayfayı yenile.',
+        ],
+      },
+      de: {
+        title: 'Drohnen-Begleiter',
+        items: [
+          'Jeder Spieler kann jetzt eine Drohne bekommen, die neben ihm schwebt und selbst kämpft. Sieben Arten: Sanitäter, Frost, Raketen, MG, Doppel-MG, Tesla und Sammler.',
+          'Drohnen findest du auf der neuen seltenen Drohnen-Karte, in Drohnenkernen (Elite und Bosse) und als Geschenk am Ende von Etage 2. Zum Wechseln klickst du oben links auf die Drohnenkarte.',
+          'Drohnen steigen beim Arbeiten auf und werden alle 5 Stufen stärker. Alle brauchen die neue Version: Seite neu laden.',
+        ],
+      },
+      es: {
+        title: 'Drones compañeros',
+        items: [
+          'Ahora cada jugador puede tener un dron que flota a su lado y lucha solo. Siete tipos: médico, de hielo, de cohetes, ametrallador, doble ametralladora, Tesla y recolector.',
+          'Los drones salen en la nueva carta rara Dron, en núcleos de dron (élites y jefes) y como regalo al final del piso 2. Para cambiar de dron haz clic en la tarjeta de arriba a la izquierda.',
+          'Los drones suben de nivel mientras trabajan y se hacen más fuertes cada 5 niveles. Todos necesitan la nueva versión: recarga la página.',
+        ],
+      },
+      fr: {
+        title: 'Drones compagnons',
+        items: [
+          'Chaque joueur peut désormais avoir un drone qui flotte à ses côtés et se bat tout seul. Sept types : médecin, givre, roquettes, mitrailleur, double mitrailleuse, Tesla et collecteur.',
+          'Les drones se trouvent sur la nouvelle carte rare Drone, dans des noyaux de drone (élites et boss) et en cadeau à la fin de l’étage 2. Pour en changer, clique sur la carte en haut à gauche.',
+          'Les drones montent de niveau en travaillant et gagnent en puissance tous les 5 niveaux. Tout le monde doit avoir la nouvelle version : recharge la page.',
+        ],
+      },
+      ru: {
+        title: 'Дроны-компаньоны',
+        items: [
+          'Теперь у каждого игрока может быть дрон, который парит рядом и сражается сам. Семь видов: медик, ледяной, ракетный, пулемётный, со сдвоенным пулемётом, Тесла и сборщик.',
+          'Дроны выпадают с новой редкой карты «Дрон», из ядер дронов (элита и боссы) и в подарок в конце 2-го этажа. Чтобы сменить дрона, нажми на карточку слева сверху.',
+          'Дроны растут в уровнях за работу и становятся сильнее каждые 5 уровней. Всем нужна новая версия: обновите страницу.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.21',
     date: '2026-10-21',
     text: {
@@ -374,7 +432,12 @@ export function autoOpenReleaseNotes(): void {
   try {
     const seen = localStorage.getItem('wrh.notesSeen');
     const cur = currentMinor();
-    if (seen === cur) return;
+    // only a newer version than the last one shown opens the notes (an older build, or the same one, does not)
+    const num = (v: string): number => {
+      const [a, b] = v.split('.').map(Number);
+      return (a ?? 0) * 1000 + (b ?? 0);
+    };
+    if (seen !== null && num(seen) >= num(cur)) return;
     const returning = localStorage.getItem('wrh.profile') !== null || seen !== null;
     localStorage.setItem('wrh.notesSeen', cur);
     if (returning && !open) toggleReleaseNotes();

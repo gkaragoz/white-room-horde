@@ -15,6 +15,7 @@ export type Sfx =
   | 'cardOffer' | 'iceFreeze' | 'iceThaw' | 'nuke' | 'secondWind' | 'weaponGet' | 'dead' | 'floorEnter' | 'slowIn' | 'slowOut' | 'impactWall' | 'barrelHit'
   | 'pounce' | 'grab' | 'warhorn' | 'thunder' | 'quake' | 'mineBeep' | 'spikeVolley' | 'shockPulse' | 'buildThud' | 'buildThudBig' | 'crumble' | 'crumbleBig' | 'boneCrack' | 'fleshHit' | 'goreDecap' | 'goreTear' | 'gibBurst'
   | 'warnCircle' | 'warnLine' | 'slamHit' | 'purge' | 'acidSplash' | 'launch' | 'chargeUp' | 'pullHum' | 'blinkZap' | 'abilityBuff' | 'abilityPower' | 'abilityWhoosh' | 'airstrikeCall'
+  | 'droneGun' | 'droneTwin' | 'droneRocket' | 'droneZap' | 'droneHeal' | 'dronePulse' | 'droneFreeze' | 'droneHum' | 'droneUnlock' | 'droneLevel' | 'droneTier' | 'droneSwap'
   | 'vo_firstblood' | 'vo_doublekill' | 'vo_triplekill' | 'vo_megakill' | 'vo_killingspree' | 'vo_rampage' | 'vo_dominating' | 'vo_massacre' | 'vo_godlike' | 'vo_mayhem' | 'vo_ownage' | 'vo_carnage';
 
 /** Minimum gap between two sounds of one kind, so a minigun or a crowd does not turn into a wall of noise. */
@@ -25,6 +26,7 @@ const GAP: Record<Sfx, number> = {
   shot: 0.035, midShot: 0.04, bigShot: 0.05, cannonShot: 0.08, heavyShot: 0.05, throw: 0.1, hit: 0.04, death: 0.05, boom: 0.1, hurt: 0.1, down: 0.3, revive: 0.3,
   level: 0.3, pick: 0.1, wave: 0.5, boss: 0.5, over: 1, zGroan: 0.25, zAttack: 0.12, zHit: 0.05, zDeath: 0.06, zScream: 0.4, step: 0.12, pickup: 0.06, pickupDrop: 0.15, spit: 0.15,
   reload: 0.2, reloadDone: 0.2, dash: 0.2, bossRoar: 0.5, uiClick: 0.03, uiConfirm: 0.1, uiBack: 0.1, uiError: 0.2, uiOpen: 0.1, uiClose: 0.1, heart: 0.3,
+  droneGun: 0.07, droneTwin: 0.06, droneRocket: 0.35, droneZap: 0.1, droneHeal: 1.2, dronePulse: 0.8, droneFreeze: 0.6, droneHum: 2.2, droneUnlock: 0.4, droneLevel: 0.2, droneTier: 0.4, droneSwap: 0.3,
   floorCleared: 0.5, countTick: 0.2, countGo: 0.2, floorCharge: 0.5, floorLift: 1, floorArrive: 0.5, floorStart: 0.5,
   cardOffer: 0.3, iceFreeze: 0.5, iceThaw: 0.3, nuke: 2, secondWind: 1, weaponGet: 0.2, dead: 0.5, floorEnter: 1, slowIn: 1, slowOut: 1, impactWall: 0.05, barrelHit: 0.1,
   pounce: 0.15, grab: 0.2, warhorn: 0.6, thunder: 0.3, quake: 0.4, mineBeep: 0.2, spikeVolley: 0.2, shockPulse: 0.2, buildThud: 0.07, buildThudBig: 0.12, crumble: 0.07, crumbleBig: 0.12, boneCrack: 0.06, fleshHit: 0.05, goreDecap: 0.2, goreTear: 0.2, gibBurst: 0.15,
@@ -167,6 +169,19 @@ const BANK: Partial<Record<Sfx, Entry>> = {
   vo_rampage: { files: ['vo_rampage'], gain: 0.95, rate: [1, 1] },
   vo_dominating: { files: ['vo_dominating'], gain: 0.95, rate: [1, 1] },
   vo_massacre: { files: ['vo_massacre'], gain: 0.95, rate: [1, 1] },
+  // the drones (recorded, see public/sfx/CREDITS.md): a support voice, quieter than the guns of the players
+  droneGun: { files: ['drone_gun_1', 'drone_gun_2', 'drone_gun_3'], gain: 0.8, rate: [0.95, 1.1] },
+  droneTwin: { files: ['drone_twin_1', 'drone_twin_2', 'drone_twin_3'], gain: 0.8, rate: [0.92, 1.08] },
+  droneRocket: { files: ['drone_rocket_1', 'drone_rocket_2'], gain: 0.85, rate: [0.95, 1.1] },
+  droneZap: { files: ['drone_zap_1', 'drone_zap_2', 'drone_zap_3'], gain: 0.85, rate: [0.95, 1.1] },
+  droneHeal: { files: ['drone_heal_1', 'drone_heal_2', 'drone_heal_3'], gain: 0.7, rate: [0.97, 1.05] },
+  dronePulse: { files: ['drone_pulse'], gain: 0.9, rate: [0.97, 1.05] },
+  droneFreeze: { files: ['drone_freeze'], gain: 0.9, rate: [0.97, 1.03] },
+  droneHum: { files: ['drone_hum'], gain: 0.8, rate: [0.96, 1.04] },
+  droneUnlock: { files: ['drone_unlock'], gain: 0.8, rate: [1, 1] },
+  droneLevel: { files: ['drone_level'], gain: 0.7, rate: [0.98, 1.02] },
+  droneTier: { files: ['drone_tier'], gain: 0.8, rate: [1, 1] },
+  droneSwap: { files: ['drone_swap'], gain: 0.7, rate: [0.97, 1.03] },
   vo_godlike: { files: ['vo_godlike'], gain: 0.95, rate: [1, 1] },
   vo_mayhem: { files: ['vo_mayhem'], gain: 0.95, rate: [1, 1] },
   vo_ownage: { files: ['vo_ownage'], gain: 0.95, rate: [1, 1] },
@@ -174,7 +189,7 @@ const BANK: Partial<Record<Sfx, Entry>> = {
 };
 
 /** Sounds that come from a place in the arena (panned and quieter with distance). */
-const SPATIAL = new Set<Sfx>([...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'pounce', 'grab', 'warhorn', 'thunder', 'quake', 'mineBeep', 'spikeVolley', 'shockPulse', 'buildThud', 'buildThudBig', 'crumble', 'crumbleBig', 'boneCrack', 'fleshHit', 'goreDecap', 'goreTear', 'gibBurst', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
+const SPATIAL = new Set<Sfx>(['droneGun', 'droneTwin', 'droneRocket', 'droneZap', 'droneHeal', 'dronePulse', 'droneFreeze', 'droneHum', ...WEAPON_IDS.map((w): Sfx => `gun_${w}`), 'reloadPistol', 'reloadRifle', 'reloadShotgun', 'reload', 'reloadDone', 'dash', 'shot', 'midShot', 'bigShot', 'cannonShot', 'heavyShot', 'throw', 'hit', 'death', 'boom', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'step', 'pickup', 'pickupDrop', 'spit', 'impactWall', 'barrelHit', 'pounce', 'grab', 'warhorn', 'thunder', 'quake', 'mineBeep', 'spikeVolley', 'shockPulse', 'buildThud', 'buildThudBig', 'crumble', 'crumbleBig', 'boneCrack', 'fleshHit', 'goreDecap', 'goreTear', 'gibBurst', 'warnCircle', 'warnLine', 'slamHit', 'acidSplash', 'launch', 'chargeUp', 'pullHum', 'blinkZap']);
 
 const VOICE_SFX = new Set<Sfx>(['vo_firstblood', 'vo_doublekill', 'vo_triplekill', 'vo_megakill', 'vo_killingspree', 'vo_rampage', 'vo_dominating', 'vo_massacre', 'vo_godlike', 'vo_mayhem', 'vo_ownage', 'vo_carnage', 'zGroan', 'zAttack', 'zHit', 'zDeath', 'zScream', 'bossRoar']);
 
@@ -664,6 +679,30 @@ export class Audio {
       case 'grenadeThrown':
         this.play('throw', e);
         break;
+      case 'droneShot': {
+        // a rocket is heard from every drone, the machine guns of the squad's drones are thinned out like their owners' guns
+        if (e.kind !== 2 && e.slot !== localSlot && Math.random() < 0.55) return;
+        const at = e.slot === localSlot ? undefined : { x: e.x, y: e.y };
+        if (e.kind === 2) this.play('droneRocket', at);
+        else if (e.kind === 3) this.play('droneGun', at);
+        else if (e.kind === 4) this.play('droneTwin', at);
+        break;
+      }
+      case 'droneZap':
+        this.play('droneZap', e.slot === localSlot ? undefined : { x: e.pts[0]!, y: e.pts[1]! });
+        break;
+      case 'dronePulse':
+        this.play(e.freeze ? 'droneFreeze' : 'dronePulse', e.slot === localSlot ? undefined : { x: e.x, y: e.y });
+        break;
+      case 'droneUnlock':
+        if (e.slot === localSlot) this.play(e.fresh ? 'droneUnlock' : 'droneLevel');
+        break;
+      case 'droneLevel':
+        if (e.slot === localSlot) this.play(e.level % 5 === 0 ? 'droneTier' : 'droneLevel');
+        break;
+      case 'droneSwap':
+        if (e.slot === localSlot) this.play('droneSwap');
+        break;
       case 'reloadStart': {
         const id = this.slotWeapon(e.slot);
         const kind: Sfx = id === 'shotgun' || id === 'dbl' || id === 'gl' ? 'reloadShotgun' : id === 'pistol' || id === 'revolver' || id === 'mp' ? 'reloadPistol' : 'reloadRifle';
@@ -836,6 +875,9 @@ export class Audio {
    * Ambient layer driven by the world each frame: groans from nearby zombies (more of them, more often), footsteps of
    * players that are moving, and a heartbeat when the local player is hurt badly.
    */
+  private droneTimer = 0;
+  private droneHumGate = 0;
+
   tick(w: World, localSlot: number, dt: number): void {
     if (!this.ctx) return;
     let boss = false;
@@ -860,6 +902,17 @@ export class Audio {
         this.play('zGroan', { x: w.eX[i]!, y: w.eY[i]! });
         if (heavy) this.play('zGroan', { x: w.eX[i]!, y: w.eY[i]! });
         break;
+      }
+    }
+    // drones: the healer's beam sings while it heals, every awake drone of the listener's own hums quietly
+    this.droneTimer -= dt;
+    if (this.droneTimer <= 0) {
+      this.droneTimer = 1.4;
+      for (let s = 0; s < MAX_PLAYERS; s++) {
+        if (!w.pActive[s] || w.pDrone[s] === 0 || w.pState[s] !== PlayerState.Alive || w.pDWarm[s]! > 0) continue;
+        const own = s === localSlot;
+        if (w.pDrone[s] === 1 && w.dBeam[s * 4]! >= 0) this.play('droneHeal', own ? undefined : { x: w.dX[s]!, y: w.dY[s]! });
+        else if (own && this.droneHumGate++ % 2 === 0) this.play('droneHum');
       }
     }
     // footsteps

@@ -44,5 +44,7 @@ jobs:
       - run: node tools/ci/play-all.mjs
       - run: node tools/ci/aim-check.mjs
       - run: node tools/ci/notes-check.mjs
+      - run: node tools/ci/menu-shots.mjs
+      - run: node tools/ci/drone-shots.mjs
       - run: node tools/ci/net-stutter.mjs
         continue-on-error: true

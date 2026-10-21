@@ -29,6 +29,28 @@ export interface WeaponStats {
   melee?: { arc: number; radius: number; knock: number; charge: number };
 }
 
+/** Numbers of one drone type: scalars, or arrays indexed by power tier (levels 1-4 = 0, 5-9 = 1, ... 30 = 6). */
+export type DroneTiers = Record<string, number | number[]>;
+export interface DroneBalance {
+  warmup: number;
+  xpBase: number;
+  xpPerLevel: number;
+  killShare: number;
+  damageXp: number;
+  healXp: number;
+  slowXp: number;
+  pickupXp: number;
+  bonusXp: number;
+  follow: { side: number; back: number; rate: number; layerSnap: number };
+  healer: DroneTiers;
+  cryo: DroneTiers;
+  rocket: DroneTiers;
+  gun: DroneTiers;
+  twin: DroneTiers;
+  tesla: DroneTiers;
+  collector: DroneTiers;
+}
+
 export interface EnemyStats {
   hp: number;
   speed: number;
@@ -79,7 +101,7 @@ export interface ProgressionConfig {
 export const BALANCE = data as unknown as {
   dash: { seconds: number; speedMul: number; cooldown: number; iFrames: number };
   difficulty: { hp: number[]; count: number[]; damage: number[] };
-  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; hasteSeconds: number; quadSeconds: number; shieldAmount: number; freezeSeconds: number; nukeDamage: number; chance: { ammo: number; health: number; grenade: number; weapon: number; shield: number; haste: number; quad: number; nuke: number; freeze: number }; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number } };
+  pickups: { lifeSeconds: number; radius: number; magnetRadius: number; magnetSpeed: number; hasteSeconds: number; quadSeconds: number; shieldAmount: number; freezeSeconds: number; nukeDamage: number; chance: { ammo: number; health: number; grenade: number; weapon: number; shield: number; haste: number; quad: number; nuke: number; freeze: number; drone: number }; eliteDrone: number; lowAmmoBonus: number; healthAmount: number; bossDrops: { ammo: number; health: number; grenade: number; drone: number } };
   grenade: { maxRange: number; minRange: number; max: number; rechargeSeconds: number; range: number; flight: number; fuse: number; radius: number; damage: number; cooldown: number };
   spit: { speed: number; life: number; radius: number };
   shielder: { frontDot: number; frontMul: number };
@@ -95,6 +117,8 @@ export const BALANCE = data as unknown as {
   elites: Record<EliteKey, number>;
   barrels: Record<BarrelKey, number>;
   knock: { perDamage: number; max: number };
+  /** Drone companions: tier arrays per type (see docs/DRONES.md). */
+  drones: DroneBalance;
   /** The class abilities (Buttons.Special), per class id. */
   abilities: Record<string, Record<string, number>>;
   /** Numbers of the special behaviours of the newer enemy types (see enemies.ts, `special`). */

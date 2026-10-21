@@ -66,7 +66,17 @@ describe('pickups', () => {
     w.kActive.fill(0);
     dropLoot(w, 0, 0, true);
     const n = BALANCE.pickups.bossDrops.ammo + BALANCE.pickups.bossDrops.health + BALANCE.pickups.bossDrops.grenade;
-    expect(w.kActive.reduce((a, b) => a + b, 0)).toBe(n);
+    const dropped = w.kActive.reduce((a, b) => a + b, 0);
+    expect(dropped === n || dropped === n + 1).toBe(true); // plus a drone core now and then
+    // elites carry drone cores now and then, other kills never do
+    let cores = 0;
+    for (let i = 0; i < 4000; i++) {
+      w.kActive.fill(0);
+      dropLoot(w, 5, 5, false, 0, true);
+      if (w.kType.some((t, k) => w.kActive[k] === 1 && t === PickupType.Drone)) cores++;
+    }
+    expect(cores).toBeGreaterThan(30);
+    expect(cores).toBeLessThan(160);
   });
 
   it('a killed enemy can leave a drop that the shooter then collects (end to end)', () => {

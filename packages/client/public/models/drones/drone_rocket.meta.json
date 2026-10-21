@@ -1,0 +1,22 @@
+{
+ "id": "rocket",
+ "tris": 1255,
+ "points": {
+  "muzzle": [
+   0.4,
+   -0.62,
+   0.0
+  ],
+  "muzzle_l": [
+   -0.4,
+   -0.62,
+   0.0
+  ]
+ },
+ "halo": true,
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ]
+}

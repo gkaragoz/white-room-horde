@@ -271,7 +271,7 @@ export const moreTests: QaTest[] = [
         const translated = Object.keys(enFlat).filter((k) => f[k] !== enFlat[k]).length;
         if (translated < Object.keys(enFlat).length * 0.6) problems.push(`${lang}: only ${translated} of ${Object.keys(enFlat).length} strings differ from English`);
         const t2 = UI_STRINGS[lang] as unknown as Record<string, unknown[]>;
-        for (const [k, n] of [['classNames', 9], ['classTips', 9], ['waveMods', 6], ['waveModTips', 6], ['elites', 12], ['powerups', 9], ['combos', 6]] as const) if (t2[k]!.length !== n) problems.push(`${lang}: ${k} needs ${n} entries`);
+        for (const [k, n] of [['classNames', 9], ['classTips', 9], ['waveMods', 6], ['waveModTips', 6], ['elites', 12], ['powerups', 10], ['combos', 6], ['droneNames', 7], ['droneTips', 7]] as const) if (t2[k]!.length !== n) problems.push(`${lang}: ${k} needs ${n} entries`);
       }
       for (const lang of ['en', 'tr', 'de', 'es', 'fr', 'ru'] as const) {
         const t = UI_STRINGS[lang] as unknown as Record<string, Record<string, unknown>>;

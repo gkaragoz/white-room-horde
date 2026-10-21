@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_TELE, MAX_ZONES, PERKS, STATS, WEAPON_IDS, WEAPON_SLOTS } from '@wrh/shared';
+import { BALANCE, CARD_IDS, DRONE_TYPES, MAX_BARRELS, MAX_BULLETS, MAX_ENEMIES, MAX_GRENADES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_TELE, MAX_ZONES, PERKS, STATS, WEAPON_IDS, WEAPON_SLOTS } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -53,6 +53,16 @@ export type SimEvent =
   | { type: 'ability'; slot: number; cls: number; x: number; y: number }
   /** A melee swing: an arc (or the whole circle) of `radius` around the player facing `angle`; `charge` 0..1 for a charged hammer. */
   | { type: 'swing'; slot: number; weapon: number; x: number; y: number; angle: number; arc: number; radius: number; hits: number; charge: number }
+  /** A drone fired (kind = DRONE_TYPES index): bullets and rockets leave from (x, y); the healer beam and the cryo field are read from the world. */
+  | { type: 'droneShot'; slot: number; kind: number; x: number; y: number; angle: number }
+  /** A tesla drone's chain: x0, y0, x1, y1, ... of the drone and the enemies it jumped to. */
+  | { type: 'droneZap'; slot: number; pts: number[] }
+  /** A cryo drone's pulse (the one that freezes for a moment when `freeze`). */
+  | { type: 'dronePulse'; slot: number; x: number; y: number; radius: number; freeze: boolean }
+  | { type: 'droneLevel'; slot: number; kind: number; level: number }
+  /** A drone joined the inventory (`fresh`) or a duplicate turned into experience. */
+  | { type: 'droneUnlock'; slot: number; kind: number; fresh: boolean }
+  | { type: 'droneSwap'; slot: number; kind: number }
   | { type: 'gameOver'; wave: number; kills: number };
 
 /** Struct-of-arrays world (docs/DESIGN.md section 15): fixed-size pools, ids are slot indices. */
@@ -154,6 +164,9 @@ export interface World {
   eShield: Float64Array;
   /** Ticks an enemy stays frozen (stands still, no attacks). */
   eFrost: Int32Array;
+  /** Ticks left of a slow and how much of the speed it takes (percent). */
+  eSlow: Int32Array;
+  eSlowP: Int32Array;
   eLayer: Uint8Array;
   bLayer: Uint8Array;
   sLayer: Uint8Array;
@@ -179,6 +192,19 @@ export interface World {
   pStat: Float64Array;
   pWpnTime: Float64Array;
   pOver: Int32Array;
+  /** Drone companions. pDrone: active type + 1 per player (0 none); pDLv / pDXp: level (0 = not owned) and experience per player and type. */
+  pDrone: Uint8Array;
+  pDLv: Uint8Array;
+  pDXp: Float64Array;
+  /** Seconds before a just-switched drone acts, its position and facing, two timers (action, second effect) and the beam targets (healer, up to 4). */
+  pDWarm: Float64Array;
+  dX: Float64Array;
+  dY: Float64Array;
+  dAim: Float64Array;
+  dCd: Float64Array;
+  dBeam: Int8Array;
+  /** Salvo / barrel counter. */
+  dN: Int32Array;
   /** Lingering ground effects (acid, fire): kind, centre, radius, ticks left. */
   zActive: Uint8Array;
   zKind: Uint8Array;
@@ -245,6 +271,10 @@ export interface World {
   bPierce: Int8Array;
   /** Last four enemy slots a bullet hit (so a piercing bullet never hits one enemy twice). */
   bHit: Int32Array;
+  /** 0 = a player's round, otherwise drone type + 1; rockets carry their blast (radius and damage). */
+  bSrc: Uint8Array;
+  bBlastR: Float64Array;
+  bBlastD: Float64Array;
   events: SimEvent[];
   // derived data, rebuilt from the fields above (never hashed)
   field: FlowField;
@@ -334,6 +364,8 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     eMod: new Uint8Array(MAX_ENEMIES),
     eShield: new Float64Array(MAX_ENEMIES),
     eFrost: new Int32Array(MAX_ENEMIES),
+    eSlow: new Int32Array(MAX_ENEMIES),
+    eSlowP: new Int32Array(MAX_ENEMIES),
     eLayer: new Uint8Array(MAX_ENEMIES),
     bLayer: new Uint8Array(MAX_BULLETS),
     sLayer: new Uint8Array(MAX_SPIT),
@@ -354,6 +386,16 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     pStat: new Float64Array(MAX_PLAYERS * STATS),
     pWpnTime: new Float64Array(MAX_PLAYERS * WEAPON_SLOTS),
     pOver: new Int32Array(MAX_PLAYERS),
+    pDrone: new Uint8Array(MAX_PLAYERS),
+    pDLv: new Uint8Array(MAX_PLAYERS * DRONE_TYPES.length),
+    pDXp: new Float64Array(MAX_PLAYERS * DRONE_TYPES.length),
+    pDWarm: new Float64Array(MAX_PLAYERS),
+    dX: new Float64Array(MAX_PLAYERS),
+    dY: new Float64Array(MAX_PLAYERS),
+    dAim: new Float64Array(MAX_PLAYERS),
+    dCd: new Float64Array(MAX_PLAYERS * 2),
+    dBeam: new Int8Array(MAX_PLAYERS * 4).fill(-1),
+    dN: new Int32Array(MAX_PLAYERS),
     zActive: new Uint8Array(MAX_ZONES),
     zKind: new Uint8Array(MAX_ZONES),
     zX: new Float64Array(MAX_ZONES),
@@ -408,6 +450,9 @@ export function createWorld(seed: number, map = 0, difficulty = 1): World {
     bOwner: new Int32Array(MAX_BULLETS),
     bPierce: new Int8Array(MAX_BULLETS),
     bHit: new Int32Array(MAX_BULLETS * 4).fill(-1),
+    bSrc: new Uint8Array(MAX_BULLETS),
+    bBlastR: new Float64Array(MAX_BULLETS),
+    bBlastD: new Float64Array(MAX_BULLETS),
     events: [],
     field: new FlowField(),
     field1: new FlowField(),

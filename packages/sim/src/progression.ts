@@ -1,3 +1,4 @@
+import { grantDrone } from './drones';
 import { BALANCE, Buttons, CARD_IDS, CARD_RARITY, FloorPhase, MAX_PLAYERS, MISC, PlayerState, RARITY_WEIGHT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { PERK } from '@wrh/shared';
 import { addPerk, perk, setPerk } from './features';
@@ -178,6 +179,10 @@ function applyCard(w: World, card: number, by: number): void {
       break;
     case 'rage':
       if (by >= 0) addPerk(w, by, PERK.Rage, 1);
+      break;
+    case 'drone':
+      // a new drone for the inventory (a duplicate turns into experience for the active one)
+      if (by >= 0) grantDrone(w, by, -1);
       break;
     case 'heal':
       for (let s = 0; s < MAX_PLAYERS; s++) {

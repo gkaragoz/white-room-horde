@@ -7,6 +7,16 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Drone companions (rules and wire format change: update the server and reload the page)**
+
+- Every player can carry **one active drone** that hovers beside them (a propeller-free sci-fi pod with an anti-gravity halo) and acts on its own, and keeps the others in an inventory (click the drone card at the top left to open the list and switch; a switch warms the new drone up for 4 s). Seven kinds: **medic** (a green beam heals the squad members who need it most, more of them at once as it levels; revives a downed player from tier 4), **frost** (a slowing field, bosses half, damage and a freezing pulse on higher tiers), **rocket** (salvos that burst on the crowd), **gun** (long range, accurate), **twin gun** (close range spray, more barrels with the tiers), **tesla** (chain lightning) and **collector** (pulls the loot its owner wants from far away).
+- Drones are found on the new rare **Drone** level-up card (appended to the pool, so the older cards keep their ids), from **drone cores** (elites drop one now and then, bosses nearly always) and as a core for every player at the end of floor 2. A duplicate turns into experience for the active drone. Drones cannot be destroyed; they switch off while their owner is down and wake a second after the revive.
+- Drones earn experience while they work (damage, kills, health given, enemies slowed, loot) and level up to 30; every 5 levels is a power tier (all numbers are tier arrays under `drones` in `balance.json`, see `docs/DRONES.md`). Their damage uses the owner's damage and crit cards and is credited to the owner. Eleven drones cost the simulation about 0.1 ms per tick.
+- Simulation: `packages/sim/src/drones.ts`, new state arrays (`pDrone`, `pDLv`, `pDXp`, `pDWarm`, `dX`, `dY`, `dAim`, `dCd`, `dBeam`, `dN`, `eSlow`, `eSlowP`, `bSrc`, `bBlastR`, `bBlastD`) in the snapshot and the hash, a real slow for enemies (`eSlow`), the `drone` card, `PickupType.Drone`, and `PlayerInput.dsel` (the drone choice rides in the high nibble of the weapon-select byte, so the input stays 10 bytes).
+- Client: seven Blender drone models (`tools/blender/make_drones.py`, a spinning halo each, no propellers, parts in the owner's colour), `render/drones.ts` (the drone follows its owner's drawn position with a critically damped spring and floats above the ground it is over and a little ahead of itself, so it climbs ramps before reaching them and never dips into them; lean, bob, appear animation; healer beams, slow field, lightning, pulses), a drone card with level and experience bar and the inventory list, drone icons and card art, a drone core pickup, texts in six languages.
+- Sounds are real recordings (CC0: Kenney, bart, Joth, Spring Spring), cut and levelled by `tools/audio/make_drone_sfx.py` to sit under the guns; credits in `public/sfx/CREDITS.md`.
+- Tests: `drones.test.ts` (inventory, tiers, every type's behaviour, switching, life cycle, snapshot and determinism), card and pickup tests updated, `drone.models` in the QA page, `tools/ci/drone-shots.mjs` (every type in the real page, the HUD list, and the flight over a ramp: clearance, climb speed, no jumps).
+
 ## v0.21.0 (2026-10-21)
 
 **A roomier main menu and a new icon set (client only; nothing changes in the rules or on the wire)**

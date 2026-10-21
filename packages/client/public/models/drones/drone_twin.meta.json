@@ -1,0 +1,22 @@
+{
+ "id": "twin",
+ "tris": 1032,
+ "points": {
+  "muzzle": [
+   0.15,
+   -1.04,
+   -0.1
+  ],
+  "muzzle_l": [
+   -0.15,
+   -1.04,
+   -0.1
+  ]
+ },
+ "halo": true,
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ]
+}

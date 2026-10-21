@@ -1,0 +1,17 @@
+{
+ "id": "cryo",
+ "tris": 915,
+ "points": {
+  "aura": [
+   0,
+   0.02,
+   0.0
+  ]
+ },
+ "halo": true,
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ]
+}

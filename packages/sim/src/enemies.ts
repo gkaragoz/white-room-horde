@@ -2,7 +2,7 @@ import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Buttons, ENEMY_TYPES, EnemyState, 
 import { addStat, heal, maxStat } from './stats';
 import { atan2, clamp, cos, sin, sqrt } from './detmath';
 import { awardXp } from './progression';
-import { ELITE, abilityTaken, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
+import { ELITE, abilityTaken, absorb, addPerk, barrelsBlast, placeBarrels, enemyDamageMul, enemyRadiusMul, droneCredit, enemySpeedMul, hooks, perk, rollElite, waveModOf } from './features';
 import { dropLoot } from './pickups';
 import { addTelegraph, addZone, aimAt, launchPlayer } from './hazards';
 import { cellIndex } from './flowfield';
@@ -130,6 +130,8 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     w.eBoss[i] = 0;
     w.eMod[i] = 0;
     w.eFrost[i] = 0;
+    w.eSlow[i] = 0;
+    w.eSlowP[i] = 0;
     w.eShield[i] = 0;
     w.eVX[i] = 0;
     w.eVY[i] = 0;
@@ -1069,6 +1071,7 @@ function runWaves(w: World, playerCount: number): void {
     w.misc[MISC.PhaseEnd] = w.tick + cine + Math.round(fl.clearedSeconds * TICK_RATE);
     w.events.push({ type: 'finalKill', by: w.misc[MISC.Killer]!, x: w.misc[MISC.KillX]!, y: w.misc[MISC.KillY]! });
     w.events.push({ type: 'waveCleared', wave: w.wave });
+    hooks.floorCleared(w, w.wave);
   }
 }
 
@@ -1115,11 +1118,13 @@ export function killEnemy(w: World, i: number, dx: number, dy: number, power: nu
   w.eActive[i] = 0;
   w.enemyCount--;
   w.kills++;
+  const eliteKill = w.eMod[i] !== 0;
   if (w.eBoss[i]) addStat(w, killer, STAT.BossKills, 1);
   w.events.push({ type: 'enemyDeath', id: i, etype: type, x: w.eX[i]!, y: w.eY[i]!, dx, dy, power });
-  dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0, w.eLayer[i]!);
+  dropLoot(w, w.eX[i]!, w.eY[i]!, w.eBoss[i]! !== 0, w.eLayer[i]!, eliteKill);
   // experience belongs to the character that made the kill; a kill nobody owns is shared by the living
   const xp = w.eBoss[i] ? BALANCE.progression.boss.xp : BALANCE.progression.xp[ENEMY_TYPES[type]!]!;
+  if (droneCredit.slot >= 0) hooks.droneXp(w, droneCredit.slot, xp * BALANCE.drones.killShare);
   if (killer >= 0 && w.pActive[killer]) awardXp(w, killer, xp);
   else {
     let alive = 0;
@@ -1318,6 +1323,7 @@ export function updateEnemies(w: World): void {
 
   for (let i = 0; i < MAX_ENEMIES; i++) {
     if (!w.eActive[i]) continue;
+    if (w.eSlow[i]! > 0 && --w.eSlow[i]! === 0) w.eSlowP[i] = 0;
     if (w.eFrost[i]! > 0) {
       w.eFrost[i] = w.eFrost[i]! - 1; // frozen solid: no step, no attack, no clock
       w.eStateTick[i] = w.eStateTick[i]! + 1;
@@ -1453,6 +1459,7 @@ export function updateEnemies(w: World): void {
         if (w.eMod[i] === ELITE.Berserk && (w.tick + i * 13) % 180 < 60) sp *= BALANCE.elites.berserkSpeed; // a few seconds of frenzy every six
         if (w.eMod[i] || w.wave >= 3) sp *= enemySpeedMul(w, i);
         if (perk(w, best, PERK.Frost) > 0 && dist < BALANCE.perks.frostRadius) sp *= BALANCE.perks.frostSlow;
+        if (w.eSlowP[i]! > 0) sp *= 1 - w.eSlowP[i]! / 100; // a cryo drone's field
         mx = dx * sp * TICK_DT;
         my = dy * sp * TICK_DT;
         w.eAngle[i] = atan2(dy, dx);
@@ -1563,11 +1570,19 @@ export function bulletVsEnemies(w: World, b: number, x0: number, y0: number, x1:
       if (facing < BALANCE.shielder.frontDot) dmg *= BALANCE.shielder.frontMul;
     }
     killer = w.bOwner[b]!;
+    const src = w.bSrc[b]!;
+    if (src > 0) droneCredit.slot = killer;
     damageEnemy(w, bestSlot, dmg, bdx, bdy);
+    if (src > 0) {
+      droneCredit.slot = -1;
+      hooks.droneXp(w, killer, dmg * BALANCE.drones.damageXp);
+      // the twin's heavier tiers push what they hit back a little
+      if (src === 5 && w.bBlastD[b]! > 0 && w.eActive[bestSlot]) shove(w, bestSlot, bdx * w.bBlastD[b]!, bdy * w.bBlastD[b]!);
+    }
     killer = -1;
     // a frost round leaves the enemy frozen for a moment (bosses shrug it off)
     const owner = w.bOwner[b]!;
-    const freeze = owner >= 0 ? BALANCE.weapons[WEAPON_IDS[w.pWeapon[owner]!]!]!.freeze : undefined;
+    const freeze = owner >= 0 && src === 0 ? BALANCE.weapons[WEAPON_IDS[w.pWeapon[owner]!]!]!.freeze : undefined;
     if (freeze && w.eActive[bestSlot] && !w.eBoss[bestSlot] && w.eFrost[bestSlot]! < freeze) w.eFrost[bestSlot] = freeze;
     if (w.bPierce[b]! <= 0) {
       w.bX[b] = x0 + sx * bestT;

@@ -9,17 +9,18 @@ export function writeInput(dv: DataView, off: number, i: PlayerInput): void {
   dv.setUint16(off + 2, i.aim, true);
   dv.setUint16(off + 4, i.buttons & 0xffff, true);
   dv.setUint8(off + 6, Math.max(0, Math.min(255, Math.round(i.aimDist ?? 0))));
-  dv.setUint8(off + 7, Math.max(0, Math.min(255, Math.round(i.wsel ?? 0))));
+  // one byte: the weapon choice in the low nibble (0..14), the drone choice in the high one (0..8)
+  dv.setUint8(off + 7, (Math.max(0, Math.min(14, Math.round(i.wsel ?? 0))) & 15) | ((Math.max(0, Math.min(8, Math.round(i.dsel ?? 0))) & 15) << 4));
   dv.setUint16(off + 8, (i.gAim ?? i.aim) & 0xffff, true);
 }
 
 export function readInput(dv: DataView, off: number): PlayerInput {
-  return { moveX: dv.getInt8(off), moveY: dv.getInt8(off + 1), aim: dv.getUint16(off + 2, true), buttons: dv.getUint16(off + 4, true), aimDist: dv.getUint8(off + 6), wsel: dv.getUint8(off + 7), gAim: dv.getUint16(off + 8, true) };
+  return { moveX: dv.getInt8(off), moveY: dv.getInt8(off + 1), aim: dv.getUint16(off + 2, true), buttons: dv.getUint16(off + 4, true), aimDist: dv.getUint8(off + 6), wsel: dv.getUint8(off + 7) & 15, dsel: dv.getUint8(off + 7) >> 4, gAim: dv.getUint16(off + 8, true) };
 }
 
 export function clampInput(i: PlayerInput): PlayerInput {
   const c = (v: number): number => (v < -127 ? -127 : v > 127 ? 127 : Math.round(v));
-  return { moveX: c(i.moveX), moveY: c(i.moveY), aim: i.aim & 0xffff, buttons: i.buttons & 0xffff, aimDist: Math.max(0, Math.min(255, Math.round(i.aimDist ?? 0))), wsel: Math.max(0, Math.min(14, Math.round(i.wsel ?? 0))), gAim: (i.gAim ?? i.aim) & 0xffff };
+  return { moveX: c(i.moveX), moveY: c(i.moveY), aim: i.aim & 0xffff, buttons: i.buttons & 0xffff, aimDist: Math.max(0, Math.min(255, Math.round(i.aimDist ?? 0))), wsel: Math.max(0, Math.min(14, Math.round(i.wsel ?? 0))), dsel: Math.max(0, Math.min(8, Math.round(i.dsel ?? 0))), gAim: (i.gAim ?? i.aim) & 0xffff };
 }
 
 /** One tick of confirmed inputs: u16 slot mask followed by the present inputs in slot order. */

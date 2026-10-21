@@ -1,0 +1,22 @@
+{
+ "id": "healer",
+ "tris": 895,
+ "points": {
+  "muzzle": [
+   0,
+   -0.62,
+   -0.02
+  ],
+  "beam": [
+   0,
+   -0.55,
+   -0.02
+  ]
+ },
+ "halo": true,
+ "forward": "-Y (Blender) / -Z (glTF)",
+ "materials": [
+  "wrh_fixed",
+  "wrh_tint"
+ ]
+}

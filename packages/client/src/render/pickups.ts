@@ -9,7 +9,7 @@ const MODELS = ['ammo', 'health', 'grenade', 'weapon', 'shield', 'haste', 'quad'
 const MODEL_SCALE = 0.85;
 /** Rarity colours, as on the cards: white (plain), blue (useful), purple (valuable), red (legendary). */
 export const TIER_COLORS = ['#e6e9ef', '#4aa8ff', '#b45cff', '#ff3b30'] as const;
-const KIND_TIER = [0, 1, 0, 2, 1, 1, 2, 3, 2];
+const KIND_TIER = [0, 1, 0, 2, 1, 1, 2, 3, 2, 3];
 const WEAPON_TIER: Record<string, number> = { pistol: 0, smg: 1, ar: 1, shotgun: 1, mp: 1, revolver: 1, dbl: 1, hmg: 2, sniper: 2, dmr: 2, flamer: 2, gl: 2, minigun: 3 };
 
 /** How valuable a drop is: 0 plain, 1 useful, 2 valuable, 3 legendary. */
@@ -21,7 +21,7 @@ function hullMaterial(): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.BackSide, transparent: true, opacity: 0.9, toneMapped: false, depthWrite: false });
 }
 
-const COLORS = ['#ffcf3a', '#3ddc6a', '#6b8f4a', '#c06bff', '#35c8ff', '#fff23a', '#ff3a3a', '#ffb000', '#9be8ff'];
+const COLORS = ['#ffcf3a', '#3ddc6a', '#6b8f4a', '#c06bff', '#35c8ff', '#fff23a', '#ff3a3a', '#ffb000', '#9be8ff', '#4df0c8'];
 const KINDS = COLORS.length;
 
 /** Floating, spinning crates for the loot the sim drops (ammo, health, grenades), with a glow ring on the floor. */
@@ -37,7 +37,7 @@ export class PickupView {
   constructor() {
     const geo = [
       new THREE.BoxGeometry(0.46, 0.34, 0.46), new THREE.BoxGeometry(0.42, 0.42, 0.42), new THREE.SphereGeometry(0.26, 10, 8), new THREE.OctahedronGeometry(0.34),
-      new THREE.IcosahedronGeometry(0.34, 0), new THREE.TetrahedronGeometry(0.4), new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.DodecahedronGeometry(0.5, 0), new THREE.OctahedronGeometry(0.44),
+      new THREE.IcosahedronGeometry(0.34, 0), new THREE.TetrahedronGeometry(0.4), new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.DodecahedronGeometry(0.5, 0), new THREE.OctahedronGeometry(0.44), new THREE.IcosahedronGeometry(0.4, 1),
     ];
     for (let k = 0; k < KINDS; k++) {
       const mat = new THREE.MeshStandardMaterial({ color: COLORS[k], emissive: COLORS[k], emissiveIntensity: 0.55, roughness: 0.5, flatShading: true });

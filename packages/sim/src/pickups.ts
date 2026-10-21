@@ -3,6 +3,7 @@ import { addStat, heal } from './stats';
 import { clamp, cos, sin, sqrt } from './detmath';
 import { PERK } from '@wrh/shared';
 import { nuke, perk, setPerk, waveModOf } from './features';
+import { dronePickup, grantDrone } from './drones';
 import { ammoLow, ammoNeeded, giveWeapon, isMelee, owns, refillAll } from './loadout';
 import type { World } from './state';
 
@@ -55,19 +56,23 @@ export function pickWeapon(w: World): number {
 }
 
 /** Roll loot for a dead enemy at (x, y). Bosses always drop a handful around them. */
-export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 0): void {
+export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 0, elite = false): void {
   const cfg = BALANCE.pickups;
   if (boss) {
     const kinds: number[] = [];
     for (let i = 0; i < cfg.bossDrops.ammo; i++) kinds.push(PickupType.Ammo);
     for (let i = 0; i < cfg.bossDrops.health; i++) kinds.push(PickupType.Health);
     for (let i = 0; i < cfg.bossDrops.grenade; i++) kinds.push(PickupType.Grenade);
+    // a boss usually leaves a drone core too (always drawn: the stream does not depend on the outcome)
+    if (w.rng.float() < cfg.bossDrops.drone) kinds.push(PickupType.Drone);
     kinds.forEach((k, n) => {
       const a = (n / kinds.length) * 6.283185307179586;
       spawnPickup(w, k, x + cos(a) * 1.8, y + sin(a) * 1.8, 0, layer);
     });
     return;
   }
+  // an elite now and then carries a drone core
+  if (elite && w.rng.float() < cfg.eliteDrone) spawnPickup(w, PickupType.Drone, x + 0.9, y, 0, layer);
   // a squad of blades alone has no use for guns or bullets: those drops would only be wasted
   const guns = gunsInSquad(w);
   const r = w.rng.float();
@@ -115,7 +120,7 @@ export function updatePickups(w: World): void {
       const dx = w.pX[s]! - w.kX[i]!;
       const dy = w.pY[s]! - w.kY[i]!;
       const d2 = dx * dx + dy * dy;
-      if (d2 < bd2 && wants(w, s, w.kType[i]!, i)) {
+      if (d2 < bd2 && wantsPickup(w, s, w.kType[i]!, i)) {
         bd2 = d2;
         best = s;
       }
@@ -138,7 +143,7 @@ export function updatePickups(w: World): void {
 }
 
 /** Would this player gain anything from the pickup? (A full player leaves it for a teammate.) */
-function wants(w: World, s: number, kind: number, i: number): boolean {
+export function wantsPickup(w: World, s: number, kind: number, i: number): boolean {
   if (kind === PickupType.Health) return w.pHp[s]! < w.pMaxHp[s]!;
   if (kind === PickupType.Grenade) return w.pGren[s]! < BALANCE.grenade.max;
   // blades and hammers have no use for guns or bullets: that loot stays for the others
@@ -170,6 +175,8 @@ function collect(w: World, s: number, i: number): void {
     w.events.push({ type: 'freeze', seconds: BALANCE.pickups.freezeSeconds });
   } else if (kind === PickupType.Weapon) {
     giveWeapon(w, s, w.kData[i]!);
+  } else if (kind === PickupType.Drone) {
+    grantDrone(w, s, -1);
   } else {
     // an ammo crate fills every weapon of the inventory; with everything full it is a grenade instead
     if (ammoNeeded(w, s)) refillAll(w, s);
@@ -177,5 +184,6 @@ function collect(w: World, s: number, i: number): void {
   }
   w.kActive[i] = 0;
   addStat(w, s, STAT.Pickups, 1);
+  dronePickup(w, s);
   w.events.push({ type: 'pickup', kind, slot: s, x: w.kX[i]!, y: w.kY[i]! });
 }

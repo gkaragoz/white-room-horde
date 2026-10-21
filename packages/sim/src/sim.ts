@@ -29,8 +29,9 @@ import { updatePickups } from './pickups';
 import { KNOCK_DECAY, updateHazards } from './hazards';
 import { chargeStep, charging, meleeAttack, updateAbilities } from './abilities';
 import { updateCards } from './progression';
+import { droneReviveHelp, resetDrones, updateDrones } from './drones';
 import { ensureUsable, equipLoadout, selectByRank, selectNext } from './loadout';
-import { abilityRate, abilityRateFrom, applyClass, bulletVsBarrels, damageMul, perk, placeBarrels, resetPerks, setPerk, speedMul, speedMulFrom, updateBarrels, updatePlayerPerks } from './features';
+import { abilityRate, abilityRateFrom, applyClass, bulletVsBarrels, damageMul, droneCredit, hooks, perk, placeBarrels, resetPerks, setPerk, speedMul, speedMulFrom, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
@@ -105,6 +106,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.modBlast[slot] = w.modReload[slot] = w.modDash[slot] = w.modArmor[slot] = 1;
   w.modPierce[slot] = w.modCrit[slot] = 0;
   resetPerks(w, slot);
+  resetDrones(w, slot);
   applyClass(w, slot, cls);
 }
 
@@ -132,8 +134,20 @@ export function joinPlayer(w: World, slot: number, weapon: WeaponId, cls = 0): v
 function endBullet(w: World, i: number, x: number, y: number, reason: number): void {
   w.bActive[i] = 0;
   const owner = w.bOwner[i]!;
-  const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[owner]!]!];
   const out = x < -ARENA_HALF_W || x > ARENA_HALF_W || y < -ARENA_HALF_H || y > ARENA_HALF_H;
+  if (w.bSrc[i]! > 0) {
+    // a drone's round: only the rocket (type 3) bursts, with the radius and damage it carries
+    if (w.bSrc[i] === 3 && !out) {
+      w.events.push({ type: 'explosion', x, y, radius: w.bBlastR[i]! });
+      droneCredit.slot = owner;
+      blastFrom(w, owner, x, y, w.bBlastR[i]!, w.bBlastD[i]!);
+      droneCredit.slot = -1;
+    } else {
+      w.events.push({ type: 'bulletGone', x, y, angle: atan2(w.bVy[i]!, w.bVx[i]!), reason });
+    }
+    return;
+  }
+  const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[owner]!]!];
   if (st.blast !== undefined && !out) {
     // explosive round: bursts where it ends (wall, enemy or end of its range)
     w.events.push({ type: 'explosion', x, y, radius: st.blast * w.modBlast[owner]! });
@@ -147,7 +161,7 @@ function endBullet(w: World, i: number, x: number, y: number, reason: number): v
  * Launch a round from the muzzle. The stretch from the shooter to the muzzle's distance ahead (along the aim) is swept first,
  * so a wall right in front of the player stops the shot and enemies standing closer than the muzzle can still be hit.
  */
-function spawnBullet(w: World, owner: number, ox: number, oy: number, sx: number, sy: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number): void {
+function spawnBullet(w: World, owner: number, ox: number, oy: number, sx: number, sy: number, x: number, y: number, angle: number, speed: number, range: number, damage: number, pierce: number, src = 0, blastR = 0, blastD = 0): void {
   for (let i = 0; i < MAX_BULLETS; i++) {
     if (w.bActive[i]) continue;
     w.bActive[i] = 1;
@@ -159,6 +173,9 @@ function spawnBullet(w: World, owner: number, ox: number, oy: number, sx: number
     w.bDamage[i] = damage;
     w.bOwner[i] = owner;
     w.bPierce[i] = pierce;
+    w.bSrc[i] = src;
+    w.bBlastR[i] = blastR;
+    w.bBlastD[i] = blastD;
     w.bHit.fill(-1, i * 4, i * 4 + 4);
     w.bLayer[i] = owner >= 0 ? w.pLayer[owner]! : 0;
     // the stretch swept first runs along the aim from the shooter to the muzzle's distance ahead (not to the muzzle itself, which
@@ -173,6 +190,8 @@ function spawnBullet(w: World, owner: number, ox: number, oy: number, sx: number
     return;
   }
 }
+
+hooks.bullet = spawnBullet;
 
 /** Speed factor on a ramp: 1 elsewhere; climbing slows by the grade (30 degrees about 16%, 45 degrees 28%), going down speeds up a little. */
 function slopeFactor(map: ReturnType<typeof currentMap>, x: number, y: number, mx: number, my: number): number {
@@ -512,6 +531,15 @@ function updateRevive(w: World, inputs: ReadonlyArray<PlayerInput | undefined>):
         helped = true;
       }
     }
+    // a healer drone's beam brings a downed player back without a hand on the key
+    if (!helped) {
+      const dh = droneReviveHelp(w, d);
+      if (dh.rate > 0) {
+        helped = true;
+        helper = dh.helper;
+        rate = dh.rate;
+      }
+    }
     if (helped) {
       w.pRevive[d] = w.pRevive[d]! + TICK_DT * rate;
       if (w.pRevive[d]! >= BALANCE.player.reviveSeconds * reviveMul) {
@@ -582,6 +610,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
 
   updateEnemies(w);
   settleLayers(w);
+  updateDrones(w, inputs);
   updateHazards(w);
   updateProjectiles(w);
   updatePickups(w);
@@ -652,5 +681,6 @@ export function hashWorld(w: World): number {
   c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pAmmo).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvAmmo);
   c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
   c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
+  c.typed(w.pDrone).typed(w.pDLv).typed(w.pDXp).typed(w.pDWarm).typed(w.dX).typed(w.dY).typed(w.dAim).typed(w.dCd).typed(w.dBeam).typed(w.dN).typed(w.eSlow).typed(w.eSlowP).typed(w.bSrc).typed(w.bBlastR).typed(w.bBlastD);
   return c.digest();
 }

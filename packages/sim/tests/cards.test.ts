@@ -30,9 +30,9 @@ function pick(w: World, id: CardId, by = 0): void {
 const offerOf = (w: World, s: number): number[] => [0, 1, 2].map((i) => w.pOffer[s * 3 + i]!);
 
 describe('card pool', () => {
-  it('has 35 cards, every one with a rarity, unique ids and a consistent team / personal split', () => {
-    expect(CARD_IDS.length).toBe(35);
-    expect(new Set(CARD_IDS).size).toBe(35);
+  it('has 36 cards, every one with a rarity, unique ids and a consistent team / personal split', () => {
+    expect(CARD_IDS.length).toBe(36);
+    expect(new Set(CARD_IDS).size).toBe(36);
     for (const id of CARD_IDS) expect([0, 1, 2]).toContain(CARD_RARITY[id]);
     for (const p of PERSONAL_CARDS) expect(CARD_IDS).toContain(p);
     for (const t of TEAM_CARDS) expect(CARD_IDS).toContain(t);
@@ -40,7 +40,7 @@ describe('card pool', () => {
     expect([...TEAM_CARDS].sort()).toEqual(['ammo', 'grenades', 'heal', 'luck']);
     expect(PERSONAL_CARDS.length + TEAM_CARDS.length).toBe(CARD_IDS.length);
     for (const id of Object.keys(CARD_RARITY)) expect(CARD_IDS).toContain(id);
-    const perkCards = ['regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage'];
+    const perkCards = ['regen', 'thorns', 'shock', 'volatile', 'frost', 'scavenger', 'adrenaline', 'barrier', 'secondwind', 'rage', 'drone'];
     for (const id of CARD_IDS) expect(BALANCE.progression.cards).toHaveProperty(id === 'arsenal' || id === 'heal' || id === 'ammo' || perkCards.includes(id) ? 'damage' : id);
   });
 
