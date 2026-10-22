@@ -18,6 +18,8 @@ export interface PlayerInfo {
   color: number;
   /** Class index chosen in the lobby (see CLASS_IDS). */
   cls: number;
+  /** Meta level of the player (1..MAX_LEVEL): the room plays at the lowest one. */
+  lvl: number;
 }
 
 /** The options of a room are the options of the game (shared/options.ts). */
@@ -28,6 +30,10 @@ export interface JoinOpts {
   acc?: number;
   color?: number;
   cls?: number;
+  /** Meta level, and the weapons and drones the player has met (bit n = WEAPON_IDS / DRONE_TYPES index n). Default: the full game, everything met. */
+  lvl?: number;
+  metW?: number;
+  metD?: number;
   /** Game version of the client; the server refuses a different major.minor (the simulation rules may differ). */
   v?: string;
 }
@@ -50,7 +56,7 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { t: 'room'; code: string; slot: number; players: PlayerInfo[]; started: boolean; options: RoomOptions; token: string; locked: boolean }
-  | { t: 'start'; seed: number; players: { slot: number; weapon: WeaponId; cls: number }[]; map: number; mods: number }
+  | { t: 'start'; seed: number; players: StartPlayer[]; map: number; mods: number; level: number }
   | { t: 'desync'; tick: number; slots: number[] }
   | { t: 'pong'; ts: number }
   | { t: 'paused'; on: boolean }
@@ -58,14 +64,26 @@ export type ServerMsg =
   /** `code`: a short reason a page can act on (room_gone, bad_token, version); `message` is for people. */
   | { t: 'error'; message: string; code?: string };
 
+/** A player in the start message: who, what they carry and what they had met before the run. */
+export interface StartPlayer {
+  slot: number;
+  weapon: WeaponId;
+  cls: number;
+  metWeapons: number;
+  metDrones: number;
+}
+
 export interface Join {
   slot: number;
   weapon: WeaponId;
 }
 
+/** A join in a bundle: slot, weapon, class, the met weapons (4 bytes) and drones (1 byte). */
+const JOIN_BYTES = 8;
+
 export interface Bundle {
   tick: number;
-  joins: { slot: number; weaponIndex: number; cls: number }[];
+  joins: { slot: number; weaponIndex: number; cls: number; metWeapons: number; metDrones: number }[];
   inputs: (PlayerInput | undefined)[];
 }
 
@@ -122,7 +140,7 @@ export function decodeInputMsg(buf: Uint8Array): { tick: number; input: PlayerIn
 
 export function encodeBundle(b: Bundle): Uint8Array {
   const body = encodeTick(b.inputs);
-  const out = new Uint8Array(1 + 4 + 1 + b.joins.length * 3 + body.length);
+  const out = new Uint8Array(1 + 4 + 1 + b.joins.length * JOIN_BYTES + body.length);
   out[0] = Bin.Bundle;
   new DataView(out.buffer).setUint32(1, b.tick, true);
   out[5] = b.joins.length;
@@ -131,6 +149,9 @@ export function encodeBundle(b: Bundle): Uint8Array {
     out[o++] = j.slot;
     out[o++] = j.weaponIndex & 255;
     out[o++] = j.cls & 255;
+    new DataView(out.buffer).setInt32(o, j.metWeapons, true);
+    out[o + 4] = j.metDrones & 255;
+    o += 5;
   }
   out.set(body, o);
   return out;
@@ -143,8 +164,8 @@ export function decodeBundle(buf: Uint8Array, slots: number): Bundle {
   const joins: Bundle['joins'] = [];
   let o = 6;
   for (let i = 0; i < n; i++) {
-    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]!, cls: buf[o + 2]! });
-    o += 3;
+    joins.push({ slot: buf[o]!, weaponIndex: buf[o + 1]!, cls: buf[o + 2]!, metWeapons: dv.getInt32(o + 3, true), metDrones: buf[o + 7]! === 255 ? -1 : buf[o + 7]! });
+    o += JOIN_BYTES;
   }
   return { tick, joins, inputs: decodeTick(buf.subarray(o), slots).inputs };
 }

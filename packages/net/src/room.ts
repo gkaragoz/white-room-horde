@@ -1,5 +1,5 @@
-import { DEFAULT_GAME_OPTIONS, GAME_VERSION, Buttons, INPUT_BYTES, resolveMap, withOptions, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
+import { DEFAULT_GAME_OPTIONS, GAME_VERSION, Buttons, INPUT_BYTES, MAP_COUNT, MAX_LEVEL, DRONE_TYPES, poolAt, withOptions, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type Bundle, type StartPlayer, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
 export interface Conn {
@@ -18,6 +18,10 @@ interface Member {
   acc: number;
   color: number;
   cls: number;
+  /** Meta level and what the player has met (see JoinOpts). */
+  lvl: number;
+  metW: number;
+  metD: number;
   /** Secret that lets this player reattach to the slot after a dropped connection. */
   token: string;
   /** Set once the member is part of the running simulation (join command emitted). */
@@ -82,14 +86,18 @@ export class Room {
   lastActive = 0;
   /** Every bundle sent so far (index = tick), for late joiners. */
   readonly history: Uint8Array[] = [];
-  private pendingJoins: { slot: number; weaponIndex: number; cls: number }[] = [];
+  private pendingJoins: Bundle['joins'] = [];
   private readonly votes = new Map<number, Map<number, number>>();
   /** Slots whose last hash vote disagreed with the rest (they get a snapshot, and never upload one). */
   readonly diverged = new Set<number>();
   private readonly jobs: SnapJob[] = [];
   /** Relay ticks seen by this room (also while paused): the clock for snapshot timeouts. */
   private clockTicks = 0;
-  private startPlayers: { slot: number; weapon: WeaponId; cls: number }[] = [];
+  private startPlayers: StartPlayer[] = [];
+  /** The meta level the game started at: the lowest in the room. Players joining later play at it too. */
+  level = MAX_LEVEL;
+  /** The difficulty multipliers actually in use: the host's choice limited to what that level has opened. */
+  mods = 0;
 
   constructor(
     readonly code: string,
@@ -98,7 +106,7 @@ export class Room {
 
   private info(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc, color: m.color, cls: m.cls });
+    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc, color: m.color, cls: m.cls, lvl: m.lvl });
     return out;
   }
 
@@ -116,19 +124,19 @@ export class Room {
   }
 
   private sendStart(conn: Conn): void {
-    send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, mods: this.options.mods });
+    send(conn, { t: 'start', seed: this.seed, players: this.startPlayers, map: this.map, mods: this.mods, level: this.level });
     if (this.paused) send(conn, { t: 'paused', on: true });
   }
 
-  add(conn: Conn, name: string, weapon: WeaponId, acc = 0, color = -1, cls = 0): Member | null {
+  add(conn: Conn, name: string, weapon: WeaponId, acc = 0, color = -1, cls = 0, lvl = MAX_LEVEL, metW = -1, metD = -1): Member | null {
     const slot = this.members.findIndex((m) => m === null);
     if (slot < 0) return null;
     const host = this.members.every((m) => m === null);
-    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, color, cls, token: randomToken(), joined: false, pending: new Map(), last: undefined };
+    const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, color, cls, lvl, metW, metD, token: randomToken(), joined: false, pending: new Map(), last: undefined };
     this.members[slot] = m;
     if (this.started) {
       // late join: add the player at the next tick and bring the client up to date
-      this.pendingJoins.push({ slot, weaponIndex: WEAPON_IDS.indexOf(weapon), cls });
+      this.pendingJoins.push({ slot, weaponIndex: WEAPON_IDS.indexOf(weapon), cls, metWeapons: metW, metDrones: metD });
       m.joined = true;
       this.sendStart(conn);
       this.catchUp(m);
@@ -262,12 +270,20 @@ export class Room {
     if (this.started) return;
     this.started = true;
     this.seed = (Math.floor(Math.random() * 0xffffffff) + 1) >>> 0;
-    this.map = resolveMap(this.options.map);
+    // the room plays at its lowest level: the pool, the arenas and the difficulty multipliers are the ones that level has opened
+    this.level = MAX_LEVEL;
+    for (const m of this.members) if (m) this.level = Math.min(this.level, m.lvl);
+    const pool = poolAt(this.level);
+    this.mods = this.options.mods & pool.mods;
+    const open: number[] = [];
+    for (let a = 0; a < MAP_COUNT; a++) if ((pool.arenas >> a) & 1) open.push(a);
+    const chosen = this.options.map;
+    this.map = chosen >= 0 && open.includes(chosen) ? chosen : open[Math.floor(Math.random() * open.length)]!;
     this.startPlayers = [];
     for (const m of this.members) {
       if (!m) continue;
       m.joined = true;
-      this.startPlayers.push({ slot: m.slot, weapon: m.weapon, cls: m.cls });
+      this.startPlayers.push({ slot: m.slot, weapon: m.weapon, cls: m.cls, metWeapons: m.metW, metDrones: m.metD });
     }
     for (const m of this.members) if (m?.conn) this.sendStart(m.conn);
     this.broadcastRoom();
@@ -532,6 +548,9 @@ export class RoomManager {
     const weaponOf = (w: unknown): WeaponId => (typeof w === 'string' && (WEAPON_IDS as readonly string[]).includes(w) ? (w as WeaponId) : 'pistol');
     const colorOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < PLAYER_COLORS.length ? v : -1);
     const clsOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < CLASS_IDS.length ? v : 0);
+    const lvlOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_LEVEL ? v : MAX_LEVEL);
+    const metWOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) ? v & ((1 << WEAPON_IDS.length) - 1) : -1);
+    const metDOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) ? v & ((1 << DRONE_TYPES.length) - 1) : -1);
     const accOf = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 40 ? v : 0);
     const isHost = (): boolean => !!a && a.room.members[a.slot]?.host === true;
     switch (msg.t) {
@@ -543,7 +562,7 @@ export class RoomManager {
         room.lastActive = this.now;
         if (typeof msg.password === 'string') room.password = msg.password.slice(0, 24);
         this.rooms.set(room.code, room);
-        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color), clsOf(msg.cls))!;
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color), clsOf(msg.cls), lvlOf(msg.lvl), metWOf(msg.metW), metDOf(msg.metD))!;
         this.attached.set(conn, { room, slot: m.slot });
         room.broadcastRoom();
         break;
@@ -554,7 +573,7 @@ export class RoomManager {
         const room = this.rooms.get(String(msg.code).toUpperCase());
         if (!room) return send(conn, { t: 'error', message: 'room not found' });
         if (room.password && room.password !== msg.password) return send(conn, { t: 'error', message: 'wrong password' });
-        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color), clsOf(msg.cls));
+        const m = room.add(conn, validName(msg.name), weaponOf(msg.weapon), accOf(msg.acc), colorOf(msg.color), clsOf(msg.cls), lvlOf(msg.lvl), metWOf(msg.metW), metDOf(msg.metD));
         if (!m) return send(conn, { t: 'error', message: 'room is full' });
         room.lastActive = this.now;
         this.attached.set(conn, { room, slot: m.slot });

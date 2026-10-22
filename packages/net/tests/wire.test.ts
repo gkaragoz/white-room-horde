@@ -12,8 +12,8 @@ describe('wire format', () => {
     expect(back.buttons).toBe(i.buttons);
   });
 
-  it('a late join carries the last weapon and the last class', () => {
-    const joins = [{ slot: 3, weaponIndex: WEAPON_IDS.length - 1, cls: CLASS_IDS.length - 1 }, { slot: 1, weaponIndex: 0, cls: 0 }];
+  it('a late join carries the last weapon, the last class and what the player had met', () => {
+    const joins = [{ slot: 3, weaponIndex: WEAPON_IDS.length - 1, cls: CLASS_IDS.length - 1, metWeapons: 0x1ffffff, metDrones: 0x7f }, { slot: 1, weaponIndex: 0, cls: 0, metWeapons: 0b1011, metDrones: 0 }, { slot: 2, weaponIndex: 1, cls: 0, metWeapons: -1, metDrones: -1 }];
     const b = decodeBundle(encodeBundle({ tick: 77, joins, inputs: [] }), 4);
     expect(b.joins).toEqual(joins);
     expect(b.tick).toBe(77);

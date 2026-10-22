@@ -177,7 +177,7 @@ export class NetSession {
         this.paused = false;
         this.adopted = false; // the relay could not resume us: a new world from tick 0, as for a new player
         this.pendingStart = { seed: m.seed, players: m.players };
-        this.world = createGame({ seed: m.seed, players: m.players, map: m.map, mods: m.mods });
+        this.world = createGame({ seed: m.seed, players: m.players, map: m.map, mods: m.mods, level: m.level });
         this.history.clear();
         this.bundles.clear();
         this.received = -1;
@@ -332,7 +332,7 @@ export class NetSession {
     this.bundles.delete(b.tick);
     this.history.set(b.tick, b);
     this.history.delete(b.tick - 900);
-    for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!, j.cls);
+    for (const j of b.joins) joinPlayer(w, j.slot, WEAPON_IDS[j.weaponIndex]!, j.cls, j.metWeapons, j.metDrones);
     hooks?.before?.(w);
     step(w, b.inputs);
     hooks?.after?.(w);
