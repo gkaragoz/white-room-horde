@@ -3,6 +3,9 @@ import { LANGS, UI_STRINGS, type Lang } from './uiStrings';
 import { CSS } from './uiStyles';
 import { esc } from './htmlUtil';
 import { arenaThumb } from './arenaThumb';
+import { Minimap } from './minimap';
+import { inventoryHtml, weaponStatBars } from './weaponHtml';
+import { WorldOverlay } from './worldOverlay';
 
 export { LANGS, UI_STRINGS, type Lang };
 import { icon, chipIcon } from './icons';
@@ -10,7 +13,7 @@ import { lobbyMarkup, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
 import { droneNeed } from '@wrh/sim';
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Difficulty, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, GAME_VERSION, compatibleVersions, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
+import { BALANCE, Difficulty, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, GAME_VERSION, compatibleVersions, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
 import { modFx, xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -102,6 +105,13 @@ const CLASS_ICON = (i: number): string => icon(`class_${i}`, 40);
 
 export class Ui {
   readonly root = document.createElement('div');
+  /** Names, arrows, rings and numbers drawn over the world. */
+  readonly overlay = new WorldOverlay(this.root);
+  /** The radar in the HUD corner. */
+  readonly minimap = new Minimap(
+    () => this.hud.querySelector<HTMLCanvasElement>('#h-mini'),
+    (slot) => this.slotColor(slot),
+  );
   lang: Lang = 'en';
   /** Starting weapon chosen in the menu or lobby. */
   weapon: WeaponId = 'pistol';
@@ -539,29 +549,6 @@ export class Ui {
     }
   }
 
-  /** Icon, bar and number for each trait of a weapon; bars are scaled against the best of all weapons. */
-  private weaponStatBars(id: WeaponId): string {
-    const t = this.t;
-    const all = WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee).map((w) => BALANCE.weapons[w]);
-    const perShot = (s: (typeof all)[number]): number => s.damage * s.pellets + (s.blastDamage ?? 0);
-    const max = (f: (s: (typeof all)[number]) => number): number => Math.max(...all.map(f));
-    const s = BALANCE.weapons[id];
-    const dps = perShot(s) * s.rate;
-    const rows: { icon: string; label: string; frac: number; text: string }[] = [
-      { icon: 'stat_dmg', label: t.statDmg, frac: perShot(s) / max(perShot), text: `${s.damage}${s.pellets > 1 ? '&times;' + s.pellets : ''}${s.blast ? ' + ' + s.blastDamage : ''}` },
-      { icon: 'stat_rate', label: t.statRate, frac: s.rate / max((x) => x.rate), text: `${s.rate}/s` },
-      { icon: 'stat_dps', label: t.statDps, frac: dps / max((x) => perShot(x) * x.rate), text: String(Math.round(dps)) },
-      { icon: 'stat_range', label: t.statRange, frac: s.range / max((x) => x.range), text: String(s.range) },
-      { icon: 'stat_acc', label: t.statAcc, frac: 1 - s.spread / (max((x) => x.spread) * 1.1), text: `${Math.round((1 - s.spread) * 100)}%` },
-      { icon: 'stat_mag', label: t.statMag, frac: s.mag / max((x) => x.mag), text: String(s.mag) },
-      { icon: 'stat_reload', label: t.statReload, frac: 1 - s.reload / (max((x) => x.reload) * 1.2), text: `${s.reload}s` },
-      { icon: s.blast ? 'stat_blast' : 'stat_pierce', label: s.blast ? t.statBlast : t.statPierce, frac: s.blast ? s.blast / 3 : Math.min(1, s.pierce / 5), text: s.blast ? String(s.blast) : String(s.pierce) },
-    ];
-    return rows
-      .map((r) => `<div class="wrh-stat"><span class="ic">${icon(r.icon, 20)}</span><span class="nm">${r.label}</span><span class="bar"><i style="width:${Math.max(4, Math.min(100, Math.round(r.frac * 100)))}%"></i></span><b>${r.text}</b></div>`)
-      .join('');
-  }
-
   /** Link that opens this page with the room code and server already filled in (no password in the link). */
   private inviteLink(code: string): string {
     let server = '';
@@ -632,7 +619,7 @@ export class Ui {
       const colorHex = PLAYER_COLORS[this.color >= 0 ? this.color % PLAYER_COLORS.length : 0]!;
       const q = (id: string): HTMLElement => this.screen.querySelector<HTMLElement>('#' + id)!;
       q('wrh-prev-name').textContent = this.previewMode === 'char' ? (names[this.acc] ?? '') : (weaponNames[this.weapon] ?? '');
-      q('wrh-prev-stats').innerHTML = this.previewMode === 'weapon' ? this.weaponStatBars(this.weapon) : '';
+      q('wrh-prev-stats').innerHTML = this.previewMode === 'weapon' ? weaponStatBars(this.t, this.weapon) : '';
       this.screen.querySelectorAll<HTMLElement>('[data-ptab]').forEach((el) => el.classList.toggle('on', el.dataset.ptab === this.previewMode));
       this.screen.querySelectorAll<HTMLElement>('[data-sw]').forEach((el) => el.classList.toggle('on', Number(el.dataset.sw) === this.color));
       this.screen.querySelectorAll<HTMLElement>('.wrh-wp[data-w]').forEach((el) => el.classList.toggle('on', el.dataset.w === this.weapon));
@@ -980,81 +967,6 @@ export class Ui {
     this.screen.querySelector<HTMLElement>('#wrh-leave')!.onclick = () => this.h.onLeave();
   }
 
-  private readonly tagEls: (HTMLDivElement | null)[] = new Array<HTMLDivElement | null>(MAX_PLAYERS).fill(null);
-
-  /** Name label floating over a teammate (screen position in px); `visible` false hides it. */
-  private arrowEls: HTMLElement[] = [];
-
-  /** Arrow on the screen edge pointing at an off-screen teammate (angle in screen space, blinks while they are down). */
-  setArrow(slot: number, name: string, color: string, px: number, py: number, angle: number, visible: boolean, down = false): void {
-    let el = this.arrowEls[slot];
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'wrh-arrow-off';
-      el.innerHTML = '<i></i><span></span>';
-      this.root.appendChild(el);
-      this.arrowEls[slot] = el;
-    }
-    el.style.display = visible ? 'block' : 'none';
-    if (!visible) return;
-    el.style.left = `${px}px`;
-    el.style.top = `${py}px`;
-    el.style.setProperty('--c', color);
-    el.classList.toggle('down', down);
-    (el.firstElementChild as HTMLElement).style.transform = `rotate(${angle}rad)`;
-    const label = el.lastElementChild as HTMLElement;
-    if (label.textContent !== name) label.textContent = name;
-  }
-
-  private comboEl: HTMLElement | null = null;
-
-  /** The kill counter on the right while a streak is going (count 0 hides it). */
-  setCombo(count: number, label: string): void {
-    let el = this.comboEl;
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'wrh-combo';
-      el.innerHTML = '<b></b><small></small>';
-      this.root.appendChild(el);
-      this.comboEl = el;
-    }
-    el.style.display = count >= 3 ? 'block' : 'none';
-    if (count < 3) return;
-    const b = el.firstElementChild as HTMLElement;
-    if (b.textContent !== `x${count}`) {
-      b.textContent = `x${count}`;
-      el.style.transform = 'scale(1.18)';
-      setTimeout(() => (el!.style.transform = 'scale(1)'), 80);
-    }
-    (el.lastElementChild as HTMLElement).textContent = label;
-  }
-
-  private ammoEl: HTMLElement | null = null;
-  private pickupLabels: HTMLElement[] = [];
-
-  /** Name tags over the loot lying on the floor (screen positions in pixels). */
-  setPickupLabels(items: { px: number; py: number; text: string; color: string }[]): void {
-    while (this.pickupLabels.length < items.length) {
-      const el = document.createElement('div');
-      el.className = 'wrh-plabel';
-      this.root.appendChild(el);
-      this.pickupLabels.push(el);
-    }
-    for (let i = 0; i < this.pickupLabels.length; i++) {
-      const el = this.pickupLabels[i]!;
-      const it = items[i];
-      if (!it) {
-        if (el.style.display !== 'none') el.style.display = 'none';
-        continue;
-      }
-      el.style.display = 'block';
-      if (el.textContent !== it.text) el.textContent = it.text;
-      el.style.borderColor = it.color;
-      el.style.color = it.color;
-      el.style.transform = `translate(${Math.round(it.px)}px,${Math.round(it.py)}px) translate(-50%,-100%)`;
-    }
-  }
-
   get powerupNames(): string[] {
     return this.t.powerups as unknown as string[];
   }
@@ -1069,95 +981,6 @@ export class Ui {
   setNightHud(on: boolean): void {
     this.root.classList.toggle('night', on);
   }
-
-  setAmmoRing(px: number, py: number, w: number, frac: number, text: string, visible: boolean, reloading: boolean): void {
-    let el = this.ammoEl;
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'wrh-ammo';
-      el.innerHTML = '<i></i><b></b>';
-      this.root.appendChild(el);
-      this.ammoEl = el;
-    }
-    el.style.display = visible ? 'block' : 'none';
-    if (!visible) return;
-    el.style.left = `${px}px`;
-    el.style.top = `${py}px`;
-    el.style.width = `${w}px`;
-    el.style.height = `${w * 0.52}px`;
-    const f = Math.max(0, Math.min(1, frac));
-    el.style.setProperty('--f', String(Math.round(f * 100)));
-    el.style.setProperty('--c', `hsl(${Math.round(f * 125)} 85% 48%)`);
-    el.classList.toggle('reload', reloading);
-    el.classList.toggle('low', f <= 0.25 && !reloading);
-    const b = el.lastElementChild as HTMLElement;
-    if (b.textContent !== text) b.textContent = text;
-  }
-
-  private ringEls: HTMLElement[] = [];
-
-  /** Round progress ring over a downed player: red = time left before they bleed out, green = the revive in progress. */
-  setRing(slot: number, bleed: number, progress: number, px: number, py: number, visible: boolean, active: boolean): void {
-    let el = this.ringEls[slot];
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'wrh-ring';
-      el.innerHTML = '<i class="bleed"></i><i class="prog"></i><b>' + icon('go_revives', 20) + '</b>';
-      this.root.appendChild(el);
-      this.ringEls[slot] = el;
-    }
-    el.style.display = visible ? 'block' : 'none';
-    if (!visible) return;
-    el.style.left = `${px}px`;
-    el.style.top = `${py}px`;
-    el.style.setProperty('--b', String(Math.round(bleed * 100)));
-    el.style.setProperty('--p', String(Math.round(progress * 100)));
-    el.classList.toggle('live', active);
-  }
-
-  setTag(slot: number, text: string, color: string, px: number, py: number, visible: boolean): void {
-    let el = this.tagEls[slot];
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'wrh-tag';
-      this.root.appendChild(el);
-      this.tagEls[slot] = el;
-    }
-    if (el.textContent !== text) el.textContent = text;
-    el.style.borderColor = color;
-    el.style.display = visible ? 'block' : 'none';
-    el.style.left = `${px}px`;
-    el.style.top = `${py}px`;
-  }
-
-  private floaters = 0;
-
-  /** A damage number that rises from a screen position and fades out. */
-  popNumber(px: number, py: number, text: string, big: boolean, teammate: string | null = null): void {
-    if (this.floaters >= 60) return;
-    this.floaters++;
-    const el = this.dmgFree.pop() ?? document.createElement('div');
-    el.className = 'wrh-dmg';
-    el.style.display = '';
-    el.style.opacity = '';
-    el.textContent = text;
-    el.style.left = `${px}px`;
-    el.style.top = `${py}px`;
-    // your own numbers are white (gold when big); a teammate's are smaller, in their colour and a little see-through
-    el.style.fontSize = teammate ? (big ? '16px' : '12px') : big ? '22px' : '15px';
-    el.style.color = teammate ?? (big ? '#ffd23a' : '#fff');
-    if (teammate) el.style.opacity = '0.85';
-    this.root.appendChild(el);
-    const dx = (Math.random() - 0.5) * 30;
-    const a = el.animate([{ transform: 'translate(-50%,0) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px),-46px) scale(${big ? 1.25 : 0.9})`, opacity: 0 }], { duration: 650, easing: 'ease-out' });
-    a.onfinish = () => {
-      el.style.display = 'none'; // kept for the next number: no element is created or removed per hit
-      this.dmgFree.push(el);
-      this.floaters--;
-    };
-  }
-
-  private readonly dmgFree: HTMLElement[] = [];
 
   private weaponButtons(): string {
     const names = this.t.weapons as Record<string, string>;
@@ -1229,22 +1052,6 @@ export class Ui {
         .join('') + '</div>';
     }
     return html;
-  }
-
-  private inventoryHtml(world: World, slot: number): string {
-    const names = this.t.weapons as Record<string, string>;
-    const cur = world.pWeapon[slot]!;
-    let rows = '';
-    WEAPON_RANK.forEach((id) => {
-      const idx = WEAPON_IDS.indexOf(id);
-      if (((world.pOwned[slot]! >> idx) & 1) === 0) return;
-      const st = BALANCE.weapons[id];
-      const live = idx === cur;
-      const mag = live ? world.pMag[slot]! : world.pInvMag[slot * WEAPON_IDS.length + idx]!;
-      const reloading = live ? world.pReload[slot]! > 0 : world.pInvReload[slot * WEAPON_IDS.length + idx]! > 0;
-      rows += `<div class="row${live ? ' cur' : ''}${reloading ? ' reload' : ''}" data-w="${idx + 1}"><img src="${asset(`ui/wpn_${id}.png`)}" alt=""><span class="nm">${names[id] ?? id}</span><b>${st.melee ? '&infin;' : `${mag}/${st.mag}`}</b></div>`;
-    });
-    return rows;
   }
 
   private lvlImgBound = false;
@@ -1700,73 +1507,6 @@ export class Ui {
     }
   }
 
-  private mini: HTMLCanvasElement | null = null;
-  private lastMini = 0;
-
-  /** Radar of the whole arena: cover, enemies, loot and the squad (about 12 Hz). */
-  drawMinimap(world: World, slot: number, now: number): void {
-    if (now - this.lastMini < 80) return;
-    this.lastMini = now;
-    this.mini ??= this.hud.querySelector<HTMLCanvasElement>('#h-mini');
-    const c = this.mini;
-    if (!c) return;
-    const g = c.getContext('2d')!;
-    const W = c.width;
-    const H = c.height;
-    const sx = W / (ARENA_HALF_W * 2);
-    const sy = H / (ARENA_HALF_H * 2);
-    const X = (x: number): number => (x + ARENA_HALF_W) * sx;
-    const Y = (y: number): number => (ARENA_HALF_H - y) * sy;
-    g.clearRect(0, 0, W, H);
-    const mapDef = MAPS[world.map] ?? MAPS[0]!;
-    // decks lighter, ramps with a gradient that runs up to the high end
-    g.fillStyle = 'rgba(214,196,160,0.75)';
-    for (const d of mapDef.decks ?? []) g.fillRect(X(d.x - d.w / 2), Y(d.y + d.h / 2), d.w * sx, d.h * sy);
-    for (const r of mapDef.ramps ?? []) {
-      const x0 = X(r.x - r.w / 2);
-      const y0 = Y(r.y + r.h / 2);
-      const grad = g.createLinearGradient(r.dir === 0 ? x0 : r.dir === 2 ? x0 + r.w * sx : x0, r.dir === 1 ? y0 + r.h * sy : r.dir === 3 ? y0 : y0, r.dir === 0 ? x0 + r.w * sx : r.dir === 2 ? x0 : x0, r.dir === 1 ? y0 : r.dir === 3 ? y0 + r.h * sy : y0);
-      grad.addColorStop(0, 'rgba(242,200,121,0.2)');
-      grad.addColorStop(1, 'rgba(242,166,70,1)');
-      g.fillStyle = grad;
-      g.fillRect(x0, y0, r.w * sx, r.h * sy);
-    }
-    g.fillStyle = '#8b7a5e';
-    for (const o of mapDef.boxes) {
-      if (o.kind === 'rail' || o.kind === 'rampwall') continue;
-      g.fillRect(X(o.x - o.w / 2), Y(o.y + o.h / 2), o.w * sx, o.h * sy);
-    }
-    for (let i = 0; i < MAX_PICKUPS; i++) {
-      if (!world.kActive[i]) continue;
-      g.fillStyle = ['#ffcf3a', '#3ddc6a', '#6b8f4a', '#c06bff'][world.kType[i]!]!;
-      g.fillRect(X(world.kX[i]!) - 3, Y(world.kY[i]!) - 3, 6, 6);
-    }
-    for (let i = 0; i < MAX_ENEMIES; i++) {
-      if (!world.eActive[i]) continue;
-      const boss = world.eBoss[i] !== 0;
-      g.fillStyle = boss ? '#d8362e' : '#c0443c';
-      const r = boss ? 7 : 2.2;
-      g.beginPath();
-      g.arc(X(world.eX[i]!), Y(world.eY[i]!), r, 0, Math.PI * 2);
-      if (world.eLayer[i] === 1) {
-        // on a deck: drawn as a ring
-        g.strokeStyle = g.fillStyle as string;
-        g.lineWidth = 1.4;
-        g.stroke();
-      } else g.fill();
-    }
-    for (let s = 0; s < MAX_PLAYERS; s++) {
-      if (!world.pActive[s] || world.pState[s] === PlayerState.Dead) continue;
-      g.fillStyle = this.slotColor(s);
-      g.strokeStyle = s === slot ? '#fff' : '#3a352d';
-      g.lineWidth = s === slot ? 3 : 1.5;
-      g.beginPath();
-      g.arc(X(world.pX[s]!), Y(world.pY[s]!), s === slot ? 6 : 4.5, 0, Math.PI * 2);
-      g.fill();
-      g.stroke();
-    }
-  }
-
   /** Update the HUD from the world (throttled to ~12 Hz; cheap DOM writes only). */
   update(world: World, slot: number, hurt: number, now: number, names: string[]): void {
     this.lastWorld = world;
@@ -1868,7 +1608,7 @@ export class Ui {
           gear('spec', icon('hud_ability', 26), esc(abName), specText, specReady || specOn, !specReady && !specOn),
       );
       this.gearInfo = { abName, cls };
-      set('h-inv', this.inventoryHtml(world, slot));
+      set('h-inv', inventoryHtml(this.t, world, slot));
       this.updateRelics(world, slot);
       const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
       bar.style.display = reloading ? 'block' : 'none'; // a charge shows over the character instead

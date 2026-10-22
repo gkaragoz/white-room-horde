@@ -760,7 +760,7 @@ function damageNumber(x: number, y: number, damage: number, teammate: string | n
   const px = ((_p.x + 1) / 2) * app.clientWidth;
   const py = ((1 - _p.y) / 2) * app.clientHeight;
   if (px < 0 || py < 0 || px > app.clientWidth || py > app.clientHeight) return;
-  ui.popNumber(px, py, String(Math.round(damage)), damage >= 25, teammate);
+  ui.overlay.popNumber(px, py, String(Math.round(damage)), damage >= 25, teammate);
 }
 
 // ---- hit feel: a short freeze on heavy kills, slow motion on big moments ----
@@ -1479,7 +1479,7 @@ function frameInner(nowMs: number): void {
     stage.update(dt, fx0, -fy0);
     climb.props.setNight(stage.night);
     ui.setNightHud(stage.night > 0.5);
-    ui.setCombo(settings.announcer && nowSec - comboAt < 2.2 ? comboCount : 0, '');
+    ui.overlay.setCombo(settings.announcer && nowSec - comboAt < 2.2 ? comboCount : 0, '');
     {
       const me = localSlot;
       const lx = vx[me]!;
@@ -1519,24 +1519,24 @@ function frameInner(nowMs: number): void {
       } else aimMarker.update(null, 0, 0, '#ffffff', nowSec, -1);
       const show = alive && !w.gameOver && settings.ammoRing && !lifted.active && !st.melee;
       ammoRing.update(lx, -ly, frac, reloading, nowSec, show, vz[me]!);
-      ui.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, show, reloading);
+      ui.overlay.setAmmoRing(((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, ppu * 2.1, frac, reloading ? '...' : `${w.pMag[me]}/${st.mag}`, show, reloading);
     }
 
     // name tags over the other players
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const show = s !== localSlot && wv.inGame(s) && (mode === 'online' || dev.bots > 0);
       if (!show) {
-        ui.setTag(s, '', '#000', 0, 0, false);
+        ui.overlay.setTag(s, '', '#000', 0, 0, false);
         continue;
       }
       _p.set(vx[s]!, 2.7 + lifted.lift + vz[s]!, -vy[s]!).project(stage.camera);
-      ui.setTag(s, (settings.colorblind ? `${s + 1} ` : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
+      ui.overlay.setTag(s, (settings.colorblind ? `${s + 1} ` : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
     }
     // revive rings over downed players (red: bleeding out, green: being revived)
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const down = wv.downed(s) && !w.gameOver;
       if (!down) {
-        ui.setRing(s, 0, 0, 0, 0, false, false);
+        ui.overlay.setRing(s, 0, 0, 0, 0, false, false);
         continue;
       }
       _p.set(vx[s]!, 1.6 + lifted.lift + vz[s]!, -vy[s]!).project(stage.camera);
@@ -1544,26 +1544,26 @@ function frameInner(nowMs: number): void {
       let medic = 1;
       for (let h = 0; h < MAX_PLAYERS; h++) if (w.pActive[h] && h !== s && w.modRevive[h]! < medic) medic = w.modRevive[h]!;
       const need = BALANCE.player.reviveSeconds * medic;
-      ui.setRing(s, Math.max(0, w.pTimer[s]! / BALANCE.player.downedSeconds), Math.min(1, w.pRevive[s]! / need), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true, w.pRevive[s]! > 0);
+      ui.overlay.setRing(s, Math.max(0, w.pTimer[s]! / BALANCE.player.downedSeconds), Math.min(1, w.pRevive[s]! / need), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true, w.pRevive[s]! > 0);
     }
     // arrows at the screen edge for teammates who are out of view
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const far = s !== localSlot && wv.inGame(s) && (mode === 'online' || dev.bots > 0);
       if (!far) {
-        ui.setArrow(s, '', '#000', 0, 0, 0, false);
+        ui.overlay.setArrow(s, '', '#000', 0, 0, 0, false);
         continue;
       }
       _p.set(vx[s]!, 1.0, -vy[s]!).project(stage.camera);
       const out = Math.abs(_p.x) > 0.96 || Math.abs(_p.y) > 0.94;
       if (!out) {
-        ui.setArrow(s, '', '#000', 0, 0, 0, false);
+        ui.overlay.setArrow(s, '', '#000', 0, 0, 0, false);
         continue;
       }
       // the point where the line from the screen centre to the teammate leaves the screen
       const k = Math.max(Math.abs(_p.x) / 0.9, Math.abs(_p.y) / 0.86);
       const ex = _p.x / k;
       const ey = _p.y / k;
-      ui.setArrow(s, names[s] ?? 'P' + (s + 1), colorFor(s), ((ex + 1) / 2) * app.clientWidth, ((1 - ey) / 2) * app.clientHeight, Math.atan2(-_p.y, _p.x), true, w.pState[s] === PlayerState.Downed);
+      ui.overlay.setArrow(s, names[s] ?? 'P' + (s + 1), colorFor(s), ((ex + 1) / 2) * app.clientWidth, ((1 - ey) / 2) * app.clientHeight, Math.atan2(-_p.y, _p.x), true, w.pState[s] === PlayerState.Downed);
     }
     audio.setListener(fx0, fy0);
     audio.tick(w, localSlot, dt);
@@ -1594,7 +1594,7 @@ function frameInner(nowMs: number): void {
         if (Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
         tags.push({ px: ((_p.x + 1) / 2) * app.clientWidth, py: ((1 - _p.y) / 2) * app.clientHeight, text: dr.kind === 3 ? ui.weaponName(WEAPON_IDS[dr.data] ?? '') : (names[dr.kind] ?? ''), color: TIER_COLORS[dr.tier]! });
       }
-      ui.setPickupLabels(tags);
+      ui.overlay.setPickupLabels(tags);
     }
 
     let n = 0;
@@ -1668,7 +1668,7 @@ function frameInner(nowMs: number): void {
       if (ui.countShown > 0) audio.play(ui.countShown <= 3 ? 'countGo' : 'countTick');
       lastCount = ui.countShown;
     }
-    ui.drawMinimap(w, localSlot, nowMs);
+    ui.minimap.draw(w, localSlot, nowMs);
   } else {
     fx.update(dt);
     stage.follow(0, 0);

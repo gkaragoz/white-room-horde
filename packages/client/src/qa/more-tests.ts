@@ -985,16 +985,16 @@ export const moreTests: QaTest[] = [
       }, settings);
       const problems: string[] = [];
       try {
-        ui.setRing(2, 0.8, 0.5, 100, 100, true, true);
+        ui.overlay.setRing(2, 0.8, 0.5, 100, 100, true, true);
         const ring = host.querySelector<HTMLElement>('.wrh-ring');
         if (!ring || ring.style.display !== 'block') problems.push('ring not shown');
         else {
           if (ring.style.getPropertyValue('--p') !== '50') problems.push('ring progress ' + ring.style.getPropertyValue('--p'));
           if (ring.style.getPropertyValue('--b') !== '80') problems.push('ring bleed ' + ring.style.getPropertyValue('--b'));
         }
-        ui.setRing(2, 0, 0, 0, 0, false, false);
+        ui.overlay.setRing(2, 0, 0, 0, 0, false, false);
         if (host.querySelector<HTMLElement>('.wrh-ring')!.style.display !== 'none') problems.push('ring not hidden');
-        ui.setArrow(1, 'Ayse', '#ff4f9a', 700, 300, Math.PI / 2, true, true);
+        ui.overlay.setArrow(1, 'Ayse', '#ff4f9a', 700, 300, Math.PI / 2, true, true);
         const arrow = host.querySelector<HTMLElement>('.wrh-arrow-off');
         if (!arrow || arrow.querySelector('span')?.textContent !== 'Ayse') problems.push('arrow label missing');
         if (!arrow?.firstElementChild?.getAttribute('style')?.includes('rotate(1.57')) problems.push('arrow not rotated');

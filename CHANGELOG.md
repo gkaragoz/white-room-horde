@@ -7,6 +7,10 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**ui.ts split into modules (internals, same game)**
+
+- The 2860-line `ui.ts` lost about 1100 lines to modules that each do one thing: `uiStrings.ts` (all interface text), `uiStyles.ts`, `arenaThumb.ts`, `worldOverlay.ts` (names, arrows, rings and numbers drawn over the world, now `ui.overlay`), `minimap.ts` (now `ui.minimap`) and `weaponHtml.ts` (the weapon panels, as plain functions with their first tests).
+
 ## v0.32.0 (2026-10-22)
 
 **One description of a game's options (internals, same game)**
