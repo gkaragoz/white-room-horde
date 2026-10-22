@@ -337,3 +337,15 @@ export function snapshotArrays(w: SchemaArrays): TypedArray[] {
   const pools = w as unknown as Record<string, TypedArray>;
   return [...ARRAY_NAMES.map((name) => pools[name]!), ...NESTED_ARRAYS.map((n) => nestedArray(w, n.path))];
 }
+
+/** The scalars the world hash covers. */
+export const HASHED_SCALARS = SCALAR_NAMES.filter((name) => !SCALARS[name].unhashed);
+
+/** The typed arrays the world hash covers, in schema order. */
+export function hashedArrays(w: SchemaArrays): TypedArray[] {
+  const pools = w as unknown as Record<string, TypedArray>;
+  return [
+    ...ARRAY_NAMES.filter((name) => !ARRAYS[name].unhashed).map((name) => pools[name]!),
+    ...NESTED_ARRAYS.filter((n) => !n.unhashed).map((n) => nestedArray(w, n.path)),
+  ];
+}

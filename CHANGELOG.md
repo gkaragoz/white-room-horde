@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**World state declared once (simulation internals)**
+
+- Every field of the simulated world now lives in one WorldSchema (`packages/sim/src/schema.ts`). Creating the world, the snapshot and the world hash are derived from it, so a new field can no longer be forgotten in one of three hand-kept lists, and a test fails if a field is neither hashed nor declared derived.
+- The world hash changed (one order for every field, scalars hashed the same way): `sim-reference.json` was regenerated, and replays recorded before this change no longer verify. Gameplay is unchanged.
+
 ## v0.29.1 (2026-10-21)
 
 **New main menu: a card hub with full-screen pages (client only)**

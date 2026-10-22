@@ -11,8 +11,8 @@ pnpm --filter @wrh/relay deploy                     # the public relay must run 
 ```
 
 The sim is deterministic (no `Math.sin`, `Math.random`, `Date`; use `detmath` and `w.rng`), so every client computes the
-same world from the same inputs. Anything stored in the world must be in `snapshot.ts` (`arrays()`) and in the hash
-(`hashWorld` in `sim.ts`).
+same world from the same inputs. Anything stored in the world is declared once, in the WorldSchema (`packages/sim/src/schema.ts`): `createWorld`, the
+snapshot and the world hash are all derived from it. A field the hash should skip needs an `unhashed` reason there.
 
 ## A new weapon
 1. `packages/shared/src/types.ts`: add the id to `WeaponId` and `WEAPON_IDS` (append, never reorder) and to `WEAPON_RANK` (weakest to strongest: the number keys and the inventory list follow it).

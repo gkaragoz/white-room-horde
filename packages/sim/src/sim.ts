@@ -24,6 +24,7 @@ import { blastFrom, bulletVsEnemies, rebuildGrid, setWave, settleLayers, spawnBo
 import { currentMap, out, pushOut, segmentBlocked, useMap } from './obstacles';
 import { deckWalkable, nextLayer, rampAt, rampDir, rampGrade } from '@wrh/shared';
 import { Crc32 } from './hash';
+import { HASHED_SCALARS, hashedArrays } from './schema';
 import { addStat } from './stats';
 import { updatePickups } from './pickups';
 import { KNOCK_DECAY, updateHazards } from './hazards';
@@ -681,27 +682,15 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
   w.tick++;
 }
 
-/** CRC32 of every simulated field in a fixed order (used for desync detection, section 8). */
+/** CRC32 of every simulated field the WorldSchema does not declare derived (used for desync detection, section 8). */
 export function hashWorld(w: World): number {
   const c = new Crc32();
-  c.u32(w.tick);
+  const scalar = new Float64Array(1);
+  for (const name of HASHED_SCALARS) {
+    scalar[0] = w[name];
+    c.typed(scalar);
+  }
   for (const v of w.rng.getState()) c.u32(v);
-  c.u32(w.mods).u32(w.map).u32(w.wave).u32(w.waveTick).u32(w.kills).u32(w.enemyCount).u32(w.gameOver);
-  c.typed(new Float64Array([w.modLoot]));
-  c.typed(w.pXp).typed(w.pLevel).typed(w.pPending).typed(w.pOffer).typed(w.pCardTimer).typed(w.pCardLock).typed(w.pCardPrev).typed(w.pCards);
-  c.typed(w.modDamage).typed(w.modRate).typed(w.modSpeed).typed(w.modPierce).typed(w.modRevive).typed(w.modMagnet).typed(w.modXp).typed(w.modBlast).typed(w.modReload).typed(w.modDash).typed(w.modArmor).typed(w.modCrit);
-  c.typed(w.pModRate).typed(w.pModPierce).typed(w.pModArmor).typed(w.pLifesteal);
-  c.typed(w.modAbCd).typed(w.modAbDur).typed(w.modAbDmg).typed(w.modAbRad).typed(w.modAbExtra);
-  c.typed(w.pActive).typed(w.pX).typed(w.pY).typed(w.pAngle).typed(w.pHp).typed(w.pMaxHp).typed(w.pState).typed(w.pTimer).typed(w.pRevive);
-  c.typed(w.pGren).typed(w.pGrenCharge).typed(w.pGrenCd);
-  c.typed(w.pMag).typed(w.pReload).typed(w.pDash).typed(w.pDashCd).typed(w.pDashX).typed(w.pDashY).typed(w.pModDmg).typed(w.pModSpeed);
-  c.typed(w.gActive).typed(w.gX).typed(w.gY).typed(w.gVx).typed(w.gVy).typed(w.gFuse).typed(w.gOwner);
-  c.typed(w.kActive).typed(w.kData).typed(w.kLayer).typed(w.kType).typed(w.kX).typed(w.kY).typed(w.kLife);
-  c.typed(w.sActive).typed(w.sX).typed(w.sY).typed(w.sVx).typed(w.sVy).typed(w.sLife);
-  c.typed(w.pPerk).typed(w.pStat).typed(w.pWpnTime).typed(w.pWpnKills).typed(w.eMod).typed(w.eShield).typed(w.eFrost).typed(w.eAct).typed(w.eActT).typed(w.eAir).typed(w.eVX).typed(w.eVY).typed(w.pStun).typed(w.pKnockX).typed(w.pKnockY).typed(w.pAir).typed(w.pLayer).typed(w.eLayer).typed(w.bLayer).typed(w.sLayer).typed(w.pSpecCd).typed(w.pSpecT).typed(w.pRally).typed(w.pCharge).typed(w.pOver).typed(w.zActive).typed(w.zKind).typed(w.zX).typed(w.zY).typed(w.zR).typed(w.zLeft).typed(w.tActive).typed(w.tShape).typed(w.tEffect).typed(w.tX).typed(w.tY).typed(w.tA).typed(w.tW).typed(w.tL).typed(w.tAmt).typed(w.tLeft).typed(w.tTotal).typed(w.tOwner).typed(w.brActive).typed(w.brX).typed(w.brY).typed(w.brHp).typed(w.brT).typed(w.misc);
-  c.typed(w.pCooldown).typed(w.pIFrames).typed(w.pWeapon).typed(w.pOwned).typed(w.pInvMag).typed(w.pInvReload);
-  c.typed(w.eActive).typed(w.eType).typed(w.eBoss).typed(w.eAux).typed(w.eState).typed(w.eStateTick).typed(w.eX).typed(w.eY).typed(w.eAngle).typed(w.eHp).typed(w.eCooldown);
-  c.typed(w.bActive).typed(w.bX).typed(w.bY).typed(w.bVx).typed(w.bVy).typed(w.bLife).typed(w.bDamage).typed(w.bOwner).typed(w.bPierce).typed(w.bHit);
-  c.typed(w.pDrone).typed(w.pDLv).typed(w.pDXp).typed(w.pDWarm).typed(w.pAway).typed(w.dX).typed(w.dY).typed(w.dAim).typed(w.dCd).typed(w.dBeam).typed(w.dN).typed(w.eSlow).typed(w.eSlowP).typed(w.bSrc).typed(w.bBlastR).typed(w.bBlastD);
+  for (const a of hashedArrays(w)) c.typed(a);
   return c.digest();
 }
