@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
 import { GoreParts, Part } from './render/gore';
 import { GIB_COLORS } from './render/fx';
-import { GAME_VERSION, heightAt, resolveMap, withOptions } from '@wrh/shared';
+import { GAME_VERSION, TICK_RATE, heightAt, resolveMap, withOptions } from '@wrh/shared';
 import { BALANCE, nextLayer, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, runScore, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession, PredictedView } from '@wrh/net';
@@ -31,7 +31,9 @@ import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
 import { viewOf } from './view/worldView';
 import { recordAchievements } from './achievements';
-import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
+import { ACCESSORIES, clearRejoin, loadProfile, loadRejoin, recordGame, saveRejoin } from './profile';
+import { RunCodex } from './codex';
+import { joinMeta, setupMeta } from './meta';
 import { BUILD, mountVersionBadge } from './buildinfo';
 import { Ui, UI_STRINGS, type Settings } from './ui';
 import { hideLoading, preloadAssets } from './preload';
@@ -269,6 +271,8 @@ window.addEventListener('keydown', (e) => {
   if (world && !over && !e.repeat) runKeys++;
 });
 let playback: Replay | null = null;
+/** What the run in progress has met (not kept while watching a replay). */
+let runCodex: RunCodex | null = null;
 const dev = {
   perf: params.get('perf') === '1',
   bots: Math.max(0, Math.min(10, Number(params.get('bots') ?? 0))),
@@ -451,6 +455,7 @@ function afterStep(w: World): void {
   }
   if (!catchingUp) crowd.onEvents(w, w.events, animSec, (e) => tryRagdoll(w, e));
   for (const e of w.events) handleEvent(e);
+  if (runCodex && w.tick % 30 === 0) runCodex.scan(w, localSlot);
 }
 
 /** Hard hits and blasts throw the body as a physical ragdoll; lighter kills play the baked death animation. */
@@ -514,6 +519,7 @@ const BOSS_BANNERS: Record<string, readonly [string, string]> = {
 };
 
 function handleEvent(e: SimEvent): void {
+  runCodex?.onEvent(e, localSlot);
   if (e.type === 'swing') {
     const heavy = WEAPON_IDS[e.weapon] === 'hammer';
     // blade cuts alternate from side to side, so a run of swings reads as a combo
@@ -718,7 +724,9 @@ function handleEvent(e: SimEvent): void {
       over = true;
       setTimeout(() => audio.stopMusic(), 4000);
       {
-        const rec = world && !playback ? { ...recordGame(world.wave, world.kills, runScore(world).final), ach: recordAchievements(world, localSlot) } : undefined;
+        const score = world ? runScore(world).final : 0;
+        runCodex?.scan(world!, localSlot);
+        const rec = world && !playback ? { ...recordGame(world.wave, world.kills, score, { teamScore: score, seconds: world.tick / TICK_RATE, codex: runCodex?.codex }), ach: recordAchievements(world, localSlot) } : undefined;
         clearRejoin();
         ui.playerNames = names;
         setTimeout(() => world && ui.screens.showGameOver(world, rec, { clicks: runClicks, keys: runKeys, bestCombo }, false, localSlot), 1800);
@@ -846,6 +854,7 @@ function beginPlaying(w: World, slot: number): void {
   climb.props.setNight(stage.night);
   world = w;
   localSlot = slot;
+  runCodex = playback ? null : new RunCodex(loadProfile().codex);
   ui.screens.clearScreen();
   input.enabled = true;
   for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -859,14 +868,15 @@ function beginPlaying(w: World, slot: number): void {
 
 function startSolo(name: string): void {
   mode = 'solo';
-  const players: { slot: number; weapon: WeaponId; cls: number }[] = [{ slot: 0, weapon: startWeapon, cls: ui.choices.cls }];
+  const meta = setupMeta(loadProfile());
+  const players: { slot: number; weapon: WeaponId; cls: number; metWeapons?: number; metDrones?: number }[] = [{ slot: 0, weapon: startWeapon, cls: ui.choices.cls, metWeapons: meta.metWeapons, metDrones: meta.metDrones }];
   names = [name];
   for (let b = 1; b <= dev.bots; b++) {
     players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar', cls: b % 7 });
     names[b] = 'Bot ' + b;
   }
   const opts = withOptions({ map: ui.choices.map, mods: ui.choices.mods }, { map: numberParam('map'), mods: numberParam('mods') });
-  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map: resolveMap(opts.map), mods: opts.mods };
+  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map: resolveMap(opts.map), mods: opts.mods, level: meta.level };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
   beginPlaying(w, 0);
@@ -926,8 +936,8 @@ function connect(name: string, rawServer: string, code: string | null, password 
     openedAt = performance.now();
     if (code) joinedLate = true;
     if (rejoinToken && code) sess.rejoin(code, rejoinToken, sess.adopted ? sess.applied : undefined);
-    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.choices.acc, color: ui.choices.color, cls: ui.choices.cls });
-    else sess.create(name, startWeapon, { password, acc: ui.choices.acc, color: ui.choices.color, cls: ui.choices.cls });
+    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.choices.acc, color: ui.choices.color, cls: ui.choices.cls, ...joinMeta(loadProfile()) });
+    else sess.create(name, startWeapon, { password, acc: ui.choices.acc, color: ui.choices.color, cls: ui.choices.cls, ...joinMeta(loadProfile()) });
   };
   sock.onmessage = (ev) => {
     sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
