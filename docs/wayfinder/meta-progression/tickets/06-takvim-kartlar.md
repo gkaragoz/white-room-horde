@@ -2,7 +2,7 @@
 title: Takvim: kartlar
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 
 ---
 
