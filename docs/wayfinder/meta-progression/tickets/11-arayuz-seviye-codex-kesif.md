@@ -3,7 +3,7 @@ title: Arayüz: seviye, Codex ve keşif anları
 type: wayfinder:prototype
 status: open
 assignee:
-blocked-by: 02-xp-seviye-egrisi-ve-yol-uzunlugu.md, 07-takvim-class-kostum-arena.md
+blocked-by: 07-takvim-class-kostum-arena.md
 ---
 
 # Arayüz: seviye, Codex ve keşif anları
@@ -19,3 +19,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Keşif kataloğu ve sınırı" ile netleşenler
 
 - Codex ve "bu run'da keşfettiklerin" ekranı ilk run bitince ilk kez tanıtılır; açılma (run sonu "yeni açıldı") ile karşılaşma (run içi bir kez bildirim, Codex girişi) ayrı iki an.
+
+## Ticket "XP, seviye eğrisi ve yolun uzunluğu" ile netleşenler
+
+- Oyun sonu ekranı skor ile kazanılan XP'yi yan yana göstermeli; asgari katılım yoksa "XP yok" durumu gösterilmeli; seviye çubuğu 100 seviye tavanına kadar.

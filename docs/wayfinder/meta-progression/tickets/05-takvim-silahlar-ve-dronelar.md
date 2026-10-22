@@ -3,7 +3,7 @@ title: Takvim: silahlar ve drone'lar
 type: wayfinder:grilling
 status: open
 assignee:
-blocked-by: 02-xp-seviye-egrisi-ve-yol-uzunlugu.md, 03-erken-oyun-zorluk-hedefi.md
+blocked-by: 03-erken-oyun-zorluk-hedefi.md
 ---
 
 # Takvim: silahlar ve drone'lar

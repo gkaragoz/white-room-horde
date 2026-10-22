@@ -71,3 +71,11 @@ _Avoid_: collection, bestiary, journal
 **Card Pack**:
 A themed group of about six to eight cards that unlocks as one Discovery.
 _Avoid_: card set, deck
+
+**Experience**:
+What a finished run adds to the Meta Level: a tenth of the run's team score, given only if the run reached floor 2 or lasted a minute.
+_Avoid_: points, score (the run score is the number it is made from)
+
+**Reference Run**:
+The typical first run, whose median Experience is the unit the Meta Level curve is measured in.
+_Avoid_: baseline run, average run

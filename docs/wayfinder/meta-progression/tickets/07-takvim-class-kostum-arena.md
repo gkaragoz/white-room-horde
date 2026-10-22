@@ -3,7 +3,7 @@ title: Takvim: class, kostüm, arena
 type: wayfinder:grilling
 status: open
 assignee:
-blocked-by: 02-xp-seviye-egrisi-ve-yol-uzunlugu.md, 04-basarimlari-yeniden-ayarlama.md
+blocked-by: 04-basarimlari-yeniden-ayarlama.md
 ---
 
 # Takvim: class, kostüm, arena

@@ -33,6 +33,7 @@ Spesifikasyon bitince bir uygulama planı çıkarılır; bu harita kod yazmaz.
 <!-- kapanan ticket başına bir satır -->
 
 - [Keşif kataloğu ve sınırı](tickets/01-kesif-katalogu-ve-siniri.md): birim = tekil içerik (kartlar ~25 paket), Reward Bundle 1-3 birim; Core hiç kilitlenmez; keşif = açılma + karşılaşma (Codex); düşman/boss kilitsiz, elit/güç-artırıcı/çarpan/arena kademeli; oyun arayüzü kilitsiz.
+- [XP, seviye eğrisi ve yolun uzunluğu](tickets/02-xp-seviye-egrisi-ve-yol-uzunlugu.md): XP = skor / 10 (takım skoru, herkese eşit); asgari katılım 2. kat ya da 60 sn; 100 seviye (~100-130 run); eğri R cinsinden üç dilim; ilk 10 seviye her sayılan run'da en az bir atlama; mutlak sayılar zorluk hedefi ölçümünden sonra.
 
 Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce verilen kararlar):
 
@@ -47,19 +48,20 @@ Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce
 
 Frontier (engeli kapalı, atanmamış):
 
-- [XP, seviye eğrisi ve yolun uzunluğu](tickets/02-xp-seviye-egrisi-ve-yol-uzunlugu.md) (grilling)
 - [Erken oyun zorluk hedefi](tickets/03-erken-oyun-zorluk-hedefi.md) (prototype)
+- [Başarımları yeniden ayarlama](tickets/04-basarimlari-yeniden-ayarlama.md) (grilling)
+- [Takvim: kartlar](tickets/06-takvim-kartlar.md) (grilling)
+- [Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz](tickets/08-takvim-dusman-dunyasi-ve-arayuz.md) (grilling)
 
 Bloklu:
 
-- [Başarımları yeniden ayarlama](tickets/04-basarimlari-yeniden-ayarlama.md) (grilling), şunu bekler: XP, seviye eğrisi ve yolun uzunluğu
-- [Takvim: silahlar ve drone'lar](tickets/05-takvim-silahlar-ve-dronelar.md) (grilling), şunu bekler: XP, seviye eğrisi ve yolun uzunluğu; Erken oyun zorluk hedefi
-- [Takvim: kartlar](tickets/06-takvim-kartlar.md) (grilling), şunu bekler: XP, seviye eğrisi ve yolun uzunluğu
-- [Takvim: class, kostüm, arena](tickets/07-takvim-class-kostum-arena.md) (grilling), şunu bekler: XP, seviye eğrisi ve yolun uzunluğu; Başarımları yeniden ayarlama
-- [Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz](tickets/08-takvim-dusman-dunyasi-ve-arayuz.md) (grilling), şunu bekler: XP, seviye eğrisi ve yolun uzunluğu
-- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md) (grilling), şunu bekler: dört takvim ticket'ı
-- [Veri modeli ve geçiş](tickets/10-veri-modeli-ve-gecis.md) (grilling), şunu bekler: XP, seviye eğrisi ve yolun uzunluğu; Başarımları yeniden ayarlama
-- [Arayüz: seviye, Codex ve keşif anları](tickets/11-arayuz-seviye-codex-kesif.md) (prototype), şunu bekler: XP, seviye eğrisi ve yolun uzunluğu; Takvim: class, kostüm, arena
+- [Takvim: silahlar ve drone'lar](tickets/05-takvim-silahlar-ve-dronelar.md) (grilling), şunu bekler: Erken oyun zorluk hedefi
+- [Takvim: class, kostüm, arena](tickets/07-takvim-class-kostum-arena.md) (grilling), şunu bekler: Başarımları yeniden ayarlama
+- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md) (grilling), şunu bekler: Takvim: silahlar ve drone'lar; Takvim: kartlar; Takvim: class, kostüm, arena; Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz
+- [Veri modeli ve geçiş](tickets/10-veri-modeli-ve-gecis.md) (grilling), şunu bekler: Başarımları yeniden ayarlama
+- [Arayüz: seviye, Codex ve keşif anları](tickets/11-arayuz-seviye-codex-kesif.md) (prototype), şunu bekler: Takvim: class, kostüm, arena
+
+Kapalı: 2 / 11 (cevapları yukarıdaki Decisions so far)
 
 ## Not yet specified
 

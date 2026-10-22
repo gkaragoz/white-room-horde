@@ -3,7 +3,7 @@ title: Veri modeli ve geçiş
 type: wayfinder:grilling
 status: open
 assignee:
-blocked-by: 02-xp-seviye-egrisi-ve-yol-uzunlugu.md, 04-basarimlari-yeniden-ayarlama.md
+blocked-by: 04-basarimlari-yeniden-ayarlama.md
 ---
 
 # Veri modeli ve geçiş
@@ -17,3 +17,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 - Yeni Profile alanları: xp, level, görülmemiş "yeni" işaretleri, Codex görüldü bilgisi.
 - Sıfırdan başlamak neleri kapsar: sadece silah/class/kostüm kilitleri mi, yoksa başarımlar ve istatistikler (bestWave, totalKills, games, ach) de mi? Eski bestWave ve WEAPON_UNLOCK ne olur?
 - Eski kayıtla ilk açılışta oyuncuya mesaj.
+
+## Ticket "XP, seviye eğrisi ve yolun uzunluğu" ile netleşenler
+
+- Profile'a xp ve level gelir (seviye tavanı 100). Run sonu XP: `round(skor / 10)`, asgari katılım (2. kat ya da 60 saniye) yoksa 0. Online'da herkes takım skorundan aynı XP'yi alır.
