@@ -23,6 +23,26 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.30',
+    date: '2026-10-22',
+    text: {
+      en: {
+        title: 'Under the hood',
+        items: [
+          'The game world is now described in one place, so online rooms can no longer drift apart because a piece of state was forgotten in a list. Nothing changes in how the game plays.',
+          'Online rooms need everyone on this version: reload the page to join.',
+        ],
+      },
+      tr: {
+        title: 'Kaputun altı',
+        items: [
+          'Oyun dünyası artık tek bir yerde tanımlanıyor; bir durum bilgisinin listede unutulması yüzünden çevrimiçi odaların birbirinden kopması artık mümkün değil. Oynanış değişmedi.',
+          'Çevrimiçi odalar için herkesin bu sürümde olması gerekir: katılmak için sayfayı yenile.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.29',
     date: '2026-10-22',
     text: {
