@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.33.0 (2026-10-22)
+
 **ui.ts split into modules (internals, same game)**
 
 - The in-game HUD (squad cards, gear, relics, drone, boss bar, countdown, warnings, banners) is its own class in `hud.ts` (`ui.hud`), talking to the Ui through a small host interface.
