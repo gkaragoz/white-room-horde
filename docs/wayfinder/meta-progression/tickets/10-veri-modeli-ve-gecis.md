@@ -49,3 +49,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz" ile netleşenler
 
 - Zorluk çarpanları meta seviyeyle açılır (seviye 52-98); `Profile.mods` (son seçilen) açılmamış bir çarpan içeriyorsa temizlenmeli. Menüdeki çarpan ızgarası kilitli çarpanları soluk gösterir.
+
+## Ticket "Sim, ağ ve replay veri modeli" ile netleşenler
+
+- İstemci, oyun başlarken sim'e **meta seviyeyi** ve **karşılaşılmış silah/drone maskelerini** verir (solo'da `Profile`/Codex deposundan; online'da `JoinOpts.lvl/metW/metD` ile). Dolayısıyla `Profile` seviye ve Codex deposundan bu maskeleri üretebilmeli. Meta seviye 1..100.

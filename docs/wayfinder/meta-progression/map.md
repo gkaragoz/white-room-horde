@@ -41,6 +41,7 @@ Spesifikasyon bitince bir uygulama planı çıkarılır; bu harita kod yazmaz.
 - [Takvim: silahlar ve drone'lar](tickets/05-takvim-silahlar-ve-dronelar.md): Core silahlar pistol + smg, ilk yerden düşen havuz ar/shotgun/revolver; başlangıç silahı listesi = Core + Codex'te tanışılanlar; 18 silah seviye 2-88 (mp 2 ... railgun 88); drone'lar gun 3, healer 12, collector 20, twin 30, cryo 42, rocket 55, tesla 70; kat-2 drone hediyesi garantili drone keşfi, seviye 3'ten önce drone yok (boss'ta ek sağlık).
 - [Takvim: kartlar](tickets/06-takvim-kartlar.md): Core 13 temel sıradan kart; 13 temel/universal paket (seviye 3, 5, 8, 11, 15, 18, 22, 27, 33, 41, 47, 56, 68; drone kartı 3, arsenal kartı 47); class başına iki paket (temel class'la, ileri soldier 22, scout 26, medic 34, heavy 44, swordsman 60, demolisher 50, ranger 55, berserker 62, hammerer 70); süzülmüş havuz ≥6 kart, teklif ≥3 farklı kart; nadirlik ağırlıkları değişmez (6/3/1).
 - [Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz](tickets/08-takvim-dusman-dunyasi-ve-arayuz.md): iki ardışık oynanış-öğesiz seviye yok (seviye 67-99 alternatif); güç-artırıcılar shield 4, haste 10, quad 19, freeze 35, nuke 45; elitler 7-51 (Giant 7 ... Warded 51); zorluk çarpanları 52-98 (tough 52 ... lategame 98); düşman türleri, boss'lar ve oyun arayüzü kilitsiz. Birleşik tablo: [discovery-track.md](discovery-track.md).
+- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md): sim'e **meta seviye** (odada en düşük) ve oyuncu başına met silah/drone maskesi girer, havuz seviyeden sabit tablolardan türer; World şemasında `metLevel`, `pMetWeapons`, `pMetDrones` (hash'li, snapshot'lı); baskı `PRESSURE_PERMILLE` tamsayı tablosu (Math.pow yok); replay v4 (seviye + met maskeleri); `JoinOpts`/`PlayerInfo`/`start`/`joins` genişler, relay en düşük seviyeyi ve arena kesişimini hesaplar; havuz başlangıçta sabit, Codex kimin karşılaştığına bakılmadan yazılır.
 
 Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce verilen kararlar):
 
@@ -55,7 +56,6 @@ Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce
 
 Frontier (engeli kapalı, atanmamış):
 
-- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md) (grilling)
 - [Veri modeli ve geçiş](tickets/10-veri-modeli-ve-gecis.md) (grilling)
 - [Arayüz: seviye, Codex ve keşif anları](tickets/11-arayuz-seviye-codex-kesif.md) (prototype)
 
@@ -63,7 +63,7 @@ Bloklu:
 
 - (yok)
 
-Kapalı: 9 / 12 (cevapları yukarıdaki Decisions so far)
+Kapalı: 10 / 12 (cevapları yukarıdaki Decisions so far)
 
 ## Not yet specified
 

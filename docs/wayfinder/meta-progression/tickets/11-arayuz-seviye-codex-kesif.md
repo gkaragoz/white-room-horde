@@ -51,3 +51,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz" ile netleşenler
 
 - Tüm takvim [discovery-track.md](../discovery-track.md) tablosunda: seviye atlama ekranı o satırı gösterir (oynanış öğeleri + kozmetik). Kilitli zorluk çarpanları, elit ve güç-artırıcılar Codex'te "seviye N".
+
+## Ticket "Sim, ağ ve replay veri modeli" ile netleşenler
+
+- Lobide her oyuncunun seviyesi görünür (`PlayerInfo.lvl`); odanın havuzu en düşük seviyedir ("havuz seviye N'e göre" bilgisi). Geç katılanın seviyesi havuzu değiştirmez.
