@@ -1,4 +1,4 @@
-import { GAME_VERSION, Difficulty, Buttons, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { DEFAULT_GAME_OPTIONS, GAME_VERSION, Buttons, INPUT_BYTES, resolveMap, withOptions, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
@@ -74,7 +74,7 @@ export class Room {
   started = false;
   tick = 0;
   seed = 0;
-  options: RoomOptions = { map: 0, mods: 0 };
+  options: RoomOptions = { ...DEFAULT_GAME_OPTIONS };
   /** The layout actually in use once the game has started. */
   map = 0;
   password = '';
@@ -254,8 +254,7 @@ export class Room {
 
   setOptions(o: Partial<RoomOptions>): void {
     if (this.started) return;
-    if (typeof o.map === 'number' && Number.isInteger(o.map) && o.map >= -1 && o.map < MAP_COUNT) this.options.map = o.map;
-    if (Difficulty.isValid(o.mods)) this.options.mods = o.mods;
+    this.options = withOptions(this.options, o);
     this.broadcastRoom();
   }
 
@@ -263,7 +262,7 @@ export class Room {
     if (this.started) return;
     this.started = true;
     this.seed = (Math.floor(Math.random() * 0xffffffff) + 1) >>> 0;
-    this.map = this.options.map >= 0 ? this.options.map : Math.floor(Math.random() * MAP_COUNT);
+    this.map = resolveMap(this.options.map);
     this.startPlayers = [];
     for (const m of this.members) {
       if (!m) continue;

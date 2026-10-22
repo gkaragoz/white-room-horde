@@ -328,6 +328,18 @@ describe('lockstep over a laggy network', () => {
 });
 
 describe('robustness of the room server', () => {
+  it('keeps the old options when the host sends ones this build does not know', () => {
+    const net = lobby([20, 20]);
+    net.clients[0]!.session.setOptions(2, 2);
+    net.advance(300);
+    net.clients[0]!.session.setOptions(99, 3);
+    net.advance(300);
+    expect(net.clients[1]!.session.options).toEqual({ map: 2, mods: 3 });
+    net.clients[0]!.session.setOptions(1, -4);
+    net.advance(300);
+    expect(net.clients[1]!.session.options).toEqual({ map: 1, mods: 3 });
+  });
+
   it('options (map, mods) reach every client and the world', () => {
     const net = lobby([20, 20]);
     net.clients[0]!.session.setOptions(2, 2);

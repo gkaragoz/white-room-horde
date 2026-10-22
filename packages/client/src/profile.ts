@@ -1,4 +1,4 @@
-import type { WeaponId } from '@wrh/shared';
+import { withOptions, type WeaponId } from '@wrh/shared';
 
 import { emptyStore, type AchStore } from './achStore';
 
@@ -42,7 +42,9 @@ export function loadProfile(): Profile {
     Object.assign(ach.best, saved.ach?.best);
     Object.assign(ach.got, saved.ach?.got);
     Object.assign(ach.seen, saved.ach?.seen);
-    return { ...DEFAULT, ...saved, ach };
+    // what was saved may be from an older build or edited by hand: keep only an arena and a Difficulty this build knows
+    const { map, mods } = withOptions({ map: DEFAULT.map, mods: DEFAULT.mods }, saved);
+    return { ...DEFAULT, ...saved, map, mods, ach };
   } catch {
     return { ...DEFAULT };
   }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
 import { GoreParts, Part } from './render/gore';
 import { GIB_COLORS } from './render/fx';
-import { Difficulty, GAME_VERSION, heightAt } from '@wrh/shared';
+import { GAME_VERSION, heightAt, resolveMap, withOptions } from '@wrh/shared';
 import { BALANCE, nextLayer, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, runScore, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession, PredictedView } from '@wrh/net';
@@ -863,8 +863,8 @@ function startSolo(name: string): void {
     players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar', cls: b % 7 });
     names[b] = 'Bot ' + b;
   }
-  const map = params.has('map') ? Number(params.get('map')) : ui.map >= 0 ? ui.map : Math.floor(Math.random() * MAPS.length);
-  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map, mods: modsFromUrl(params.get('mods')) ?? ui.mods };
+  const opts = withOptions({ map: ui.map, mods: ui.mods }, { map: numberParam('map'), mods: numberParam('mods') });
+  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map: resolveMap(opts.map), mods: opts.mods };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
   beginPlaying(w, 0);
@@ -1734,12 +1734,11 @@ function frameInner(nowMs: number): void {
   requestAnimationFrame(frame);
 }
 
-/** The ?mods= test parameter: a valid Difficulty mask, otherwise ignored. */
-function modsFromUrl(v: string | null): number | undefined {
-  const n = Number(v);
-  return v !== null && Difficulty.isValid(n) ? n : undefined;
+/** A numeric URL test parameter (?map=, ?mods=), or undefined when it is absent or not a number. */
+function numberParam(name: string): number | undefined {
+  const v = params.get(name);
+  return v === null || v.trim() === '' ? undefined : Number(v);
 }
-
 const replayUrl = params.get('replay');
 if (replayUrl) {
   void fetch(replayUrl)

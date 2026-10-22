@@ -1,4 +1,4 @@
-import { INPUT_BYTES, decodeTick, encodeTick, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { INPUT_BYTES, decodeTick, encodeTick, type GameOptions, type PlayerInput, type WeaponId } from '@wrh/shared';
 
 /** First byte of every binary message. */
 export const Bin = { Input: 1, Bundle: 2, Snapshot: 3, SnapshotDeliver: 4, Inputs: 5 } as const;
@@ -20,12 +20,8 @@ export interface PlayerInfo {
   cls: number;
 }
 
-export interface RoomOptions {
-  /** Arena layout index, or -1 for a random one when the game starts. */
-  map: number;
-  /** The chosen difficulty multipliers: a bit mask over MODS (0 = none). */
-  mods: number;
-}
+/** The options of a room are the options of the game (shared/options.ts). */
+export type RoomOptions = GameOptions;
 
 export interface JoinOpts {
   password?: string;

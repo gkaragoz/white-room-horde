@@ -1,4 +1,4 @@
-import { GAME_VERSION, INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { DEFAULT_GAME_OPTIONS, GAME_VERSION, INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, restoreWorld, serializeWorld, step, type World } from '@wrh/sim';
 import { Bin, decodeBundle, decodeSnapshot, encodeInputsMsg, encodeSnapshot, INPUT_REDUNDANCY, type Bundle, type ClientMsg, type JoinOpts, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
@@ -23,7 +23,7 @@ export class NetSession {
   code = '';
   slot = -1;
   players: PlayerInfo[] = [];
-  options: RoomOptions = { map: 0, mods: 0 };
+  options: RoomOptions = { ...DEFAULT_GAME_OPTIONS };
   /** Secret for rejoining this slot after a dropped connection (kept by the page in sessionStorage). */
   token = '';
   locked = false;

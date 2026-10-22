@@ -7,6 +7,10 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**One description of a game's options (internals, same game)**
+
+- The arena and the Difficulty a game is set up with are now one `GameOptions` type with one validator (`packages/shared/src/options.ts`), used by the room, the menu's saved profile and a solo start. A saved profile or a `?map=` / `?mods=` test parameter this build does not understand is ignored instead of reaching the game.
+
 **Tests: a shared testkit, and the browser-free QA checks run under Vitest**
 
 - `quietWorld()` in the sim testkit makes a world where nothing happens on its own; tests use it instead of repeating the setup.

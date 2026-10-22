@@ -4,6 +4,7 @@ export * from './cards-universal';
 export * from './cards-class';
 export * from './mods';
 export * from './difficulty';
+export * from './options';
 export * from './cardStats';
 export * from './achievements';
 export * from './balance';
