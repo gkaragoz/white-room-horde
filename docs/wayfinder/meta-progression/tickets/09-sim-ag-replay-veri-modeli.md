@@ -21,3 +21,7 @@ Keşif kümesi sim'e, ağa ve replay'e nasıl taşınır?
 ## Ticket "Düşman baskısı rampası" ile netleşenler
 
 - Düşman baskısı rampası sim'e girer: hasar, can ve sayı çarpanları Difficulty etkilerinin üstüne çarpılır (`fxOf`). Baskı `p(L) = 0,45 + 0,55 × ((L − 1) / 59)^1,6` (L ≤ 60, sonra 1,0), L = odadaki en düşük meta seviye. Dolayısıyla oyuna **meta seviye de taşınmalı** (havuz maskesinin yanında, ya da seviyeden türetilen baskı değeri): GameSetup/protokol/replay başlığına. Hash ve snapshot etkisi bu ticket'ta karara bağlanır.
+
+## Ticket "Takvim: class, kostüm, arena" ile netleşenler
+
+- Odanın arena seçeneği, odadaki herkesin açtığı arenaların kesişimi: oda üyelerinin arena açılış maskesi (11 bit) relay'e iletilir; class/aksesuar/renk kişisel, kesişime girmez (sim bunları görmez, istemci seçer).

@@ -33,3 +33,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "Başarımları yeniden ayarlama" ile netleşenler
 
 - Başarım deposu (AchStore) kalır; XP vermez. Codex tamamlama başarımları yeni istatistikler ister: tanışılan silah/drone/düşman türü/boss/elit sayıları ve oynanan arena sayısı. Bunlar kalıcı bir Codex deposundan (`Profile`) gelmeli. Başarım hedef tablosu `tools/cards/achievements.py` kuraldan üretilir.
+
+## Ticket "Takvim: class, kostüm, arena" ile netleşenler
+
+- Class, aksesuar, renk ve arena açılışı **meta seviyeden ve başarımlardan türetilir** (ayrı bir açılmış-liste saklamaya gerek yok): seviye takvimi sabit bir tablo, imza başarımları AchStore'dan okunur. Profile'a sadece "görüldü/yeni" işaretleri gerekir. Açık set: soldier, bandana/cap/goggles, otomatik + 2 renk, warehouse.
