@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.32.0 (2026-10-22)
+
 **One description of a game's options (internals, same game)**
 
 - The arena and the Difficulty a game is set up with are now one `GameOptions` type with one validator (`packages/shared/src/options.ts`), used by the room, the menu's saved profile and a solo start. A saved profile or a `?map=` / `?mods=` test parameter this build does not understand is ignored instead of reaching the game.
