@@ -41,3 +41,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "Takvim: silahlar ve drone'lar" ile netleşenler
 
 - Codex deposu "karşılaşılmış silah" bilgisini taşır (başlangıç silahı listesi için); `WEAPON_UNLOCK` ve `bestWave` kilidi kalkar.
+
+## Ticket "Takvim: kartlar" ile netleşenler
+
+- Kart paketi açılışı meta seviyeden ve class açılışından türetilir (ayrı liste saklanmaz). Class ileri paketi seviye tablosu sabit.

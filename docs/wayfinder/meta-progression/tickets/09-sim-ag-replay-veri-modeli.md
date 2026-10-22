@@ -29,3 +29,7 @@ Keşif kümesi sim'e, ağa ve replay'e nasıl taşınır?
 ## Ticket "Takvim: silahlar ve drone'lar" ile netleşenler
 
 - Sim'e giren açılış kümesi: silah (23 ateşli silah, 23 bit; melee class'larla geldiği için sim bunları zaten class üzerinden bilir), drone (7 bit). Menüdeki başlangıç silahı listesindeki "karşılaşılmış" şartı yalnızca istemci (Codex); sim görmez. Oda kesişimi: silah ve drone maskelerinin AND'i.
+
+## Ticket "Takvim: kartlar" ile netleşenler
+
+- Kart açılış kümesi 176 bit (22 bayt); paketler seviyeden ve class açılışından türetilen sabit bir tablodan çıkar. Oda kesişimi: kart maskelerinin AND'i (class'a göre süzme sim'de zaten var).

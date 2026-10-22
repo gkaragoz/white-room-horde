@@ -26,3 +26,7 @@ Oyuncunun düşünmediği yerler hangi sırayla ve hangi biçimde devreye girer?
 ## Ticket "Erken oyun zorluk hedefi" ile netleşenler
 
 - Düşman baskısı rampası ayrı ticket'ta ([Düşman baskısı rampası](12-dusman-baskisi-rampasi.md)); elit türlerinin açılışı bundan bağımsız bu ticket'ta.
+
+## Ticket "Takvim: kartlar" ile netleşenler
+
+- Şimdiye kadar planlanan oynanış öğeleri (class, arena, silah, drone, kart paketi) 66 birim; **oynanış öğesi olmayan seviyeler:** 4, 7, 10, 16, 19, 23, 31, 32, 35, 36, 37, 38, 43, 45, 46, 51, 52, 53, 58, 59, 61, 63, 64, 65, 67, 69, 71, 72, 74, 75, 76, 77, 78, 79, 81, 82, 83, 84, 85, 86, 87, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100. Bu ticket'ın 36 birimi (11 elit, 5 güç-artırıcı, 20 zorluk çarpanı) bu boşluklara yerleştirilmeli: zorluk çarpanları "seyrek ve geç" (76-99 civarı), elitler orta seviyelerdeki boşluklara, güç-artırıcılar erken-orta boşluklara. Her seviyede en fazla 3 öğe kuralı korunur.

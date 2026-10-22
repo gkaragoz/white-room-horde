@@ -39,6 +39,7 @@ Spesifikasyon bitince bir uygulama planı çıkarılır; bu harita kod yazmaz.
 - [Başarımları yeniden ayarlama](tickets/04-basarimlari-yeniden-ayarlama.md): hız hedefi 3 run ≤1, 20 run ~10, 60 run ~30, yol sonu ~55 başarım; kademeler tipik run × gereken run kuralından türer (bronz 10-40 run, gümüş 40-100, altın 120-300, platin 400+); `games_1` tek armağan, games 1/25/100/400; başarım XP vermez; 4 class imza başarımıyla (Demolisher/grenades, Ranger/crits, Berserker/runkills, Hammerer/maxhit, gümüş); ~8 kolay başarım yerine Codex tamamlama başarımları (toplam 100); gizliler 10. run'dan önce ulaşılamaz, "That Was Quick" 15 sn.
 - [Takvim: class, kostüm, arena](tickets/07-takvim-class-kostum-arena.md): ilk set soldier + bandana/cap/goggles + otomatik renk ve 2 renk + warehouse; class'lar seviye 6/14/24/40 (scout, medic, heavy, swordsman) ve imza başarımı (demolisher, ranger, berserker, hammerer); düz arenalar 3-28, katlı 40-80; 33 kozmetik seviye 2-95 her 3 seviyede, crown seviye 100; class/aksesuar/renk kişisel, online arena seçenekleri odanın kesişimi.
 - [Takvim: silahlar ve drone'lar](tickets/05-takvim-silahlar-ve-dronelar.md): Core silahlar pistol + smg, ilk yerden düşen havuz ar/shotgun/revolver; başlangıç silahı listesi = Core + Codex'te tanışılanlar; 18 silah seviye 2-88 (mp 2 ... railgun 88); drone'lar gun 3, healer 12, collector 20, twin 30, cryo 42, rocket 55, tesla 70; kat-2 drone hediyesi garantili drone keşfi, seviye 3'ten önce drone yok (boss'ta ek sağlık).
+- [Takvim: kartlar](tickets/06-takvim-kartlar.md): Core 13 temel sıradan kart; 13 temel/universal paket (seviye 3, 5, 8, 11, 15, 18, 22, 27, 33, 41, 47, 56, 68; drone kartı 3, arsenal kartı 47); class başına iki paket (temel class'la, ileri soldier 22, scout 26, medic 34, heavy 44, swordsman 60, demolisher 50, ranger 55, berserker 62, hammerer 70); süzülmüş havuz ≥6 kart, teklif ≥3 farklı kart; nadirlik ağırlıkları değişmez (6/3/1).
 
 Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce verilen kararlar):
 
@@ -53,22 +54,21 @@ Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce
 
 Frontier (engeli kapalı, atanmamış):
 
-- [Takvim: kartlar](tickets/06-takvim-kartlar.md) (grilling)
 - [Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz](tickets/08-takvim-dusman-dunyasi-ve-arayuz.md) (grilling)
 - [Veri modeli ve geçiş](tickets/10-veri-modeli-ve-gecis.md) (grilling)
 - [Arayüz: seviye, Codex ve keşif anları](tickets/11-arayuz-seviye-codex-kesif.md) (prototype)
 
 Bloklu:
 
-- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md) (grilling), şunu bekler: Takvim: kartlar; Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz
+- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md) (grilling), şunu bekler: Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz
 
-Kapalı: 7 / 12 (cevapları yukarıdaki Decisions so far)
+Kapalı: 8 / 12 (cevapları yukarıdaki Decisions so far)
 
 ## Not yet specified
 
 - Baskı yükselirken run XP'sinin düşmesi riski (bot tahmini: ilk run ~500 XP, seviye 40+ ~200-300) ve XP'yi baskıyla normalleştiren çarpan `f(p)` ihtiyacı; insan oyunuyla doğrulanır.
 - R'nin insan oyunuyla yeniden ölçülmesi (bot alt sınır).
-- Garantili keşfin kart ve güç-artırıcı karşılığı (silah ve drone için karar verildi); kart takvimi ve düşman dünyası ticket'larında netleşir.
+- Garantili keşfin güç-artırıcı karşılığı (silah ve drone için karar verildi); düşman dünyası ticket'ında netleşir. Kartlar için garanti gerekmedi (teklifte her kart zaten sık görünür).
 - Yolun sonunda ne olur (prestij, tekrar XP, kozmetik); çok yüksek seviyede içerik bittiğinde.
 - Online lobide kesişimin oyuncuya gösterimi ("havuz X'e göre sınırlı").
 - Yeni metinlerin 6 dilde çevirisi (uiStrings + i18n EXTRA; classNames/accs uzunluk testleri).

@@ -43,3 +43,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Takvim: silahlar ve drone'lar" ile netleşenler
 
 - Başlangıç silahı seçici: pistol ve smg her zaman, diğerleri yalnızca Codex'te varsa; açılmış ama karşılaşılmamış silah soluk "???" ve "yerden düşünce seçilebilir" ipucuyla görünür.
+
+## Ticket "Takvim: kartlar" ile netleşenler
+
+- Ödül paketi ekranında kart paketi "6 yeni kart" gibi gösterilebilir; Codex sayfasında kartlar paket paket listelenir (açılmamışlar "???").
