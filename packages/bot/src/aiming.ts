@@ -1,6 +1,6 @@
 import { BALANCE, WEAPON_IDS } from '@wrh/shared';
 import { PRIORITY, T, bursts, radiusOf } from './danger';
-import { geoOf, hit, intercept, pointSegDist, segmentCovered } from './geometry';
+import { geoOf, hit, intercept, pointSegDist, segmentCovered, type MapGeo } from './geometry';
 import type { WeaponProfile } from './weapons';
 import type { Ctx, Percept, Threat } from './types';
 
@@ -16,9 +16,11 @@ export interface Shot {
   dist: number;
   /** Is it worth pulling the trigger (a clear line, in range)? */
   clear: boolean;
+  /** The aim point is an explosive barrel with a crowd around it (then `index` is -1). */
+  barrel: boolean;
 }
 
-export const shot: Shot = { index: -1, angle: 0, dist: 0, clear: false };
+export const shot: Shot = { index: -1, angle: 0, dist: 0, clear: false, barrel: false };
 
 const MUZZLE_ITER = 2;
 
@@ -83,6 +85,7 @@ const SCAN = 40;
 export function chooseShot(p: Percept, ctx: Ctx, prof: WeaponProfile): Shot {
   shot.index = -1;
   shot.clear = false;
+  shot.barrel = false;
   shot.angle = p.angle;
   shot.dist = 0;
   const g = geoOf(p.world.map, p.layer);
@@ -107,7 +110,7 @@ export function chooseShot(p: Percept, ctx: Ctx, prof: WeaponProfile): Shot {
     // the closer, the more urgent
     let score = pr * (1 + 7 / (d + 1.5));
     // finishing off a wounded one counts more
-    const frac = e.hp / Math.max(1, e.maxHp);
+    const frac = Math.min(1, e.hp / Math.max(1, e.maxHp));
     score *= 1.35 - 0.35 * frac;
     // an explosive that is already on us is not shot at point blank (it would burst anyway: shoot it if we cannot run)
     if (bursts(e) && d < 3.5) score *= 0.6;
@@ -125,6 +128,16 @@ export function chooseShot(p: Percept, ctx: Ctx, prof: WeaponProfile): Shot {
       best = i;
     }
   }
+  // a barrel with a crowd around it is a bomb: set it off from a safe distance
+  const bomb = bestBarrel(p, g, maxR);
+  if (bomb >= 0 && bombScore > bestScore * 0.8) {
+    const b = p.barrels[bomb]!;
+    shot.angle = Math.atan2(b.y - p.y, b.x - p.x);
+    shot.dist = Math.hypot(b.x - p.x, b.y - p.y);
+    shot.clear = true;
+    shot.barrel = true;
+    return shot;
+  }
   if (best < 0) return shot;
   const e = p.enemies[best]!;
   shot.index = best;
@@ -134,6 +147,47 @@ export function chooseShot(p: Percept, ctx: Ctx, prof: WeaponProfile): Shot {
   (ctx.mem.aim ??= { id: -1 } as never);
   (ctx.mem.aim as { id: number }).id = e.id;
   return shot;
+}
+
+let bombScore = 0;
+
+/**
+ * The barrel worth shooting: a crowd within its blast, the barrel in range and in the clear, and the shooter (and friends) far
+ * enough from it not to take the blast. Returns its index in `p.barrels` or -1; its worth is left in `bombScore`.
+ */
+function bestBarrel(p: Percept, g: MapGeo, maxR: number): number {
+  bombScore = 0;
+  let pick = -1;
+  const B = BALANCE.barrels;
+  const safe2 = (B.radius * 0.8 + 1.8) * (B.radius * 0.8 + 1.8);
+  const lim = Math.min(48, p.enemies.length);
+  for (let i = 0; i < p.barrels.length; i++) {
+    const b = p.barrels[i]!;
+    const dx = b.x - p.x;
+    const dy = b.y - p.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < safe2 || d2 > maxR * maxR) continue;
+    let near = false;
+    for (const a of p.allies) {
+      const ax = a.x - b.x;
+      const ay = a.y - b.y;
+      if (ax * ax + ay * ay < safe2) near = true;
+    }
+    if (near || segmentCovered(g, p.x, p.y, b.x, b.y)) continue;
+    let value = 0;
+    for (let k = 0; k < lim; k++) {
+      const e = p.enemies[k]!;
+      const ex = e.x - b.x;
+      const ey = e.y - b.y;
+      if (ex * ex + ey * ey > B.radius * B.radius) continue;
+      value += Math.min(1.2, B.damage / Math.max(1, e.hp)) * (0.6 + 0.4 * PRIORITY[e.type]!);
+    }
+    if (value > bombScore && value >= 3) {
+      bombScore = value * 0.9;
+      pick = i;
+    }
+  }
+  return pick;
 }
 
 /** Enemies inside the blast radius around an enemy. */

@@ -22,13 +22,18 @@ describe.skipIf(process.env.DBG !== '1')('dbg', () => {
       const inp = inputs[0]!;
       if (w.tick >= from) {
         const near: string[] = [];
+        const far: string[] = [];
+        for (let i = 0; i < w.eActive.length; i++) {
+          if (!w.eActive[i]) continue;
+          far.push(`${w.eType[i]}@(${(w.eX[i]! - w.pX[0]!).toFixed(0)},${(w.eY[i]! - w.pY[0]!).toFixed(0)}) st${w.eState[i]} fr${w.eFrost[i]} L${w.eLayer[i]} hp${w.eHp[i]!.toFixed(0)}`);
+        }
         for (let i = 0; i < w.eActive.length; i++) {
           if (!w.eActive[i]) continue;
           const dx = w.eX[i]! - w.pX[0]!;
           const dy = w.eY[i]! - w.pY[0]!;
           if (dx * dx + dy * dy < 36) near.push(`(${dx.toFixed(1)},${dy.toFixed(1)})`);
         }
-        lines.push(`t${w.tick} pos ${w.pX[0]!.toFixed(2)},${w.pY[0]!.toFixed(2)} hp ${w.pHp[0]!.toFixed(0)} if ${w.pIFrames[0]!.toFixed(2)} dashcd ${w.pDashCd[0]!.toFixed(1)} move ${inp.moveX},${inp.moveY} btn ${inp.buttons}\n   costs ${Array.from(lastCosts).map((c, k) => c.toFixed(1) + '[' + Array.from(lastTerms.slice(k * 5, k * 5 + 5)).map((v) => v.toFixed(1)).join(',') + ']').join(' ')}\n   near ${near.join(' ')}\n   seen ${seen.n}: ${Array.from({ length: Math.min(seen.n, 8) }, (_, i) => `(${(seen.ex[i]! - w.pX[0]!).toFixed(1)},${(seen.ey[i]! - w.pY[0]!).toFixed(1)} sp${seen.esp[i]!.toFixed(1)} t${seen.etouch[i]!.toFixed(2)} dps${seen.edps[i]!.toFixed(2)} rel${Math.sqrt(seen.erel2[i]!).toFixed(1)} h${seen.ehold[i]})`).join(' ')}`);
+        lines.push(`t${w.tick} pos ${w.pX[0]!.toFixed(2)},${w.pY[0]!.toFixed(2)} hp ${w.pHp[0]!.toFixed(0)} if ${w.pIFrames[0]!.toFixed(2)} dashcd ${w.pDashCd[0]!.toFixed(1)} move ${inp.moveX},${inp.moveY} btn ${inp.buttons}\n   costs ${Array.from(lastCosts).map((c, k) => c.toFixed(1) + '[' + Array.from(lastTerms.slice(k * 5, k * 5 + 5)).map((v) => v.toFixed(1)).join(',') + ']').join(' ')}\n   all ${far.length}: ${far.slice(0, 16).join(' ')}\n   near ${near.join(' ')}\n   seen ${seen.n}: ${Array.from({ length: Math.min(seen.n, 8) }, (_, i) => `(${(seen.ex[i]! - w.pX[0]!).toFixed(1)},${(seen.ey[i]! - w.pY[0]!).toFixed(1)} sp${seen.esp[i]!.toFixed(1)} t${seen.etouch[i]!.toFixed(2)} dps${seen.edps[i]!.toFixed(2)} rel${Math.sqrt(seen.erel2[i]!).toFixed(1)} h${seen.ehold[i]})`).join(' ')}`);
       }
       step(w, inputs);
     }

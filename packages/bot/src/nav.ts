@@ -24,7 +24,7 @@ const blockedCache = new Map<string, Uint8Array>();
 
 /** Cells a character cannot stand in (an obstacle within its body plus a little), per map and layer. */
 function blockedOf(g: MapGeo, mapIndex: number, layer: number): Uint8Array {
-  const key = mapIndex * 2 + layer;
+  const key = mapIndex * 4 + layer * 2 + (g.open ? 1 : 0);
   let b = blockedCache.get(String(key));
   if (b) return b;
   b = new Uint8Array(N);
@@ -52,7 +52,8 @@ const myD = new Int32Array(N);
 const enD = new Int32Array(N);
 const sat = new Int32Array((NX + 1) * (NY + 1));
 // bucket queue
-const MAXB = Math.max(LIM_ME, LIM_EN) + 15;
+const LIM_GOAL = 1500;
+const MAXB = LIM_GOAL + 15;
 const bucketHead = new Int32Array(MAXB);
 const entNode = new Int32Array(N * 8 + 64);
 const entNext = new Int32Array(N * 8 + 64);
@@ -101,6 +102,33 @@ function spread(dist: Int32Array, blocked: Uint8Array, lim: number): void {
       }
     }
   }
+}
+
+const goalD = new Int32Array(N);
+let goalReady = false;
+
+/**
+ * Walking distances to a point over the whole arena (around the boxes): where to go to reach a far goal, such as the last enemies
+ * of a floor. Afterwards `goalDist` answers for any point.
+ */
+export function goalField(g: MapGeo, mapIndex: number, layer: number, gx: number, gy: number): void {
+  const blocked = blockedOf(g, mapIndex, layer);
+  goalD.fill(INF);
+  bucketHead.fill(-1);
+  entN = 0;
+  // the goal itself may sit in a blocked cell (an enemy hugging a wall): start from its cell regardless
+  const c = cellY(gy) * NX + cellX(gx);
+  goalD[c] = 0;
+  addEntry(0, c);
+  spread(goalD, blocked, LIM_GOAL);
+  goalReady = true;
+}
+
+/** Walking distance in units from (x, y) to the goal of the last `goalField` (a large number when it cannot be reached). */
+export function goalDist(x: number, y: number): number {
+  if (!goalReady) return 1e6;
+  const d = goalD[cellY(y) * NX + cellX(x)]!;
+  return d >= INF ? 1e6 : (d / 10) * CELL;
 }
 
 let ready = false;

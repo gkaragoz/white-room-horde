@@ -1,4 +1,4 @@
-import { ARENA_HALF_H, ARENA_HALF_W, MAPS, deckWalkable, type MapDef } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, MAPS, deckWalkable, rampDir, type MapDef, type Ramp } from '@wrh/shared';
 
 /**
  * Plain geometry for the bot: the arena's boxes as flat arrays per map and layer, circle-in-box pushing (the same rule the sim
@@ -9,6 +9,9 @@ import { ARENA_HALF_H, ARENA_HALF_W, MAPS, deckWalkable, type MapDef } from '@wr
 /** The boxes of one map that matter on one layer, flattened: minX, minY, maxX, maxY per box. */
 export interface MapGeo {
   map: MapDef;
+  layer: number;
+  /** Ramps are open to the ground (the bot may climb). */
+  open: boolean;
   /** Boxes that stop walking on this layer. */
   nSolid: number;
   solid: Float64Array;
@@ -17,20 +20,24 @@ export interface MapGeo {
   cover: Float64Array;
 }
 
-const cache = new Map<number, [MapGeo, MapGeo]>();
+const cache = new Map<number, MapGeo>();
 
-/** The geometry of a map as seen from a layer (0 ground, 1 deck). Cached: call it freely. */
-export function geoOf(mapIndex: number, layer: number): MapGeo {
-  let pair = cache.get(mapIndex);
-  if (!pair) {
-    const map = MAPS[mapIndex] ?? MAPS[0]!;
-    pair = [build(map, 0), build(map, 1)];
-    cache.set(mapIndex, pair);
+/**
+ * The geometry of a map as seen from a layer (0 ground, 1 deck). Cached: call it freely. On the ground the ramps are walled off
+ * unless `openRamps` is set: the bot stays off the decks by default (an enemy left on a deck that nobody can reach from the
+ * deck the squad stands on never comes down), and climbs one only on purpose.
+ */
+export function geoOf(mapIndex: number, layer: number, openRamps = false): MapGeo {
+  const key = mapIndex * 4 + (layer === 1 ? 2 : 0) + (openRamps ? 1 : 0);
+  let g = cache.get(key);
+  if (!g) {
+    g = build(MAPS[mapIndex] ?? MAPS[0]!, layer === 1 ? 1 : 0, openRamps);
+    cache.set(key, g);
   }
-  return pair[layer === 1 ? 1 : 0];
+  return g;
 }
 
-function build(map: MapDef, layer: number): MapGeo {
+function build(map: MapDef, layer: number, openRamps: boolean): MapGeo {
   const mask = layer === 1 ? 2 : 1;
   const solid: number[] = [];
   const cover: number[] = [];
@@ -40,7 +47,10 @@ function build(map: MapDef, layer: number): MapGeo {
     solid.push(...b);
     if (o.cover !== false) cover.push(...b);
   }
-  return { map, nSolid: solid.length / 4, solid: Float64Array.from(solid), nCover: cover.length / 4, cover: Float64Array.from(cover) };
+  if (layer === 0 && !openRamps) {
+    for (const r of map.ramps ?? []) solid.push(r.x - r.w / 2, r.y - r.h / 2, r.x + r.w / 2, r.y + r.h / 2);
+  }
+  return { map, layer, open: openRamps, nSolid: solid.length / 4, solid: Float64Array.from(solid), nCover: cover.length / 4, cover: Float64Array.from(cover) };
 }
 
 const local = new Float64Array(4 * 96);
@@ -299,3 +309,13 @@ export function wrapAngle(a: number): number {
 
 /** Is a layer-1 character able to stand here? (Deck or ramp.) */
 export const onDeck = (g: MapGeo, x: number, y: number): boolean => deckWalkable(g.map, x, y);
+
+/** The two ends of a ramp as points a character can walk to: `top` (where it reaches the deck) and `foot` (where it meets the ground). */
+export const rampEnd = { x: 0, y: 0 };
+export function rampPoint(r: Ramp, top: boolean): void {
+  const d = rampDir(r);
+  const half = (r.dir === 0 || r.dir === 2 ? r.w : r.h) / 2 - 0.7;
+  const sign = top ? 1 : -1;
+  rampEnd.x = r.x + d[0] * half * sign;
+  rampEnd.y = r.y + d[1] * half * sign;
+}

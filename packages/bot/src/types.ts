@@ -75,6 +75,13 @@ export interface Zone {
   kind: number;
 }
 
+/** An explosive barrel standing in the arena. */
+export interface Barrel {
+  x: number;
+  y: number;
+  hp: number;
+}
+
 /** A spitter's glob in the air. */
 export interface Spit {
   x: number;
@@ -129,6 +136,8 @@ export interface Percept {
   zones: Zone[];
   /** Spitter globs in flight. */
   spits: Spit[];
+  /** Explosive barrels that stand (they go off when hit: enemies near them take a blow, so do players within about 3.4 units). */
+  barrels: Barrel[];
   pickups: Pickup[];
   allies: Ally[];
   /** A card offer waits for this player (card indices), or an empty list. */

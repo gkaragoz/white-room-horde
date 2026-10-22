@@ -22,8 +22,9 @@ describe.skipIf(process.env.MEASURE !== '1')('bot benchmark', () => {
     for (const map of MAPS) {
       for (const bots of BOTS) {
         for (const skill of LIST) {
-          const { report } = evaluate({ bots, skill, map, maxTicks: 30 * 60 * MAX_MIN }, Array.from({ length: RUNS }, (_, i) => 2000 + i));
+          const { report, results } = evaluate({ bots, skill, map, maxTicks: 30 * 60 * MAX_MIN }, Array.from({ length: RUNS }, (_, i) => 2000 + i));
           lines.push(`${String(bots).padStart(4)}  ${skill.padEnd(10)}  ${String(map).padStart(3)}  ${String(report.floor.p10).padStart(4)}/${String(report.floor.median).padStart(3)}/${String(report.floor.p90).padEnd(3)}        ${(report.seconds.median / 60).toFixed(1).padStart(6)}  ${String(report.kills.median).padStart(5)}  ${(report.capped * 100).toFixed(0)}%`);
+          if (process.env.PER_SEED === '1') lines.push('        ' + results.map((r) => `${r.seed}:f${r.floor}${r.capped ? 'c' : 'x'}`).join(' '));
         }
       }
     }

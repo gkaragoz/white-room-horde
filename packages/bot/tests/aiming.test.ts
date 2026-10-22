@@ -16,7 +16,7 @@ function enemy(id: number, x: number, y: number, over: Partial<Threat> = {}): Th
 
 function percept(enemies: Threat[], weapon = SMG, x = 0, y = 0): Percept {
   const list = [...enemies].sort((a, b) => a.d2 - b.d2);
-  return { tick: 0, wave: 1, slot: 0, x, y, angle: 0, hp: 100, maxHp: 100, state: 0, layer: 0, mag: 30, weapon, enemies: list, telegraphs: [], zones: [], spits: [], pickups: [], allies: [], offer: [], phase: 0, grenades: 0, world: { map: 0 } as unknown as World };
+  return { tick: 0, wave: 1, slot: 0, x, y, angle: 0, hp: 100, maxHp: 100, state: 0, layer: 0, mag: 30, weapon, enemies: list, telegraphs: [], zones: [], spits: [], barrels: [], pickups: [], allies: [], offer: [], phase: 0, grenades: 0, world: { map: 0 } as unknown as World };
 }
 
 const ctx = (skill: 'expert' | 'easy' = 'expert'): Ctx => ({ skill: profileOf(skill), rand: () => 0.5, mem: {} });
@@ -97,5 +97,27 @@ describe('aiming: target choice', () => {
     const p = percept([a, b]);
     const s = chooseShot(p, c, profileOfWeapon(SMG));
     expect(p.enemies[s.index]!.id).toBe(1);
+  });
+
+  it('sets off a barrel with a crowd around it, but only from a safe distance', () => {
+    const crowd = [enemy(1, 13, 1), enemy(2, 14, -1), enemy(3, 12, 2), enemy(4, 15, 0), enemy(5, 13.5, 2.5)];
+    const near = enemy(6, 4, -2);
+    const far = percept([near, ...crowd]);
+    far.barrels = [{ x: 13.5, y: 0.5, hp: 30 }];
+    const s = chooseShot(far, ctx(), profileOfWeapon(SMG));
+    expect(s.barrel).toBe(true);
+    expect(s.angle).toBeCloseTo(Math.atan2(0.5, 13.5), 1);
+    // the same barrel next to the shooter would hurt: no
+    const close = percept([near, ...crowd.map((e) => ({ ...e, x: e.x - 9, d2: (e.x - 9) ** 2 + e.y ** 2 }))]);
+    close.barrels = [{ x: 4.5, y: 0.5, hp: 30 }];
+    expect(chooseShot(close, ctx(), profileOfWeapon(SMG)).barrel).toBe(false);
+  });
+
+  it('still shoots an enemy that has healed past its first health', () => {
+    const regen = enemy(1, 9, 0, { hp: 300, maxHp: 30, elite: 5 });
+    const p = percept([regen]);
+    const s = chooseShot(p, ctx(), profileOfWeapon(SMG));
+    expect(s.clear).toBe(true);
+    expect(s.index).toBe(0);
   });
 });

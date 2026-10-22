@@ -1,10 +1,10 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAPS, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
 import { owns } from '@wrh/sim';
 import { BLOW, DPS, HOLD, RANGED, STAND_OFF, T, bursts, lateScale, radiusOf, speedOf, telePain } from './danger';
-import { focusBoxes, geoOf, movingDist2, onDeck, pushOutLocal, pushed, teleDist, wrapAngle, type MapGeo } from './geometry';
-import { computeField, territoryAt } from './nav';
+import { focusBoxes, geoOf, movingDist2, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
+import { computeField, goalDist, goalField, territoryAt } from './nav';
 import { engagement } from './weapons';
-import type { Ctx, MoveDecision, Percept, TeamDecision } from './types';
+import type { Ctx, MoveDecision, Percept, TeamDecision, Threat } from './types';
 
 /**
  * Where to move and when to dash.
@@ -26,6 +26,7 @@ const DT = 0.2;
 const HORIZON = STEPS * DT;
 const MAXE = 40;
 const SEE2 = 26 * 26;
+const FIELD2 = 34 * 34;
 const PR = BALANCE.player.radius;
 const DASH_SECONDS = Math.ceil(BALANCE.dash.seconds * 30) / 30;
 const DASH_COST = 0.9;
@@ -48,6 +49,8 @@ const eblow = new Float64Array(MAXE);
 const ehold = new Float64Array(MAXE);
 const erel2 = new Float64Array(MAXE);
 const eburst = new Uint8Array(MAXE);
+const fx = new Float64Array(96);
+const fy = new Float64Array(96);
 const wx = new Float64Array(MAXE);
 const wy = new Float64Array(MAXE);
 const pathX = new Float64Array(STEPS + 1);
@@ -124,7 +127,7 @@ function pickupValue(p: Percept, type: number, data: number): number {
     case PickupType.Weapon:
       return owns(p.world, p.slot, data) || isMeleeWeapon(p) ? 0 : 1.6;
     case PickupType.Shield:
-      return 1.6;
+      return p.world.pPerk[p.slot * PERKS + PERK.Shield]! < 100 ? 1.6 : 0;
     case PickupType.Haste:
       return 1.2;
     case PickupType.Quad:
@@ -183,7 +186,9 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
   let cost = 0;
   tm.c = tm.n = tm.o = tm.l = tm.e = 0;
   const free = dash ? Math.max(iframes, BALANCE.dash.iFrames) : iframes;
-  const meleeK = melee ? 0.45 : 1;
+  const meleeK = melee ? 0.35 : 1;
+  // a blade has to be near what it cuts: it pays more for drifting out of reach
+  const lagK = melee ? 0.35 : 0.05;
   for (let k = 1; k <= STEPS; k++) {
     const sp = dash && k === 1 ? speed * BALANCE.dash.speedMul : speed;
     const ox = px;
@@ -247,7 +252,7 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
     if (n > 0) {
       const nearest = Math.sqrt(nearest2);
       if (nearest > band) {
-        const cl = Math.min(2, (nearest - band) * 0.05) * DT * 3;
+        const cl = Math.min(2, (nearest - band) * lagK) * DT * 3;
         cost += cl;
         tm.l += cl;
       } else if (nearest < near) {
@@ -315,9 +320,17 @@ function groundCost(p: Percept, iframes: number, dash: boolean): number {
   return cost;
 }
 
-/** What the goals (pickups, the team's pull, the middle of the arena) are worth along the path, as a negative cost. */
+let huntValue = 0;
+let huntStart = 0;
+
+/** What the goals (pickups, the team's pull, the middle of the arena, the enemies to hunt) are worth along the path, as a negative cost. */
 function goalGain(startX: number, startY: number, reach: number): number {
   let gain = 0;
+  if (huntValue > 0) {
+    // the way to the last enemies, around the boxes
+    const progress = Math.max(0, Math.min(1, (huntStart - goalDist(pathX[STEPS]!, pathY[STEPS]!)) / reach));
+    gain += huntValue * progress;
+  }
   for (let i = 0; i < goalN; i++) {
     const gx = goalX[i]!;
     const gy = goalY[i]!;
@@ -341,6 +354,81 @@ function roomCost(): number {
   return ROOM_W * (1 - territoryAt(pathX[STEPS]!, pathY[STEPS]!)) + ROOM_W * 0.5 * (1 - territoryAt(pathX[STEPS >> 1]!, pathY[STEPS >> 1]!));
 }
 
+/** Where the bot goes when nothing is in shooting range. */
+interface Trip {
+  go: boolean;
+  x: number;
+  y: number;
+  /** The way leads up a ramp: the ground geometry opens its ramps. */
+  climb: boolean;
+}
+const trip: Trip = { go: false, x: 0, y: 0, climb: false };
+
+/**
+ * Nothing to shoot: walk to the enemies that are left. If they are all on the other level (an enemy that is stuck on a deck the
+ * squad is not on never comes down) the way goes over a ramp: up to them, or, from a deck with only ground enemies far off,
+ * down. The bot keeps off the decks otherwise.
+ */
+function planTrip(p: Percept, band: number): Trip {
+  trip.go = false;
+  trip.climb = false;
+  const first = p.enemies[0];
+  if (first === undefined) return trip;
+  let same: Threat | undefined;
+  for (const e of p.enemies) {
+    if (e.layer === p.layer) {
+      same = e;
+      break;
+    }
+  }
+  const reach = (band + 1) * (band + 1);
+  if (same !== undefined) {
+    if (same.d2 > reach) {
+      trip.go = true;
+      trip.x = same.x;
+      trip.y = same.y;
+    }
+    return trip;
+  }
+  const ramps = MAPS[p.world.map]?.ramps;
+  if (!ramps || ramps.length === 0) return trip;
+  if (p.layer === 0) {
+    // all that is left stands on a deck: take the ramp whose top is nearest to the closest of them
+    let best = -1;
+    let bestD = 1e9;
+    for (let i = 0; i < ramps.length; i++) {
+      rampPoint(ramps[i]!, true);
+      const d = (rampEnd.x - first.x) ** 2 + (rampEnd.y - first.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    rampPoint(ramps[best]!, true);
+    trip.go = true;
+    trip.climb = true;
+    trip.x = rampEnd.x;
+    trip.y = rampEnd.y;
+  } else if (first.d2 > 625) {
+    // on a deck, the ground enemies are far and not coming: go down the nearest ramp
+    let best = -1;
+    let bestD = 1e9;
+    for (let i = 0; i < ramps.length; i++) {
+      rampPoint(ramps[i]!, false);
+      const d = (rampEnd.x - p.x) ** 2 + (rampEnd.y - p.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    rampPoint(ramps[best]!, false);
+    trip.go = true;
+    trip.x = rampEnd.x;
+    trip.y = rampEnd.y;
+  }
+  return trip;
+}
+
 export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecision {
   // a fresh object per decision: the Bot keeps it for the ticks in between
   const out: MoveDecision = { x: 0, y: 0, dash: false };
@@ -359,10 +447,11 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   }
   if (w.pStun[s]! > 0) return out;
 
-  const g = geoOf(w.map, p.layer);
-  const deck = p.layer === 1;
   const speed = speedNow(p);
   const weapon = engagement(p);
+  const plan = planTrip(p, weapon.band);
+  const g = geoOf(w.map, p.layer, plan.climb);
+  const deck = p.layer === 1;
   const melee = weapon.melee;
 
   // enemies that matter: this level, close enough to reach us in the planning time
@@ -397,6 +486,13 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   }
 
   seen.n = n;
+  // nothing within shooting range: go and find the rest of the floor (up or down a ramp when they are on the other level)
+  huntValue = 0;
+  if (plan.go) {
+    goalField(g, w.map, p.layer, plan.x, plan.y);
+    huntStart = goalDist(p.x, p.y);
+    if (huntStart < 1e5) huntValue = 2;
+  }
   // goals: pickups, the team's pull, the middle of the arena when nothing is around
   goalN = 0;
   if (n < 14) {
@@ -404,7 +500,9 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
       if ((k.layer ?? 0) !== p.layer) continue;
       const dx = k.x - p.x;
       const dy = k.y - p.y;
-      if (dx * dx + dy * dy > 45 * 45) continue;
+      const kd2 = dx * dx + dy * dy;
+      // too far to bother; and one the bot stands on is one it cannot take
+      if (kd2 > 45 * 45 || kd2 < 1.44) continue;
       const v = pickupValue(p, k.type, k.data);
       if (v > 0) addGoal(k.x, k.y, v, p.x, p.y);
     }
@@ -417,8 +515,19 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   const dashReady = w.pDashCd[s]! <= 0 && w.pDash[s]! === 0;
   const reach = speed * HORIZON;
   const gscale = 0.3 + 0.7 * ctx.skill.dodge;
+  // hurt, the bot weighs every danger more: below 70% health the price of a blow goes up to double
+  const risk = 1 + 1.6 * Math.max(0, 0.7 - p.hp / Math.max(1, p.maxHp));
   focusBoxes(g, p.x, p.y, 36);
-  computeField(g, w.map, p.layer, p.x, p.y, speed, n, ex, ey, 0.3);
+  // the room field sees the whole crowd, the rollouts the nearest few
+  let nf = 0;
+  for (const e of p.enemies) {
+    if (e.d2 > FIELD2) break;
+    if (e.layer !== p.layer && e.d2 > 25) continue;
+    fx[nf] = e.x;
+    fy[nf] = e.y;
+    nf++;
+  }
+  computeField(g, w.map, p.layer, p.x, p.y, speed, nf, fx, fy, 0.3);
   const last = memo.heading;
 
   // plain headings
@@ -427,12 +536,13 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   for (let k = 0; k < DIRS; k++) {
     let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, false, iframes, weapon.band, weapon.near, melee);
     c += groundCost(p, iframes, false) * gscale + roomCost();
-    c -= goalGain(p.x, p.y, reach);
+    c *= risk;
     if (last >= 0) {
       // keep a course: turning around has to buy a clearly cheaper way out
       const turn = Math.abs(wrapAngle(((k - last) / DIRS) * Math.PI * 2)) / Math.PI;
-      c = c * (1 + 0.3 * turn) + 0.1 * turn;
+      c = c * (1 + 0.3 * turn) + 0.15 * turn;
     }
+    c -= goalGain(p.x, p.y, reach);
     lastCosts[k] = c;
     lastTerms[k * 5] = tm.c;
     lastTerms[k * 5 + 1] = tm.n;
@@ -452,7 +562,8 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     let bestDash = 1e18;
     for (let k = 0; k < DIRS; k += DASH_EVERY) {
       let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, true, iframes, weapon.band, weapon.near, melee);
-      c += groundCost(p, iframes, true) * gscale + roomCost() + DASH_COST;
+      c += groundCost(p, iframes, true) * gscale + roomCost();
+      c = c * risk + DASH_COST;
       c -= goalGain(p.x, p.y, reach);
       if (c < bestDash) {
         bestDash = c;
@@ -469,7 +580,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   out.x = DIR_X[bestK]!;
   out.y = DIR_Y[bestK]!;
   out.dash = dash;
-  if (n === 0 && goalN === 0) {
+  if (n === 0 && goalN === 0 && huntValue === 0) {
     out.x = 0;
     out.y = 0;
   }

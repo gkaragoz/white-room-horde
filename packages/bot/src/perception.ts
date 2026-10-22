@@ -1,6 +1,6 @@
-import { MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_ZONES, MISC, PERK, PERKS, PlayerState, type PlayerInput } from '@wrh/shared';
+import { MAX_BARRELS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, MAX_SPIT, MAX_ZONES, MISC, PERK, PERKS, PlayerState, type PlayerInput } from '@wrh/shared';
 import type { World } from '@wrh/sim';
-import type { Ally, Memory, Percept, Pickup, Spit, Telegraph, Threat, Zone } from './types';
+import type { Ally, Barrel, Memory, Percept, Pickup, Spit, Telegraph, Threat, Zone } from './types';
 
 const AIM_TO_RAD = (Math.PI * 2) / 65536;
 const MAX_THREATS = 96;
@@ -57,6 +57,12 @@ export function perceive(w: World, slot: number, mem: Memory, humans: ReadonlySe
     spits.push({ x: w.sX[k]!, y: w.sY[k]!, vx: w.sVx[k]!, vy: w.sVy[k]!, life: w.sLife[k]!, layer: w.sLayer[k]! });
   }
 
+  const barrels: Barrel[] = [];
+  for (let b = 0; b < MAX_BARRELS; b++) {
+    if (!w.brActive[b]) continue;
+    barrels.push({ x: w.brX[b]!, y: w.brY[b]!, hp: w.brHp[b]! });
+  }
+
   const pickups: Pickup[] = [];
   for (let k = 0; k < MAX_PICKUPS; k++) {
     if (!w.kActive[k]) continue;
@@ -92,6 +98,7 @@ export function perceive(w: World, slot: number, mem: Memory, humans: ReadonlySe
     telegraphs,
     zones,
     spits,
+    barrels,
     pickups,
     allies,
     offer,

@@ -198,7 +198,7 @@ export function decideCombat(p: Percept, ctx: Ctx): CombatDecision {
     }
   } else {
     const sh = chooseShot(p, ctx, prof);
-    if (sh.index >= 0) {
+    if (sh.clear) {
       out.aim = sh.angle;
       out.aimDist = sh.dist;
       out.fire = true;
@@ -206,7 +206,7 @@ export function decideCombat(p: Percept, ctx: Ctx): CombatDecision {
       out.aim = Math.atan2(nearest.y - p.y, nearest.x - p.x);
     }
     // reload: never with a kill in sight; use the lulls (nothing to shoot at) and keep a thin magazine for when nothing is close
-    if (sh.index < 0 && p.mag < prof.mag * 0.9) out.reload = true;
+    if (!sh.clear && p.mag < prof.mag * 0.9) out.reload = true;
     else if (p.mag < prof.mag * 0.25 && nd > 9) out.reload = true;
     if (p.mag === 0) out.reload = false;
   }
