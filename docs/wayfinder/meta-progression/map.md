@@ -6,7 +6,7 @@ status: open
 
 # Meta ilerleme: her run'da yeni bir şey keşfet
 
-**Durum: harita kapandı (12/12 ticket). Birleşik özet: [spec.md](spec.md); seviye seviye tablo: [discovery-track.md](discovery-track.md).**
+**Durum: harita kapandı (12/12 ticket). Birleşik özet: [spec.md](spec.md); uygulama planı: [implementation-plan.md](implementation-plan.md); seviye seviye tablo: [discovery-track.md](discovery-track.md).**
 
 ## Destination
 
