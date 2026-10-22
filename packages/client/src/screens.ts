@@ -17,6 +17,8 @@ import { Preview } from './render/preview';
 import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile, type MetaResult } from './profile';
 import { META, colorLevel, levelOf, startWeapons, unlockLevelOf, unlocked, type Unlocked } from './meta';
 import { type CodexCategory } from './codex';
+import { BOT_BADGE, MAX_COMPANIONS, companionLimit, saveCompanions, xpFactor, isSkill, type CompanionChoice } from './companions';
+import { SKILLS, type Skill } from '@wrh/bot';
 import { codexPageHtml, codexSub, introHtml, levelPathHtml, runRewardHtml } from './metaUi';
 import { fill, metaWords } from './metaStrings';
 import type { UiHandlers } from './ui';
@@ -36,6 +38,8 @@ export interface MenuChoices {
   color: number;
   /** Class index (see CLASS_IDS). */
   cls: number;
+  /** Companion bots for solo games (the room's own choice lives in the lobby). */
+  companions: CompanionChoice;
 }
 
 /** What the screens need from the Ui that owns them. */
@@ -530,8 +534,10 @@ export class Screens {
     const saved0 = loadRejoin();
     // a saved game of another major.minor cannot be rejoined (the relay turns it away): do not offer it
     const rejoin = saved0 && (saved0.v === undefined || compatibleVersions(saved0.v, GAME_VERSION)) ? saved0 : null;
+    this.comp = { ...this.choices.companions };
+    this.compMax = companionLimit(1);
     const ach = achWords(this.host.lang());
-    const got = ACHIEVEMENTS.filter((a) => isGot(a, profile.ach)).length;
+    const got =ACHIEVEMENTS.filter((a) => isGot(a, profile.ach)).length;
     this.host.screen.innerHTML = menuMarkup({
       title: t.title,
       tag: t.tag,
@@ -547,6 +553,7 @@ export class Screens {
       lookHtml: this.previewSwatches(),
       classHtml: this.classPicker(),
       arenaHtml: this.arenaRows(true, this.choices.map, this.choices.mods),
+      companionsHtml: this.companionsInner(),
       modsHtml: modsPanel(this.host.lang(), this.choices.mods, true, true, this.lockedMods()),
       soloLabel: t.solo,
       hostLabel: t.host,
@@ -583,6 +590,11 @@ export class Screens {
     this.bindWeapons();
     this.bindPreview();
     this.refreshHub();
+    this.compOnChange = (c) => {
+      this.choices.companions = { ...c };
+      saveCompanions(c);
+    };
+    this.drawCompanions();
     void this.fillRelay(fromParam !== null);
     this.bindGroup('map', (id) => {
       this.choices.map = Number(id);
@@ -741,15 +753,67 @@ export class Screens {
   private lobbyMap = 0;
   private lobbyMods = 0;
 
-  private lobbyList(players: { slot: number; name: string; host: boolean; weapon: WeaponId; acc: number; color: number }[]): string {
+  private lobbyList(players: { slot: number; name: string; host: boolean; weapon: WeaponId; acc: number; color: number; cls?: number; bot?: boolean }[]): string {
     const t = this.host.t();
     const accNames = t.accs as readonly string[];
+    const classNames = t.classNames as readonly string[];
     return players
-      .map(
-        (p) =>
-          `<li><span class="wrh-dot" style="background:${p.color >= 0 ? PLAYER_COLORS[p.color % PLAYER_COLORS.length] : PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]} &middot; ${accNames[p.acc] ?? ''}</small></li>`,
-      )
+      .map((p) => {
+        const dot = `<span class="wrh-dot" style="background:${p.color >= 0 ? PLAYER_COLORS[p.color % PLAYER_COLORS.length] : PLAYER_COLORS[p.slot % PLAYER_COLORS.length]}"></span>`;
+        if (p.bot) return `<li class="wrh-botrow">${dot}${BOT_BADGE}${esc(p.name)}<span class="wrh-bottag">${esc(t.botTag)}</span> <small style="opacity:.7">&middot; ${esc(classNames[p.cls ?? 0] ?? '')} &middot; ${(t.weapons as Record<string, string>)[p.weapon]}</small></li>`;
+        return `<li>${dot}${esc(p.name)} ${p.host ? `<small>(${t.host_tag})</small>` : ''} <small style="opacity:.7">&middot; ${(t.weapons as Record<string, string>)[p.weapon]} &middot; ${accNames[p.acc] ?? ''}</small></li>`;
+      })
       .join('');
+  }
+
+  // ---- companions: how many bots fight alongside and how well they play ----
+  private comp: CompanionChoice = { count: 0, skill: 'expert' };
+  private compMax = MAX_COMPANIONS;
+  private compOnChange: ((c: CompanionChoice) => void) | null = null;
+
+  /** The inside of the Companions picker for the current state: count buttons 0..max, the skill row once there are bots, a hint. */
+  private companionsInner(): string {
+    const t = this.host.t();
+    const max = this.compMax;
+    const counts = Array.from({ length: MAX_COMPANIONS + 1 }, (_, n) => `<button type="button" class="wrh-wp${n === this.comp.count ? ' on' : ''}" data-ccount="${n}"${n > max ? ' disabled' : ''} aria-label="${n}">${n}</button>`).join('');
+    const skills = SKILLS.map((s) => `<button type="button" class="wrh-wp${s === this.comp.skill ? ' on' : ''}" data-cskill="${s}">${esc((t.botSkills as Record<string, string>)[s] ?? s)}</button>`).join('');
+    const hint = this.comp.count > 0 ? t.companionsXp.replace('{f}', xpFactor(this.comp.count).toFixed(2)) : t.companionsTip;
+    return `<label>${BOT_BADGE}${esc(t.companions)}</label><div class="wrh-seg" role="group" aria-label="${esc(t.companions)}">${counts}</div>${this.comp.count > 0 ? `<div class="wrh-comp-skill"><label>${esc(t.botSkill)}</label><div class="wrh-seg" role="group" aria-label="${esc(t.botSkill)}">${skills}</div></div>` : ''}<p class="wrh-comp-hint">${esc(hint)}</p>`;
+  }
+
+  /** Draw the picker into its box and wire the buttons; a pick updates the state and tells whoever listens. */
+  private drawCompanions(): void {
+    const box = this.host.screen.querySelector<HTMLElement>('#wrh-comp');
+    if (!box) return;
+    box.innerHTML = this.companionsInner();
+    box.querySelectorAll<HTMLElement>('[data-ccount]').forEach((b) => {
+      b.onclick = () => {
+        this.comp = { ...this.comp, count: Math.min(this.compMax, Number(b.dataset.ccount)) };
+        this.compOnChange?.(this.comp);
+        this.drawCompanions();
+      };
+    });
+    box.querySelectorAll<HTMLElement>('[data-cskill]').forEach((b) => {
+      b.onclick = () => {
+        const s = b.dataset.cskill;
+        if (!isSkill(s)) return;
+        this.comp = { ...this.comp, skill: s };
+        this.compOnChange?.(this.comp);
+        this.drawCompanions();
+      };
+    });
+  }
+
+  /** The state of the picker from outside (the room says how many bots it holds and at what skill). */
+  private setCompanions(c: CompanionChoice, max: number): void {
+    this.comp = { count: Math.min(c.count, max), skill: c.skill };
+    this.compMax = max;
+    this.drawCompanions();
+  }
+
+  /** The Companions the Play page would start a solo game with. */
+  soloCompanions(): CompanionChoice {
+    return { ...this.choices.companions };
   }
 
   private bindArena(): void {
@@ -805,21 +869,26 @@ export class Screens {
 
   showLobby(
     code: string,
-    players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId; acc: number; color: number }[],
+    players: { slot: number; name: string; host: boolean; connected: boolean; weapon: WeaponId; acc: number; color: number; cls?: number; bot?: boolean }[],
     iAmHost: boolean,
     options: { map: number; mods: number } = { map: 0, mods: 0 },
     locked = false,
+    botSkill: Skill = 'expert',
   ): void {
     this.redraw = () => {
       this.lobbyCode = '';
-      this.showLobby(code, players, iAmHost, options, locked);
+      this.showLobby(code, players, iAmHost, options, locked, botSkill);
     };
+    const bots = players.filter((p) => p.bot).length;
+    const roomComp: CompanionChoice = { count: bots, skill: botSkill };
+    const roomMax = companionLimit(players.length - bots);
     const t = this.host.t();
     // somebody else changed something (joined, picked a weapon, the host chose an arena): update in place. Rebuilding the
     // whole lobby would reset the scroll position, the 3D preview and whatever the player is clicking.
     if (this.lobbyCode === code && this.lobbyHost === iAmHost && this.lobbyLocked === locked && this.host.screen.querySelector('#wrh-lobby')) {
       this.host.screen.querySelector<HTMLElement>('#wrh-plist')!.innerHTML = this.lobbyList(players);
       this.host.screen.querySelector<HTMLElement>('#wrh-pcount')!.textContent = `${t.players} (${players.length}/${MAX_PLAYERS})`;
+      if (iAmHost) this.setCompanions(roomComp, roomMax);
       const key = `${options.map}/${options.mods}`;
       if (key !== this.lobbyOpts) {
         this.lobbyOpts = key;
@@ -851,12 +920,17 @@ export class Screens {
       weaponsHtml: this.weaponButtons(),
       previewHtml: this.previewBlock(),
       arenaHtml: this.arenaRows(iAmHost, options.map, options.mods),
+      companionsHtml: iAmHost ? ((this.comp = roomComp), (this.compMax = roomMax), this.companionsInner()) : '',
       startHtml: iAmHost ? `<button id="wrh-start">${t.start}</button>` : '',
       inviteHtml: `<button id="wrh-invite" class="alt">${icon('hud_link', 18)} ${t.invite}</button>`,
       leaveLabel: t.leave,
     });
     this.bindWeapons();
     this.bindPreview();
+    if (iAmHost) {
+      this.compOnChange = (c) => this.host.handlers.onCompanions?.(c.count, c.skill);
+      this.drawCompanions();
+    }
     if (iAmHost) this.bindArena();
     else this.bindMods(false, () => this.lobbyMods, () => undefined);
     const s = this.host.screen.querySelector<HTMLElement>('#wrh-start');

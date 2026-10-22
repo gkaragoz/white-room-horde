@@ -6,6 +6,7 @@ import { GAME_VERSION, TICK_RATE, heightAt, resolveMap, withOptions } from '@wrh
 import { BALANCE, nextLayer, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, runScore, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession, PredictedView } from '@wrh/net';
+import { Squad, type Skill } from '@wrh/bot';
 import { Audio } from './audio';
 import { Input, type Action } from './input';
 import { ArenaView } from './render/arena';
@@ -33,7 +34,8 @@ import { viewOf } from './view/worldView';
 import { recordAchievements } from './achievements';
 import { ACCESSORIES, clearRejoin, loadProfile, loadRejoin, recordGame, saveRejoin } from './profile';
 import { RunCodex } from './codex';
-import { META, catalogFound, CATALOG_TOTAL, initMeta, joinMeta, setupMeta } from './meta';
+import { META, catalogFound, CATALOG_TOTAL, initMeta, joinMeta, setupMeta, unlocked } from './meta';
+import { BOT_GLYPH, achievementClassMask, companionsFromUrl, freeSlots, planCompanions } from './companions';
 import { cornerCardHtml, showCornerCard } from './metaUi';
 import type { Discovery } from './codex';
 import { BUILD, mountVersionBadge } from './buildinfo';
@@ -277,13 +279,20 @@ let playback: Replay | null = null;
 let runCodex: RunCodex | null = null;
 const dev = {
   perf: params.get('perf') === '1',
-  bots: Math.max(0, Math.min(10, Number(params.get('bots') ?? 0))),
+  /** `?bots=N` (and `?botskill=`): companions for a dev game without the menu; replaces the choice of the Play page. */
+  bots: 0,
+  botSkill: undefined as Skill | undefined,
   auto: params.get('auto') === '1',
   god: params.get('god') === '1',
   wave: Number(params.get('wave') ?? 1),
   /** `?zoom=0.4` pulls the camera back to look over a whole arena (map review). */
   zoom: Math.max(0.2, Math.min(2, Number(params.get('zoom') ?? 1))),
 };
+{
+  const o = companionsFromUrl(location.search, { count: 0, skill: 'expert' });
+  dev.bots = o.forced ? o.choice.count : 0;
+  if (o.forced || params.has('botskill')) dev.botSkill = o.choice.skill;
+}
 const weaponParam = (params.get('weapon') ?? 'weapon_pistol').replace('weapon_', '');
 let startWeapon: WeaponId = (WEAPON_IDS as readonly string[]).includes(weaponParam) ? (weaponParam as WeaponId) : 'pistol';
 
@@ -312,7 +321,14 @@ const ui = new Ui(
       startWeapon = wp;
       session?.setWeapon(wp);
     },
-    onStart: () => session?.start(),
+    onCompanions: (count, skill) => setRoomBots(count, skill),
+    onStart: () => {
+      if (!session) return;
+      // the squad is planned once more against who is in the room now (classes the people picked meanwhile), then the game starts
+      const n = session.botSlots.length;
+      if (n > 0) setRoomBots(n, session.botSkill);
+      session.start();
+    },
     onLeave: () => location.reload(),
     onCard: (i) => input.queueButton([Buttons.Card1, Buttons.Card2, Buttons.Card3][i]!),
     onAgain: () => location.reload(),
@@ -741,7 +757,7 @@ function handleEvent(e: SimEvent): void {
       {
         const score = world ? runScore(world).final : 0;
         runCodex?.scan(world!, localSlot);
-        const rec = world && !playback ? { ...recordGame(world.wave, world.kills, score, { teamScore: score, seconds: world.tick / TICK_RATE, codex: runCodex?.codex }), ach: recordAchievements(world, localSlot) } : undefined;
+        const rec = world && !playback ? { ...recordGame(world.wave, world.kills, score, { teamScore: score, seconds: world.tick / TICK_RATE, codex: runCodex?.codex, companions: companionCount() }), ach: recordAchievements(world, localSlot) } : undefined;
         clearRejoin();
         ui.playerNames = names;
         setTimeout(() => world && ui.screens.showGameOver(world, rec, { clicks: runClicks, keys: runKeys, bestCombo }, false, localSlot), 1800);
@@ -881,20 +897,82 @@ function beginPlaying(w: World, slot: number): void {
   }
 }
 
+/** The companion bots of a solo game; null for a game without. Their inputs join the player's in the tick loop. */
+let soloSquad: Squad | null = null;
+/** Milliseconds the bots' brains took over the last half second per tick (shown with the other timings). */
+let botMs = 0, botN = 0;
+
 function startSolo(name: string): void {
   mode = 'solo';
-  const meta = setupMeta(loadProfile());
+  const profile = loadProfile();
+  const meta = setupMeta(profile);
   const players: { slot: number; weapon: WeaponId; cls: number; metWeapons?: number; metDrones?: number }[] = [{ slot: 0, weapon: startWeapon, cls: ui.choices.cls, metWeapons: meta.metWeapons, metDrones: meta.metDrones }];
   names = [name];
-  for (let b = 1; b <= dev.bots; b++) {
-    players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar', cls: b % 7 });
-    names[b] = 'Bot ' + b;
+  const seed = (Math.random() * 0xffffffff) >>> 0;
+  // the Play page's choice, or the dev override of the address (?bots=N, ?botskill=...)
+  const comp = dev.bots > 0 ? { count: dev.bots, skill: dev.botSkill ?? ui.choices.companions.skill } : ui.choices.companions;
+  const plan = planCompanions({ count: comp.count, freeSlots: freeSlots([0]), seed, roomLevel: meta.level, achClasses: META.enabled ? achievementClassMask(unlocked(profile).classes) : ~0, taken: [ui.choices.cls] });
+  for (const b of plan) {
+    players.push({ slot: b.slot, weapon: b.weapon, cls: b.cls });
+    names[b.slot] = b.name;
   }
+  ui.botSlots = new Set(plan.map((b) => b.slot));
+  soloSquad = plan.length ? new Squad(plan.map((b) => b.slot), dev.botSkill ?? comp.skill, seed, new Set([0])) : null;
+  soloBots = plan.length;
   const opts = withOptions({ map: ui.choices.map, mods: ui.choices.mods }, { map: numberParam('map'), mods: numberParam('mods') });
-  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map: resolveMap(opts.map), mods: opts.mods, level: meta.level };
+  const setup = { seed, players, map: resolveMap(opts.map), mods: opts.mods, level: meta.level };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
   beginPlaying(w, 0);
+}
+
+/** Companions in the solo game that runs. */
+let soloBots = 0;
+
+/** Companions in the game that is on (solo or in the room): they take their share off the experience. */
+function companionCount(): number {
+  if (playback) return 0;
+  return mode === 'online' ? (session?.botSlots.length ?? 0) : soloBots;
+}
+
+// ---- companions in an online room: the host plans them in the lobby and its page drives them in the game ----
+const botNameSeed = Math.floor(Math.random() * 1000);
+
+function setRoomBots(count: number, skill: Skill): void {
+  const s = session;
+  if (!s) return;
+  const people = s.players.filter((p) => !p.bot);
+  const profile = loadProfile();
+  const level = people.reduce((m, p) => Math.min(m, p.lvl), 100);
+  const plan = planCompanions({ count, freeSlots: freeSlots(people.map((p) => p.slot)), seed: botNameSeed, roomLevel: level, achClasses: META.enabled ? achievementClassMask(unlocked(profile).classes) : ~0, taken: people.map((p) => p.cls) });
+  s.setBots(plan.map((b) => [b.cls, b.weapon, b.name]), skill);
+}
+
+let roomSquad: { key: string; squad: Squad } | null = null;
+let roomBotWarn = 0;
+
+/** Once per input tick on the host's page: the bots look at the world, decide, and their inputs go out tagged like the player's own. */
+function driveRoomBots(): void {
+  const s = session;
+  if (!s || !s.world || !s.drivesBots || s.backlog > 30) return;
+  const slots = s.botSlots;
+  const key = `${s.seed}:${slots.join(',')}:${s.botSkill}`;
+  if (roomSquad?.key !== key) {
+    const humans = new Set(s.players.filter((p) => !p.bot).map((p) => p.slot));
+    roomSquad = { key, squad: new Squad(slots, s.botSkill, s.seed, humans) };
+  }
+  const t0 = performance.now();
+  try {
+    const map = roomSquad.squad.inputs(s.world);
+    const list: { slot: number; input: PlayerInput }[] = [];
+    for (const [slot, input] of map) list.push({ slot, input });
+    s.sendBotInputs(list);
+  } catch (e) {
+    // a bot brain must never take the host's own input loop down with it
+    if (roomBotWarn++ < 3) console.error('bot error', e);
+  }
+  botMs += performance.now() - t0;
+  botN++;
 }
 
 function startPlayback(r: Replay): void {
@@ -988,7 +1066,7 @@ let acc = 0;
 let last = performance.now();
 let frames = 0, fpsT = 0, fps = 0;
 let stepMs = 0, stepN = 0, frameMs = 0, frameN = 0;
-const perf = { fps: 0, simMs: 0, frameMs: 0, calls: 0, triangles: 0, enemies: 0, corpses: 0, particles: 0 };
+const perf = { fps: 0, simMs: 0, botMs: 0, frameMs: 0, calls: 0, triangles: 0, enemies: 0, corpses: 0, particles: 0 };
 const dummy = new THREE.Object3D();
 const q = new THREE.Quaternion();
 const fwd = new THREE.Vector3(0, 0, 1);
@@ -1113,6 +1191,7 @@ function onlineInputTick(): void {
   diag.inputLate(nowMs - session.lastSendAt - TICK_DT * 1000);
   session.sendInput(sampleLocal());
   diag.input();
+  if (session.drivesBots) driveRoomBots();
 }
 const inputTimer = new InputTimer(onlineInputTick);
 inputTimer.start();
@@ -1260,15 +1339,16 @@ function frameInner(nowMs: number): void {
   const sess0 = session;
   if (mode === 'online' && sess0 && session) {
     if (session.state === 'lobby') {
-      const sig = session.code + JSON.stringify(session.players) + JSON.stringify(session.options);
+      const sig = session.code + JSON.stringify(session.players) + JSON.stringify(session.options) + session.botSkill;
       if (sig !== lobbySig) {
         lobbySig = sig;
         names = [];
         for (const p of session.players) names[p.slot] = p.name;
-        ui.screens.showLobby(session.code, session.players, session.players.find((p) => p.slot === sess0.slot)?.host ?? false, session.options, session.locked);
+        ui.screens.showLobby(session.code, session.players, session.players.find((p) => p.slot === sess0.slot)?.host ?? false, session.options, session.locked, session.botSkill);
       }
     } else if (session.state === 'playing' && session.world && session.world !== world && session.slot >= 0) {
       for (const p of session.players) names[p.slot] = p.name;
+      ui.botSlots = new Set(session.botSlots);
       beginPlaying(session.world, session.slot);
     }
     if (session.error && !world) {
@@ -1305,9 +1385,16 @@ function frameInner(nowMs: number): void {
           break;
         }
       } else {
+        let bots: Map<number, PlayerInput> | null = null;
+        if (soloSquad) {
+          const b0 = performance.now();
+          bots = soloSquad.inputs(world);
+          botMs += performance.now() - b0;
+          botN++;
+        }
         for (let s = 0; s < MAX_PLAYERS; s++) {
           if (!world.pActive[s]) continue;
-          inputs[s] = scriptedInput(world.tick, s);
+          inputs[s] = bots?.get(s) ?? scriptedInput(world.tick, s);
         }
         localInput = sampleLocal();
         inputs[localSlot] = localInput;
@@ -1550,13 +1637,13 @@ function frameInner(nowMs: number): void {
 
     // name tags over the other players
     for (let s = 0; s < MAX_PLAYERS; s++) {
-      const show = s !== localSlot && wv.inGame(s) && (mode === 'online' || dev.bots > 0);
+      const show = s !== localSlot && wv.inGame(s) && (mode === 'online' || soloBots > 0);
       if (!show) {
         ui.overlay.setTag(s, '', '#000', 0, 0, false);
         continue;
       }
       _p.set(vx[s]!, 2.7 + lifted.lift + vz[s]!, -vy[s]!).project(stage.camera);
-      ui.overlay.setTag(s, (settings.colorblind ? `${s + 1} ` : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
+      ui.overlay.setTag(s, (settings.colorblind ? `${s + 1} ` : '') + (ui.botSlots.has(s) ? BOT_GLYPH + ' ' : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((_p.x + 1) / 2) * app.clientWidth, ((1 - _p.y) / 2) * app.clientHeight, true);
     }
     // revive rings over downed players (red: bleeding out, green: being revived)
     for (let s = 0; s < MAX_PLAYERS; s++) {
@@ -1574,7 +1661,7 @@ function frameInner(nowMs: number): void {
     }
     // arrows at the screen edge for teammates who are out of view
     for (let s = 0; s < MAX_PLAYERS; s++) {
-      const far = s !== localSlot && wv.inGame(s) && (mode === 'online' || dev.bots > 0);
+      const far = s !== localSlot && wv.inGame(s) && (mode === 'online' || soloBots > 0);
       if (!far) {
         ui.overlay.setArrow(s, '', '#000', 0, 0, 0, false);
         continue;
@@ -1589,7 +1676,7 @@ function frameInner(nowMs: number): void {
       const k = Math.max(Math.abs(_p.x) / 0.9, Math.abs(_p.y) / 0.86);
       const ex = _p.x / k;
       const ey = _p.y / k;
-      ui.overlay.setArrow(s, names[s] ?? 'P' + (s + 1), colorFor(s), ((ex + 1) / 2) * app.clientWidth, ((1 - ey) / 2) * app.clientHeight, Math.atan2(-_p.y, _p.x), true, w.pState[s] === PlayerState.Downed);
+      ui.overlay.setArrow(s, (ui.botSlots.has(s) ? BOT_GLYPH + ' ' : '') + (names[s] ?? 'P' + (s + 1)), colorFor(s), ((ex + 1) / 2) * app.clientWidth, ((1 - ey) / 2) * app.clientHeight, Math.atan2(-_p.y, _p.x), true, w.pState[s] === PlayerState.Downed);
     }
     audio.setListener(fx0, fy0);
     audio.tick(w, localSlot, dt);
@@ -1739,6 +1826,8 @@ function frameInner(nowMs: number): void {
     perf.fps = fps;
     adaptScale(fps, 0.5);
     perf.simMs = stepN ? stepMs / stepN : 0;
+    perf.botMs = botN ? botMs / botN : 0;
+    botMs = 0; botN = 0;
     perf.frameMs = frameN ? frameMs / frameN : 0;
     perf.calls = stage.renderer.info.render.calls;
     perf.triangles = stage.renderer.info.render.triangles;
@@ -1748,7 +1837,7 @@ function frameInner(nowMs: number): void {
     frames = 0; fpsT = 0; stepMs = 0; stepN = 0; frameMs = 0; frameN = 0;
     if (dev.perf || settings.showFps) {
       ui.setDev(
-        `${fps} fps &middot; frame ${perf.frameMs.toFixed(2)} ms &middot; sim ${perf.simMs.toFixed(2)} ms &middot; calls ${perf.calls} &middot; tris ${(perf.triangles / 1000).toFixed(0)}k<br>` +
+        `${fps} fps &middot; frame ${perf.frameMs.toFixed(2)} ms &middot; sim ${perf.simMs.toFixed(2)} ms${soloBots || session?.botSlots.length ? ` &middot; bots ${perf.botMs.toFixed(2)} ms` : ''} &middot; calls ${perf.calls} &middot; tris ${(perf.triangles / 1000).toFixed(0)}k<br>` +
           `enemies ${perf.enemies} &middot; corpses ${perf.corpses} &middot; particles ${perf.particles}` +
           ` &middot; ${backend}` +
           (world ? ` &middot; tick ${world.tick} &middot; hash ${hashWorld(world).toString(16)}` : '') +
@@ -1786,6 +1875,9 @@ setTimeout(() => stage.warmFlight(), 800);
   },
   get session() {
     return session;
+  },
+  get names() {
+    return names;
   },
   stage,
   crowd,

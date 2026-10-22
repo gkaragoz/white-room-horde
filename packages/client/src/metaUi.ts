@@ -163,7 +163,7 @@ export interface PackState {
 
 /** The game over panel: XP gained, the level and the reward packs of the levels reached (face down until opened). */
 export function runRewardHtml(
-  meta: { xp: number; levelBefore: number; levelAfter: number; rewards: TrackItem[]; discoveries: Discovery[] },
+  meta: { xp: number; companions?: number; levelBefore: number; levelAfter: number; rewards: TrackItem[]; discoveries: Discovery[] },
   state: PackState,
   t: StringSet,
   lang: Lang,
@@ -173,6 +173,7 @@ export function runRewardHtml(
   const up = meta.levelAfter > meta.levelBefore;
   const head = up ? fill(w.levelUp, { a: meta.levelBefore, b: meta.levelAfter }) : fill(w.noLevelUp, { a: meta.levelAfter });
   const xp = meta.xp > 0 ? fill(w.xpGain, { n: meta.xp }) : seconds < 15 ? w.xpNone : fill(w.xpGain, { n: 0 });
+  const companions = meta.companions && seconds >= 15 ? `<p class="wrh-rw-bots">${esc(fill(w.xpCompanions, { f: (1 / (1 + 0.25 * meta.companions)).toFixed(2) }))}</p>` : '';
   const packs = meta.rewards.map((r, i) => {
     const v = trackView(r, t, lang);
     const open = state.opened.has(i);
@@ -182,6 +183,7 @@ export function runRewardHtml(
   const found = meta.discoveries.map((d) => esc(entryView(d.cat, d.index, t, lang).name)).join(', ');
   return `<section class="wrh-reward">
     <div class="wrh-rw-head"><b>${esc(head)}</b><span class="gain">${esc(xp)}</span></div>
+    ${companions}
     ${packs.length ? `<div class="wrh-packs">${packs.join('')}</div>${left > 1 ? `<button type="button" class="wrh-openall" id="wrh-openall">${esc(w.openAll)}</button>` : ''}` : up ? '' : `<p class="wrh-rw-none">${esc(w.rewardsNone)}</p>`}
     ${found ? `<p class="wrh-rw-found"><b>${esc(w.added)}:</b> ${found}</p>` : ''}
   </section>`;
@@ -265,6 +267,7 @@ export const META_CSS = `
 .wrh-pack.open .face{transform:rotateY(0)}
 .wrh-openall{display:block;margin:6px auto 0;padding:8px 18px;border:0;border-radius:14px;font-weight:800;background:#2b3a52;color:#fff;cursor:pointer}
 .wrh-rw-found,.wrh-rw-none{margin:8px 0 0;font-size:14px}
+.wrh-rw-bots{margin:4px 0 0;font-size:13px;font-weight:700;opacity:.75}
 .wrh-corner{position:fixed;left:14px;bottom:14px;z-index:60;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .wrh-ccard{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border-radius:16px;background:rgba(255,253,250,.95);color:#2b3a52;box-shadow:0 6px 20px rgba(0,0,0,.28);transform:translateX(-120%);opacity:0;transition:transform .35s,opacity .35s;max-width:min(320px,80vw)}
 .wrh-ccard.in{transform:none;opacity:1}

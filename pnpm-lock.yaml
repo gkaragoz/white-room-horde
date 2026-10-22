@@ -206,6 +206,9 @@ importers:
 
   packages/client:
     dependencies:
+      '@wrh/bot':
+        specifier: workspace:*
+        version: link:../bot
       '@wrh/net':
         specifier: workspace:*
         version: link:../net

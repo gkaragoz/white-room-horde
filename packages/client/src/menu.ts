@@ -27,6 +27,8 @@ export interface MenuParts {
   /** Class picker with its tip. */
   classHtml: string;
   arenaHtml: string;
+  /** The Companions picker (count and skill of the bots) of the Play page. */
+  companionsHtml: string;
   /** The inline 20-multiplier grid of the Difficulty page. */
   modsHtml: string;
   soloLabel: string;
@@ -109,6 +111,7 @@ export function menuMarkup(p: MenuParts): string {
           <div class="wrh-loadline"><span id="wrh-loadline"></span><button type="button" class="wrh-linkbtn" data-go="loadout">${w.change}</button></div>
         </div>
         <div class="wrh-hcard wrh-pl-side">
+          <div class="wrh-comp" id="wrh-comp">${p.companionsHtml}</div>
           <div id="wrh-arena-menu">${p.arenaHtml}</div>
           <div class="wrh-startrow">
             <button id="wrh-solo" class="wrh-play">${icon('hud_right', 34)}<span>${p.soloLabel}</span></button>
@@ -168,6 +171,8 @@ export interface LobbyParts {
   weaponsHtml: string;
   previewHtml: string;
   arenaHtml: string;
+  /** The host's Companions picker (empty for guests). */
+  companionsHtml: string;
   startHtml: string;
   inviteHtml: string;
   leaveLabel: string;
@@ -183,6 +188,7 @@ export function lobbyMarkup(p: LobbyParts): string {
         <section class="wrh-hcard wrh-lleft">
           <label id="wrh-pcount">${p.playersLabel}</label>
           <ul class="wrh-plist" id="wrh-plist">${p.playersHtml}</ul>
+          ${p.companionsHtml ? `<div class="wrh-comp" id="wrh-comp">${p.companionsHtml}</div>` : ''}
           <label>${p.weaponLabel}</label>
           <div class="wrh-weapons">${p.weaponsHtml}</div>
         </section>
@@ -256,6 +262,19 @@ export const MENU_CSS = `
 .wrh-ui .wrh-home button.wrh-big{display:flex;align-items:center;gap:12px;width:100%;min-height:clamp(52px,7.4vh,68px);font-size:clamp(16px,1.5vw,20px);margin:4px 0;border-radius:16px;justify-content:flex-start;padding:8px 18px}
 .wrh-ui .wrh-home button.wrh-big.alt{background:#fffdf8;color:#2b3a52;border:2px solid #cdbfa5;box-shadow:0 3px 0 #cdbfa5}
 .wrh-startrow{margin-top:auto;padding-top:12px}
+
+/* companions: a row of count buttons and a row of skill buttons */
+.wrh-comp{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.wrh-pl-side .wrh-comp{margin:0 0 4px}
+.wrh-comp .wrh-seg{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px}
+.wrh-comp .wrh-comp-skill .wrh-seg{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}
+.wrh-ui .wrh-home .wrh-seg button.wrh-wp{min-width:0;min-height:clamp(38px,5.2vh,46px);padding:4px 6px;font-size:clamp(13px,1.1vw,16px);font-weight:800}
+.wrh-ui .wrh-home .wrh-comp-skill .wrh-seg button.wrh-wp{padding:4px 4px;font-size:clamp(12px,1vw,14px)}
+.wrh-ui .wrh-home .wrh-seg button.wrh-wp:disabled{opacity:.4;cursor:not-allowed}
+.wrh-comp-hint{margin:2px 0 0;font-size:12px;opacity:.7;line-height:1.3}
+.wrh-comp .wrh-comp-skill{display:flex;flex-direction:column;gap:4px}
+.wrh-botbadge{vertical-align:-2px;margin-right:4px;color:#2b3a52}
+.wrh-bottag{display:inline-block;margin-left:6px;padding:3px 9px;border-radius:99px;font-size:10px;font-weight:800;letter-spacing:.06em;background:#dfe6ef;color:#44546f;border:1px solid #b9c5d6;vertical-align:1px}
 .wrh-loadline{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:8px;font-weight:700}
 .wrh-ui .wrh-home button.wrh-linkbtn{margin:0;padding:6px 14px;border-radius:99px;font-size:14px;background:#efe7d6;color:#2b3a52;border:2px solid #cdbfa5}
 .wrh-slot{display:flex;flex-direction:column;align-items:center;min-height:0}
@@ -316,11 +335,11 @@ export const MENU_CSS = `
 .wrh-lmid{align-items:center}
 .wrh-lmid>label{align-self:flex-start}
 .wrh-lobby .wrh-lleft .wrh-weapons{width:100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-.wrh-ui .wrh-lobby .wrh-lleft button.wrh-wp{min-height:44px;padding:3px 1px}
+.wrh-ui .wrh-lobby .wrh-lleft button.wrh-wp{min-height:44px;padding:3px 4px}
 .wrh-lobby .wrh-lmid .wrh-classes{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:5px}
 .wrh-ui .wrh-lobby .wrh-lmid button.wrh-class{padding:5px 1px}
 .wrh-lobby .wrh-lmid .wrh-class .ci{height:clamp(30px,3vw,42px)!important}
-.wrh-lobby .wrh-lmid .wrh-class b{font-size:clamp(9px,.8vw,12px)}
+.wrh-lobby .wrh-lmid .wrh-class b{font-size:clamp(10px,.8vw,12px)}
 .wrh-lobby .wrh-lmid .wrh-class-tip{min-height:34px;margin-top:2px}
 .wrh-lright .wrh-arenas{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}
 .wrh-lbar{display:flex;justify-content:flex-end;align-items:center;gap:14px;padding-top:clamp(10px,1.6vh,18px)}

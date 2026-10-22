@@ -27,6 +27,8 @@ export class NetSession {
   /** Secret for rejoining this slot after a dropped connection (kept by the page in sessionStorage). */
   token = '';
   locked = false;
+  /** Seed of the world the relay started (the host's bots are seeded with it, so any page that takes over plays the same squad). */
+  seed = 0;
   /** The ladder step of the room's companion bots. */
   botSkill: BotSkill = DEFAULT_BOT_SKILL;
   world: World | null = null;
@@ -100,6 +102,7 @@ export class NetSession {
     this.token = prev.token;
     this.locked = prev.locked;
     this.botSkill = prev.botSkill;
+    this.seed = prev.seed;
     this.applied = prev.applied;
     this.received = prev.applied; // bundles that never got applied are asked for again
     for (const [t, b] of prev.history) this.history.set(t, b);
@@ -208,6 +211,7 @@ export class NetSession {
         this.paused = false;
         this.adopted = false; // the relay could not resume us: a new world from tick 0, as for a new player
         this.pendingStart = { seed: m.seed, players: m.players };
+        this.seed = m.seed;
         this.world = createGame({ seed: m.seed, players: m.players, map: m.map, mods: m.mods, level: m.level });
         this.history.clear();
         this.bundles.clear();

@@ -91,9 +91,14 @@ export function setupMeta(p: Pick<Profile, 'xp' | 'codex'>): { level: number; me
   return { level: m.lvl, metWeapons: m.metW, metDrones: m.metD };
 }
 
-/** XP a finished run is worth: a tenth of the team score, nothing for a run shorter than 15 seconds. */
-export function xpForRun(teamScore: number, seconds: number): number {
-  return seconds >= MIN_XP_RUN_SECONDS ? runXp(teamScore) : 0;
+/**
+ * XP a finished run is worth: a tenth of the team score, nothing for a run shorter than 15 seconds. Companion bots in the squad
+ * take their share: it is divided by 1 + 0.25 per companion (see `xpFactor` in companions.ts), then rounded.
+ */
+export function xpForRun(teamScore: number, seconds: number, companions = 0): number {
+  if (seconds < MIN_XP_RUN_SECONDS) return 0;
+  const n = Math.max(0, Math.floor(companions) || 0);
+  return Math.round(runXp(teamScore) / (1 + 0.25 * n));
 }
 
 /** The track items that opening levels (from, to] give. */

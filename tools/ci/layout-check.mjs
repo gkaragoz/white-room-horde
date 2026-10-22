@@ -269,6 +269,16 @@ async function menuJob(size, w, h, lang, ts) {
       await sleep(name === 'mods' ? 300 : 700);
       await scan(page, `menu-${name}`, size, lang, ts);
       if (name === 'play') {
+        // companions picked: the skill row shows up under the count
+        const three = page.locator('[data-ccount="3"]');
+        if (await three.count()) {
+          await three.click().catch(() => undefined);
+          await sleep(200);
+          await page.evaluate(() => document.querySelector('.wrh-home').scrollTo(0, 0));
+          await sleep(100);
+          await scan(page, 'menu-play-companions', size, lang, ts);
+          await page.locator('[data-ccount="0"]').click().catch(() => undefined);
+        }
         const online = page.locator('#wrh-online');
         if (await online.count()) {
           await online.click().catch(() => undefined);
@@ -295,6 +305,33 @@ async function menuJob(size, w, h, lang, ts) {
     }
   } catch (e) {
     results.push({ scene: 'menu', size, lang, textSize: ts, kind: 'script', at: '', detail: String(e).slice(0, 200) });
+  }
+  await ctx.close();
+}
+
+/** The online room with companions: the host's picker and the player list with bots (drawn straight from the screens, no relay needed). */
+async function lobbyJob(size, w, h, lang) {
+  const ts = 0;
+  const { ctx, page } = await newPage(w, h, lang, ts, '?menu=1');
+  try {
+    await page.waitForSelector('#wrh-solo', { timeout: 90000, state: 'attached' });
+    await sleep(900);
+    for (const host of [true, false]) {
+      await page.evaluate((host) => {
+        const players = [
+          { slot: 0, name: 'host', host: true, connected: true, weapon: 'smg', acc: 0, color: -1, cls: 0, lvl: 30 },
+          { slot: 1, name: 'friend with a long name', host: false, connected: true, weapon: 'pistol', acc: 1, color: -1, cls: 1, lvl: 12 },
+          { slot: 2, name: 'Ada', host: false, connected: true, weapon: 'ar', acc: 0, color: -1, cls: 2, lvl: 100, bot: true },
+          { slot: 3, name: 'Bolt', host: false, connected: true, weapon: 'smg', acc: 0, color: -1, cls: 3, lvl: 100, bot: true },
+          { slot: 4, name: 'Cinder', host: false, connected: true, weapon: 'shotgun', acc: 0, color: -1, cls: 4, lvl: 100, bot: true },
+        ];
+        window.__wrh.ui.screens.showLobby('ABCD', players, host, { map: -1, mods: 0 }, false, 'expert');
+      }, host);
+      await sleep(700);
+      await scan(page, host ? 'lobby-host-bots' : 'lobby-guest-bots', size, lang, ts);
+    }
+  } catch (e) {
+    results.push({ scene: 'lobby', size, lang, textSize: ts, kind: 'script', at: '', detail: String(e).slice(0, 200) });
   }
   await ctx.close();
 }
@@ -340,6 +377,7 @@ for (const [size, w, h] of SIZES) {
   for (const lang of LANGS) {
     if (wants('menu')) for (const ts of TEXT_SIZES) queue.push(retrying(() => menuJob(size, w, h, lang, ts)));
     if (wants('meta')) for (const ts of TEXT_SIZES) queue.push(retrying(() => metaJob(size, w, h, lang, ts)));
+    if (wants('lobby') && (!quick || lang === 'en')) queue.push(retrying(() => lobbyJob(size, w, h, lang)));
     if (wants('hud') && (!quick || lang === 'en')) queue.push(retrying(() => hudJob(size, w, h, lang)));
   }
 }

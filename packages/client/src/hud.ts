@@ -8,6 +8,7 @@ import { BALANCE, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAX_PLAYE
 import { modFx, xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { loadProfile } from './profile';
+import { BOT_BADGE } from './companions';
 import type { UiHandlers } from './ui';
 import type { Lang, StringSet } from './uiStrings';
 
@@ -21,6 +22,8 @@ export interface HudHost {
   t(): StringSet;
   lang(): Lang;
   playerNames(): string[];
+  /** True for a companion bot. */
+  isBot(slot: number): boolean;
   slotColor(slot: number): string;
 }
 
@@ -560,7 +563,7 @@ export class Hud {
       if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>${icon('chip_haste', 16)}</i>${Math.ceil(haste)}s</span>`;
       if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>${icon('chip_quad', 16)}</i>${Math.ceil(quad)}s</span>`;
       squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${wv.lowHealth(s) ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
-        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${s === slot ? `<i class="you">${t.youBadge}</i>` : ''}${world.pDrone[s] ? `<span class="dr-chip">${icon('drone_' + (world.pDrone[s]! - 1), 14)}${world.pDLv[s * DRONE_TYPES.length + world.pDrone[s]! - 1]}</span>` : ''}${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
+        `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span>${this.host.isBot(s) ? BOT_BADGE : ''}<b>${esc(names[s] ?? 'P' + (s + 1))}</b>${s === slot ? `<i class="you">${t.youBadge}</i>` : ''}${world.pDrone[s] ? `<span class="dr-chip">${icon('drone_' + (world.pDrone[s]! - 1), 14)}${world.pDLv[s * DRONE_TYPES.length + world.pDrone[s]! - 1]}</span>` : ''}${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
         `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
         `<div class="stats" data-tip="pc" data-s="${s}"><span>${t.dpsLabel} <b>${Math.round(this.dpsOf(world, s, now))}</b></span><span>${icon('go_kills', 14)} <b>${Math.round(world.pPerk[s * PERKS + PERK.Kills]!)}</b></span></div>` +
         (chips ? `<div class="chips">${chips}</div>` : '') +

@@ -1,4 +1,6 @@
 import { LANGS, UI_STRINGS, type Lang } from './uiStrings';
+import { loadCompanions } from './companions';
+import type { Skill } from '@wrh/bot';
 import { CSS } from './uiStyles';
 import { Hud } from './hud';
 import { Screens, type MenuChoices } from './screens';
@@ -26,6 +28,8 @@ export interface UiHandlers {
   onResetKeys(): void;
   onOptions(map: number, mods: number): void;
   onStart(): void;
+  /** The host picked how many companion bots (and how well they play) the room gets. */
+  onCompanions?(count: number, skill: Skill): void;
   onLeave(): void;
   onCard(index: number): void;
   /** The player picked a drone (DRONE_TYPES index) from the inventory list. */
@@ -92,7 +96,7 @@ export class Ui {
   /** Names, arrows, rings and numbers drawn over the world. */
   readonly overlay = new WorldOverlay(this.root);
   /** What the player picked in the menu or the lobby. */
-  readonly choices: MenuChoices = { weapon: 'pistol', map: -1, mods: 0, acc: 0, color: -1, cls: Math.max(0, Math.min(CLASS_IDS.length - 1, loadProfile().cls | 0)) }; // (the class is also the one of a game that starts without showing the menu)
+  readonly choices: MenuChoices = { weapon: 'pistol', map: -1, mods: 0, acc: 0, color: -1, cls: Math.max(0, Math.min(CLASS_IDS.length - 1, loadProfile().cls | 0)), companions: loadCompanions() }; // (the class is also the one of a game that starts without showing the menu)
   /** The full-screen pages: menu, room, pause, loading, game over. */
   readonly screens: Screens;
   /** The in-game HUD. */
@@ -105,6 +109,8 @@ export class Ui {
   lang: Lang = 'en';
   /** Names of the players by slot (game over screen). */
   playerNames: string[] = [];
+  /** Slots that are companion bots (marked in the squad list and over their heads). */
+  botSlots: ReadonlySet<number> = new Set();
   /** Colour of a player slot as the game draws it (set by main from the lobby choices). */
   slotColor: (slot: number) => string = (s) => PLAYER_COLORS[s % PLAYER_COLORS.length]!;
   private readonly screen = document.createElement('div');
@@ -144,6 +150,7 @@ export class Ui {
       t: () => this.t,
       lang: () => this.lang,
       playerNames: () => this.playerNames,
+      isBot: (slot) => this.botSlots.has(slot),
       slotColor: (slot) => this.slotColor(slot),
     });
     this.lang = settings.lang;

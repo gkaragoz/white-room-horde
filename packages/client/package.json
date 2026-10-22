@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@wrh/bot": "workspace:*",
     "@wrh/shared": "workspace:*",
     "@wrh/sim": "workspace:*",
     "three": "^0.186.1",

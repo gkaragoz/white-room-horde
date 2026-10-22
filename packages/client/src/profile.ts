@@ -110,11 +110,15 @@ export interface RunMeta {
   seconds: number;
   /** What the run met. */
   codex?: Codex;
+  /** Companion bots that played with the squad: the experience is divided by 1 + 0.25 each. */
+  companions?: number;
 }
 
 /** What a run changed in the meta progression. */
 export interface MetaResult {
   xp: number;
+  /** Companion bots in the squad (the experience was reduced by 1 + 0.25 each); 0 for none. */
+  companions: number;
   levelBefore: number;
   levelAfter: number;
   /** The track items the levels reached opened. */
@@ -135,7 +139,7 @@ export function recordGame(wave: number, kills: number, score = 0, run?: RunMeta
   p.totalKills += kills;
   // experience and first meetings: added to what is saved right now (a second tab may have added its own)
   const levelBefore = levelOf(p);
-  const xp = run ? xpForRun(run.teamScore, run.seconds) : 0;
+  const xp = run ? xpForRun(run.teamScore, run.seconds, run.companions) : 0;
   p.xp += xp;
   const discoveries = run?.codex ? codexMerge(p.codex, run.codex) : [];
   const levelAfter = levelOf(p);
@@ -143,7 +147,7 @@ export function recordGame(wave: number, kills: number, score = 0, run?: RunMeta
   for (const r of rewards) if (!p.seenNew.includes(itemKey(r))) p.seenNew.push(itemKey(r));
   saveProfile(p);
   const unlocked = (Object.keys(WEAPON_UNLOCK) as WeaponId[]).filter((w) => WEAPON_UNLOCK[w] > before && WEAPON_UNLOCK[w] <= p.bestWave);
-  return { newWave, newKills, unlocked, profile: p, meta: { xp, levelBefore, levelAfter, rewards, discoveries } };
+  return { newWave, newKills, unlocked, profile: p, meta: { xp, companions: run?.companions ?? 0, levelBefore, levelAfter, rewards, discoveries } };
 }
 
 export function isUnlocked(weapon: WeaponId, p: Profile = loadProfile()): boolean {

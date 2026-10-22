@@ -30,6 +30,7 @@ const EN = {
   added: 'Added to the album',
   xpGain: '+{n} XP',
   xpNone: 'Runs shorter than 15 seconds give no XP',
+  xpCompanions: 'XP reduced by companions (x{f})',
   levelUp: 'Level {a} to {b}',
   noLevelUp: 'Level {a}',
   rewardsNone: 'No new level this run',
@@ -47,6 +48,7 @@ const EN = {
 export type MetaWords = typeof EN;
 
 const TR: Partial<Record<keyof MetaWords, unknown>> = {
+  xpCompanions: 'Yoldaşlar nedeniyle XP azaldı (x{f})',
   level: 'Seviye',
   levelShort: 'Sv',
   max: 'MAKS',
@@ -85,6 +87,7 @@ const TR: Partial<Record<keyof MetaWords, unknown>> = {
 };
 
 const DE: Partial<Record<keyof MetaWords, unknown>> = {
+  xpCompanions: 'XP durch Begleiter verringert (x{f})',
   level: 'Stufe',
   levelShort: 'St.',
   max: 'MAX',
@@ -108,6 +111,7 @@ const DE: Partial<Record<keyof MetaWords, unknown>> = {
 };
 
 const ES: Partial<Record<keyof MetaWords, unknown>> = {
+  xpCompanions: 'XP reducida por los compañeros (x{f})',
   level: 'Nivel',
   levelShort: 'Nv',
   max: 'MÁX',
@@ -131,6 +135,7 @@ const ES: Partial<Record<keyof MetaWords, unknown>> = {
 };
 
 const FR: Partial<Record<keyof MetaWords, unknown>> = {
+  xpCompanions: 'XP réduite par les compagnons (x{f})',
   level: 'Niveau',
   levelShort: 'Niv',
   max: 'MAX',
@@ -154,6 +159,7 @@ const FR: Partial<Record<keyof MetaWords, unknown>> = {
 };
 
 const RU: Partial<Record<keyof MetaWords, unknown>> = {
+  xpCompanions: 'Опыт уменьшен из-за напарников (x{f})',
   level: 'Уровень',
   levelShort: 'Ур.',
   max: 'МАКС',
