@@ -2,7 +2,7 @@
 title: Takvim: class, kostüm, arena
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 04-basarimlari-yeniden-ayarlama.md
 ---
 
