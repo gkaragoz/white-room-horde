@@ -1,7 +1,7 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
 import { owns } from '@wrh/sim';
 import { BLOW, DPS, HOLD, RANGED, STAND_OFF, T, bursts, lateScale, radiusOf, speedOf, telePain } from './danger';
-import { geoOf, movingDist2, onDeck, pushOut, pushed, teleDist, wrapAngle, type MapGeo } from './geometry';
+import { focusBoxes, geoOf, movingDist2, onDeck, pushOutLocal, pushed, teleDist, wrapAngle, type MapGeo } from './geometry';
 import { computeField, territoryAt } from './nav';
 import { engagement } from './weapons';
 import type { Ctx, MoveDecision, Percept, TeamDecision } from './types';
@@ -85,9 +85,13 @@ function addGoal(x: number, y: number, value: number, px: number, py: number): v
   goalV[at] = value;
 }
 
-const out: MoveDecision = { x: 0, y: 0, dash: false };
 /** The cost of every heading on the last decision (for tests and tuning). */
 export const lastCosts = new Float64Array(DIRS);
+/** Contact, near-contact, stand-off, range and edge terms of the last rollout (for tests and tuning). */
+export const tm = { c: 0, n: 0, o: 0, l: 0, e: 0 };
+export const lastTerms = new Float64Array(DIRS * 5);
+/** The enemies the last decision looked at (for tests and tuning). */
+export const seen = { n: 0, ex, ey, esp, etouch, edps, erel2, ehold };
 
 /** The player's own speed in units per second. */
 function speedNow(p: Percept): number {
@@ -136,22 +140,31 @@ function pickupValue(p: Percept, type: number, data: number): number {
   }
 }
 
-/** Walk the player forward one step along (hx, hy), stopping at boxes, the arena edge and the deck edge. Result in `stepped`. */
+/** Longest stretch walked between two collision checks: well under the thinnest wall, as the sim moves 0.4 units a tick. */
+const SUB = 0.8;
+
+/** Walk the player forward along (hx, hy), stopping at boxes, the arena edge and the deck edge. Result in `stepped`. */
 function stepPlayer(g: MapGeo, deck: boolean, x: number, y: number, hx: number, hy: number, dist: number): void {
-  let nx = x + hx * dist;
-  let ny = y + hy * dist;
-  nx = nx < -ARENA_HALF_W + PR ? -ARENA_HALF_W + PR : nx > ARENA_HALF_W - PR ? ARENA_HALF_W - PR : nx;
-  ny = ny < -ARENA_HALF_H + PR ? -ARENA_HALF_H + PR : ny > ARENA_HALF_H - PR ? ARENA_HALF_H - PR : ny;
-  if (pushOut(g, nx, ny, PR)) {
-    nx = pushed.x;
-    ny = pushed.y;
+  const n = Math.ceil(dist / SUB);
+  const d = dist / n;
+  for (let i = 0; i < n; i++) {
+    let nx = x + hx * d;
+    let ny = y + hy * d;
+    nx = nx < -ARENA_HALF_W + PR ? -ARENA_HALF_W + PR : nx > ARENA_HALF_W - PR ? ARENA_HALF_W - PR : nx;
+    ny = ny < -ARENA_HALF_H + PR ? -ARENA_HALF_H + PR : ny > ARENA_HALF_H - PR ? ARENA_HALF_H - PR : ny;
+    if (pushOutLocal(nx, ny, PR)) {
+      nx = pushed.x;
+      ny = pushed.y;
+    }
+    if (deck && !onDeck(g, nx, ny)) {
+      nx = x;
+      ny = y;
+    }
+    x = nx;
+    y = ny;
   }
-  if (deck && !onDeck(g, nx, ny)) {
-    nx = x;
-    ny = y;
-  }
-  stepped.x = nx;
-  stepped.y = ny;
+  stepped.x = x;
+  stepped.y = y;
 }
 
 /**
@@ -168,6 +181,7 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
     wy[i] = ey[i]!;
   }
   let cost = 0;
+  tm.c = tm.n = tm.o = tm.l = tm.e = 0;
   const free = dash ? Math.max(iframes, BALANCE.dash.iFrames) : iframes;
   const meleeK = melee ? 0.45 : 1;
   for (let k = 1; k <= STEPS; k++) {
@@ -210,30 +224,44 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
       const gap = dmin - etouch[i]!;
       const off = eoff[i]!;
       if (gap <= 0) {
-        cost += (eburst[i] ? eblow[i]! : edps[i]! * DT * meleeK) * tw;
+        const cc = (eburst[i] ? eblow[i]! : edps[i]! * DT * meleeK) * tw;
+        cost += cc;
+        tm.c += cc;
       } else {
         const a = 1.1 + esp[i]! * 0.4;
         if (gap < a) {
           const f = (a - gap) / a;
-          cost += (eburst[i] ? eblow[i]! * 0.5 : edps[i]! * DT * meleeK) * f * f * 0.55 * tw;
+          const cn = (eburst[i] ? eblow[i]! * 0.5 : edps[i]! * DT * meleeK) * f * f * 0.55 * tw;
+          cost += cn;
+          tm.n += cn;
         }
       }
       if (off > 0 && gap > 0 && gap < off) {
         const f = (off - gap) / off;
-        cost += (eburst[i] ? eblow[i]! : eblow[i]! * 0.5) * f * f * 0.5 * tw;
+        const co = (eburst[i] ? eblow[i]! : eblow[i]! * 0.5) * f * f * 0.5 * tw;
+        cost += co;
+        tm.o += co;
       }
     }
     // stay in shooting range of the crowd: a bot that only runs away never kills anything
     if (n > 0) {
       const nearest = Math.sqrt(nearest2);
-      if (nearest > band) cost += Math.min(2, (nearest - band) * 0.05) * DT * 3;
-      else if (nearest < near) cost += (near - nearest) * 0.05 * DT;
+      if (nearest > band) {
+        const cl = Math.min(2, (nearest - band) * 0.05) * DT * 3;
+        cost += cl;
+        tm.l += cl;
+      } else if (nearest < near) {
+        const cl = (near - nearest) * 0.05 * DT;
+        cost += cl;
+        tm.l += cl;
+      }
     }
     // edges: the arena's border is where a run ends
     const mx = ARENA_HALF_W - Math.abs(px);
     const my = ARENA_HALF_H - Math.abs(py);
     if (mx < 4) cost += (4 - mx) * 0.06 * DT * 3;
     if (my < 4) cost += (4 - my) * 0.06 * DT * 3;
+    tm.e = cost - tm.c - tm.n - tm.o - tm.l;
   }
   return cost;
 }
@@ -314,9 +342,8 @@ function roomCost(): number {
 }
 
 export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecision {
-  out.x = 0;
-  out.y = 0;
-  out.dash = false;
+  // a fresh object per decision: the Bot keeps it for the ticks in between
+  const out: MoveDecision = { x: 0, y: 0, dash: false };
   const w = p.world;
   const s = p.slot;
   const memo = ((ctx.mem.move as Memo | undefined) ?? (ctx.mem.move = { heading: -1 } as Memo)) as Memo;
@@ -369,6 +396,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     if (n >= MAXE) break;
   }
 
+  seen.n = n;
   // goals: pickups, the team's pull, the middle of the arena when nothing is around
   goalN = 0;
   if (n < 14) {
@@ -389,6 +417,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   const dashReady = w.pDashCd[s]! <= 0 && w.pDash[s]! === 0;
   const reach = speed * HORIZON;
   const gscale = 0.3 + 0.7 * ctx.skill.dodge;
+  focusBoxes(g, p.x, p.y, 36);
   computeField(g, w.map, p.layer, p.x, p.y, speed, n, ex, ey, 0.3);
   const last = memo.heading;
 
@@ -405,6 +434,11 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
       c = c * (1 + 0.3 * turn) + 0.1 * turn;
     }
     lastCosts[k] = c;
+    lastTerms[k * 5] = tm.c;
+    lastTerms[k * 5 + 1] = tm.n;
+    lastTerms[k * 5 + 2] = tm.o;
+    lastTerms[k * 5 + 3] = tm.l;
+    lastTerms[k * 5 + 4] = tm.e;
     if (c < bestCost) {
       bestCost = c;
       bestK = k;

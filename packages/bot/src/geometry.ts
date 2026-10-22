@@ -43,6 +43,23 @@ function build(map: MapDef, layer: number): MapGeo {
   return { map, nSolid: solid.length / 4, solid: Float64Array.from(solid), nCover: cover.length / 4, cover: Float64Array.from(cover) };
 }
 
+const local = new Float64Array(4 * 96);
+let localN = 0;
+
+/** Keep only the solid boxes within `radius` of (x, y) for `pushOutLocal` (the bot looks at a few seconds of running, not the whole arena). */
+export function focusBoxes(g: MapGeo, x: number, y: number, radius: number): void {
+  localN = 0;
+  const s = g.solid;
+  for (let i = 0, n = g.nSolid * 4; i < n && localN < 96; i += 4) {
+    if (s[i + 2]! < x - radius || s[i]! > x + radius || s[i + 3]! < y - radius || s[i + 1]! > y + radius) continue;
+    local[localN * 4] = s[i]!;
+    local[localN * 4 + 1] = s[i + 1]!;
+    local[localN * 4 + 2] = s[i + 2]!;
+    local[localN * 4 + 3] = s[i + 3]!;
+    localN++;
+  }
+}
+
 /** Result of `pushOut`. */
 export const pushed = { x: 0, y: 0 };
 
@@ -51,6 +68,36 @@ export function pushOut(g: MapGeo, x: number, y: number, r: number): boolean {
   let moved = false;
   const s = g.solid;
   for (let i = 0, n = g.nSolid * 4; i < n; i += 4) {
+    const cx = x < s[i]! ? s[i]! : x > s[i + 2]! ? s[i + 2]! : x;
+    const cy = y < s[i + 1]! ? s[i + 1]! : y > s[i + 3]! ? s[i + 3]! : y;
+    const ex = x - cx;
+    const ey = y - cy;
+    const d2 = ex * ex + ey * ey;
+    if (d2 >= r * r) continue;
+    moved = true;
+    if (d2 > 1e-9) {
+      const d = Math.sqrt(d2);
+      x += (ex / d) * (r - d);
+      y += (ey / d) * (r - d);
+    } else {
+      const mx = (s[i]! + s[i + 2]!) / 2;
+      const my = (s[i + 1]! + s[i + 3]!) / 2;
+      const px = (s[i + 2]! - s[i]!) / 2 - Math.abs(x - mx);
+      const py = (s[i + 3]! - s[i + 1]!) / 2 - Math.abs(y - my);
+      if (px < py) x += (x < mx ? -1 : 1) * (px + r);
+      else y += (y < my ? -1 : 1) * (py + r);
+    }
+  }
+  pushed.x = x;
+  pushed.y = y;
+  return moved;
+}
+
+/** `pushOut` against the boxes chosen by `focusBoxes`. */
+export function pushOutLocal(x: number, y: number, r: number): boolean {
+  let moved = false;
+  const s = local;
+  for (let i = 0, n = localN * 4; i < n; i += 4) {
     const cx = x < s[i]! ? s[i]! : x > s[i + 2]! ? s[i + 2]! : x;
     const cy = y < s[i + 1]! ? s[i + 1]! : y > s[i + 3]! ? s[i + 3]! : y;
     const ex = x - cx;

@@ -12,7 +12,6 @@ import type { CombatDecision, Ctx, Percept } from './types';
  * (see `useSpecial`). Everything is deterministic from the percept.
  */
 
-const out: CombatDecision = { aim: 0, aimDist: 0, fire: false, reload: false, grenade: { throw: false, aim: 0 }, special: false };
 
 const CLS = { soldier: 0, medic: 1, heavy: 2, scout: 3, demolisher: 4, ranger: 5, berserker: 6, swordsman: 7, hammerer: 8 } as const;
 const G = BALANCE.grenade;
@@ -169,15 +168,10 @@ function useSpecial(p: Percept, ctx: Ctx): boolean {
 }
 
 export function decideCombat(p: Percept, ctx: Ctx): CombatDecision {
+  // a fresh object per decision: the Bot keeps it for the ticks in between
+  const out: CombatDecision = { aim: p.angle, aimDist: 0, fire: false, reload: false, grenade: { throw: false, aim: p.angle }, special: false };
   const prof = engagement(p);
   const w = p.world;
-  out.fire = false;
-  out.reload = false;
-  out.special = false;
-  out.grenade.throw = false;
-  out.aimDist = 0;
-  out.aim = p.angle;
-  out.grenade.aim = p.angle;
   if (p.state !== PlayerState.Alive || p.enemies.length === 0) {
     // nothing to shoot: top the magazine up
     if (!prof.melee && p.state === PlayerState.Alive && p.mag < prof.mag * 0.7) out.reload = true;
@@ -211,28 +205,28 @@ export function decideCombat(p: Percept, ctx: Ctx): CombatDecision {
     } else {
       out.aim = Math.atan2(nearest.y - p.y, nearest.x - p.x);
     }
-    // reload: never with a kill in sight, only when the magazine is thin and nothing is close
-    if (p.mag < prof.mag * 0.25 && p.mag > 0 && nd > 9) out.reload = true;
+    // reload: never with a kill in sight; use the lulls (nothing to shoot at) and keep a thin magazine for when nothing is close
+    if (sh.index < 0 && p.mag < prof.mag * 0.9) out.reload = true;
+    else if (p.mag < prof.mag * 0.25 && nd > 9) out.reload = true;
     if (p.mag === 0) out.reload = false;
   }
 
-  // grenade: throw when the blast catches a crowd
-  if (p.grenades > 0 && w.pGrenCd[p.slot]! <= 0) {
+  out.special = useSpecial(p, ctx);
+  const striker = w.pPerk[p.slot * PERKS + PERK.Class]! === CLS.demolisher;
+  if (out.special && striker) {
+    // the airstrike lands where the sim reads `reach = clamp(aimDist * 0.5)`: send half the distance so it lands on the crowd
+    out.aim = Math.atan2(gren.y - p.y, gren.x - p.x);
+    out.aimDist = Math.hypot(gren.x - p.x, gren.y - p.y) / 2;
+  } else if (p.grenades > 0 && w.pGrenCd[p.slot]! <= 0) {
+    // grenade: throw when the blast catches a crowd (the fewer left, the bigger the crowd has to be)
     const full = p.grenades >= BALANCE.grenade.max;
     const need = full ? 3.2 : p.grenades === 1 ? 7 : 5;
     if (gren.score >= need || (bossNear(p, 14) && gren.score >= 1.5)) {
       out.grenade.throw = true;
       out.grenade.aim = Math.atan2(gren.y - p.y, gren.x - p.x);
-      // the wire value is a distance in units/4 steps: the Bot multiplies by 4
+      // the wire value is a distance in units; the Bot sends four times that
       out.aimDist = Math.hypot(gren.x - p.x, gren.y - p.y);
     }
-  }
-
-  out.special = useSpecial(p, ctx);
-  if (out.special && w.pPerk[p.slot * PERKS + PERK.Class]! === CLS.demolisher) {
-    // the airstrike lands where the sim reads `reach = clamp(aimDist * 0.5)`: send half the distance so it lands on the crowd
-    out.aim = Math.atan2(gren.y - p.y, gren.x - p.x);
-    out.aimDist = Math.hypot(gren.x - p.x, gren.y - p.y) / 2;
   }
   return out;
 }

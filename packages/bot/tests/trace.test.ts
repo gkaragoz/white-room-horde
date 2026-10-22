@@ -22,9 +22,17 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
     const w = createGame({ seed, level: MAX_LEVEL, map, mods: 0, players: loads.map((l) => ({ slot: l.slot, weapon: l.weapon, cls: l.cls })) });
     const squad = new Squad(loads.map((l) => l.slot), skill, seed);
     const log = (s: string): void => appendFileSync(out, s + '\n');
+    const up = { fight: 0, reloading: 0, firing: 0, idle: 0, empty: 0 };
     while (!w.gameOver && w.tick < maxTicks) {
       const inputs = [];
       for (const [slot, input] of squad.inputs(w)) inputs[slot] = input;
+      if (w.misc[4] === 0 && w.enemyCount > 0 && w.pState[0] === 0) {
+        up.fight++;
+        if (w.pReload[0]! > 0) up.reloading++;
+        else if (w.pMag[0] === 0) up.empty++;
+        else if (inputs[0] && (inputs[0].buttons & 1)) up.firing++;
+        else up.idle++;
+      }
       step(w, inputs);
       for (const ev of w.events) {
         if (ev.type === 'playerHit' || ev.type === 'playerDown') {
@@ -43,6 +51,7 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
       const st = (k: number): number => w.pStat[l.slot * STATS + k]!;
       log(`slot ${l.slot} cls ${l.cls} shots ${st(STAT.Shots)} hits ${st(STAT.Hits)} swings ${st(STAT.Swings)} dashes ${st(STAT.Dashes)} abilities ${st(STAT.Abilities)} grenades ${st(STAT.Grenades)} dmgTaken ${st(STAT.DamageTaken).toFixed(0)} downs ${st(STAT.Downs)} alive ${st(STAT.AliveTicks)} distance ${st(STAT.Distance).toFixed(0)}`);
     }
+    log(`uptime of slot 0 in fights: ${JSON.stringify(up)}`);
     log(`end t${w.tick} floor ${w.wave} kills ${w.kills}`);
   }, 3_600_000);
 });
