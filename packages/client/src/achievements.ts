@@ -2,6 +2,7 @@ import type { AchievementDef } from '@wrh/shared';
 import { runSummary, type World } from '@wrh/sim';
 import { applyRun, type AchStore } from './achStore';
 import { asset } from './assets';
+import { codexTotals } from './meta';
 import { loadProfile, saveProfile } from './profile';
 import type { Lang } from './ui';
 
@@ -10,7 +11,10 @@ export { applyRun, isGot, valueOf } from './achStore';
 /** Record a run into the saved profile; the earned achievements come back for the game over screen. */
 export function recordAchievements(world: World, slot: number): AchievementDef[] {
   const p = loadProfile();
-  const earned = applyRun(p.ach, runSummary(world, slot));
+  // the Codex achievements count what the player has met so far, this run included (the profile already holds the run's discoveries)
+  const summary = runSummary(world, slot);
+  Object.assign(summary.totals, codexTotals(p.codex));
+  const earned = applyRun(p.ach, summary);
   saveProfile(p);
   return earned;
 }
@@ -78,10 +82,16 @@ const W: Record<string, Words> = {
       score: 'Score {n} points in a run',
       weapon: 'Defeat {n} enemies with this weapon',
       classFloor: 'Reach floor {n} with this class',
+      codexWeapons: 'Meet {n} different weapons in runs',
+      codexDrones: 'Meet {n} different drones in runs',
+      codexEnemies: 'Meet {n} different enemy types',
+      codexBosses: 'Meet {n} different bosses',
+      codexElites: 'Meet {n} different elite kinds',
+      codexArenas: 'Play in {n} different arenas',
     },
     flag: {
       untouchable: 'Reach floor 5 while taking 50 damage or less',
-      quickDeath: 'Lose a run in under a minute',
+      quickDeath: 'Lose a run in under 15 seconds',
       pistolOnly: 'Reach floor 10 with nothing but the pistol',
       fragileFloor8: 'Reach floor 8 with the Fragile multiplier on',
       allMods: 'Reach floor 5 with every difficulty multiplier on',
@@ -127,10 +137,16 @@ const W: Record<string, Words> = {
       score: 'Bir oyunda {n} puan yap',
       weapon: 'Bu silahla {n} düşman yen',
       classFloor: 'Bu sınıfla {n}. kata ulaş',
+      codexWeapons: 'Oyunlarda {n} farklı silahla tanış',
+      codexDrones: 'Oyunlarda {n} farklı dronla tanış',
+      codexEnemies: '{n} farklı düşman türüyle tanış',
+      codexBosses: '{n} farklı bossla tanış',
+      codexElites: '{n} farklı elit türüyle tanış',
+      codexArenas: '{n} farklı arenada oyna',
     },
     flag: {
       untouchable: '50 ya da daha az hasar alarak 5. kata ulaş',
-      quickDeath: 'Bir oyunu bir dakikadan kısa sürede kaybet',
+      quickDeath: 'Bir oyunu 15 saniyeden kısa sürede kaybet',
       pistolOnly: 'Yalnızca tabancayla 10. kata ulaş',
       fragileFloor8: 'Kırılgan çarpanı açıkken 8. kata ulaş',
       allMods: 'Bütün zorluk çarpanları açıkken 5. kata ulaş',
@@ -157,5 +173,5 @@ export function howTo(def: AchievementDef, lang: Lang): string {
 }
 
 export const achName = (def: AchievementDef, lang: Lang): string => (lang === 'tr' ? def.name.tr : def.name.en);
-export const achIcon = (def: AchievementDef): string => asset(`ach/${def.id}.webp`);
+export const achIcon = (def: AchievementDef): string => asset(`ach/${def.icon}.webp`);
 export const lockedIcon = (): string => asset('ach/locked.webp');

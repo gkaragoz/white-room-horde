@@ -140,7 +140,7 @@ describe('levels and what they open', () => {
     const p = loadProfile();
     const demolisher = 4;
     expect((unlocked(p).classes >> demolisher) & 1).toBe(0);
-    p.ach.got['sig_demolisher'] = 1;
+    p.ach.got['grenades_2'] = 1;
     expect((unlocked(p).classes >> demolisher) & 1).toBe(1);
   });
 });

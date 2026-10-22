@@ -566,12 +566,13 @@ export const moreTests: QaTest[] = [
       if (ACHIEVEMENTS.filter((a) => a.hidden).length !== 10) problems.push('expected 10 hidden achievements');
       const store = emptyStore();
       const noFlags = Object.fromEntries(ACHIEVEMENTS.filter((a) => a.kind === 'flag').map((a) => [a.stat, false]));
+      const target = (id: string): number => ACHIEVEMENTS.find((a) => a.id === id)!.target;
       let earned = applyRun(store, { totals: { kills: 60, runKills: 60, floor: 3, games: 1 }, flags: noFlags }, 1000).map((a) => a.id);
       if (!earned.includes('games_1')) problems.push('the first game did not earn Welcome');
-      if (earned.includes('kills_1')) problems.push('60 kills earned the 100-kill achievement');
-      earned = applyRun(store, { totals: { kills: 60, runKills: 40, floor: 6, games: 1 }, flags: noFlags }, 2000).map((a) => a.id);
-      if (store.life.kills !== 120 || store.best.runKills !== 60) problems.push(`totals ${store.life.kills}/${store.best.runKills}`);
-      if (!earned.includes('kills_1') || !earned.includes('floor_1')) problems.push(`second run did not earn the 100 kills and floor 5 (${earned.join(',')})`);
+      if (earned.length !== 1) problems.push(`the first short run earned ${earned.join(',')}, expected only Welcome`);
+      earned = applyRun(store, { totals: { kills: target('kills_1'), runKills: 40, floor: target('floor_1'), games: 1 }, flags: noFlags }, 2000).map((a) => a.id);
+      if (store.life.kills !== 60 + target('kills_1') || store.best.runKills !== 60) problems.push(`totals ${store.life.kills}/${store.best.runKills}`);
+      if (!earned.includes('kills_1') || !earned.includes('floor_1')) problems.push(`second run did not earn the kills and the floor (${earned.join(',')})`);
       if (earned.includes('floor_1') && store.got.floor_1 !== 2000) problems.push('the time of earning is not kept');
       const again = applyRun(store, { totals: { kills: 5, games: 1 }, flags: noFlags }, 3000);
       if (again.length) problems.push('an earned achievement was earned twice');
@@ -587,10 +588,11 @@ export const moreTests: QaTest[] = [
         const cards = host.querySelectorAll('.wrh-achc');
         if (cards.length !== 100) problems.push(`${cards.length} cards on the page`);
         const k = host.querySelector('.wrh-achc[data-id="kills_3"] .num')?.textContent ?? '';
-        if (k !== '125 / 10,000') problems.push(`progress text "${k}"`);
+        const wantK = `${fmtNum(store.life.kills ?? 0, 'en')} / ${fmtNum(target('kills_3'), 'en')}`;
+        if (k !== wantK) problems.push(`progress text "${k}", expected "${wantK}"`);
         const hid = [...host.querySelectorAll('.wrh-achc')].filter((c) => c.querySelector('b')?.textContent === '???').length;
         if (hid !== 9) problems.push(`${hid} hidden cards read ???, expected 9 (one is earned)`);
-        if (!host.querySelector('.wrh-achc[data-id="kills_1"] .tip')?.textContent?.includes('100 enemies')) problems.push('no how-to text on the card');
+        if (!host.querySelector('.wrh-achc[data-id="kills_1"] .tip')?.textContent?.includes(fmtNum(target('kills_1'), 'en'))) problems.push('no how-to text on the card');
         if (fmtNum(533223, 'tr') !== '533.223') problems.push(`fmtNum tr ${fmtNum(533223, 'tr')}`);
         if (runAchievementsHtml('en', ACHIEVEMENTS.slice(0, 2)).split('class="one"').length !== 3) problems.push('the game over list does not show the earned achievements');
       } finally {

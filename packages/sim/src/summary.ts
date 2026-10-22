@@ -62,7 +62,7 @@ export function runSummary(world: World, slot: number): RunSummary {
   const pistolOnly = world.pOwned[slot] === 1 << WEAPON_IDS.indexOf('pistol');
   const flags: Record<string, boolean> = {
     untouchable: world.wave >= 5 && totals.taken! <= 50,
-    quickDeath: seconds < 60,
+    quickDeath: seconds < 15,
     pistolOnly: pistolOnly && world.wave >= 10,
     fragileFloor8: Difficulty.has(mods, 'fragile') && world.wave >= 8,
     allMods: mods === Difficulty.ALL && world.wave >= 5,

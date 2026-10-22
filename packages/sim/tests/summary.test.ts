@@ -9,7 +9,7 @@ describe('runSummary and the achievement table', () => {
     const { totals, flags } = runSummary(world(), 0);
     for (const def of ACHIEVEMENTS) {
       if (def.kind === 'flag') expect(flags, def.id).toHaveProperty(def.stat);
-      else expect(totals, def.id).toHaveProperty(def.stat);
+      else if (!def.stat.startsWith('codex')) expect(totals, def.id).toHaveProperty(def.stat); // (the Codex counts come from the profile, added by the client)
     }
   });
 
@@ -28,7 +28,7 @@ describe('runSummary and the achievement table', () => {
     expect(totals.kills).toBe(w.pPerk[PERK.Kills]);
     expect(totals.shots).toBe(w.pStat[STAT.Shots]);
     expect(totals.seconds).toBeCloseTo(w.pStat[STAT.AliveTicks]! / 30, 9);
-    expect(flags.quickDeath).toBe(totals.seconds! < 60);
+    expect(flags.quickDeath).toBe(totals.seconds! < 15);
     expect(flags.hourRun).toBe(false);
   });
 

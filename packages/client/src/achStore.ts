@@ -32,8 +32,11 @@ export function applyRun(store: AchStore, run: RunSummary, now = Date.now()): Ac
     else store.best[def.stat] = Math.max(store.best[def.stat] ?? 0, v);
   }
   const earned: AchievementDef[] = [];
+  // the hidden special-condition achievements are not given before the tenth run ("That Was Quick" aside: a short run is its point)
+  const veteran = (store.life.games ?? 0) >= 10;
   for (const def of ACHIEVEMENTS) {
     if (store.got[def.id]) continue;
+    if (def.hidden && def.kind === 'flag' && def.stat !== 'quickDeath' && !veteran) continue;
     const done = def.kind === 'flag' ? run.flags[def.stat] === true : valueOf(def, store) >= def.target;
     if (!done) continue;
     store.got[def.id] = now;

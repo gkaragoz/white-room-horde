@@ -1,4 +1,4 @@
-import { BALANCE, CARD_IDS, CARD_PACKS, CLASS_IDS, DRONE_TYPES, ELITE_NAMES, MAPS, MIN_XP_RUN_SECONDS, PLAYER_COLORS, PickupType, TRACK, WEAPON_IDS, levelFromXp, poolAt, runXp, type Pool, type TrackItem, type WeaponId } from '@wrh/shared';
+import { SIGNATURE_ACHIEVEMENTS, BALANCE, CARD_IDS, CARD_PACKS, CLASS_IDS, DRONE_TYPES, ELITE_NAMES, MAPS, MIN_XP_RUN_SECONDS, PLAYER_COLORS, PickupType, TRACK, WEAPON_IDS, levelFromXp, poolAt, runXp, type Pool, type TrackItem, type WeaponId } from '@wrh/shared';
 import { CODEX_CATEGORIES, CODEX_SIZES, codexHas, type Codex, type CodexCategory } from './codex';
 import { ACCESSORIES, type Profile } from './profile';
 
@@ -9,13 +9,8 @@ import { ACCESSORIES, type Profile } from './profile';
  */
 export const META = { enabled: false };
 
-/** The achievement that opens each class that is not on the track. (The achievements themselves arrive with the new table.) */
-export const CLASS_GATE: Readonly<Record<string, string>> = {
-  demolisher: 'sig_demolisher',
-  ranger: 'sig_ranger',
-  berserker: 'sig_berserker',
-  hammerer: 'sig_hammerer',
-};
+/** The achievement that opens each class that is not on the track (the signature achievements of the table). */
+export const CLASS_GATE: Readonly<Record<string, string>> = SIGNATURE_ACHIEVEMENTS;
 
 /** Accessories every player has from the start; the others come with a level (the track's cosmetic column). */
 const CORE_ACCESSORIES = ['acc_bandana', 'acc_cap', 'acc_goggles'];
@@ -125,6 +120,12 @@ export function catalog(cat: CodexCategory): number[] {
     default:
       return all(CODEX_SIZES[cat]);
   }
+}
+
+/** The Codex counts the Codex achievements are checked against (`codex...` stats of the table). */
+export function codexTotals(codex: Codex): Record<string, number> {
+  const n = (cat: CodexCategory): number => catalog(cat).filter((i) => codexHas(codex, cat, i)).length;
+  return { codexWeapons: n('weapon'), codexDrones: n('drone'), codexEnemies: n('enemy'), codexBosses: n('boss'), codexElites: n('elite'), codexArenas: n('arena') };
 }
 
 /** Total entries the Codex lists, over all categories. */
