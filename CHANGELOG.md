@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.34.0 (2026-10-22)
+
 **Roomier, tidier screens (menu, settings, HUD)**
 
 - A new check (`tools/ci/layout-check.mjs`) opens the menu pages, the settings, the HUD, the pause menu and the downed screen at five screen sizes, in all six languages and two text sizes, and looks for text that is clipped, elements that overlap or stick out of the window, text jammed against the edge of its own badge and tap targets too small for a finger. 750 scenes, from 5,963 findings to none.
