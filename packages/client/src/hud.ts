@@ -205,7 +205,7 @@ export class Hud {
     this.host.screen.addEventListener('mouseover', (e) => {
       const el = lockedAt(e);
       if (!el) return;
-      const text = this.host.t().lockedFloor.replace('{n}', el.dataset.lock ?? '').replace('{m}', String(loadProfile().bestWave));
+      const text = el.dataset.locktext ?? this.host.t().lockedFloor.replace('{n}', el.dataset.lock ?? '').replace('{m}', String(loadProfile().bestWave));
       this.squadTip = null;
       this.hoverTip = null;
       this.tipEl.style.setProperty('--rc', '#9aa5b4');

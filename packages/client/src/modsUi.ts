@@ -107,12 +107,12 @@ export function modsCardIcon(mods: number): string {
 }
 
 /** The grid of every multiplier, a toggle each with its sentence on hover. `page` draws it inside the Difficulty page (no title, no Done button). */
-export function modsPanel(lang: Lang, mods: number, editable: boolean, page = false): string {
+export function modsPanel(lang: Lang, mods: number, editable: boolean, page = false, locked = 0): string {
   const t = modWords(lang);
   const cards = MODS.map((_, i) => {
     const [name, text] = modText(lang, i);
     const on = Difficulty.indices(mods).includes(i);
-    return `<button type="button" class="wrh-mod${on ? ' on' : ''}" data-mod="${i}" aria-pressed="${on ? 'true' : 'false'}"${editable ? '' : ' aria-disabled="true"'}><img src="${modIcon(i)}" alt=""><span>${name}</span><span class="tip">${text}</span></button>`;
+    return `<button type="button" class="wrh-mod${on ? ' on' : ''}" data-mod="${i}" aria-pressed="${on ? 'true' : 'false'}"${editable ? '' : ' aria-disabled="true"'}${(locked >> i) & 1 ? ' disabled data-locked="1"' : ''}><img src="${modIcon(i)}" alt=""><span>${name}</span><span class="tip">${text}</span></button>`;
   }).join('');
   const tools = editable ? `<button type="button" class="alt" id="wrh-mods-all">${t.all}</button><button type="button" class="alt" id="wrh-mods-none">${t.clear}</button>` : '';
   const done = page ? '' : `<button type="button" id="wrh-mods-close">${t.close}</button>`;

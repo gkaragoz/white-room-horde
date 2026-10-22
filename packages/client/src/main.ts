@@ -33,7 +33,9 @@ import { viewOf } from './view/worldView';
 import { recordAchievements } from './achievements';
 import { ACCESSORIES, clearRejoin, loadProfile, loadRejoin, recordGame, saveRejoin } from './profile';
 import { RunCodex } from './codex';
-import { joinMeta, setupMeta } from './meta';
+import { META, catalogFound, CATALOG_TOTAL, initMeta, joinMeta, setupMeta } from './meta';
+import { cornerCardHtml, showCornerCard } from './metaUi';
+import type { Discovery } from './codex';
 import { BUILD, mountVersionBadge } from './buildinfo';
 import { Ui, UI_STRINGS, type Settings } from './ui';
 import { hideLoading, preloadAssets } from './preload';
@@ -285,6 +287,7 @@ const dev = {
 const weaponParam = (params.get('weapon') ?? 'weapon_pistol').replace('weapon_', '');
 let startWeapon: WeaponId = (WEAPON_IDS as readonly string[]).includes(weaponParam) ? (weaponParam as WeaponId) : 'pistol';
 
+initMeta();
 const ui = new Ui(
   document.body,
   {
@@ -455,7 +458,7 @@ function afterStep(w: World): void {
   }
   if (!catchingUp) crowd.onEvents(w, w.events, animSec, (e) => tryRagdoll(w, e));
   for (const e of w.events) handleEvent(e);
-  if (runCodex && w.tick % 30 === 0) runCodex.scan(w, localSlot);
+  if (runCodex && w.tick % 30 === 0) announce(runCodex.scan(w, localSlot));
 }
 
 /** Hard hits and blasts throw the body as a physical ragdoll; lighter kills play the baked death animation. */
@@ -518,8 +521,20 @@ const BOSS_BANNERS: Record<string, readonly [string, string]> = {
   hurl: ['Incoming soldiers!', 'Asker fırlatıyor!'],
 };
 
+/** First meetings worth a corner card: a weapon, a drone, an elite, a boss or a power-up (cards and common enemies only go to the album). */
+const CORNER_CATEGORIES = new Set(['weapon', 'drone', 'elite', 'boss', 'powerup']);
+
+function announce(found: Discovery[]): void {
+  if (!META.enabled || catchingUp || !runCodex) return;
+  for (const d of found) {
+    if (!CORNER_CATEGORIES.has(d.cat)) continue;
+    const n = catalogFound(runCodex.codex);
+    showCornerCard(document.body, cornerCardHtml(d, n, CATALOG_TOTAL, UI_STRINGS[ui.lang], ui.lang));
+  }
+}
+
 function handleEvent(e: SimEvent): void {
-  runCodex?.onEvent(e, localSlot);
+  if (runCodex) announce(runCodex.onEvent(e, localSlot));
   if (e.type === 'swing') {
     const heavy = WEAPON_IDS[e.weapon] === 'hammer';
     // blade cuts alternate from side to side, so a run of swings reads as a combo

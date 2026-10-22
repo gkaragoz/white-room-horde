@@ -40,6 +40,8 @@ export interface MenuParts {
   achSub: string;
   closeLabel: string;
   rejoinHtml: string;
+  /** The meta progression: the level path above the cards, the Codex card and the Codex page (all empty while it is off). */
+  meta?: { path: string; codexLabel: string; codexSub: string; codexPage: string };
   codeLabel: string;
   inviteCode: string;
   passLabel: string;
@@ -82,12 +84,14 @@ export function menuMarkup(p: MenuParts): string {
       </header>
       ${p.invite}
       ${p.error ? `<p class="wrh-err">${esc(p.error)}</p>` : ''}
+      ${p.meta?.path ?? ''}
       <main class="wrh-hubcards">
         <button type="button" class="wrh-hc wrh-hc-play" id="wrh-card-play" data-go="play">
           <span class="ico">${icon('hud_right', 88)}</span>
           <span class="txt"><b>${w.play}</b><small>${w.playSub}</small></span>
         </button>
         ${p.rejoinHtml}
+        ${p.meta ? `<button type="button" class="wrh-hc" id="wrh-open-codex" data-go="codex"><span class="ico">${icon('hud_star', 64)}</span><span class="txt"><b>${p.meta.codexLabel}</b><small id="wrh-hc-codex">${p.meta.codexSub}</small></span></button>` : ''}
         <button type="button" class="wrh-hc" id="wrh-open-ach"><span class="ico"><img src="${w.achIcon}" width="64" height="64" alt="" draggable="false"></span><span class="txt"><b>${p.achLabel}</b><small id="wrh-hc-ach">${p.achSub}</small></span>${p.achUnread > 0 ? '<em class="wrh-badge" id="wrh-ach-badge">!</em>' : ''}</button>
         <button type="button" class="wrh-hc" id="wrh-open-loadout" data-go="loadout"><span class="ico" id="wrh-hc-wicon">${w.loadoutIcon}</span><span class="txt"><b>${w.loadout}</b><small id="wrh-hc-loadout">${w.loadoutSub}</small></span></button>
         <button type="button" class="wrh-hc" id="wrh-card-mods" data-go="mods"><span class="ico" id="wrh-hc-micon">${w.modsIcon}</span><span class="txt"><b>${w.difficulty}</b><small id="wrh-hc-mods">${w.modsSub}</small></span></button>
@@ -128,6 +132,11 @@ export function menuMarkup(p: MenuParts): string {
         </div>
       </div>
     </section>
+
+    ${p.meta ? `<section class="wrh-pg" data-p="codex">
+      ${subBar(w.back, p.meta.codexLabel)}
+      <div class="wrh-hcard wrh-codexpage" id="wrh-codex-page">${p.meta.codexPage}</div>
+    </section>` : ''}
 
     <section class="wrh-pg" data-p="mods">
       ${subBar(w.back, w.difficulty)}
@@ -197,7 +206,7 @@ export const MENU_CSS = `
 @keyframes wrh-float{to{transform:translateY(-120vh) translateX(40px)}}
 @media (prefers-reduced-motion:reduce){.wrh-home-bg i{animation:none;bottom:20%}}
 .wrh-pg{position:relative;display:none;flex:1;min-height:0;flex-direction:column;width:100%;max-width:1240px;margin:0 auto}
-.wrh-home[data-page="hub"] [data-p="hub"],.wrh-home[data-page="play"] [data-p="play"],.wrh-home[data-page="loadout"] [data-p="loadout"],.wrh-home[data-page="mods"] [data-p="mods"],.wrh-pg-lobby{display:flex}
+.wrh-home[data-page="hub"] [data-p="hub"],.wrh-home[data-page="play"] [data-p="play"],.wrh-home[data-page="loadout"] [data-p="loadout"],.wrh-home[data-page="mods"] [data-p="mods"],.wrh-home[data-page="codex"] [data-p="codex"],.wrh-pg-lobby{display:flex}
 .wrh-hbar{position:relative;display:flex;align-items:baseline;gap:clamp(14px,2vw,32px);flex-wrap:wrap;margin:0 0 clamp(10px,2.4vh,24px);padding-right:110px}
 .wrh-home .wrh-logo{font-size:clamp(34px,4.2vw,62px)!important;line-height:1;text-align:left;margin:0!important;letter-spacing:1px}
 .wrh-hsub{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0;font-size:clamp(13px,1.2vw,18px);opacity:.78}

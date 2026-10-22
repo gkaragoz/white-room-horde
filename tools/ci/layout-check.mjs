@@ -194,16 +194,20 @@ function detector(rootSel) {
 const results = [];
 let scenes = 0;
 
-async function newPage(w, h, lang, textSize, query) {
+const OLD_PROFILE = { bestWave: 12, bestKills: 640, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 };
+/** A player part way along the Discovery Path: level 30, a few things met, something new waiting. */
+const META_PROFILE = { ...OLD_PROFILE, v: 2, xp: 14000, introSeen: true, codex: { weapon: [0b110000011], drone: [8], class: [1], arena: [1], elite: [6], enemy: [3], boss: [2] }, seenNew: ['weapon:mp'] };
+
+async function newPage(w, h, lang, textSize, query, profile = OLD_PROFILE) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: w < 800 });
-  await ctx.addInitScript(([lang, textSize]) => {
+  await ctx.addInitScript(([lang, textSize, profile]) => {
     try {
-      localStorage.setItem('wrh.profile', JSON.stringify({ bestWave: 12, bestKills: 640, games: 9, totalKills: 999, acc: 0, color: -1, cls: 0, map: -1, difficulty: 1 }));
+      localStorage.setItem('wrh.profile', JSON.stringify(profile));
       localStorage.setItem('wrh.lang', lang);
       localStorage.setItem('wrh.settings', JSON.stringify({ lang, textSize }));
       localStorage.setItem('wrh.notesSeen', '999.0');
     } catch {}
-  }, [lang, textSize]);
+  }, [lang, textSize, profile]);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -224,6 +228,35 @@ async function scan(page, scene, size, lang, textSize, sel = '.wrh-ui') {
 }
 
 const wants = (name) => !only || only.includes(name);
+
+/** The menu under the meta progression: the level path on the hub, the Codex page and the locked pickers. */
+async function metaJob(size, w, h, lang, ts) {
+  const { ctx, page } = await newPage(w, h, lang, ts, '?menu=1&meta=1', META_PROFILE);
+  try {
+    await page.waitForSelector('#wrh-open-codex', { timeout: 90000, state: 'attached' });
+    await sleep(900);
+    await scan(page, 'meta-hub', size, lang, ts);
+    await page.click('#wrh-open-codex');
+    await sleep(500);
+    for (const tab of ['weapon', 'class', 'card', 'arena']) {
+      await page.click(`[data-ctab="${tab}"]`);
+      await sleep(250);
+      await scan(page, `meta-codex-${tab}`, size, lang, ts);
+    }
+    await page.keyboard.press('Escape');
+    await sleep(200);
+    await page.click('#wrh-open-loadout');
+    await sleep(700);
+    await scan(page, 'meta-loadout', size, lang, ts);
+    await page.keyboard.press('Escape');
+    await sleep(200);
+    await page.click('#wrh-card-mods');
+    await sleep(300);
+    await scan(page, 'meta-mods', size, lang, ts);
+  } finally {
+    await ctx.close();
+  }
+}
 
 async function menuJob(size, w, h, lang, ts) {
   const { ctx, page } = await newPage(w, h, lang, ts, '?menu=1');
@@ -306,6 +339,7 @@ const queue = [];
 for (const [size, w, h] of SIZES) {
   for (const lang of LANGS) {
     if (wants('menu')) for (const ts of TEXT_SIZES) queue.push(retrying(() => menuJob(size, w, h, lang, ts)));
+    if (wants('meta')) for (const ts of TEXT_SIZES) queue.push(retrying(() => metaJob(size, w, h, lang, ts)));
     if (wants('hud') && (!quick || lang === 'en')) queue.push(retrying(() => hudJob(size, w, h, lang)));
   }
 }

@@ -4,7 +4,7 @@ import { weaponStatBars } from './weaponHtml';
 import { icon } from './icons';
 import { lobbyMarkup, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
-import { BALANCE, Difficulty, MELEE_CLASSES, MAPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, WEAPON_IDS, GAME_VERSION, compatibleVersions, type WeaponId } from '@wrh/shared';
+import { TICK_RATE, BALANCE, Difficulty, MELEE_CLASSES, MAPS, MODS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, WEAPON_IDS, GAME_VERSION, compatibleVersions, type WeaponId } from '@wrh/shared';
 import { type World } from '@wrh/sim';
 import { asset } from './assets';
 import { modsCardIcon, modsPanel, modsRow, modsSummary } from './modsUi';
@@ -14,7 +14,11 @@ import { ACHIEVEMENTS, type AchievementDef } from '@wrh/shared';
 import { renderGameOver, type RunExtras } from './gameOver';
 import { discoverRelay } from './relay';
 import { Preview } from './render/preview';
-import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile } from './profile';
+import { ACCESSORIES, WEAPON_UNLOCK, isUnlocked, loadProfile, loadRejoin, saveProfile, type MetaResult } from './profile';
+import { META, colorLevel, levelOf, startWeapons, unlockLevelOf, unlocked, type Unlocked } from './meta';
+import { type CodexCategory } from './codex';
+import { codexPageHtml, codexSub, introHtml, levelPathHtml, runRewardHtml } from './metaUi';
+import { fill, metaWords } from './metaStrings';
 import type { UiHandlers } from './ui';
 import type { Lang, StringSet } from './uiStrings';
 
@@ -164,6 +168,26 @@ export class Screens {
     return u.toString();
   }
 
+  /** What the player has open under the meta progression; null while it is off (then everything is open). */
+  private lock(): Unlocked | null {
+    return META.enabled ? unlocked(loadProfile()) : null;
+  }
+
+  /** The difficulty multipliers the level has not opened yet (a mask over MODS; 0 while the meta progression is off). */
+  private lockedMods(): number {
+    const lock = this.lock();
+    return lock ? ~lock.mods & ((1 << MODS.length) - 1) : 0;
+  }
+
+  private classLockText(i: number): string {
+    const at = unlockLevelOf('class', i);
+    return at === 'ach' ? metaWords(this.host.lang()).lockedAchTip : this.lockTip(Number(at ?? 0));
+  }
+
+  private lockTip(level: number): string {
+    return fill(metaWords(this.host.lang()).lockedTip, { n: level });
+  }
+
   private disposePreview(): void {
     this.preview?.dispose();
     this.preview = null;
@@ -178,15 +202,22 @@ export class Screens {
   }
 
   private previewSwatches(): string {
-    const swatches = PLAYER_COLORS.map((c, i) => `<button type="button" class="wrh-sw${i === this.choices.color ? ' on' : ''}" data-sw="${i}" style="background:${c}" aria-label="${c}"></button>`).join('');
+    const lock = this.lock();
+    const swatches = PLAYER_COLORS.map((c, i) => {
+      const shut = lock !== null && !lock.colors[i];
+      return `<button type="button" class="wrh-sw${i === this.choices.color ? ' on' : ''}${shut ? ' locked' : ''}" data-sw="${i}" style="background:${c}" aria-label="${c}"${shut ? ` disabled title="${esc(this.lockTip(colorLevel(i)))}"` : ''}></button>`;
+    }).join('');
     return `<div class="wrh-swatches" id="wrh-swatches">${swatches}</div>`;
   }
 
   private classPicker(): string {
     const t = this.host.t();
     const tips = t.classTips as readonly string[];
+    const lock = this.lock();
+    const shut = (i: number): boolean => lock !== null && ((lock.classes >> i) & 1) === 0;
+    const tip = (i: number): string => (shut(i) ? this.classLockText(i) : tips[i]!);
     return `<label style="margin-top:8px">${t.classTitle}</label>
-      <div class="wrh-classes">${(t.classNames as readonly string[]).map((n, i) => `<button type="button" class="wrh-class${i === this.choices.cls ? ' on' : ''}" data-cls="${i}" title="${esc(tips[i]!)}"><span class="ci">${CLASS_ICON(i)}</span><b>${n}</b></button>`).join('')}</div>
+      <div class="wrh-classes">${(t.classNames as readonly string[]).map((n, i) => `<button type="button" class="wrh-class${i === this.choices.cls ? ' on' : ''}${shut(i) ? ' locked' : ''}" data-cls="${i}"${shut(i) ? ' disabled' : ''} title="${esc(tip(i))}"><span class="ci">${CLASS_ICON(i)}</span><b>${n}</b></button>`).join('')}</div>
       <div class="wrh-class-tip" id="wrh-class-tip">${esc(tips[this.choices.cls]!)}</div>`;
   }
 
@@ -212,7 +243,7 @@ export class Screens {
     }
     const names = this.host.t().accs as readonly string[];
     const weaponNames = this.host.t().weapons as Record<string, string>;
-    const unlocked = (): WeaponId[] => WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee && isUnlocked(w, loadProfile()));
+    const unlockedWeapons = (): WeaponId[] => WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee && this.canStartWith(w));
     const refresh = (): void => {
       const colorHex = PLAYER_COLORS[this.choices.color >= 0 ? this.choices.color % PLAYER_COLORS.length : 0]!;
       const q = (id: string): HTMLElement => this.host.screen.querySelector<HTMLElement>('#' + id)!;
@@ -234,11 +265,17 @@ export class Screens {
       el.onclick = () => {
         const dir = Number(el.dataset.pdir);
         if (this.previewMode === 'char') {
-          this.choices.acc = (this.choices.acc + dir + ACCESSORIES.length) % ACCESSORIES.length;
+          const lock = this.lock();
+          let next = this.choices.acc;
+          for (let k = 0; k < ACCESSORIES.length; k++) {
+            next = (next + dir + ACCESSORIES.length) % ACCESSORIES.length;
+            if (!lock || lock.accessories[next]) break;
+          }
+          this.choices.acc = next;
           this.persistLook();
           this.host.handlers.onLook(this.choices.acc, this.choices.color, this.choices.cls);
         } else {
-          const list = unlocked();
+          const list = unlockedWeapons();
           const at = Math.max(0, list.indexOf(this.choices.weapon));
           this.choices.weapon = list[(at + dir + list.length) % list.length]!;
           this.host.handlers.onWeapon(this.choices.weapon);
@@ -298,10 +335,13 @@ export class Screens {
       const pic = map >= 0 ? `<img class="wrh-thumb-s" src="${arenaThumb(map)}" alt="">` : '<span class="wrh-thumb-s wrh-dice">?</span>';
       return `<div class="wrh-ro">${pic}<span><b>${names[String(map)]}</b></span></div><label>${t.difficulty}</label><div id="wrh-modsrow">${modsRow(this.host.lang(), mods, false)}</div>`;
     }
+    const lock = this.lock();
     const cards = ['-1', ...MAPS.map((_, i) => String(i))]
       .map((id) => {
         const pic = id === '-1' ? '<span class="wrh-dice">?</span>' : `<img src="${arenaThumb(Number(id))}" alt="">`;
-        return `<button type="button" class="wrh-arena${id === String(map) ? ' on' : ''}" data-map="${id}">${pic}<span>${names[id]}</span></button>`;
+        const shut = lock !== null && id !== '-1' && ((lock.arenas >> Number(id)) & 1) === 0;
+        const tip = shut ? ` disabled title="${esc(this.lockTip(Number(unlockLevelOf('arena', Number(id)) ?? 0)))}"` : '';
+        return `<button type="button" class="wrh-arena${id === String(map) ? ' on' : ''}${shut ? ' locked' : ''}" data-map="${id}"${tip}>${pic}<span>${names[id]}</span></button>`;
       })
       .join('');
     return `<label>${t.arena}</label><div class="wrh-arenas">${cards}</div><label>${t.difficulty}</label><div id="wrh-modsrow">${modsRow(this.host.lang(), mods, true)}</div>`;
@@ -371,17 +411,65 @@ export class Screens {
     return `<img src="${asset(`ui/wpn_${this.choices.weapon}.png`)}" alt="" draggable="false">`;
   }
 
+  private codexTab: CodexCategory = 'weapon';
+  /** The profile the Codex page was last drawn from (kept so the "new!" badges stay while the page is open). */
+  private codexProfile: ReturnType<typeof loadProfile> | null = null;
+
+  /** Draw the Codex page; the first time after it opens the "new!" badges are shown and then cleared from the save. */
+  private drawCodex(fresh: boolean): void {
+    const host = this.host.screen.querySelector<HTMLElement>('#wrh-codex-page');
+    if (!host) return;
+    if (fresh || !this.codexProfile) {
+      this.codexProfile = loadProfile();
+      const saved = loadProfile();
+      if (saved.seenNew.length) {
+        saved.seenNew = [];
+        saveProfile(saved);
+      }
+    }
+    const scroll = host.scrollTop;
+    host.innerHTML = codexPageHtml(this.codexProfile, this.codexTab, this.host.t(), this.host.lang());
+    host.querySelectorAll<HTMLElement>('[data-ctab]').forEach((b) => {
+      b.onclick = () => {
+        this.codexTab = b.dataset.ctab as CodexCategory;
+        this.drawCodex(false);
+      };
+    });
+    host.scrollTop = scroll;
+  }
+
+  private bindCodex(): void {
+    this.codexProfile = null;
+    this.drawCodex(false);
+    const open = this.host.screen.querySelector<HTMLElement>('#wrh-open-codex');
+    if (open) open.addEventListener('click', () => this.drawCodex(true));
+  }
+
+  /** The one-time note for a player whose old save moved to the new system. */
+  private showIntro(): void {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = introHtml(this.host.lang());
+    const modal = wrap.firstElementChild as HTMLElement;
+    document.body.appendChild(modal);
+    modal.querySelector<HTMLElement>('#wrh-intro-ok')!.onclick = () => {
+      const p = loadProfile();
+      p.introSeen = true;
+      saveProfile(p);
+      modal.remove();
+    };
+  }
+
   /** The Difficulty page: the same multiplier grid the room uses, drawn in the page. */
   private drawModsPage(): void {
     const host = this.host.screen.querySelector<HTMLElement>('#wrh-mods-page');
     if (!host) return;
     const scroll = host.scrollTop;
-    host.innerHTML = modsPanel(this.host.lang(), this.choices.mods, true, true);
+    host.innerHTML = modsPanel(this.host.lang(), this.choices.mods, true, true, this.lockedMods());
     host.querySelectorAll<HTMLElement>('.wrh-mod').forEach((b) => {
       b.onclick = () => this.setMods(Difficulty.toggle(this.choices.mods, Number(b.dataset.mod)));
     });
     const all = host.querySelector<HTMLElement>('#wrh-mods-all');
-    if (all) all.onclick = () => this.setMods(Difficulty.ALL);
+    if (all) all.onclick = () => this.setMods(Difficulty.ALL & ~this.lockedMods());
     const none = host.querySelector<HTMLElement>('#wrh-mods-none');
     if (none) none.onclick = () => this.setMods(0);
     host.scrollTop = scroll;
@@ -459,7 +547,7 @@ export class Screens {
       lookHtml: this.previewSwatches(),
       classHtml: this.classPicker(),
       arenaHtml: this.arenaRows(true, this.choices.map, this.choices.mods),
-      modsHtml: modsPanel(this.host.lang(), this.choices.mods, true, true),
+      modsHtml: modsPanel(this.host.lang(), this.choices.mods, true, true, this.lockedMods()),
       soloLabel: t.solo,
       hostLabel: t.host,
       joinLabel: t.join,
@@ -469,6 +557,7 @@ export class Screens {
       achUnread: unreadCount(profile.ach),
       achSub: `${got} / ${ACHIEVEMENTS.length} ${ach.earned}`,
       closeLabel: t.close,
+      meta: META.enabled ? { path: levelPathHtml(profile, t, this.host.lang()), codexLabel: metaWords(this.host.lang()).codex, codexSub: codexSub(profile, this.host.lang()), codexPage: codexPageHtml(profile, this.codexTab, t, this.host.lang()) } : undefined,
       rejoinHtml: rejoin ? `<button type="button" id="wrh-rejoin" class="wrh-hc wrh-hc-rejoin"><span class="ico">${icon('hud_link', 34)}</span><span class="txt"><b>${t.rejoin} (${esc(rejoin.code)})</b></span></button>` : '',
       codeLabel: t.code,
       inviteCode,
@@ -501,6 +590,10 @@ export class Screens {
     });
     this.drawModsPage();
     this.bindMenuMods();
+    if (META.enabled) {
+      this.bindCodex();
+      if (!profile.introSeen) this.showIntro();
+    }
     const q = <E extends HTMLElement>(id: string): E => this.host.screen.querySelector<E>('#' + id)!;
     const name = (): string => {
       const n = q<HTMLInputElement>('wrh-name').value.trim() || 'player';
@@ -570,12 +663,25 @@ export class Screens {
   }
 
 
+  /** May this gun be a starting weapon: under the meta progression the pistol, the SMG and the guns met in the Codex; otherwise by the best floor. */
+  private canStartWith(w: WeaponId): boolean {
+    const profile = loadProfile();
+    return META.enabled ? startWeapons(profile).includes(w) : isUnlocked(w, profile);
+  }
+
+  /** Why a gun is not a starting weapon under the meta progression: its level has not come, or it has not been met yet. */
+  private weaponLockText(w: WeaponId, profile: ReturnType<typeof loadProfile>, words: ReturnType<typeof metaWords>): string {
+    const at = unlockLevelOf('weapon', WEAPON_IDS.indexOf(w));
+    return typeof at === 'number' && at > levelOf(profile) ? fill(words.lockedTip, { n: at }) : words.startLocked;
+  }
+
   private weaponButtons(): string {
     const names = this.host.t().weapons as Record<string, string>;
     const profile = loadProfile();
+    const meta = metaWords(this.host.lang());
     return WEAPON_IDS.filter((w) => !BALANCE.weapons[w].melee).map((w) => {
-      const ok = isUnlocked(w, profile);
-      return `<button type="button" class="wrh-wp${w === this.choices.weapon ? ' on' : ''}${ok ? '' : ' locked'}" data-w="${w}"${ok ? '' : ` aria-disabled="true" data-lock="${WEAPON_UNLOCK[w]}"`}>${ok ? '' : icon('hud_lock', 16) + ' '}<img class="wp-i" src="${asset(`ui/wpn_${w}.png`)}" alt="" draggable="false">${names[w]}</button>`;
+      const ok = this.canStartWith(w);
+      return `<button type="button" class="wrh-wp${w === this.choices.weapon ? ' on' : ''}${ok ? '' : ' locked'}" data-w="${w}"${ok ? '' : ` aria-disabled="true" data-lock="${WEAPON_UNLOCK[w]}"${META.enabled ? ` data-locktext="${esc(this.weaponLockText(w, profile, meta))}"` : ''}`}>${ok ? '' : icon('hud_lock', 16) + ' '}<img class="wp-i" src="${asset(`ui/wpn_${w}.png`)}" alt="" draggable="false">${names[w]}</button>`;
     }).join('');
   }
 
@@ -804,8 +910,38 @@ export class Screens {
     document.body.appendChild(page);
   }
 
-  showGameOver(world: World, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[]; ach?: readonly AchievementDef[] }, extras: RunExtras = { clicks: 0, keys: 0, bestCombo: 0 }, instant = false, slot = 0): void {
+  /** Reward packs the player has opened on the game over screen (they stay open when the page is drawn again). */
+  private readonly packsOpened = new Set<number>();
+  private packsBound = false;
+  private packMeta: MetaResult | undefined;
+
+  /** Clicking a face-down pack turns it over; "Open all" turns the rest. One listener on the screen, because the page is rebuilt now and then. */
+  private bindPacks(meta: MetaResult | undefined): void {
+    this.packMeta = meta;
+    if (this.packsBound) return;
+    this.packsBound = true;
+    this.host.screen.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const pack = target.closest<HTMLElement>('[data-pack]');
+      const all = target.closest<HTMLElement>('#wrh-openall');
+      if (!pack && !all) return;
+      const open = (el: HTMLElement): void => {
+        this.packsOpened.add(Number(el.dataset.pack));
+        el.classList.add('open');
+      };
+      if (pack) {
+        open(pack);
+        this.host.handlers.onUiSound('confirm');
+      } else this.host.screen.querySelectorAll<HTMLElement>('[data-pack]').forEach(open);
+      const left = this.host.screen.querySelectorAll('[data-pack]:not(.open)').length;
+      const btn = this.host.screen.querySelector<HTMLElement>('#wrh-openall');
+      if (btn && left < 2) btn.remove();
+    });
+  }
+
+  showGameOver(world: World, rec?: { newWave: boolean; newKills: boolean; unlocked: WeaponId[]; ach?: readonly AchievementDef[]; meta?: MetaResult }, extras: RunExtras = { clicks: 0, keys: 0, bestCombo: 0 }, instant = false, slot = 0): void {
     this.redraw = () => this.showGameOver(world, rec, extras, true, slot);
+    if (!instant) this.packsOpened.clear();
     this.lobbyCode = '';
     this.goStop?.();
     const t = this.host.t();
@@ -824,12 +960,13 @@ export class Screens {
       slotColor: (s) => this.host.slotColor(s),
       weaponName: (id) => names[WEAPON_IDS[id]!] ?? '',
       head,
-      foot: `${runAchievementsHtml(this.host.lang(), rec?.ach ?? [])}<button id="wrh-again">${t.again}</button>`,
+      foot: `${META.enabled && rec?.meta ? runRewardHtml(rec.meta, { opened: this.packsOpened }, t, this.host.lang(), world.tick / TICK_RATE) : ''}${runAchievementsHtml(this.host.lang(), rec?.ach ?? [])}<button id="wrh-again">${t.again}</button>`,
       tick: (_i, last) => this.host.handlers.onUiSound(last ? 'confirm' : 'click'),
       instant,
       extras: { ...extras, slot },
     });
     this.goStop = r.stop;
+    this.bindPacks(rec?.meta);
     const again = (): void => {
       this.host.screen.querySelector<HTMLElement>('#wrh-again')!.onclick = () => this.host.handlers.onAgain();
     };

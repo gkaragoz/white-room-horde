@@ -1,6 +1,7 @@
 import { ACH_CSS } from './achUi';
 import { MENU_CSS } from './menu';
 import { MODS_CSS } from './modsUi';
+import { META_CSS } from './metaUi';
 
 const CSS_BASE = `
 .wrh-ui{position:fixed;inset:0;pointer-events:none;font-family:system-ui,sans-serif;color:#3a352d}
@@ -239,6 +240,7 @@ const CSS_BASE = `
 .wrh-ui button.wrh-diff.on{background:#fff;border-color:#d8362e;box-shadow:0 0 0 2px rgba(216,54,46,.2)}
 .wrh-sk-row{display:inline-flex;gap:2px;align-items:center}
 ${MODS_CSS}
+${META_CSS}
 ${ACH_CSS}
 .wrh-skull{display:block}
 .wrh-ro{display:flex;gap:10px;align-items:center;margin:6px 0 10px;font-size:13px}

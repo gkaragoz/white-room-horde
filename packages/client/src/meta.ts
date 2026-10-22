@@ -1,5 +1,5 @@
-import { CLASS_IDS, MIN_XP_RUN_SECONDS, PLAYER_COLORS, TRACK, WEAPON_IDS, BALANCE, levelFromXp, poolAt, runXp, type Pool, type TrackItem, type WeaponId } from '@wrh/shared';
-import { codexHas } from './codex';
+import { BALANCE, CARD_IDS, CARD_PACKS, CLASS_IDS, DRONE_TYPES, ELITE_NAMES, MAPS, MIN_XP_RUN_SECONDS, PLAYER_COLORS, PickupType, TRACK, WEAPON_IDS, levelFromXp, poolAt, runXp, type Pool, type TrackItem, type WeaponId } from '@wrh/shared';
+import { CODEX_CATEGORIES, CODEX_SIZES, codexHas, type Codex, type CodexCategory } from './codex';
 import { ACCESSORIES, type Profile } from './profile';
 
 /**
@@ -109,3 +109,91 @@ export function rewardsBetween(from: number, to: number): TrackItem[] {
 /** A stable key for a track item, used for the "new!" badges. */
 export const itemKey = (i: TrackItem): string => `${i.cat}:${i.name}`;
 
+
+/** Where the Codex looks up what to list in a category (indices into its lists). Melee weapons are class gear and not listed. */
+export function catalog(cat: CodexCategory): number[] {
+  const all = (n: number, from = 0): number[] => Array.from({ length: n - from }, (_, i) => i + from);
+  switch (cat) {
+    case 'weapon':
+      return WEAPON_IDS.map((id, i) => (BALANCE.weapons[id].melee ? -1 : i)).filter((i) => i >= 0);
+    case 'powerup':
+      return [PickupType.Shield, PickupType.Haste, PickupType.Quad, PickupType.Nuke, PickupType.Freeze];
+    case 'elite':
+      return all(ELITE_NAMES.length, 1);
+    case 'boss':
+      return all(12, 1);
+    default:
+      return all(CODEX_SIZES[cat]);
+  }
+}
+
+/** Total entries the Codex lists, over all categories. */
+export const CATALOG_TOTAL = CODEX_CATEGORIES.reduce((n, c) => n + catalog(c).length, 0);
+
+/** How many entries the player has met. */
+export function catalogFound(codex: Codex): number {
+  return CODEX_CATEGORIES.reduce((n, c) => n + catalog(c).filter((i) => codexHas(codex, c, i)).length, 0);
+}
+
+const POWERUP_NAMES: Record<number, string> = { [PickupType.Shield]: 'shield', [PickupType.Haste]: 'haste', [PickupType.Quad]: 'quad', [PickupType.Nuke]: 'nuke', [PickupType.Freeze]: 'freeze' };
+
+/** The pack a card belongs to, by card index. */
+const PACK_OF_CARD = new Map<string, string>(Object.entries(CARD_PACKS).flatMap(([pack, ids]) => ids.map((id) => [id, pack] as [string, string])));
+
+/**
+ * What opens a Codex entry: the meta level (0 = from the start), 'ach' for a class that comes with an achievement, or null when
+ * it is not gated (enemies and bosses appear as the waves bring them).
+ */
+export function unlockLevelOf(cat: CodexCategory, index: number): number | 'ach' | null {
+  const at = (trackCat: TrackItem['cat'], name: string): number | null => TRACK.find((i) => i.cat === trackCat && i.name === name)?.level ?? null;
+  switch (cat) {
+    case 'weapon':
+      return at('weapon', WEAPON_IDS[index]!) ?? 0;
+    case 'drone':
+      return at('drone', DRONE_TYPES[index]!);
+    case 'class': {
+      const id = CLASS_IDS[index]!;
+      return id in CLASS_GATE ? 'ach' : (at('class', id) ?? 0);
+    }
+    case 'arena':
+      return at('arena', MAPS[index]!.id) ?? 0;
+    case 'powerup':
+      return at('powerup', POWERUP_NAMES[index] ?? '');
+    case 'elite':
+      return at('elite', ELITE_NAMES[index] ?? '');
+    case 'card': {
+      const pack = PACK_OF_CARD.get(CARD_IDS[index]!);
+      if (!pack || pack === 'core') return 0;
+      if (/^(demolisher|ranger|berserker|hammerer):basic$/.test(pack)) return 'ach';
+      return at('pack', pack);
+    }
+    default:
+      return null;
+  }
+}
+
+/** Is a Codex entry open to the player now (met, or opened by the level)? */
+export function isOpen(p: Pick<Profile, 'xp' | 'codex' | 'ach'>, cat: CodexCategory, index: number): boolean {
+  if (codexHas(p.codex, cat, index)) return true;
+  const at = unlockLevelOf(cat, index);
+  if (at === null) return false;
+  if (at === 'ach') return cat === 'class' ? ((unlocked(p).classes >> index) & 1) === 1 : ((unlocked(p).classes >> CLASS_IDS.indexOf(cardClassOf(index))) & 1) === 1;
+  return at <= levelOf(p);
+}
+
+function cardClassOf(index: number): (typeof CLASS_IDS)[number] {
+  const pack = PACK_OF_CARD.get(CARD_IDS[index]!) ?? '';
+  return (pack.split(':')[0] as (typeof CLASS_IDS)[number]) || 'soldier';
+}
+
+/** Turn the switch on from the address (?meta=1) or a saved flag while the new system is still being tried out. */
+export function initMeta(): void {
+  try {
+    const on = new URLSearchParams(location.search).get('meta');
+    if (on === '1') localStorage.setItem('wrh.meta', '1');
+    else if (on === '0') localStorage.removeItem('wrh.meta');
+    META.enabled = localStorage.getItem('wrh.meta') === '1';
+  } catch {
+    /* no storage: off */
+  }
+}
