@@ -2,7 +2,7 @@
 title: Erken oyun zorluk hedefi
 type: wayfinder:prototype
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 
 ---
 
