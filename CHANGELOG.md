@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.31.0 (2026-10-22)
+
 **One place for what the HUD and the sound read from the world (client)**
 
 - A new `WorldView` (`packages/client/src/view/worldView.ts`) answers the questions the HUD, the sound and the rings around the characters kept answering separately: who is alive or downed, how hurt a player is, whether a boss is up, how far a reload has come. The hurt pulse and the heartbeat now share one threshold, and the client has its first unit tests (`pnpm test`).
