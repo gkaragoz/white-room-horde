@@ -2,7 +2,7 @@
 title: Başarımları yeniden ayarlama
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 
 ---
 
