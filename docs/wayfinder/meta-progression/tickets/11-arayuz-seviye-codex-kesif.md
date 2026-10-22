@@ -2,7 +2,7 @@
 title: Arayüz: seviye, Codex ve keşif anları
 type: wayfinder:prototype
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 07-takvim-class-kostum-arena.md
 ---
 
