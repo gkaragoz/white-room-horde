@@ -2,7 +2,7 @@
 title: Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 
 ---
 
