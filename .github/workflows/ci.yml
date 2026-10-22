@@ -40,3 +40,4 @@ jobs:
       - run: node tools/ci/check-dist.mjs
       - run: node tools/ci/qa-browsers.mjs chromium
       - run: node tools/ci/game-smoke.mjs chromium
+      - run: node tools/ci/dev-boot.mjs

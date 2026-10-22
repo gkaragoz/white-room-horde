@@ -59,6 +59,8 @@ function loadSettings(): Settings {
 let settings = loadSettings();
 /** Render scale chosen by the auto-resolution controller (never above the setting). */
 let autoScale = settings.scale;
+/** The quality governor's level (see applyQuality). Declared here, before applySettings can run: a `let` further down is still in its temporal dead zone when the first applySettings call reads it (the dev server crashed on start). */
+let qualityLevel = 0;
 
 const wantBackend = params.get('renderer') === 'webgpu' ? 'webgpu' : params.get('renderer') === 'webgl' ? 'webgl' : settings.renderer;
 const backend = await pickBackend(wantBackend);
@@ -1122,7 +1124,6 @@ function setCrowdView(): void {
  * Quality governor, the step after resolution scaling: when the frame rate still sags at the lowest resolution, effects shed
  * weight one level at a time (0 = everything). It comes back up when there is headroom.
  */
-let qualityLevel = 0;
 function applyQuality(level: number): void {
   qualityLevel = level;
   const base = [0.5, 1, 1.6][settings.particles]!;

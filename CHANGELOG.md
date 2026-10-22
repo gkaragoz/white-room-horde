@@ -7,6 +7,10 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Fix: `pnpm dev` crashed on start (development only)**
+
+- The Vite dev server showed a blank game with `Cannot access 'qualityLevel' before initialization`: `applySettings` runs at start-up and read a `let` declared a thousand lines further down. The production build was not affected (its bundler hides that order), so the build-based checks never saw it. The declaration moved above its first use, and a new check (`tools/ci/dev-boot.mjs`) boots the game from the dev server on every push.
+
 ## v0.34.0 (2026-10-22)
 
 **Roomier, tidier screens (menu, settings, HUD)**

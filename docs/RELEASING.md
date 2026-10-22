@@ -3,7 +3,7 @@
 1. Write what changed under `## Unreleased` in `CHANGELOG.md` and add an entry at the top of `NOTES` in
    `packages/client/src/releaseNotes.ts` (player wording, per language).
 2. Run the gates: `pnpm lint`, `pnpm -r typecheck`, `pnpm test`, `pnpm build`, and the browser checks in `tools/ci`
-   (`qa-browsers`, `play-all`, `game-smoke`, `aim-check`, `notes-check`, `check-dist`, `layout-check`; `PLAY_PART=classes1|classes2|arenas|misc` runs a part of `play-all`).
+   (`qa-browsers`, `play-all`, `game-smoke`, `aim-check`, `notes-check`, `check-dist`, `layout-check`, `dev-boot` (the game booted by the Vite dev server); `PLAY_PART=classes1|classes2|arenas|misc` runs a part of `play-all`).
    `net-stutter` is a local tool only (it needs a GPU to mean anything).
 3. `pnpm release minor` (or `patch`) bumps the version, moves the changelog and tags it. `git push --follow-tags`.
 
