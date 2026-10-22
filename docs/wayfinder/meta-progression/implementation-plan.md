@@ -8,7 +8,7 @@ Sim ve ağ değişimleri (hash, snapshot, protokol, replay) erken girer ama **da
 
 | Sürüm | İçerik | Oyuncuya görünür mü |
 |---|---|---|
-| v0.35.0 | Faz 0-2: tablolar, sim, replay v4, ağ (altyapı; seviye hep 100) | Hayır (hash ve protokol değişir: minor + relay) |
+| v0.35.0 | Faz 0-6 tek sürüm olarak (karar: ayrı altyapı sürümü çıkarılmadı; özellik varsayılan açık) | Evet (hash ve protokol değişir: minor + relay) |
 | v0.36.0 | Faz 3-5: Profile v2, XP, arayüz, başarım tablosu; istemci seviyeyi göndermeye başlar | Evet (özellik açılır) |
 | sonraki | Faz 6: dengeleme (R, baskı), yama sürümleri | - |
 

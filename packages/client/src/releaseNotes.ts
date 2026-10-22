@@ -23,6 +23,76 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.35',
+    date: '2026-10-23',
+    text: {
+      en: {
+        title: 'Discover the game, run by run',
+        items: [
+          'New progression: every run earns XP and every level opens something new: a weapon, a drone, a card pack, a class, an arena, a power-up, an elite enemy, a difficulty multiplier or a look. The hub shows your level and what comes next.',
+          'The first runs start with a small pool and gentler enemies. Enemies reach their full strength at level 60.',
+          'Every run brings something new: a weapon you have not met yet is guaranteed by the end of the first floor, and the second floor gift is a drone you have not met.',
+          'The Codex lists everything you have met, what is open but not met yet, and silhouettes for what is still locked. Reward packs open at the end of a run, and a card in the corner announces each first meeting.',
+          'Achievements were reworked: harder, with Codex achievements, and four classes (Demolisher, Ranger, Berserker, Hammerer) now open with an achievement. They give no XP.',
+          'Your records are kept. Your old progress and achievements are saved aside and start again under the new system. Add ?meta=0 to the address to play the classic game.',
+          'In an online room everyone plays at the lowest level in the room. Online rooms need everyone on this version: reload the page to join.',
+        ],
+      },
+      tr: {
+        title: "Oyunu run run keşfet",
+        items: [
+          'Yeni ilerleme: her run XP kazandırır, her seviye yeni bir şey açar: silah, drone, kart paketi, class, arena, güç-artırıcı, elit düşman, zorluk çarpanı ya da görünüm. Ana ekran seviyeni ve sıradakini gösterir.',
+          "İlk run'lar küçük bir havuz ve daha yumuşak düşmanlarla başlar. Düşmanlar 60. seviyede tam güce ulaşır.",
+          'Her run yeni bir şey getirir: ilk katın sonunda tanışmadığın bir silah garanti gelir, ikinci kat hediyesi tanışmadığın bir drone olur.',
+          'Codex tanıştığın her şeyi, açık ama henüz görülmemişleri ve hâlâ kilitli olanların silüetlerini listeler. Ödül paketleri run sonunda açılır, ilk karşılaşmaları köşede bir kart duyurur.',
+          'Başarımlar yenilendi: daha zor, Codex başarımları var ve dört class (Yıkımcı, Avcı, Çılgın, Çekiççi) artık bir başarımla açılıyor. XP vermezler.',
+          'Rekorların korunur. Eski ilerlemen ve başarımların yedeklenir, yeni sistemde baştan başlar. Klasik oyun için adrese ?meta=0 ekle.',
+          'Çevrimiçi odada herkes odadaki en düşük seviyede oynar. Çevrimiçi odalar için herkesin bu sürümde olması gerekir: katılmak için sayfayı yenile.',
+        ],
+      },
+      de: {
+        title: 'Das Spiel Runde für Runde entdecken',
+        items: [
+          'Neuer Fortschritt: Jede Runde bringt XP, jede Stufe schaltet etwas Neues frei: Waffe, Drohne, Kartenpaket, Klasse, Arena, Power-up, Elitegegner, Schwierigkeitsmultiplikator oder Look. Das Hauptmenü zeigt deine Stufe und was als Nächstes kommt.',
+          'Die ersten Runden beginnen mit kleinem Pool und sanfteren Gegnern; auf Stufe 60 sind sie voll stark.',
+          'Der Codex listet alles, was du getroffen hast, und Silhouetten für Gesperrtes. Belohnungspakete öffnen sich am Rundenende.',
+          'Deine Rekorde bleiben. Alter Fortschritt und Erfolge werden gesichert und beginnen neu. Mit ?meta=0 in der Adresse spielst du das klassische Spiel.',
+          'Online-Räume: alle spielen auf der niedrigsten Stufe des Raums und müssen diese Version haben: Seite neu laden.',
+        ],
+      },
+      es: {
+        title: 'Descubre el juego partida a partida',
+        items: [
+          'Nuevo progreso: cada partida da XP y cada nivel abre algo nuevo: arma, dron, paquete de cartas, clase, arena, potenciador, élite, multiplicador de dificultad o aspecto. El menú muestra tu nivel y lo siguiente.',
+          'Las primeras partidas empiezan con un grupo pequeño y enemigos más suaves; en el nivel 60 tienen toda su fuerza.',
+          'El Códice lista lo que has encontrado y siluetas de lo bloqueado. Los paquetes de recompensa se abren al final de la partida.',
+          'Se conservan tus récords. Tu progreso y logros anteriores se guardan aparte y empiezan de nuevo. Añade ?meta=0 a la dirección para jugar el juego clásico.',
+          'En una sala en línea todos juegan al nivel más bajo y deben tener esta versión: recarga la página.',
+        ],
+      },
+      fr: {
+        title: 'Découvrez le jeu partie après partie',
+        items: [
+          "Nouvelle progression : chaque partie rapporte de l'XP et chaque niveau débloque du neuf : arme, drone, paquet de cartes, classe, arène, bonus, élite, multiplicateur de difficulté ou apparence. Le menu montre votre niveau et la suite.",
+          'Les premières parties commencent avec un petit choix et des ennemis plus doux ; au niveau 60 ils sont à pleine force.',
+          "Le Codex liste ce que vous avez rencontré et des silhouettes pour le reste. Les paquets de récompense s'ouvrent en fin de partie.",
+          "Vos records sont conservés. L'ancienne progression et les succès sont mis de côté et repartent à zéro. Ajoutez ?meta=0 à l'adresse pour le jeu classique.",
+          'En salle en ligne, tout le monde joue au niveau le plus bas et doit avoir cette version : rechargez la page.',
+        ],
+      },
+      ru: {
+        title: 'Открывайте игру забег за забегом',
+        items: [
+          'Новый прогресс: каждый забег даёт опыт, а каждый уровень открывает новое: оружие, дрона, набор карт, класс, арену, усиление, элиту, множитель сложности или облик. Главное меню показывает ваш уровень и что дальше.',
+          'Первые забеги идут с малым набором и более слабыми врагами; на 60 уровне они в полной силе.',
+          'Кодекс показывает всё встреченное и силуэты закрытого. Наборы наград открываются в конце забега.',
+          'Рекорды сохраняются. Старый прогресс и достижения откладываются и начинаются заново. Добавьте ?meta=0 к адресу, чтобы играть в классическую версию.',
+          'В онлайн-комнате все играют на самом низком уровне и должны иметь эту версию: перезагрузите страницу.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.34',
     date: '2026-10-23',
     text: {

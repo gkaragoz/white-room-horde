@@ -3,9 +3,9 @@ import { CODEX_CATEGORIES, CODEX_SIZES, codexHas, type Codex, type CodexCategory
 import { ACCESSORIES, type Profile } from './profile';
 
 /**
- * META.enabled: whether the game runs on the meta progression: the pool and enemy pressure by level, locked classes, looks, arenas and
- * multipliers, the migration of an old profile. Off, the game plays as before (everything open, full pressure) while XP and the
- * Codex are still collected, so nothing the player sees changes until the screens for the new system are in.
+ * Whether the game runs on the meta progression: the pool and enemy pressure by level, locked classes, looks, arenas and
+ * multipliers, the migration of an old profile. The game decides at start-up (`initMeta`); until then, and in code that never
+ * calls it (the unit tests, the in-page QA), it is off and the game plays as before: everything open, full pressure.
  */
 export const META = { enabled: false };
 
@@ -187,14 +187,19 @@ function cardClassOf(index: number): (typeof CLASS_IDS)[number] {
   return (pack.split(':')[0] as (typeof CLASS_IDS)[number]) || 'soldier';
 }
 
-/** Turn the switch on from the address (?meta=1) or a saved flag while the new system is still being tried out. */
+/**
+ * Decide whether the game runs on the meta progression. On by default. `?meta=0` turns it off for this browser (kept in
+ * `wrh.meta`), `?meta=1` back on. An automated browser (`navigator.webdriver`: the QA scripts that play every class and arena)
+ * gets the classic game unless it asks for `?meta=1`, so those checks keep seeing everything open.
+ */
 export function initMeta(): void {
   try {
-    const on = new URLSearchParams(location.search).get('meta');
-    if (on === '1') localStorage.setItem('wrh.meta', '1');
-    else if (on === '0') localStorage.removeItem('wrh.meta');
-    META.enabled = localStorage.getItem('wrh.meta') === '1';
+    const ask = new URLSearchParams(location.search).get('meta');
+    if (ask === '0') localStorage.setItem('wrh.meta', '0');
+    else if (ask === '1') localStorage.removeItem('wrh.meta');
+    const robot = typeof navigator !== 'undefined' && navigator.webdriver === true && ask !== '1';
+    META.enabled = !robot && localStorage.getItem('wrh.meta') !== '0';
   } catch {
-    /* no storage: off */
+    META.enabled = true;
   }
 }

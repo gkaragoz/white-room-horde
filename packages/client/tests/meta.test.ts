@@ -2,7 +2,7 @@ import { CARD_IDS, ENEMY_TYPES, TRACK, WEAPON_IDS, levelFromXp, xpForLevel } fro
 import { createGame, step } from '@wrh/sim';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CODEX_SIZES, RunCodex, codexAdd, codexCount, codexHas, codexMask, codexMerge, emptyCodex, sanitizeCodex } from '../src/codex';
-import { META, accessoryLevel, colorLevel, joinMeta, levelOf, sanitizeChoices, startWeapons, unlocked, xpForRun } from '../src/meta';
+import { META, accessoryLevel, colorLevel, initMeta, joinMeta, levelOf, sanitizeChoices, startWeapons, unlocked, xpForRun } from '../src/meta';
 import { ACCESSORIES, loadProfile, recordGame, saveProfile } from '../src/profile';
 
 beforeEach(() => {
@@ -233,5 +233,34 @@ describe('moving an old profile to the new system', () => {
     localStorage.clear();
     expect(loadProfile().introSeen).toBe(true);
     expect(localStorage.getItem('wrh.profile.v1')).toBeNull();
+  });
+});
+
+describe('switching the meta progression on at start-up', () => {
+  const at = (search: string, webdriver?: boolean) => {
+    Object.defineProperty(globalThis, 'location', { value: { search }, configurable: true });
+    Object.defineProperty(globalThis, 'navigator', { value: { webdriver }, configurable: true });
+    initMeta();
+  };
+
+  it('is on by default', () => {
+    at('');
+    expect(META.enabled).toBe(true);
+  });
+
+  it('is turned off by ?meta=0 and stays off until ?meta=1', () => {
+    at('?meta=0');
+    expect(META.enabled).toBe(false);
+    at('');
+    expect(META.enabled).toBe(false);
+    at('?meta=1');
+    expect(META.enabled).toBe(true);
+  });
+
+  it('gives an automated browser the classic game unless it asks for the new one', () => {
+    at('', true);
+    expect(META.enabled).toBe(false);
+    at('?meta=1', true);
+    expect(META.enabled).toBe(true);
   });
 });

@@ -7,6 +7,15 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Meta progression: discover the game, run by run (minor release: hash, protocol and replay format change, the relay must be redeployed)**
+
+- Every run earns XP (a tenth of the team score, nothing under 15 seconds, none from a replay) and every meta level (1-100) opens one to three things of the Discovery Track: weapons, drones, card packs, classes, arenas, power-ups, elites, difficulty multipliers and looks. The reference run is worth 1000 XP and the whole path is about 117 reference runs. The hub shows the level path; the game over screen opens reward packs; the Codex album lists what was met, what is open and what is locked; a corner card announces first meetings.
+- The pool of weapons, drones, cards, elites and power-ups follows the level, and enemy damage, health and numbers follow a pressure table (45% at level 1, full from level 60). Every run guarantees a weapon the player has not met (by the end of the first floor or after a minute) and the floor-2 drone gift is one they have not met. A level 100 game plays as before.
+- Online rooms play at the lowest level present; the relay limits the arena and the multipliers to what that level opened, and a late joiner plays at the room's level. The relay protocol, the join record in a bundle and the replay format (v4) carry the level and what each player had met.
+- Achievements rebuilt from rules (tools/cards/achievements.py, pace check in achievements_pace.py): harder, 12 Codex achievements, hidden ones wait for the tenth run, 'That Was Quick' is a loss under 15 seconds, and Demolisher, Ranger, Berserker and Hammerer open with the grenades, crits, run kills and max hit silver achievements. Achievements give no XP.
+- An old profile is saved to `wrh.profile.v1`; achievements and XP start again, records and settings stay. `?meta=0` plays the classic game (it is remembered), `?meta=1` returns. Automated browsers get the classic game unless they ask for `?meta=1`.
+- Tooling: `tools/cards/track.mjs` builds the track and the XP and pressure tables from `docs/wayfinder/meta-progression/discovery-track.md`; `MEASURE=1 pnpm --filter @wrh/sim exec vitest run tests/meta-balance.test.ts` measures floors and XP by level; `dev-boot` also boots a new player's meta game. The balance notes and the human playtest list are in `docs/wayfinder/meta-progression/balance.md`.
+
 **Fix: `pnpm dev` crashed on start (development only)**
 
 - The Vite dev server showed a blank game with `Cannot access 'qualityLevel' before initialization`: `applySettings` runs at start-up and read a `let` declared a thousand lines further down. The production build was not affected (its bundler hides that order), so the build-based checks never saw it. The declaration moved above its first use, and a new check (`tools/ci/dev-boot.mjs`) boots the game from the dev server on every push.

@@ -30,6 +30,18 @@ try {
   console.log(`${booted ? 'PASS' : 'FAIL'}  the dev server game boots and its world ticks`);
   console.log(`${errors.length === 0 ? 'PASS' : 'FAIL'}  no page errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
   failed = !booted || errors.length > 0;
+  // the meta progression, as a new player meets it: level 1, so the first run plays on the small pool
+  const meta = await (await browser.newContext({ viewport: { width: 1100, height: 700 } })).newPage();
+  const metaErrors = [];
+  meta.on('pageerror', (e) => metaErrors.push(String(e).split('\n')[0]));
+  await meta.goto(`${base}/?solo=1&meta=1&wave=1&map=0`);
+  const metaOk = await meta
+    .waitForFunction(() => window.__wrh?.world && window.__wrh.world.tick > 30 && window.__wrh.world.metLevel === 1, null, { timeout: 120000 })
+    .then(() => true)
+    .catch(() => false);
+  console.log(`${metaOk ? 'PASS' : 'FAIL'}  a new player's game starts at meta level 1 and ticks`);
+  console.log(`${metaErrors.length === 0 ? 'PASS' : 'FAIL'}  no page errors in the meta game${metaErrors.length ? ': ' + metaErrors.join(' | ') : ''}`);
+  failed = failed || !metaOk || metaErrors.length > 0;
 } finally {
   await browser.close();
   await server.close();
