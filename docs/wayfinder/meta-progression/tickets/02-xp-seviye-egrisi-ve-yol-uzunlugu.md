@@ -2,7 +2,7 @@
 title: XP, seviye eğrisi ve yolun uzunluğu
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 
 ---
 
