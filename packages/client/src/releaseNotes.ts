@@ -23,6 +23,28 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.31',
+    date: '2026-10-23',
+    text: {
+      en: {
+        title: 'Boss bar and reload bar fixes',
+        items: [
+          'The boss health bar now starts full and drops with every hit, also on high floors, with a big squad, and with Titan Bosses or Tough Hides on. Before, it could sit at 100% for a while.',
+          'The reload bar in the corner now fills as fast as the ring around your character, also when you hold a reload card.',
+          'Online rooms need everyone on this version: reload the page to join.',
+        ],
+      },
+      tr: {
+        title: 'Boss ve doldurma çubuğu düzeltmeleri',
+        items: [
+          'Boss can çubuğu artık dolu başlıyor ve her vuruşta düşüyor; yüksek katlarda, kalabalık takımda, Titan Bosslar ya da Kalın Deriler açıkken de. Önceden bir süre tam dolu görünüp kalabiliyordu.',
+          'Köşedeki doldurma çubuğu artık karakterin etrafındaki halka kadar hızlı doluyor, doldurma kartı olsa bile.',
+          'Çevrimiçi odalar için herkesin bu sürümde olması gerekir: katılmak için sayfayı yenile.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.30',
     date: '2026-10-22',
     text: {
