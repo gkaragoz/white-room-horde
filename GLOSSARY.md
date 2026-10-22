@@ -79,3 +79,7 @@ _Avoid_: points, score (the run score is the number it is made from)
 **Reference Run**:
 The typical first run, whose median Experience is the unit the Meta Level curve is measured in.
 _Avoid_: baseline run, average run
+
+**Pressure**:
+How strong the enemies are compared with the full game: below one for new players, rising with the Meta Level until it reaches the full game at level 60.
+_Avoid_: difficulty (that is the set of Multipliers the player chooses), scaling

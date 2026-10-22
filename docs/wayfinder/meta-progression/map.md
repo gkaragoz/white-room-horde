@@ -35,6 +35,7 @@ Spesifikasyon bitince bir uygulama planı çıkarılır; bu harita kod yazmaz.
 - [Keşif kataloğu ve sınırı](tickets/01-kesif-katalogu-ve-siniri.md): birim = tekil içerik (kartlar ~25 paket), Reward Bundle 1-3 birim; Core hiç kilitlenmez; keşif = açılma + karşılaşma (Codex); düşman/boss kilitsiz, elit/güç-artırıcı/çarpan/arena kademeli; oyun arayüzü kilitsiz.
 - [XP, seviye eğrisi ve yolun uzunluğu](tickets/02-xp-seviye-egrisi-ve-yol-uzunlugu.md): XP = skor / 10 (takım skoru, herkese eşit); asgari katılım 2. kat ya da 60 sn; 100 seviye (~100-130 run); eğri R cinsinden üç dilim; ilk 10 seviye her sayılan run'da en az bir atlama; mutlak sayılar zorluk hedefi ölçümünden sonra.
 - [Erken oyun zorluk hedefi](tickets/03-erken-oyun-zorluk-hedefi.md): havuz kısıtlaması botun zorluğunu değiştirmiyor (kat ~2, ~1,5 dk; zorluk düşman baskısından); **ilk run'lar daha kolay** (ilk 3-4 run'da ortalama kat 4-5, baskı meta seviyeyle artar); **her run XP verir** (asgari 15 sn; ticket 2'nin 2. kat/60 sn şartı kalktı); **garantili silah sandığı** (ilk kat sonu ya da ilk 60 sn); R geçici; prototip dalı `prototype/early-pool-difficulty`.
+- [Düşman baskısı rampası](tickets/12-dusman-baskisi-rampasi.md): baskı bileşik (hasar p, can 0,6 + 0,4 p, sayı 0,7 + 0,3 p); **p0 = 0,45** (bot orta kat ~4); **seviye 60'ta p = 1,0** (bugünkü zorluk), ease-in `p(L) = 0,45 + 0,55 ((L−1)/59)^1,6`; örtük çarpan, online'da odadaki en düşük seviye; **XP dilimleri ×0,75**, R ≈ 500 XP (geçici); yol ~117 run; prototip dalı `prototype/pressure-ramp`.
 
 Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce verilen kararlar):
 
@@ -53,7 +54,6 @@ Frontier (engeli kapalı, atanmamış):
 - [Takvim: silahlar ve drone'lar](tickets/05-takvim-silahlar-ve-dronelar.md) (grilling)
 - [Takvim: kartlar](tickets/06-takvim-kartlar.md) (grilling)
 - [Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz](tickets/08-takvim-dusman-dunyasi-ve-arayuz.md) (grilling)
-- [Düşman baskısı rampası](tickets/12-dusman-baskisi-rampasi.md) (prototype)
 
 Bloklu:
 
@@ -62,10 +62,12 @@ Bloklu:
 - [Veri modeli ve geçiş](tickets/10-veri-modeli-ve-gecis.md) (grilling), şunu bekler: Başarımları yeniden ayarlama
 - [Arayüz: seviye, Codex ve keşif anları](tickets/11-arayuz-seviye-codex-kesif.md) (prototype), şunu bekler: Takvim: class, kostüm, arena
 
-Kapalı: 3 / 12 (cevapları yukarıdaki Decisions so far)
+Kapalı: 4 / 12 (cevapları yukarıdaki Decisions so far)
 
 ## Not yet specified
 
+- Baskı yükselirken run XP'sinin düşmesi riski (bot tahmini: ilk run ~500 XP, seviye 40+ ~200-300) ve XP'yi baskıyla normalleştiren çarpan `f(p)` ihtiyacı; insan oyunuyla doğrulanır.
+- R'nin insan oyunuyla yeniden ölçülmesi (bot alt sınır).
 - Garantili keşif sandığının drone, kart ve diğer yerden düşen içerikteki karşılığı (silah için karar verildi); silah/drone takvimi ticket'ında netleşir.
 - Yolun sonunda ne olur (prestij, tekrar XP, kozmetik); çok yüksek seviyede içerik bittiğinde.
 - Online lobide kesişimin oyuncuya gösterimi ("havuz X'e göre sınırlı").

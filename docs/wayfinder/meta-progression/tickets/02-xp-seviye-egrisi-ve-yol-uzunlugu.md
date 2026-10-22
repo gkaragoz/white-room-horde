@@ -35,3 +35,7 @@ Meta XP nasıl kazanılır, seviye eğrisi nasıl akar ve Keşif Yolu kaç run s
 ## Revizyon (ticket "Erken oyun zorluk hedefi")
 
 "Sayılan run" şartı değişti: 2. kat ya da 60 sn yerine yalnızca **en az 15 saniye**; her gerçek run XP verir ("her run bir keşif" ilkesi; prototip ölçümü botun ilk run'larının ~%48'inin eski şartı geçemediğini gösterdi). Ayrıca R geçici: ilk run kolaylaştırılacağı için gerçek R düşman baskısı rampası ticket'ından sonra ölçülür.
+
+## Revizyon 2 (ticket "Düşman baskısı rampası")
+
+Eğri dilimleri **×0,75 küçüldü**: seviye 1-10 ≈ 0,45-0,75 R, 11-50 ≈ 0,75-1,125 R, 51-100 ≈ 1,125-1,875 R. **R ≈ 500 XP** (düşman baskısı rampasının başlangıcı p0 = 0,45'te bot medyanı; geçici, insan oyunuyla yeniden ölçülür). Hedef yol ~117 run, run XP ≈ R varsayımıyla; baskı arttıkça run XP düşerse risk için ticket 12'ye bak.

@@ -17,3 +17,7 @@ Keşif kümesi sim'e, ağa ve replay'e nasıl taşınır?
 - GameSetup ve protokol (net/src/protocol.ts: JoinOpts, PlayerInfo, start mesajı) ve replay başlığı alanları; silah 25 bit, drone 7 bit, kart ~176 bit, vb.
 - World şemasında saklama (hash/snapshot bump) veya GameSetup'tan türetme.
 - Online kesişim (Decisions): relay'de Member'a keşif maskesi eklemek; odada kesişimin kim hesapladığı; geç katılan oyuncu ve rejoin; replay sürümü; eski istemci uyumu (minor sürüm).
+
+## Ticket "Düşman baskısı rampası" ile netleşenler
+
+- Düşman baskısı rampası sim'e girer: hasar, can ve sayı çarpanları Difficulty etkilerinin üstüne çarpılır (`fxOf`). Baskı `p(L) = 0,45 + 0,55 × ((L − 1) / 59)^1,6` (L ≤ 60, sonra 1,0), L = odadaki en düşük meta seviye. Dolayısıyla oyuna **meta seviye de taşınmalı** (havuz maskesinin yanında, ya da seviyeden türetilen baskı değeri): GameSetup/protokol/replay başlığına. Hash ve snapshot etkisi bu ticket'ta karara bağlanır.

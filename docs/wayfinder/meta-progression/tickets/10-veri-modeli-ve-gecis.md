@@ -25,3 +25,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "Erken oyun zorluk hedefi" ile netleşenler
 
 - XP asgari katılım şartı **15 saniye** (2. kat/60 sn şartı kalktı).
+
+## Ticket "Düşman baskısı rampası" ile netleşenler
+
+- XP dilimleri ×0,75 (R ≈ 500 XP, geçici). Baskı rampası meta seviyeye bağlı; `Profile.level` bunu besler.
