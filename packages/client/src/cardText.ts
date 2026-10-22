@@ -1,4 +1,4 @@
-import { CLASS_CARDS, UNIVERSAL_CARDS } from '@wrh/shared';
+import { CARD_STATS, CLASS_CARDS, UNIVERSAL_CARDS } from '@wrh/shared';
 import type { Lang } from './ui';
 
 /**
@@ -176,26 +176,24 @@ const P: Record<Lang, Record<string, Phrase>> = {
   },
 };
 
-/** The pairs of stat names that share a phrase (the personal and the team flavour of the same thing). */
-const ALIAS: Record<string, string> = { pdmg: 'dmg', prate: 'rate', pspeed: 'speed', parmor: 'armor' };
-/** Stats written as a share: the value is a factor (1.3 = +30%) or an added fraction (0.25 = +25%). */
-const FACTOR = new Set(['armor', 'parmor', 'reload', 'dash', 'magnet', 'xp', 'blast', 'revive', 'loot', 'acd', 'adur', 'admg', 'arad']);
-const FRACTION = new Set(['dmg', 'pdmg', 'rate', 'prate', 'speed', 'pspeed', 'crit', 'heal']);
-
 function line(lang: Lang, stat: string, v: number): string {
-  const key = ALIAS[stat] ?? stat;
-  const phrase = P[lang][key] ?? P.en[key];
+  const def = CARD_STATS[stat];
+  if (!def) return '';
+  const phrase = P[lang][def.phrase] ?? P.en[def.phrase];
   if (!phrase) return '';
   let amount: number;
   let up = v > 0;
-  if (FACTOR.has(stat)) {
+  if (def.format === 'factor') {
     amount = Math.round(Math.abs(v - 1) * 100);
     up = v > 1;
-  } else if (FRACTION.has(stat)) {
+  } else if (def.format === 'fraction') {
     amount = Math.round(Math.abs(v) * 100);
   } else amount = Math.abs(v);
   return (up ? phrase.up : phrase.down || phrase.up).replace('{n}', String(amount));
 }
+
+/** The phrase tables, for the test that every stat is worded in every language. */
+export const CARD_PHRASES = P;
 
 /** id -> [title, text] for one language (the 50 universal and the 90 class cards). */
 export function universalCardTexts(lang: Lang): Record<string, [string, string]> {

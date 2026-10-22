@@ -7,6 +7,10 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Card stats defined once (internals, same game)**
+
+- Each stat a card can change (damage, reload, shield, ...) is now one entry in `CARD_STATS` (`packages/shared/src/cardStats.ts`): how the sim applies it (with its bounds) and how the client words it. Tests fail when a card uses a stat with no entry, when an entry points at a field the world does not have, or when a language lacks the phrase.
+
 **Run results in the sim (internals, same game)**
 
 - What a run came to (the numbers and special conditions the achievements are checked against) is now computed by the sim (`runSummary`), and the pure part of the achievement store moved to `achStore.ts`. Both have unit tests, including one that fails if the generated achievement table asks for a number or condition the sim does not produce.
