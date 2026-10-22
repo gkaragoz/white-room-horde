@@ -2,7 +2,7 @@
 title: Keşif kataloğu ve sınırı
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 
 ---
 
