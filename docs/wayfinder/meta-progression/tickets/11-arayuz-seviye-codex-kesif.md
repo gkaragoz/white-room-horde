@@ -55,3 +55,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Sim, ağ ve replay veri modeli" ile netleşenler
 
 - Lobide her oyuncunun seviyesi görünür (`PlayerInfo.lvl`); odanın havuzu en düşük seviyedir ("havuz seviye N'e göre" bilgisi). Geç katılanın seviyesi havuzu değiştirmez.
+
+## Ticket "Veri modeli ve geçiş" ile netleşenler
+
+- Eski profili olan oyuncuya bir kez bilgilendirme ("her şey yeniden açılıyor, rekorların korunuyor"); rekorlar menüde görünmeye devam eder. Seviye 100'de gösterge "MAX" ve XP birikmeye devam eder. "Yeni!" rozetleri `seenNew` ile.
