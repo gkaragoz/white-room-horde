@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.30.0 (2026-10-22)
+
 **World state declared once (simulation internals)**
 
 - Every field of the simulated world now lives in one WorldSchema (`packages/sim/src/schema.ts`). Creating the world, the snapshot and the world hash are derived from it, so a new field can no longer be forgotten in one of three hand-kept lists, and a test fails if a field is neither hashed nor declared derived.
