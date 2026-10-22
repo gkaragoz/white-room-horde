@@ -31,3 +31,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Düşman baskısı rampası" ile netleşenler
 
 - Baskı rampası örtük (oyuncuya görünür bir çarpan değil); arayüzde göstermek gerekip gerekmediği bu ticket'ta (örn. "yeni oyuncu desteği" bilgisi) değerlendirilebilir.
+
+## Ticket "Başarımları yeniden ayarlama" ile netleşenler
+
+- Codex sayfasında Codex tamamlama başarımlarının ilerlemesi gösterilebilir (örn. "silah 8 / 25"). İmza başarımı class kartında "kilit: şu başarım" olarak görünür.

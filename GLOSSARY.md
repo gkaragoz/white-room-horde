@@ -83,3 +83,7 @@ _Avoid_: baseline run, average run
 **Pressure**:
 How strong the enemies are compared with the full game: below one for new players, rising with the Meta Level until it reaches the full game at level 60.
 _Avoid_: difficulty (that is the set of Multipliers the player chooses), scaling
+
+**Signature Achievement**:
+The achievement that unlocks a class, tied to what that class is about (grenades for the demolisher, critical hits for the ranger, kills in one run for the berserker, one big hit for the hammerer).
+_Avoid_: class quest, class challenge

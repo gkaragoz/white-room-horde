@@ -29,3 +29,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "Düşman baskısı rampası" ile netleşenler
 
 - XP dilimleri ×0,75 (R ≈ 500 XP, geçici). Baskı rampası meta seviyeye bağlı; `Profile.level` bunu besler.
+
+## Ticket "Başarımları yeniden ayarlama" ile netleşenler
+
+- Başarım deposu (AchStore) kalır; XP vermez. Codex tamamlama başarımları yeni istatistikler ister: tanışılan silah/drone/düşman türü/boss/elit sayıları ve oynanan arena sayısı. Bunlar kalıcı bir Codex deposundan (`Profile`) gelmeli. Başarım hedef tablosu `tools/cards/achievements.py` kuraldan üretilir.

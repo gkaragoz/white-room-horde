@@ -21,3 +21,7 @@ Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [XP, sevi
 ## Ticket "Keşif kataloğu ve sınırı" ile netleşenler
 
 - Class, kostüm ve arena oyuncunun seçtiği içerik: karşılaşma = ilk seçilip kullanıldığı an. Arenalar düzden katlıya; "rastgele arena" yalnızca açılmışlardan seçer. İlk arena Core. Kozmetikler en çok her ikinci Reward Bundle'da.
+
+## Ticket "Başarımları yeniden ayarlama" ile netleşenler
+
+- **4 class imza başarımıyla açılır** (gümüş kademe, run ~30-60): Demolisher ← grenades, Ranger ← crits, Berserker ← runkills (tek run öldürme), Hammerer ← maxhit (tek vuruş). Kalan 5 class (soldier baştan, medic, heavy, scout, swordsman) seviyeyle; bu ticket'ta sıra ve seviyeleri belirlenir. Başarımlar XP vermez.
