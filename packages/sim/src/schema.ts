@@ -331,3 +331,9 @@ export function nestedArray(w: object, path: string): TypedArray {
   const [head, tail] = path.split('.') as [string, string];
   return (w as Record<string, Record<string, TypedArray>>)[head]![tail]!;
 }
+
+/** Every typed array of a World, schema pools first and then the nested ones, in the fixed snapshot order. */
+export function snapshotArrays(w: SchemaArrays): TypedArray[] {
+  const pools = w as unknown as Record<string, TypedArray>;
+  return [...ARRAY_NAMES.map((name) => pools[name]!), ...NESTED_ARRAYS.map((n) => nestedArray(w, n.path))];
+}
