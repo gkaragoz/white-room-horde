@@ -1,12 +1,8 @@
 import { ACHIEVEMENTS, Difficulty, PERK, STAT, WEAPON_IDS, WEAPON_SLOTS } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
-import { addPlayer, createGame, createWorld, runSummary, scriptedInput, step, type World } from '../src';
+import { createGame, quietWorld, runSummary, scriptedInput, step, type World } from '../src';
 
-function world(mods = 0): World {
-  const w = createWorld(9, 0, mods);
-  addPlayer(w, 0, 0, 0, 'pistol');
-  return w;
-}
+const world = (mods = 0): World => quietWorld({ seed: 9, mods });
 
 describe('runSummary and the achievement table', () => {
   it('produces every number and every condition the table asks for (a renamed id would fail here)', () => {

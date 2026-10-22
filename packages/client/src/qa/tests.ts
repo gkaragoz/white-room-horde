@@ -25,6 +25,8 @@ export interface QaTest {
   id: string;
   title: string;
   run(ctx: Ctx): Promise<Result>;
+  /** Needs no browser (no DOM, no WebGL): runs under Vitest (packages/client/tests/qa-pure.test.ts) and is left out of the browser page. */
+  pure?: true;
 }
 
 const f = (n: number, d = 2): number => +n.toFixed(d);
@@ -415,3 +417,6 @@ export const tests: QaTest[] = [
 ];
 
 tests.push(...crowdTests, ...moreTests);
+
+/** The tests that need a real browser: the QA page runs these. */
+export const browserTests: QaTest[] = tests.filter((t) => !t.pure);

@@ -1,6 +1,6 @@
 import { BALANCE, Difficulty, MODS, MOD_COUNT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
-import { addPlayer, createGame, createWorld, spawnBoss, spawnEnemy, step, type World } from '../src';
+import { createGame, quietWorld, spawnBoss, spawnEnemy, step, type World } from '../src';
 import { modFx } from '../src/mods';
 import { dropLoot } from '../src/pickups';
 import { awardXp, xpForNext } from '../src/progression';
@@ -11,13 +11,7 @@ const NONE: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
 const bit = Difficulty.bit;
 const G = ENEMY_TYPES.indexOf('grunt');
 
-function world(mods: number, seed = 5): World {
-  const w = createWorld(seed, 0, mods);
-  w.waveTick = 1e9;
-  w.countMul = 0;
-  addPlayer(w, 0, 0, 0, 'pistol');
-  return w;
-}
+const world = (mods: number, seed = 5): World => quietWorld({ seed, mods });
 
 describe('difficulty multipliers', () => {
   it('there are twenty, every one makes the game harder, and the score multiplier grows with them', () => {

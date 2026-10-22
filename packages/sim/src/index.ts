@@ -3,7 +3,7 @@ export * as detmath from './detmath';
 export { Rng } from './rng';
 export { Crc32 } from './hash';
 export type { SimEvent } from './state';
-export { scriptedInput, runScripted } from './testkit';
+export { scriptedInput, runScripted, quietWorld, type QuietOptions } from './testkit';
 export * from './replay';
 export { xpForNext } from './progression';
 export { livingPlayers } from './enemies';

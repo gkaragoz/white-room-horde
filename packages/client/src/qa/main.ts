@@ -1,7 +1,7 @@
 import { Character } from '../render/character';
 import { mountVersionBadge } from '../buildinfo';
 import { Stage } from '../render/stage';
-import { measured, tests, type Ctx, type Result } from './tests';
+import { measured, browserTests as tests, type Ctx, type Result } from './tests';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 mountVersionBadge();

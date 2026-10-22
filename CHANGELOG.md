@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Tests: a shared testkit, and the browser-free QA checks run under Vitest**
+
+- `quietWorld()` in the sim testkit makes a world where nothing happens on its own; tests use it instead of repeating the setup.
+- Six QA checks that never needed a browser (auto-aim, card offer queue, profile unlocks, UI strings) are marked `pure`: they run in Node on every `pnpm test` and are left out of the browser QA page, which now keeps only what needs a renderer.
+
 **Card stats defined once (internals, same game)**
 
 - Each stat a card can change (damage, reload, shield, ...) is now one entry in `CARD_STATS` (`packages/shared/src/cardStats.ts`): how the sim applies it (with its bounds) and how the client words it. Tests fail when a card uses a stat with no entry, when an entry points at a field the world does not have, or when a language lacks the phrase.

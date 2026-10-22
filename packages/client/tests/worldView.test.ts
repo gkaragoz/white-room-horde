@@ -1,17 +1,17 @@
 import { Difficulty, MISC, PlayerState, BALANCE } from '@wrh/shared';
-import { addPlayer, createWorld, spawnBoss, spawnEnemy, type World } from '@wrh/sim';
+import { addPlayer, createWorld, quietWorld, spawnBoss, spawnEnemy, type World } from '@wrh/sim';
 import { describe, expect, it } from 'vitest';
 import { LOW_HP, WorldView, viewOf } from '../src/view/worldView';
 
-function world(): World {
-  const w = createWorld(3);
-  w.waveTick = 1e9;
-  w.countMul = 0;
-  addPlayer(w, 0, 0, 0, 'smg');
-  addPlayer(w, 1, 2, 0, 'pistol');
-  addPlayer(w, 2, 4, 0, 'pistol');
-  return w;
-}
+const world = (): World =>
+  quietWorld({
+    seed: 3,
+    players: [
+      { slot: 0, weapon: 'smg' },
+      { slot: 1, x: 2 },
+      { slot: 2, x: 4 },
+    ],
+  });
 
 describe('WorldView: who is playing', () => {
   it('tells alive, downed and dead apart and lists the slots of each', () => {

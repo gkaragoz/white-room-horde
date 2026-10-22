@@ -1,6 +1,7 @@
-import { Buttons, WEAPON_IDS, type PlayerInput } from '@wrh/shared';
+import { Buttons, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { cos, sin } from './detmath';
-import { createGame, hashWorld, setWave, step, type World } from './sim';
+import { addPlayer, createGame, hashWorld, setWave, step, type World } from './sim';
+import { createWorld } from './state';
 
 /**
  * A scripted input stream so any two environments (Node tests, the browser QA page, a CI browser) can run the same
@@ -38,14 +39,47 @@ export interface ScriptOptions {
   wave?: number;
 }
 
-export function runScripted(seed: number, ticks: number, players = 4, opts: ScriptOptions = {}): { world: World; hash: number } {
+export function runScripted(
+  seed: number,
+  ticks: number,
+  players = 4,
+  opts: ScriptOptions = {},
+): { world: World; hash: number } {
   const w = createGame({
     seed,
     map: opts.map ?? 0,
     mods: opts.mods ?? 0,
-    players: Array.from({ length: players }, (_, s) => ({ slot: s, weapon: WEAPON_IDS[s % WEAPON_IDS.length]! })),
+    players: Array.from({ length: players }, (_, s) => ({
+      slot: s,
+      weapon: WEAPON_IDS[s % WEAPON_IDS.length]!,
+    })),
   });
   if (opts.wave && opts.wave > 1) setWave(w, opts.wave);
-  for (let t = 0; t < ticks; t++) step(w, Array.from({ length: players }, (_, s) => scriptedInput(t, s)));
+  for (let t = 0; t < ticks; t++)
+    step(
+      w,
+      Array.from({ length: players }, (_, s) => scriptedInput(t, s)),
+    );
   return { world: w, hash: hashWorld(w) };
+}
+
+export interface QuietOptions {
+  seed?: number;
+  map?: number;
+  mods?: number;
+  /** Who is in the world (default: one pistol player at the origin in slot 0). */
+  players?: { slot: number; weapon?: WeaponId; x?: number; y?: number; cls?: number }[];
+}
+
+/**
+ * A world where nothing happens on its own: no wave is due and none is queued, so the test decides what appears.
+ * The one place that knows how to make a world stand still.
+ */
+export function quietWorld(opts: QuietOptions = {}): World {
+  const w = createWorld(opts.seed ?? 1, opts.map ?? 0, opts.mods ?? 0);
+  w.waveTick = 1e9;
+  w.countMul = 0;
+  for (const p of opts.players ?? [{ slot: 0 }])
+    addPlayer(w, p.slot, p.x ?? 0, p.y ?? 0, p.weapon ?? 'pistol', p.cls ?? 0);
+  return w;
 }

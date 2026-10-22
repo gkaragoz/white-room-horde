@@ -271,6 +271,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'profile.unlocks',
+    pure: true,
     title: 'Progress is remembered: best wave, record flags and weapon unlocks',
     async run() {
       const saved = loadProfile();
@@ -296,6 +297,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'ui.strings',
+    pure: true,
     title: 'Both languages have every string: same keys, every card, weapon, map, mods and key action',
     async run() {
       const problems: string[] = [];
@@ -599,6 +601,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'cards.queue',
+    pure: true,
     title: 'Several levels at once open their card offers one after the other, a held key never skips one, queued clocks wait',
     async run() {
       const problems: string[] = [];
@@ -1004,6 +1007,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'aim.auto',
+    pure: true,
     title: 'Auto-aim picks the nearest enemy or barrel in reach, sticks to it, and keeps away from barrels at the shooter\'s feet',
     async run() {
       const problems: string[] = [];
@@ -1091,6 +1095,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'aim.hits',
+    pure: true,
     title: 'Auto-aimed shots hit: from the muzzle, leading a walking enemy, through the delay of the input, around cover',
     async run() {
       const problems: string[] = [];
@@ -1137,6 +1142,7 @@ export const moreTests: QaTest[] = [
   },
   {
     id: 'aim.cover',
+    pure: true,
     title: 'Auto-aim prefers a target it can hit over one behind cover (also one hidden from the muzzle only), and falls back to the nearest when all are hidden',
     async run() {
       const problems: string[] = [];
