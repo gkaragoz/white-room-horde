@@ -23,6 +23,28 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.32',
+    date: '2026-10-23',
+    text: {
+      en: {
+        title: 'Tidier insides, safer settings',
+        items: [
+          'A saved difficulty or arena from an older version, or a mistyped test link, is now ignored instead of starting a broken game.',
+          'Card texts, run results and the room settings each live in one place now, with tests, so a card can no longer say one thing and do another. The game plays the same.',
+          'Online rooms need everyone on this version: reload the page to join.',
+        ],
+      },
+      tr: {
+        title: 'Daha derli toplu, daha güvenli ayarlar',
+        items: [
+          'Eski bir sürümden kalan zorluk ya da arena kaydı veya yanlış yazılmış bir test bağlantısı artık bozuk bir oyun başlatmak yerine yok sayılıyor.',
+          'Kart metinleri, oyun sonu sonuçları ve oda ayarları artık testlerle korunan tek bir yerde; bir kart bir şey söyleyip başka bir şey yapamaz. Oynanış aynı.',
+          'Çevrimiçi odalar için herkesin bu sürümde olması gerekir: katılmak için sayfayı yenile.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.31',
     date: '2026-10-23',
     text: {
