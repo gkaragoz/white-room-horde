@@ -2,7 +2,7 @@
 title: Düşman baskısı rampası
 type: wayfinder:prototype
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by:
 ---
 
