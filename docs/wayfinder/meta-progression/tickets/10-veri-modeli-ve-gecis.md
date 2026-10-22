@@ -37,3 +37,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "Takvim: class, kostüm, arena" ile netleşenler
 
 - Class, aksesuar, renk ve arena açılışı **meta seviyeden ve başarımlardan türetilir** (ayrı bir açılmış-liste saklamaya gerek yok): seviye takvimi sabit bir tablo, imza başarımları AchStore'dan okunur. Profile'a sadece "görüldü/yeni" işaretleri gerekir. Açık set: soldier, bandana/cap/goggles, otomatik + 2 renk, warehouse.
+
+## Ticket "Takvim: silahlar ve drone'lar" ile netleşenler
+
+- Codex deposu "karşılaşılmış silah" bilgisini taşır (başlangıç silahı listesi için); `WEAPON_UNLOCK` ve `bestWave` kilidi kalkar.

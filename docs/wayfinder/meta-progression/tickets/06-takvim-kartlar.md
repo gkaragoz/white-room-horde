@@ -22,3 +22,7 @@ Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [XP, sevi
 ## Ticket "Keşif kataloğu ve sınırı" ile netleşenler
 
 - Kartlar tek tek değil ~6-8 kartlık **Card Pack** olarak açılır (~25 paket). Seviye atlayınca kart seçme mekaniği Core'da.
+
+## Ticket "Takvim: silahlar ve drone'lar" ile netleşenler
+
+- `arsenal` kartı bugün "güçlü sıradaki eksik silahı" veriyor (`WEAPON_RANK`); açılmış havuzla sınırlı olmalı (ya da karşılaşma garantisi sayılmalı). `drone` kartı yalnızca açılmış drone'lardan verir; seviye 3'ten önce teklif edilmez. Kart takviminde bu iki kartın hangi seviyede açıldığı gözden geçirilsin (örn. arsenal ≥ seviye 9, drone kartı ≥ seviye 3 ile birlikte).

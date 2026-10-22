@@ -38,6 +38,7 @@ Spesifikasyon bitince bir uygulama planı çıkarılır; bu harita kod yazmaz.
 - [Düşman baskısı rampası](tickets/12-dusman-baskisi-rampasi.md): baskı bileşik (hasar p, can 0,6 + 0,4 p, sayı 0,7 + 0,3 p); **p0 = 0,45** (bot orta kat ~4); **seviye 60'ta p = 1,0** (bugünkü zorluk), ease-in `p(L) = 0,45 + 0,55 ((L−1)/59)^1,6`; örtük çarpan, online'da odadaki en düşük seviye; **XP dilimleri ×0,75**, R ≈ 500 XP (geçici); yol ~117 run; prototip dalı `prototype/pressure-ramp`.
 - [Başarımları yeniden ayarlama](tickets/04-basarimlari-yeniden-ayarlama.md): hız hedefi 3 run ≤1, 20 run ~10, 60 run ~30, yol sonu ~55 başarım; kademeler tipik run × gereken run kuralından türer (bronz 10-40 run, gümüş 40-100, altın 120-300, platin 400+); `games_1` tek armağan, games 1/25/100/400; başarım XP vermez; 4 class imza başarımıyla (Demolisher/grenades, Ranger/crits, Berserker/runkills, Hammerer/maxhit, gümüş); ~8 kolay başarım yerine Codex tamamlama başarımları (toplam 100); gizliler 10. run'dan önce ulaşılamaz, "That Was Quick" 15 sn.
 - [Takvim: class, kostüm, arena](tickets/07-takvim-class-kostum-arena.md): ilk set soldier + bandana/cap/goggles + otomatik renk ve 2 renk + warehouse; class'lar seviye 6/14/24/40 (scout, medic, heavy, swordsman) ve imza başarımı (demolisher, ranger, berserker, hammerer); düz arenalar 3-28, katlı 40-80; 33 kozmetik seviye 2-95 her 3 seviyede, crown seviye 100; class/aksesuar/renk kişisel, online arena seçenekleri odanın kesişimi.
+- [Takvim: silahlar ve drone'lar](tickets/05-takvim-silahlar-ve-dronelar.md): Core silahlar pistol + smg, ilk yerden düşen havuz ar/shotgun/revolver; başlangıç silahı listesi = Core + Codex'te tanışılanlar; 18 silah seviye 2-88 (mp 2 ... railgun 88); drone'lar gun 3, healer 12, collector 20, twin 30, cryo 42, rocket 55, tesla 70; kat-2 drone hediyesi garantili drone keşfi, seviye 3'ten önce drone yok (boss'ta ek sağlık).
 
 Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce verilen kararlar):
 
@@ -52,7 +53,6 @@ Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce
 
 Frontier (engeli kapalı, atanmamış):
 
-- [Takvim: silahlar ve drone'lar](tickets/05-takvim-silahlar-ve-dronelar.md) (grilling)
 - [Takvim: kartlar](tickets/06-takvim-kartlar.md) (grilling)
 - [Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz](tickets/08-takvim-dusman-dunyasi-ve-arayuz.md) (grilling)
 - [Veri modeli ve geçiş](tickets/10-veri-modeli-ve-gecis.md) (grilling)
@@ -60,15 +60,15 @@ Frontier (engeli kapalı, atanmamış):
 
 Bloklu:
 
-- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md) (grilling), şunu bekler: Takvim: silahlar ve drone'lar; Takvim: kartlar; Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz
+- [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md) (grilling), şunu bekler: Takvim: kartlar; Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz
 
-Kapalı: 6 / 12 (cevapları yukarıdaki Decisions so far)
+Kapalı: 7 / 12 (cevapları yukarıdaki Decisions so far)
 
 ## Not yet specified
 
 - Baskı yükselirken run XP'sinin düşmesi riski (bot tahmini: ilk run ~500 XP, seviye 40+ ~200-300) ve XP'yi baskıyla normalleştiren çarpan `f(p)` ihtiyacı; insan oyunuyla doğrulanır.
 - R'nin insan oyunuyla yeniden ölçülmesi (bot alt sınır).
-- Garantili keşif sandığının drone, kart ve diğer yerden düşen içerikteki karşılığı (silah için karar verildi); silah/drone takvimi ticket'ında netleşir.
+- Garantili keşfin kart ve güç-artırıcı karşılığı (silah ve drone için karar verildi); kart takvimi ve düşman dünyası ticket'larında netleşir.
 - Yolun sonunda ne olur (prestij, tekrar XP, kozmetik); çok yüksek seviyede içerik bittiğinde.
 - Online lobide kesişimin oyuncuya gösterimi ("havuz X'e göre sınırlı").
 - Yeni metinlerin 6 dilde çevirisi (uiStrings + i18n EXTRA; classNames/accs uzunluk testleri).

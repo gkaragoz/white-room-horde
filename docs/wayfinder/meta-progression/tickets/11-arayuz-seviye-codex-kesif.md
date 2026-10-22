@@ -39,3 +39,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Takvim: class, kostüm, arena" ile netleşenler
 
 - Kilitli class kartı "seviye N" veya "başarım: şu" gösterir (imza başarımı); kilitli arena ve kostüm "seviye N". 33 kozmetik tek tabloda, menüdeki aksesuar okları ve renk örnekleri kilitlileri soluk gösterir; seviye 100 ödülü crown. Menüdeki "rastgele arena" kartı açılmış arena sayısını bilir.
+
+## Ticket "Takvim: silahlar ve drone'lar" ile netleşenler
+
+- Başlangıç silahı seçici: pistol ve smg her zaman, diğerleri yalnızca Codex'te varsa; açılmış ama karşılaşılmamış silah soluk "???" ve "yerden düşünce seçilebilir" ipucuyla görünür.

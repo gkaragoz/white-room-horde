@@ -25,3 +25,7 @@ Keşif kümesi sim'e, ağa ve replay'e nasıl taşınır?
 ## Ticket "Takvim: class, kostüm, arena" ile netleşenler
 
 - Odanın arena seçeneği, odadaki herkesin açtığı arenaların kesişimi: oda üyelerinin arena açılış maskesi (11 bit) relay'e iletilir; class/aksesuar/renk kişisel, kesişime girmez (sim bunları görmez, istemci seçer).
+
+## Ticket "Takvim: silahlar ve drone'lar" ile netleşenler
+
+- Sim'e giren açılış kümesi: silah (23 ateşli silah, 23 bit; melee class'larla geldiği için sim bunları zaten class üzerinden bilir), drone (7 bit). Menüdeki başlangıç silahı listesindeki "karşılaşılmış" şartı yalnızca istemci (Codex); sim görmez. Oda kesişimi: silah ve drone maskelerinin AND'i.
