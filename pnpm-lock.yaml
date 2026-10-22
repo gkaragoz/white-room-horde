@@ -191,6 +191,19 @@ importers:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
 
+  packages/bot:
+    dependencies:
+      '@wrh/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@wrh/sim':
+        specifier: workspace:*
+        version: link:../sim
+    devDependencies:
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@26.6.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15))
+
   packages/client:
     dependencies:
       '@wrh/net':
