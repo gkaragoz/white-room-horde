@@ -3,12 +3,12 @@ title: Takvim: class, kostüm, arena
 type: wayfinder:grilling
 status: open
 assignee:
-blocked-by: 01-kesif-katalogu-ve-siniri.md, 02-xp-seviye-egrisi-ve-yol-uzunlugu.md, 04-basarimlari-yeniden-ayarlama.md
+blocked-by: 02-xp-seviye-egrisi-ve-yol-uzunlugu.md, 04-basarimlari-yeniden-ayarlama.md
 ---
 
 # Takvim: class, kostüm, arena
 
-Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [Keşif kataloğu ve sınırı](01-kesif-katalogu-ve-siniri.md), [XP, seviye eğrisi ve yolun uzunluğu](02-xp-seviye-egrisi-ve-yol-uzunlugu.md), [Başarımları yeniden ayarlama](04-basarimlari-yeniden-ayarlama.md)
+Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [XP, seviye eğrisi ve yolun uzunluğu](02-xp-seviye-egrisi-ve-yol-uzunlugu.md), [Başarımları yeniden ayarlama](04-basarimlari-yeniden-ayarlama.md)
 
 ## Question
 
@@ -17,3 +17,7 @@ Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [Keşif k
 - İlk açık class ve geri kalanı (hangisi seviyeyle, hangisi başarımla).
 - Aksesuar ve renklerin seviyeye dağılımı, ilk açık set.
 - Arenaların açılış sırası (6 düz önce, 5 katlı sonra mı); varsayılan "rastgele" arena (map -1) kilitli arenaları atlar mı?
+
+## Ticket "Keşif kataloğu ve sınırı" ile netleşenler
+
+- Class, kostüm ve arena oyuncunun seçtiği içerik: karşılaşma = ilk seçilip kullanıldığı an. Arenalar düzden katlıya; "rastgele arena" yalnızca açılmışlardan seçer. İlk arena Core. Kozmetikler en çok her ikinci Reward Bundle'da.

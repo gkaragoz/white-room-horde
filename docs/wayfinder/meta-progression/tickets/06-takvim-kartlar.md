@@ -3,12 +3,12 @@ title: Takvim: kartlar
 type: wayfinder:grilling
 status: open
 assignee:
-blocked-by: 01-kesif-katalogu-ve-siniri.md, 02-xp-seviye-egrisi-ve-yol-uzunlugu.md
+blocked-by: 02-xp-seviye-egrisi-ve-yol-uzunlugu.md
 ---
 
 # Takvim: kartlar
 
-Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [Keşif kataloğu ve sınırı](01-kesif-katalogu-ve-siniri.md), [XP, seviye eğrisi ve yolun uzunluğu](02-xp-seviye-egrisi-ve-yol-uzunlugu.md)
+Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [XP, seviye eğrisi ve yolun uzunluğu](02-xp-seviye-egrisi-ve-yol-uzunlugu.md)
 
 ## Question
 
@@ -18,3 +18,7 @@ Harita: [Meta ilerleme](../map.md) · Tip: **grilling** · Engelleyen: [Keşif k
 - Nadirlik ağırlıkları (RARITY_WEIGHT 6/3/1) ve class filtresiyle etkileşim: küçük havuzda teklif sayısı 3'ü dolduruyor mu?
 - arsenal ve drone kartlarının kilitli içerikle davranışı.
 - Class kartları class açılınca mı açılır?
+
+## Ticket "Keşif kataloğu ve sınırı" ile netleşenler
+
+- Kartlar tek tek değil ~6-8 kartlık **Card Pack** olarak açılır (~25 paket). Seviye atlayınca kart seçme mekaniği Core'da.
