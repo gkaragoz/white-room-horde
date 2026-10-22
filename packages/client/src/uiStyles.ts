@@ -74,11 +74,11 @@ const CSS_BASE = `
 .wrh-squad{position:absolute;left:12px;bottom:12px;display:flex;flex-direction:column;gap:7px;max-width:260px}
 .wrh-pc{width:196px;padding:6px 9px 7px;border-radius:12px;background:rgba(251,246,234,.82);border:1.5px solid rgba(43,58,82,.18);border-left:4px solid var(--pc);box-shadow:0 2px 8px rgba(20,28,44,.18);backdrop-filter:blur(2px);font-size:12px;font-weight:600;color:#2b3a52}
 .wrh-pc.me{width:230px;padding:8px 11px 9px;font-size:13px;background:rgba(255,255,255,.93);box-shadow:0 0 0 2px #fff,0 0 0 4px #1b2433,0 0 16px 4px rgba(255,255,255,.8)}
-.wrh-pc.me .top b{flex:0 1 auto;padding:1px 7px;border-radius:7px;background:#1b2433;color:#fff}
-.wrh-pc.me .top .you{font-style:normal;font-size:9px;font-weight:900;letter-spacing:.08em;padding:1px 6px;border-radius:6px;background:#fff;color:#1b2433;box-shadow:inset 0 0 0 1.5px #1b2433}.wrh-pc.me .top .lv{margin-left:auto}
-.wrh-pc .top{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.wrh-pc.me .top b{flex:0 1 auto;padding:3px 9px;border-radius:7px;background:#1b2433;color:#fff}
+.wrh-pc.me .top .you{font-style:normal;font-size:10px;font-weight:900;letter-spacing:.05em;padding:3px 7px;border-radius:6px;background:#fff;color:#1b2433;box-shadow:inset 0 0 0 1.5px #1b2433}.wrh-pc.me .top .lv{margin-left:auto}
+.wrh-pc .top{display:flex;align-items:center;gap:5px;margin-bottom:4px}
 .wrh-pc .top b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
-.wrh-pc .top .lv{font-size:.82em;font-weight:800;padding:0 5px;border-radius:7px;background:rgba(43,58,82,.12)}
+.wrh-pc .top .lv{font-size:.9em;font-weight:800;padding:3px 7px;border-radius:7px;background:rgba(43,58,82,.12)}
 .wrh-pc .top .pick{font-style:normal;color:#ffb000;animation:wrh-lowhp .5s ease-in-out infinite alternate}
 .wrh-pc .top em{font-style:normal;font-variant-numeric:tabular-nums;font-weight:800;font-size:1.12em}
 .wrh-pc .top em small{font-size:.78em;font-weight:600;opacity:.6}
@@ -93,11 +93,11 @@ const CSS_BASE = `
 .wrh-pc .stats b{font-variant-numeric:tabular-nums}
 .wrh-pc .top,.wrh-pc .stats,.wrh-pc .chip{cursor:help}
 .wrh-pc .chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
-.wrh-pc .chip{display:inline-flex;align-items:center;gap:3px;padding:1px 6px 1px 2px;border-radius:9px;background:rgba(43,58,82,.1);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent);font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;line-height:15px}
+.wrh-pc .chip{display:inline-flex;align-items:center;gap:3px;padding:3px 7px 3px 3px;border-radius:9px;background:rgba(43,58,82,.1);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent);font-size:10.5px;font-weight:800;font-variant-numeric:tabular-nums;line-height:15px}
 .wrh-pc .chip i{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;font-style:normal}
 .wrh-pc .chip.timed{animation:wrh-lowhp .5s ease-in-out infinite alternate}
 .wrh-pc:not(.me) .chips{margin-top:4px}
-.wrh-pc:not(.me) .chip{font-size:9.5px}
+.wrh-pc:not(.me) .chip{font-size:10px}
 .wrh-me{position:absolute;right:14px;bottom:12px;text-align:right;font-weight:700;font-size:15px;text-shadow:0 1px 0 rgba(255,255,255,.7)}
 .wrh-hurt{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(200,20,30,0) 45%,rgba(200,20,30,.55) 100%);opacity:0}
 .wrh-banner{position:absolute;left:50%;top:26%;transform:translateX(-50%);text-align:center;font-weight:800;font-size:30px;color:#c8242c;text-shadow:0 2px 0 #fff,0 0 18px rgba(255,255,255,.8)}
@@ -159,14 +159,14 @@ const CSS_BASE = `
 [data-menu="1"] .wrh-ui .wrh-set-back{display:inline-flex;align-items:center;margin:0;padding:10px 20px;border-radius:14px;font-size:17px;font-weight:800;background:#fffdf8;color:#2b3a52;border:2px solid #cdbfa5;box-shadow:0 3px 0 #cdbfa5;cursor:pointer}
 [data-menu="1"] .wrh-set-tabs{padding:0 22px;gap:6px}
 [data-menu="1"] .wrh-ui .wrh-set-tabs button{font-size:16px;padding:10px 16px}
-[data-menu="1"] .wrh-set-body{padding:6px 24px 14px;flex:1}
+[data-menu="1"] .wrh-set-body{padding:6px 24px 14px;flex:1;min-height:0}
 [data-menu="1"] .wrh-set-foot{padding:12px 22px 16px}
 @media (max-width:700px){[data-menu="1"] .wrh-set{padding:10px;padding-top:54px}[data-menu="1"] .wrh-set-body{padding:4px 12px 12px}}
 .wrh-set-x{background:none!important;color:#3a352d!important;font-size:30px!important;line-height:26px;padding:0 6px!important;margin:0!important}
 .wrh-set-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px;border-bottom:2px solid #e6dcc8}
 .wrh-ui .wrh-set-tabs button{background:none;color:#7a7060;border:0;border-bottom:3px solid transparent;border-radius:0;margin:0 0 -2px;padding:8px 12px;font-size:14px;font-weight:700}
 .wrh-ui .wrh-set-tabs button.on{color:#1488e6;border-bottom-color:#1fa2ff}
-.wrh-set-body{padding:6px 18px 12px;overflow-y:auto;min-height:220px}
+.wrh-set-body{padding:6px 18px 12px;overflow-y:auto;min-height:min(220px,26vh)}
 .wrh-set-group{margin:14px 0 4px;padding-bottom:3px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8a7f6a;border-bottom:1px solid #e6dcc8}
 .wrh-set-row{display:grid;grid-template-columns:1fr 1.25fr;gap:10px;align-items:center;padding:7px 0;border-bottom:1px dashed rgba(205,191,165,.45)}
 .wrh-set-row label{font-size:14px;font-weight:600}
@@ -233,7 +233,7 @@ const CSS_BASE = `
 .wrh-ui button.wrh-arena:hover{transform:translateY(-2px)}
 .wrh-ui button.wrh-arena.on{background:#fff;border-color:#1fa2ff;box-shadow:0 0 0 2px rgba(31,162,255,.25),0 4px 10px rgba(60,45,20,.2)}
 .wrh-arena img,.wrh-arena .wrh-dice{width:100%;aspect-ratio:3/2;border-radius:7px;object-fit:cover;display:block}
-.wrh-dice{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#dfe4ea,#dfe4ea 8px,#d3dae2 8px,#d3dae2 16px);font-size:34px;font-weight:800;color:#7d8896}
+.wrh-dice{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#dfe4ea,#dfe4ea 8px,#d3dae2 8px,#d3dae2 16px);font-size:clamp(20px,2.6vw,34px);line-height:1;font-weight:800;color:#7d8896}
 .wrh-diffs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
 .wrh-ui button.wrh-diff{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;margin:0;border-radius:11px;background:#efe7d6;color:#3a352d;border:3px solid transparent;font-size:13px;box-shadow:0 2px 5px rgba(60,45,20,.15)}
 .wrh-ui button.wrh-diff.on{background:#fff;border-color:#d8362e;box-shadow:0 0 0 2px rgba(216,54,46,.2)}
@@ -246,6 +246,7 @@ ${ACH_CSS}
 .wrh-ui button.wrh-play{width:100%;font-size:19px;padding:13px;margin:6px 0 4px;background:linear-gradient(180deg,#38b6ff,#1488e6);box-shadow:0 3px 0 #0e6fba}
 .wrh-classes{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 2px;width:100%;max-width:340px}
 .wrh-ui button.wrh-class{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;margin:0;border-radius:10px;background:#efe7d6;color:#3a352d;border:3px solid transparent;font-size:11px;box-shadow:0 2px 4px rgba(60,45,20,.15)}
+.wrh-ui button.wrh-class b{display:block;max-width:100%;overflow-wrap:anywhere;hyphens:auto;line-height:1.15}
 .wrh-ui button.wrh-class .ci{font-size:20px;line-height:1.1;display:block;height:40px}
 .wrh-ui button.wrh-class.on{background:#fff;border-color:#1fa2ff}
 .wrh-class-tip{font-size:12px;opacity:.8;min-height:30px;text-align:center;max-width:340px}
@@ -283,7 +284,7 @@ ${ACH_CSS}
 .wrh-tb>*{pointer-events:auto}
 .wrh-ui .wrh-tbtn{position:relative;display:block;width:36px;min-width:0;height:36px;border-radius:50%;padding:0;margin:0;cursor:pointer;background:rgba(250,244,232,.94);border:2px solid #cdbfa5;color:#3a352d;font-size:18px;line-height:32px;text-align:center;box-shadow:0 2px 8px rgba(20,28,44,.2);transition:transform .12s,background .12s}
 .wrh-ui .wrh-tbtn:hover{transform:scale(1.08);background:#fff}
-.wrh-ui .wrh-tbtn small{position:absolute;right:-3px;bottom:-4px;padding:0 4px;border-radius:6px;background:#2b3a52;color:#fff;font:800 9px/13px system-ui,sans-serif;letter-spacing:.03em}
+.wrh-ui .wrh-tbtn small{position:absolute;right:-4px;bottom:-5px;padding:3px 6px;border-radius:8px;background:#2b3a52;color:#fff;font:800 10.5px/14px system-ui,sans-serif;letter-spacing:.03em}
 .wrh-langpop{position:absolute;right:88px;top:44px;min-width:150px;padding:6px;border-radius:12px;background:rgba(251,246,234,.98);border:2px solid #cdbfa5;box-shadow:0 8px 24px rgba(20,28,44,.3);display:none}
 .wrh-langpop.open{display:block}
 .wrh-ui .wrh-langpop button{display:block;width:100%;margin:2px 0;padding:7px 10px;border-radius:8px;border:0;background:transparent;color:#2b3a52;font-size:14px;font-weight:700;text-align:left;cursor:pointer;box-shadow:none}
@@ -315,7 +316,7 @@ ${ACH_CSS}
 .wrh-go-skip{margin-top:4px;font-size:11px;opacity:.5;transition:opacity .3s}.wrh-go-skip.gone{opacity:0}
 .wrh-inv{pointer-events:none}.wrh-inv .row{pointer-events:auto;cursor:pointer;transition:transform .08s,box-shadow .08s}
 .wrh-inv .row:hover{transform:translateX(-3px);box-shadow:0 2px 8px rgba(20,28,44,.28)}
-.wrh-ui .wrh-me{display:flex;gap:6px;right:14px;bottom:8px;width:236px;padding:0;background:none;border:0;box-shadow:none;text-align:left;pointer-events:none}
+.wrh-ui .wrh-me{display:flex;gap:6px;right:14px;bottom:8px;width:256px;padding:0;background:none;border:0;box-shadow:none;text-align:left;pointer-events:none}
 .wrh-me .g{pointer-events:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;min-width:0;height:36px;padding:0 8px;border-radius:10px;background:rgba(251,246,234,.86);border:1.5px solid rgba(43,58,82,.18);box-shadow:0 1px 4px rgba(20,28,44,.14);font-size:13px;font-weight:800;color:#2b3a52}
 .wrh-me .g i{font-style:normal;font-size:16px}
 .wrh-me .g span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
@@ -325,17 +326,17 @@ ${ACH_CSS}
 .wrh-me .g:last-child{flex:1 1 0}
 .wrh-me .g:nth-child(1){width:54px}.wrh-me .g:nth-child(2){width:60px}
 .wrh-ui .wrh-reload{bottom:46px}
-.wrh-plabel{position:absolute;left:0;top:0;pointer-events:none;display:none;white-space:nowrap;font:700 12px/1 system-ui,sans-serif;color:#fff;background:rgba(20,26,38,.62);padding:3px 7px;border-radius:9px;border:1.5px solid #fff;text-shadow:0 1px 1px rgba(0,0,0,.5)}
+.wrh-plabel{position:absolute;left:0;top:0;pointer-events:none;display:none;white-space:nowrap;font:700 12px/1.25 system-ui,sans-serif;color:#fff;background:rgba(20,26,38,.62);padding:4px 9px;border-radius:10px;border:1.5px solid #fff;text-shadow:0 1px 1px rgba(0,0,0,.5)}
 .wrh-ammo{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none}
 /* the ring itself is a 3D object on the floor (render/ammoRing.ts); this element only carries the count */
 .wrh-ammo i{display:none;position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--c) calc(var(--f)*1%),rgba(30,36,48,.28) 0);-webkit-mask:radial-gradient(closest-side,transparent 76%,#000 79%);mask:radial-gradient(closest-side,transparent 76%,#000 79%);filter:drop-shadow(0 0 3px rgba(0,0,0,.35))}
-.wrh-ammo b{position:absolute;left:100%;top:50%;transform:translate(8px,-50%);font-size:14px;font-weight:800;color:#fff;white-space:nowrap;padding:0 7px;border-radius:9px;background:rgba(25,30,42,.62);text-shadow:0 1px 0 rgba(0,0,0,.6)}
+.wrh-ammo b{position:absolute;left:100%;top:50%;transform:translate(8px,-50%);font-size:14px;font-weight:800;color:#fff;white-space:nowrap;padding:3px 11px;border-radius:11px;background:rgba(25,30,42,.62);text-shadow:0 1px 0 rgba(0,0,0,.6)}
 .wrh-ammo.low b{background:rgba(190,30,30,.8);animation:wrhblink .4s infinite alternate}
 .wrh-ammo.reload i{animation:wrhspin 0.9s linear infinite}
 @keyframes wrhspin{from{filter:drop-shadow(0 0 3px rgba(0,0,0,.35)) brightness(1)}to{filter:drop-shadow(0 0 5px rgba(255,255,255,.7)) brightness(1.4)}}
 .wrh-arrow-off{position:absolute;pointer-events:none;display:none;transform:translate(-50%,-50%)}
 .wrh-arrow-off i{display:block;width:0;height:0;border-left:18px solid var(--c);border-top:10px solid transparent;border-bottom:10px solid transparent;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
-.wrh-arrow-off span{position:absolute;left:50%;top:18px;transform:translateX(-50%);font-size:10px;font-weight:700;padding:0 5px;border-radius:7px;background:rgba(250,244,232,.85);white-space:nowrap}
+.wrh-arrow-off span{position:absolute;left:50%;top:18px;transform:translateX(-50%);font-size:11px;font-weight:700;padding:3px 9px;border-radius:9px;background:rgba(250,244,232,.85);white-space:nowrap}
 .wrh-arrow-off.down i{animation:wrhblink .6s infinite alternate}
 @keyframes wrhblink{from{opacity:1}to{opacity:.35}}
 .wrh-ring{position:absolute;width:64px;height:64px;transform:translate(-50%,-50%);pointer-events:none;display:none}
@@ -344,7 +345,7 @@ ${ACH_CSS}
 .wrh-ring .prog{inset:7px;background:conic-gradient(#3dd66a calc(var(--p)*1%),rgba(60,45,20,.22) 0);-webkit-mask:radial-gradient(circle,transparent 52%,#000 54%);mask:radial-gradient(circle,transparent 52%,#000 54%)}
 .wrh-ring b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:15px;text-shadow:0 1px 0 #fff}
 .wrh-ring.live .prog{filter:drop-shadow(0 0 4px rgba(61,214,106,.9))}
-.wrh-tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(250,244,232,.85);border:2px solid;white-space:nowrap;pointer-events:none}
+.wrh-tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;padding:3px 8px;border-radius:9px;background:rgba(250,244,232,.85);border:2px solid;white-space:nowrap;pointer-events:none}
 .wrh-reload{position:absolute;right:14px;bottom:36px;width:180px;height:6px;border-radius:4px;background:rgba(60,45,20,.25);overflow:hidden;display:none}
 .wrh-reload>i{display:block;height:100%;background:#ff9a3a;width:0}
 /* polish: soft cards, smooth anti-aliased bars, steady text rendering */
@@ -372,5 +373,20 @@ ${ACH_CSS}
 .wrh-keys button{margin:0;padding:3px 8px;font-size:12px;background:#e6dcc8;color:#3a352d}
 .wrh-low{color:#d8362e}
 .wrh-hud-dev{position:absolute;left:12px;top:26px;font-size:12px;line-height:1.5}
+/* short screens (a phone on its side): the squad shows one compact line per teammate and the page never outgrows the window */
+@media (max-height:560px){
+.wrh-squad{gap:4px;max-height:calc(100vh - 24px)}
+.wrh-pc:not(.me){padding:3px 8px 4px}
+.wrh-pc:not(.me) .chips,.wrh-pc:not(.me) .stats{display:none}
+.wrh-pc.me{padding:5px 10px 6px}
+.wrh-pc .top{margin-bottom:2px}
+}
+/* touch-sized screens: controls a finger can hit */
+@media (pointer:coarse),(max-width:800px),(max-height:560px){
+.wrh-ui .wrh-seg button{min-height:36px}
+.wrh-ui .wrh-switch{width:54px;height:32px;border-radius:16px}
+.wrh-ui .wrh-switch i{width:26px;height:26px}
+.wrh-ui .wrh-switch.on i{left:25px}
+}
 `;
 export const CSS = CSS_BASE + MENU_CSS;

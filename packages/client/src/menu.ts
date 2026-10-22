@@ -214,7 +214,8 @@ export const MENU_CSS = `
 .wrh-ui .wrh-home button.wrh-hc:hover{transform:translateY(-3px);background:#fff;filter:none}
 .wrh-ui .wrh-home button.wrh-hc:focus-visible{outline:4px solid #1fa2ff;outline-offset:3px}
 .wrh-hc .ico{display:flex;align-items:center;justify-content:center;height:clamp(48px,9vh,76px)}
-.wrh-hc .ico img{max-height:100%;width:auto;height:100%;object-fit:contain}
+.wrh-hc .ico{max-width:100%;min-width:0}
+.wrh-hc .ico img{max-height:100%;max-width:100%;width:auto;height:100%;object-fit:contain}
 .wrh-hc .ico .strip{display:flex;gap:4px;height:100%}
 .wrh-hc .txt{display:flex;flex-direction:column;gap:4px;align-items:center;min-width:0;max-width:100%}
 .wrh-hc .txt b{font-size:clamp(18px,1.9vw,26px);line-height:1.1}
@@ -260,7 +261,7 @@ export const MENU_CSS = `
 .wrh-home .wrh-prev-name{font-size:clamp(18px,1.8vw,26px);margin-top:10px}
 .wrh-home .wrh-prev-stats{max-width:min(100%,460px)}
 .wrh-home .wrh-swatches{max-width:100%;margin-top:10px;justify-content:center}
-.wrh-ui .wrh-home button.wrh-sw{width:clamp(26px,2.2vw,34px);height:clamp(26px,2.2vw,34px)}
+.wrh-ui .wrh-home button.wrh-sw{width:clamp(30px,2.2vw,34px);height:clamp(30px,2.2vw,34px)}
 .wrh-home .wrh-tabs{margin-bottom:10px}
 .wrh-home .wrh-classes{grid-template-columns:repeat(auto-fill,minmax(88px,1fr));max-width:100%;gap:clamp(4px,.6vw,10px);margin-top:6px}
 .wrh-ui .wrh-home button.wrh-class{padding:8px 2px;border-radius:14px}
@@ -271,8 +272,9 @@ export const MENU_CSS = `
 .wrh-home .wrh-arenas{grid-template-columns:repeat(auto-fill,minmax(clamp(96px,9vw,130px),1fr));gap:clamp(6px,.7vw,10px)}
 [data-menu="1"] .wrh-touch{display:none!important}
 .wrh-home .wrh-weapons{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(78px,7vw,104px),1fr));gap:6px}
-.wrh-ui .wrh-home button.wrh-wp{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:clamp(52px,7vh,70px);font-size:clamp(10px,.85vw,12px);padding:4px 2px;border-radius:10px;line-height:1.1;text-align:center}
+.wrh-ui .wrh-home button.wrh-wp{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:clamp(52px,7vh,70px);font-size:clamp(10px,.85vw,12px);padding:5px 4px;border-radius:10px;line-height:1.1;text-align:center;min-width:0;overflow-wrap:anywhere;hyphens:auto}
 .wrh-home .wrh-wp .wp-i{height:clamp(20px,3vh,30px);max-width:100%}
+.wrh-ui .wrh-home .wrh-tabs button.wrh-wp{flex-direction:row;min-height:0;padding:8px 16px;font-size:13px}
 .wrh-wp .wp-i{width:auto;object-fit:contain}
 .wrh-ui .wrh-home .wrh-modsbtn{margin:4px 0 8px;background:#efe7d6;color:#3a352d;min-height:52px}
 .wrh-ui .wrh-home .wrh-modsbtn:hover{background:#fff}
@@ -290,7 +292,7 @@ export const MENU_CSS = `
 /* online dialog */
 .wrh-online{position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;background:rgba(30,40,58,.38);backdrop-filter:blur(5px)}
 .wrh-online.open{display:flex}
-.wrh-online-box{position:relative;width:min(520px,92vw);max-height:92vh;overflow:auto;padding:26px 28px;border-radius:24px;background:rgba(250,244,232,.97);border:2px solid #cdbfa5;box-shadow:0 20px 60px rgba(20,28,44,.45)}
+.wrh-online-box{position:relative;width:min(520px,92vw);max-height:min(92vh,calc(100vh - 72px));overflow:auto;padding:26px 28px;border-radius:24px;background:rgba(250,244,232,.97);border:2px solid #cdbfa5;box-shadow:0 20px 60px rgba(20,28,44,.45)}
 .wrh-online-box h2{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:26px}
 .wrh-ui .wrh-online-x{position:absolute;right:14px;top:10px;width:40px;height:40px;padding:0;margin:0;border-radius:50%;background:#e6dcc8;color:#3a352d;font-size:24px;line-height:36px}
 .wrh-online .wrh-row{display:flex;gap:8px;align-items:flex-end}

@@ -42,13 +42,17 @@ export class WorldOverlay {
     }
     el.style.display = visible ? 'block' : 'none';
     if (!visible) return;
-    el.style.left = `${px}px`;
-    el.style.top = `${py}px`;
     el.style.setProperty('--c', color);
     el.classList.toggle('down', down);
     (el.firstElementChild as HTMLElement).style.transform = `rotate(${angle}rad)`;
     const label = el.lastElementChild as HTMLElement;
     if (label.textContent !== name) label.textContent = name;
+    // keep the name inside the window: the arrow sits on the edge, its label hangs below it
+    const half = Math.max(20, label.offsetWidth / 2 + 6);
+    const x = Math.min(this.root.clientWidth - half, Math.max(half, px));
+    const y = Math.min(this.root.clientHeight - 48, Math.max(16, py));
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
   }
 
   /** The kill counter on the right while a streak is going (count 0 hides it). */

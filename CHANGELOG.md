@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Roomier, tidier screens (menu, settings, HUD)**
+
+- A new check (`tools/ci/layout-check.mjs`) opens the menu pages, the settings, the HUD, the pause menu and the downed screen at five screen sizes, in all six languages and two text sizes, and looks for text that is clipped, elements that overlap or stick out of the window, text jammed against the edge of its own badge and tap targets too small for a finger. 750 scenes, from 5,963 findings to none.
+- Fixes: badges and labels (language button, level, YOU, upgrade chips, teammate arrows, ammo ring, loot labels) have room around their text and are readable; long German weapon and class names wrap instead of spilling or overlapping; on a phone held sideways the squad panel shows one compact line per teammate instead of running off the top, and the settings page fits the window; settings switches and option buttons are finger-sized on small screens; the online panel leaves the corner buttons free; teammate arrows keep their names inside the window; the ability label in the gear row is no longer cut off in Turkish.
+
 ## v0.33.0 (2026-10-22)
 
 **ui.ts split into modules (internals, same game)**

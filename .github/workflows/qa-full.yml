@@ -49,6 +49,10 @@ jobs:
           - name: menu and drone shots
             browsers: chromium
             run: node tools/ci/menu-shots.mjs && node tools/ci/drone-shots.mjs
+          # menu, settings, HUD and game over at two sizes and two languages: nothing clipped, overlapping, off screen or cramped
+          - name: layout
+            browsers: chromium
+            run: node tools/ci/layout-check.mjs --quick
           # two pages and the local server: pause and resume, a dropped connection, a reload
           - name: rejoin
             browsers: chromium
