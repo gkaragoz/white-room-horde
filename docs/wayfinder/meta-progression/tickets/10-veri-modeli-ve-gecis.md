@@ -45,3 +45,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "Takvim: kartlar" ile netleşenler
 
 - Kart paketi açılışı meta seviyeden ve class açılışından türetilir (ayrı liste saklanmaz). Class ileri paketi seviye tablosu sabit.
+
+## Ticket "Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz" ile netleşenler
+
+- Zorluk çarpanları meta seviyeyle açılır (seviye 52-98); `Profile.mods` (son seçilen) açılmamış bir çarpan içeriyorsa temizlenmeli. Menüdeki çarpan ızgarası kilitli çarpanları soluk gösterir.

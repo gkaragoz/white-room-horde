@@ -33,3 +33,7 @@ Keşif kümesi sim'e, ağa ve replay'e nasıl taşınır?
 ## Ticket "Takvim: kartlar" ile netleşenler
 
 - Kart açılış kümesi 176 bit (22 bayt); paketler seviyeden ve class açılışından türetilen sabit bir tablodan çıkar. Oda kesişimi: kart maskelerinin AND'i (class'a göre süzme sim'de zaten var).
+
+## Ticket "Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz" ile netleşenler
+
+- Tüm takvim [discovery-track.md](../discovery-track.md) tablosunda. Sim'e giren açılış kümesi: silah (23 bit), drone (7), kart (176), elit türü (11), güç-artırıcı (5), zorluk çarpanı yok (çarpanlar oyuncunun seçtiği Difficulty maskesi; açılmamış çarpan seçilemez, istemci tarafı), arena (11, relay'de oda kesişimi için). Elit türü yokken `rollElite` elit üretmez (prototipteki `PROTO.elites = []` davranışı).

@@ -47,3 +47,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Takvim: kartlar" ile netleşenler
 
 - Ödül paketi ekranında kart paketi "6 yeni kart" gibi gösterilebilir; Codex sayfasında kartlar paket paket listelenir (açılmamışlar "???").
+
+## Ticket "Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz" ile netleşenler
+
+- Tüm takvim [discovery-track.md](../discovery-track.md) tablosunda: seviye atlama ekranı o satırı gösterir (oynanış öğeleri + kozmetik). Kilitli zorluk çarpanları, elit ve güç-artırıcılar Codex'te "seviye N".
