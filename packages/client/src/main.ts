@@ -549,12 +549,12 @@ function handleEvent(e: SimEvent): void {
       const px = _p.x;
       const py = _p.y;
       _p.set(world.eX[best]!, 0.5, -world.eY[best]!).project(stage.camera);
-      ui.hurtFrom(Math.atan2(-(_p.y - py), _p.x - px));
+      ui.hud.hurtFrom(Math.atan2(-(_p.y - py), _p.x - px));
     }
   }
   if (e.type === 'weaponGet' && e.slot === localSlot && e.fresh) {
     const L = UI_STRINGS[ui.lang];
-    ui.banner(`${L.newWeapon}: ${(L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!]}`, '', 1800);
+    ui.hud.banner(`${L.newWeapon}: ${(L.weapons as Record<string, string>)[WEAPON_IDS[e.weapon]!]}`, '', 1800);
   }
   if (catchingUp) return;
   fx.onEvent(e, localSlot);
@@ -582,7 +582,7 @@ function handleEvent(e: SimEvent): void {
       const L = UI_STRINGS[ui.lang];
       const mod = e.mod ?? 0;
       if (e.boss && settings.announcer) audio.announce('mayhem', 4);
-      ui.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${L.wave} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
+      ui.hud.banner(e.boss ? (ui.lang === 'tr' ? 'BOSS GELİYOR!' : 'BOSS INCOMING!') : `${L.wave} ${e.wave}`, mod ? `${L.waveMods[mod]} ${L.waveModTips[mod]}` : '', e.boss ? 3500 : mod ? 2600 : 1800);
       break;
     }
     case 'finalKill': {
@@ -598,7 +598,7 @@ function handleEvent(e: SimEvent): void {
       audio.play('slowIn');
       if (settings.announcer) setTimeout(() => audio.announce('ownage', 6), 700);
       audio.duckMusic(0.4, BALANCE.floors.finisherSeconds + 0.3);
-      ui.screenFlash('#ffffff', 220);
+      ui.hud.screenFlash('#ffffff', 220);
       break;
     }
     case 'floorAscend':
@@ -607,12 +607,12 @@ function handleEvent(e: SimEvent): void {
     case 'waveCleared':
       break; // the big countdown under the top bar says it
     case 'secondWind':
-      ui.banner(UI_STRINGS[ui.lang].secondWind, names[e.slot] ?? '', 1600);
+      ui.hud.banner(UI_STRINGS[ui.lang].secondWind, names[e.slot] ?? '', 1600);
       break;
     case 'droneUnlock': {
       const L = UI_STRINGS[ui.lang];
       const nm = (L.droneNames as readonly string[])[e.kind] ?? '';
-      if (e.slot === localSlot) ui.banner(`${L.droneNew}: ${nm}`, e.fresh ? (L.droneTips as readonly string[])[e.kind] ?? '' : '', 2800);
+      if (e.slot === localSlot) ui.hud.banner(`${L.droneNew}: ${nm}`, e.fresh ? (L.droneTips as readonly string[])[e.kind] ?? '' : '', 2800);
       const at = drones.positionOf(e.slot);
       if (at) {
         fx.shockRing(at.x, at.y, '#7affd6', 2.2);
@@ -625,8 +625,8 @@ function handleEvent(e: SimEvent): void {
       const nm = (L.droneNames as readonly string[])[e.kind] ?? '';
       const tier = e.level % 5 === 0;
       if (e.slot === localSlot) {
-        if (tier) ui.banner(`${nm} ${L.droneUp} ${e.level}`, L.droneTier, 2200);
-        else ui.warn(`${nm} ${L.droneLv} ${e.level}`);
+        if (tier) ui.hud.banner(`${nm} ${L.droneUp} ${e.level}`, L.droneTier, 2200);
+        else ui.hud.warn(`${nm} ${L.droneLv} ${e.level}`);
       }
       const at = drones.positionOf(e.slot);
       if (at) {
@@ -636,16 +636,16 @@ function handleEvent(e: SimEvent): void {
       break;
     }
     case 'pickup':
-      if (e.slot === localSlot && e.kind >= 4) ui.banner(UI_STRINGS[ui.lang].powerups[e.kind]!, '', e.kind === 7 ? 1800 : 1300);
-      if (e.kind === 7) ui.screenFlash('#ffffff', 700);
+      if (e.slot === localSlot && e.kind >= 4) ui.hud.banner(UI_STRINGS[ui.lang].powerups[e.kind]!, '', e.kind === 7 ? 1800 : 1300);
+      if (e.kind === 7) ui.hud.screenFlash('#ffffff', 700);
       break;
     case 'nuke':
       if (settings.announcer) audio.announce('megakill', 5);
       slowMo(0.7);
-      ui.screenFlash('#fff6c8', 900);
+      ui.hud.screenFlash('#fff6c8', 900);
       break;
     case 'freeze':
-      ui.screenFlash('#9be8ff', 800);
+      ui.hud.screenFlash('#9be8ff', 800);
       break;
     case 'enemyDeath': {
       // the kill you just made lands with a tiny freeze; heavy rounds freeze a little longer; bosses go to slow motion
@@ -660,7 +660,7 @@ function handleEvent(e: SimEvent): void {
       comboAt = nowSec;
       const step = COMBO_STEPS.indexOf(comboCount);
       if (step >= 0 && settings.announcer) {
-        ui.banner(UI_STRINGS[ui.lang].combos[step]!, `x${comboCount}`, 1100);
+        ui.hud.banner(UI_STRINGS[ui.lang].combos[step]!, `x${comboCount}`, 1100);
         if (!audio.announce(COMBO_VOICE[step]!, 2 + step)) audio.play('level');
       }
       if (settings.announcer) {
@@ -690,12 +690,12 @@ function handleEvent(e: SimEvent): void {
         const L = UI_STRINGS[ui.lang];
         const cards = L.cards as Record<string, readonly [string, string]>;
         const info = L.teamInfo as Record<string, string>;
-        ui.pushInfo(cards[id]![0], info[id] ?? cards[id]![1], names[e.by] ?? `P${e.by + 1}`, colorFor(e.by));
+        ui.hud.pushInfo(cards[id]![0], info[id] ?? cards[id]![1], names[e.by] ?? `P${e.by + 1}`, colorFor(e.by));
       }
       break;
     }
     case 'playerRevive':
-      ui.banner(ui.lang === 'tr' ? 'Kaldırıldı!' : 'Revived!', names[e.slot] ?? '', 1500);
+      ui.hud.banner(ui.lang === 'tr' ? 'Kaldırıldı!' : 'Revived!', names[e.slot] ?? '', 1500);
       animator.trigger(e.slot, 'get_up', 1.3, nowSec);
       break;
     case 'grenadeThrown':
@@ -708,7 +708,7 @@ function handleEvent(e: SimEvent): void {
       {
         // what the boss just did, in words that match (only a summon is "reinforcements")
         const b = BOSS_BANNERS[e.kind];
-        if (b) ui.banner(ui.lang === 'tr' ? b[1] : b[0], '', 1400);
+        if (b) ui.hud.banner(ui.lang === 'tr' ? b[1] : b[0], '', 1400);
       }
       break;
     case 'gameOver':
@@ -948,7 +948,7 @@ function connect(name: string, rawServer: string, code: string | null, password 
     mode = 'menu';
     session = null;
     world = null;
-    ui.clearHud();
+    ui.hud.clearHud();
     ui.showMenu(ui.tr('connLost'));
   };
   sock.onerror = () => {
@@ -1006,7 +1006,7 @@ async function downloadReport(): Promise<void> {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
-  ui.warn(ui.lang === 'tr' ? 'Rapor indirildi' : 'Report downloaded');
+  ui.hud.warn(ui.lang === 'tr' ? 'Rapor indirildi' : 'Report downloaded');
 }
 
 let easedFacing: number | null = null;
@@ -1212,7 +1212,7 @@ function frameInner(nowMs: number): void {
       if (session.players.find((p) => p.slot === session!.slot)?.host) session.setPause(!session.paused);
     } else if (mode === 'solo') setPaused(!paused);
   }
-  ui.setHostPause(mode === 'online' && !!session?.paused, !!session?.players.find((p) => p.slot === session!.slot)?.host);
+  ui.hud.setHostPause(mode === 'online' && !!session?.paused, !!session?.players.find((p) => p.slot === session!.slot)?.host);
   const realDt = Math.min(0.1, (nowMs - last) / 1000);
   last = nowMs;
   stopT = Math.max(0, stopT - realDt);
@@ -1260,7 +1260,7 @@ function frameInner(nowMs: number): void {
       world = null;
       reconnecting = false;
       ui.setLoading(null);
-      ui.clearHud();
+      ui.hud.clearHud();
       ui.showMenu(ui.tr('connLost'));
     }
   }
@@ -1319,7 +1319,7 @@ function frameInner(nowMs: number): void {
     catchingUp = false;
     alpha = session.catchingUp ? 0 : session.playFraction;
     for (let s = 0; s < MAX_PLAYERS; s++) if (world.pActive[s]) ensureCharacter(s);
-    if (session.desyncTicks.length) ui.warn(ui.tr('desync'));
+    if (session.desyncTicks.length) ui.hud.warn(ui.tr('desync'));
   }
 
   if (world) {
@@ -1466,7 +1466,7 @@ function frameInner(nowMs: number): void {
       fy0 += (cine.y - fy0) * cineFrame.focus;
     }
     stage.setZoom(cineFrame.zoom * dev.zoom);
-    ui.setCine(cineFrame.bars, cine.by >= 0 ? names[cine.by] ?? '' : '', cine.by >= 0 ? PLAYER_COLORS[cine.by % PLAYER_COLORS.length]! : '#ffffff');
+    ui.hud.setCine(cineFrame.bars, cine.by >= 0 ? names[cine.by] ?? '' : '', cine.by >= 0 ? PLAYER_COLORS[cine.by % PLAYER_COLORS.length]! : '#ffffff');
     // the roof of a bridge or gallery thins out while the local character walks under it, so it stays in sight
     const hidden = w.pActive[localSlot] === 1 && w.pLayer[localSlot] === 0 && climb.arena.hidesGround(stage.camera, vx[localSlot]!, vy[localSlot]!);
     climb.arena.fadeRoof(hidden ? 0.2 : 1, dt);
@@ -1478,7 +1478,7 @@ function frameInner(nowMs: number): void {
     audio.nightBias = stage.night * 0.15;
     stage.update(dt, fx0, -fy0);
     climb.props.setNight(stage.night);
-    ui.setNightHud(stage.night > 0.5);
+    ui.hud.setNightHud(stage.night > 0.5);
     ui.overlay.setCombo(settings.announcer && nowSec - comboAt < 2.2 ? comboCount : 0, '');
     {
       const me = localSlot;
@@ -1663,10 +1663,10 @@ function frameInner(nowMs: number): void {
     spitMesh.count = sn;
     spitMesh.instanceMatrix.needsUpdate = true;
     flushHits();
-    ui.update(w, localSlot, fx.hurt, nowMs, names);
-    if (ui.countShown !== lastCount) {
-      if (ui.countShown > 0) audio.play(ui.countShown <= 3 ? 'countGo' : 'countTick');
-      lastCount = ui.countShown;
+    ui.hud.update(w, localSlot, fx.hurt, nowMs, names);
+    if (ui.hud.countShown !== lastCount) {
+      if (ui.hud.countShown > 0) audio.play(ui.hud.countShown <= 3 ? 'countGo' : 'countTick');
+      lastCount = ui.hud.countShown;
     }
     ui.minimap.draw(w, localSlot, nowMs);
   } else {

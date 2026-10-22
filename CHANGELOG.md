@@ -9,6 +9,7 @@ minors), so a minor bump means: update the server and reload the page.
 
 **ui.ts split into modules (internals, same game)**
 
+- The in-game HUD (squad cards, gear, relics, drone, boss bar, countdown, warnings, banners) is its own class in `hud.ts` (`ui.hud`), talking to the Ui through a small host interface.
 - The 2860-line `ui.ts` lost about 1100 lines to modules that each do one thing: `uiStrings.ts` (all interface text), `uiStyles.ts`, `arenaThumb.ts`, `worldOverlay.ts` (names, arrows, rings and numbers drawn over the world, now `ui.overlay`), `minimap.ts` (now `ui.minimap`) and `weaponHtml.ts` (the weapon panels, as plain functions with their first tests).
 
 ## v0.32.0 (2026-10-22)

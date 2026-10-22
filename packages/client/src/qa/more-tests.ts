@@ -480,7 +480,7 @@ export const moreTests: QaTest[] = [
             bySet(group);
             w.pCardTimer[0] = 100;
             clock += 200; // the HUD throttles on time, so keep it moving forward
-            ui.update(w, 0, 0, clock, ['p']);
+            ui.hud.update(w, 0, 0, clock, ['p']);
             const cards = [...host.querySelectorAll<HTMLElement>('.wrh-card')];
             if (cards.length !== 3) {
               problems.push(`${lang}: ${cards.length} cards shown for ${group.join(',')}`);
@@ -1074,7 +1074,7 @@ export const moreTests: QaTest[] = [
         giveWeapon(w, 0, WEAPON_IDS.indexOf('sniper'));
         giveWeapon(w, 0, WEAPON_IDS.indexOf('minigun'));
         w.pInvMag[WEAPON_IDS.indexOf('sniper')] = 0;
-        ui.update(w, 0, 0, 1000, ['p']);
+        ui.hud.update(w, 0, 0, 1000, ['p']);
         const rows = [...host.querySelectorAll<HTMLElement>('.wrh-inv .row')];
         const expected = ['pistol', 'ar', 'sniper', 'minigun'].length;
         if (rows.length !== expected) problems.push(`${rows.length} rows, expected ${expected}`);
@@ -1269,7 +1269,7 @@ export const moreTests: QaTest[] = [
         const w = createWorld(1);
         addPlayer(w, 0, 0, 0);
         ui.clearScreen();
-        ui.update(w, 0, 0, 1000, ['p']);
+        ui.hud.update(w, 0, 0, 1000, ['p']);
         check('game');
         // the language list names every language and picking one reports it
         host.querySelector<HTMLElement>('#tb-lang')!.click();
@@ -1354,8 +1354,8 @@ export const moreTests: QaTest[] = [
       }, settings);
       const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
       try {
-        ui.pushInfo('First aid', 'Everyone healed to full', 'Alice', '#1FA2FF');
-        ui.pushInfo('Full magazines', 'Every weapon refilled', 'Bob', '#FF4F9A');
+        ui.hud.pushInfo('First aid', 'Everyone healed to full', 'Alice', '#1FA2FF');
+        ui.hud.pushInfo('Full magazines', 'Every weapon refilled', 'Bob', '#FF4F9A');
         await sleep(120);
         let items = [...host.querySelectorAll<HTMLElement>('.wrh-info .it')];
         if (items.length !== 1) problems.push(`${items.length} bars at once, expected 1 (the second waits)`);
@@ -1389,13 +1389,13 @@ export const moreTests: QaTest[] = [
       const w = createWorld(3);
       addPlayer(w, 0, 0, 0);
       try {
-        ui.update(w, 0, 0, 1000, ['p']);
+        ui.hud.update(w, 0, 0, 1000, ['p']);
         if (host.querySelectorAll('.wrh-relic').length !== 0) problems.push('relics shown before any card was taken');
         const n = CARD_IDS.length;
         w.pCards[CARD_IDS.indexOf('damage')] = 2;
         w.pCards[CARD_IDS.indexOf('heal')] = 1;
         w.pCards[n + CARD_IDS.indexOf('crit')] = 3; // another character's: not shown
-        ui.update(w, 0, 0, 1200, ['p']);
+        ui.hud.update(w, 0, 0, 1200, ['p']);
         const relics = [...host.querySelectorAll<HTMLElement>('.wrh-relic')];
         if (relics.length !== 2) problems.push(`${relics.length} relics, expected the 2 kinds this character took`);
         if (!relics.some((r) => r.textContent?.includes('x2'))) problems.push('the stack count (x2) is missing');
@@ -1415,7 +1415,7 @@ export const moreTests: QaTest[] = [
         r.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
         if (tip && tip.style.display !== 'none') problems.push('the text stays after the pointer left');
         void bar;
-        ui.clearHud();
+        ui.hud.clearHud();
         if (host.querySelector('.wrh-relics.on')) problems.push('the bar stays after the HUD is cleared');
       } finally {
         host.remove();
@@ -1441,12 +1441,12 @@ export const moreTests: QaTest[] = [
       addPlayer(w, 0, 0, 0, 'pistol', 1);
       addPlayer(w, 1, 2, 0, 'pistol', 2);
       try {
-        ui.update(w, 0, 0, 1000, ['Ann', 'Bob']);
+        ui.hud.update(w, 0, 0, 1000, ['Ann', 'Bob']);
         // slot 0 deals 100 damage per second for a while, slot 1 nothing
         for (let k = 1; k <= 20; k++) {
           w.pPerk[0 * 24 + 21] = k * 25;
           w.pPerk[0 * 24 + 17] = Math.floor(k / 4);
-          ui.update(w, 0, 0, 1000 + k * 250, ['Ann', 'Bob']);
+          ui.hud.update(w, 0, 0, 1000 + k * 250, ['Ann', 'Bob']);
         }
         const cards = [...host.querySelectorAll<HTMLElement>('.wrh-pc')];
         if (cards.length !== 2) problems.push(`${cards.length} cards`);
@@ -1461,7 +1461,7 @@ export const moreTests: QaTest[] = [
         cards[0]!.querySelector('.top')!.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
         if (tip && tip.style.display !== 'none') problems.push('the text stays after the pointer left');
       } finally {
-        ui.clearHud();
+        ui.hud.clearHud();
         host.remove();
       }
       return { status: problems.length ? 'fail' : 'pass', detail: problems.length ? problems.join(' | ') : 'dps, kills and the hover text' };
