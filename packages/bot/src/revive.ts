@@ -1,5 +1,6 @@
 import { BALANCE, MAX_ENEMIES, MAX_TELE, PERK, PERKS, PlayerState, TeleEffect } from '@wrh/shared';
 import type { World } from '@wrh/sim';
+import { legToLayer } from './route';
 import type { Member } from './roles';
 
 /** Everything the squad knows about one downed friend. Computed from the world only, so every bot gets the same numbers. */
@@ -22,6 +23,8 @@ export interface DownedInfo {
   /** Where the nearby enemies are (centroid, weighted); the friend's own spot when there are none. */
   threatX: number;
   threatY: number;
+  /** 0 ground, 1 deck. */
+  layer: number;
   /** The bot that goes for the revive (-1: none). */
   assignee: number;
 }
@@ -104,13 +107,12 @@ export function planRevives(w: World, squad: readonly Member[]): RevivePlan {
     if (m.state !== PlayerState.Downed) continue;
     const press = pressureAt(w, m.x, m.y);
     const zone = zoneOver(w, m.x, m.y);
-    const need = reviveSeconds(w, m.slot);
     downed.push({
       slot: m.slot,
       x: m.x,
       y: m.y,
       timeLeft: w.pTimer[m.slot]!,
-      progress: Math.min(1, w.pRevive[m.slot]! / Math.max(0.1, need)),
+      progress: Math.min(1, w.pRevive[m.slot]! / BALANCE.player.reviveSeconds),
       pressure: press.pressure,
       zoneEta: zone ? zone.eta : Infinity,
       zoneX: zone ? zone.x : m.x,
@@ -118,6 +120,7 @@ export function planRevives(w: World, squad: readonly Member[]): RevivePlan {
       zoneR: zone ? zone.r : 0,
       threatX: press.cx,
       threatY: press.cy,
+      layer: m.layer,
       assignee: -1,
     });
   }
@@ -137,8 +140,11 @@ export function planRevives(w: World, squad: readonly Member[]): RevivePlan {
     let nearest = Infinity;
     for (const m of bots) {
       if (assigned.has(m.slot)) continue;
-      const dist = Math.hypot(m.x - d.x, m.y - d.y);
-      nearest = Math.min(nearest, dist);
+      const direct = Math.hypot(m.x - d.x, m.y - d.y);
+      // on another level the way leads over a ramp (a revive across levels works only when they stand almost on top of each other)
+      const leg = m.layer === d.layer || direct < REVIVE_RANGE * 0.9 ? null : legToLayer(w, m.x, m.y, m.layer, d.x, d.y, d.layer);
+      const dist = leg ? leg.length : m.layer === d.layer || direct < REVIVE_RANGE * 0.9 ? direct : direct * 3 + 8;
+      nearest = Math.min(nearest, direct);
       const eta = Math.max(0, dist - REVIVE_RANGE * 0.8) / MOVE_SPEED;
       const need = reviveSeconds(w, m.slot) * (1 - d.progress);
       // the friend would be gone before the revive could finish

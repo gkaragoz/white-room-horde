@@ -34,6 +34,8 @@ export interface Member {
   frac: number;
   /** Alive and able to act. */
   standing: boolean;
+  /** 0 ground, 1 deck. */
+  layer: number;
 }
 
 /** Everybody in the squad (self included), sorted by slot: the same list, in the same order, for every bot. */
@@ -42,7 +44,7 @@ export function squadOf(p: Percept): Member[] {
   const out: Member[] = [];
   const mk = (slot: number, x: number, y: number, state: number, hp: number, maxHp: number, human: boolean): Member => {
     const cls = w.pPerk[slot * PERKS + PERK.Class] ?? 0;
-    return { slot, x, y, state, hp, maxHp, human, cls, role: roleOfClass(cls), frac: maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0, standing: state === PlayerState.Alive };
+    return { slot, x, y, state, hp, maxHp, human, cls, role: roleOfClass(cls), frac: maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0, standing: state === PlayerState.Alive, layer: w.pLayer[slot] ?? 0 };
   };
   let placed = false;
   for (const a of p.allies) {

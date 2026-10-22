@@ -3,6 +3,7 @@ import { BIAS_MAX, clampVec, formationBias, teamMemory, trackHumans, type TeamMe
 import { lootBias } from './loot';
 import { planRevives, zoneOver, type DownedInfo, type RevivePlan } from './revive';
 import { anchorOf, squadOf, type Member } from './roles';
+import { legToLayer } from './route';
 import type { Ctx, Percept, TeamDecision } from './types';
 
 export { BIAS_MAX } from './formation';
@@ -61,9 +62,18 @@ export function decideTeam(p: Percept, ctx: Ctx): TeamDecision {
   let bx = 0;
   let by = 0;
   if (anchor) {
-    const f = formationBias(p, ctx, me, squad, anchor, mem, near);
-    bx += f.x;
-    by += f.y;
+    const a = anchor.slot >= 0 ? squad.find((m) => m.slot === anchor.slot) : undefined;
+    const leg = a && a.layer !== p.layer && Math.hypot(a.x - p.x, a.y - p.y) > 5 ? legToLayer(p.world, p.x, p.y, p.layer, a.x, a.y, a.layer) : null;
+    if (leg) {
+      // the anchor is on another level: use the ramp rather than push against the edge
+      const ld = Math.hypot(leg.x - p.x, leg.y - p.y) || 1;
+      bx += ((leg.x - p.x) / ld) * 1.1;
+      by += ((leg.y - p.y) / ld) * 1.1;
+    } else {
+      const f = formationBias(p, ctx, me, squad, anchor, mem, near);
+      bx += f.x;
+      by += f.y;
+    }
   }
   const s = supportBias(p, me, squad);
   bx += s.x;
@@ -79,7 +89,7 @@ function crawlToward(p: Percept, squad: readonly Member[]): Vec {
   let bd = Infinity;
   for (const m of squad) {
     if (m.slot === p.slot || !m.standing) continue;
-    const d = (m.x - p.x) ** 2 + (m.y - p.y) ** 2;
+    const d = (m.x - p.x) ** 2 + (m.y - p.y) ** 2 + (m.layer === p.layer ? 0 : 400);
     if (d < bd) {
       bd = d;
       best = m;
@@ -146,8 +156,8 @@ function goRevive(p: Percept, ctx: Ctx, mem: TeamMemory, t: DownedInfo): TeamDec
     mem.awareTick = p.tick;
     mem.aware = ctx.rand() < 0.3 + 0.7 * ctx.skill.dodge;
   }
-  const dx = t.x - p.x;
-  const dy = t.y - p.y;
+  let dx = t.x - p.x;
+  let dy = t.y - p.y;
   const dist = Math.hypot(dx, dy);
   if (mem.aware) {
     const here = zoneOver(p.world, p.x, p.y, 0.4);
@@ -161,6 +171,17 @@ function goRevive(p: Percept, ctx: Ctx, mem: TeamMemory, t: DownedInfo): TeamDec
       const edge = zone.r + 1.2;
       if (zd < edge) return { revive: false, bias: clampVec((zx / zd) * (1.2 + (edge - zd) * 0.3), (zy / zd) * (1.2 + (edge - zd) * 0.3), BIAS_MAX) };
       return none();
+    }
+  }
+  if (dist > KNEEL * 1.5 && p.layer !== t.layer) {
+    // the friend lies on another level: take the ramp first
+    const leg = legToLayer(p.world, p.x, p.y, p.layer, t.x, t.y, t.layer);
+    if (leg) {
+      dx = leg.x - p.x;
+      dy = leg.y - p.y;
+      const ld = Math.hypot(dx, dy) || 1;
+      const lk = Math.min(BIAS_MAX, 1.4) / ld;
+      return { revive: false, bias: { x: dx * lk, y: dy * lk } };
     }
   }
   if (dist <= KNEEL) return { revive: true, bias: dist > 0.7 ? clampVec((dx / dist) * 0.4, (dy / dist) * 0.4, 0.4) : { x: 0, y: 0 } };
