@@ -513,7 +513,7 @@ export const moreTests: QaTest[] = [
     },
   },
   {
-    id: 'ui.mods',
+    id: 'ui.choices.mods',
     title: 'The difficulty multipliers: a summary button opens the 20-card grid, toggles change the score multiplier, a guest can only look, the lobby follows the host',
     async run() {
       const problems: string[] = [];
@@ -529,7 +529,7 @@ export const moreTests: QaTest[] = [
       }, settings);
       try {
         const p = (slot: number, name: string): { slot: number; name: string; host: boolean; connected: boolean; weapon: 'pistol'; acc: number; color: number } => ({ slot, name, host: slot === 0, connected: true, weapon: 'pistol', acc: 0, color: 0 });
-        ui.showLobby('ABCD', [p(0, 'host')], true, { map: 0, mods: 0 }, false);
+        ui.screens.showLobby('ABCD', [p(0, 'host')], true, { map: 0, mods: 0 }, false);
         host.querySelector<HTMLElement>('#wrh-mods-open')?.click();
         const grid = document.querySelectorAll<HTMLElement>('.wrh-modal .wrh-mod');
         if (grid.length !== 20) problems.push(`${grid.length} multipliers in the grid, expected 20`);
@@ -543,7 +543,7 @@ export const moreTests: QaTest[] = [
         if (document.querySelector('.wrh-modal')) problems.push('the grid did not close');
         if (!host.querySelector('#wrh-modsrow .strip img')) problems.push('the summary does not show the chosen icons');
         // a guest sees the host's choice and cannot change it
-        ui.showLobby('ABCE', [p(0, 'host'), p(1, 'guest')], false, { map: 0, mods: 1 | 8 | 16 }, false);
+        ui.screens.showLobby('ABCE', [p(0, 'host'), p(1, 'guest')], false, { map: 0, mods: 1 | 8 | 16 }, false);
         host.querySelector<HTMLElement>('#wrh-mods-open')?.click();
         const before = sent.length;
         document.querySelectorAll<HTMLElement>('.wrh-modal .wrh-mod')[5]?.click();
@@ -658,9 +658,9 @@ export const moreTests: QaTest[] = [
       const problems: string[] = [];
       try {
         saveProfile({ ...loadProfile(), acc: 0, color: -1 });
-        ui.acc = 0;
-        ui.color = -1;
-        ui.showMenu();
+        ui.choices.acc = 0;
+        ui.choices.color = -1;
+        ui.screens.showMenu();
         const q = <E extends HTMLElement>(sel: string): E => host.querySelector<E>(sel)!;
         const canvas = host.querySelector('canvas.wrh-prev-canvas');
         if (!canvas) return { status: 'warn', detail: 'no preview canvas (browser without a second WebGL context?)' };
@@ -691,7 +691,7 @@ export const moreTests: QaTest[] = [
         const sw = host.querySelector('[data-sw].on');
         if (!sw) problems.push('selected swatch is not marked');
       } finally {
-        ui.clearScreen();
+        ui.screens.clearScreen();
         host.remove();
         saveProfile({ ...loadProfile(), acc: 0, color: -1 });
       }
@@ -1262,13 +1262,13 @@ export const moreTests: QaTest[] = [
             else if (getComputedStyle(b).display === 'none') problems.push(`${where}: ${id} is hidden`);
           }
         };
-        ui.showMenu();
+        ui.screens.showMenu();
         check('menu');
-        ui.showLobby('ABCD', [{ slot: 0, name: 'a', host: true, connected: true, weapon: 'pistol', acc: 0, color: 0 }], true, { map: 0, mods: 1 }, false);
+        ui.screens.showLobby('ABCD', [{ slot: 0, name: 'a', host: true, connected: true, weapon: 'pistol', acc: 0, color: 0 }], true, { map: 0, mods: 1 }, false);
         check('lobby');
         const w = createWorld(1);
         addPlayer(w, 0, 0, 0);
-        ui.clearScreen();
+        ui.screens.clearScreen();
         ui.hud.update(w, 0, 0, 1000, ['p']);
         check('game');
         // the language list names every language and picking one reports it
@@ -1285,7 +1285,7 @@ export const moreTests: QaTest[] = [
         if (!host.querySelector('.wrh-ctl-row')) problems.push('the Controls tab of the settings does not show the controls sheet');
         host.querySelector<HTMLElement>('#tb-set')!.click();
         // a language change redraws the menu in the new language and keeps what was typed
-        ui.showMenu();
+        ui.screens.showMenu();
         const name = host.querySelector<HTMLInputElement>('#wrh-name');
         if (name) name.value = 'Zed';
         ui.applySettings({ ...settings, lang: 'tr' });
@@ -1314,7 +1314,7 @@ export const moreTests: QaTest[] = [
       }, settings);
       const p = (slot: number, name: string, weapon: (typeof WEAPON_IDS)[number] = 'pistol') => ({ slot, name, host: slot === 0, connected: true, weapon, acc: 0, color: slot });
       try {
-        ui.showLobby('ABCD', [p(0, 'host')], false, { map: 0, mods: 1 }, false);
+        ui.screens.showLobby('ABCD', [p(0, 'host')], false, { map: 0, mods: 1 }, false);
         const panel = host.querySelector<HTMLElement>('#wrh-lobby');
         const stage = host.querySelector('.wrh-prev');
         if (!panel || !stage) throw new Error('the lobby did not draw');
@@ -1322,8 +1322,8 @@ export const moreTests: QaTest[] = [
         panel.style.overflow = 'auto';
         panel.scrollTop = 120;
         const before = panel.scrollTop;
-        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'ar')], false, { map: 0, mods: 1 }, false);
-        ui.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'smg'), p(2, 'third')], false, { map: 2, mods: 2 }, false);
+        ui.screens.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'ar')], false, { map: 0, mods: 1 }, false);
+        ui.screens.showLobby('ABCD', [p(0, 'host'), p(1, 'guest', 'smg'), p(2, 'third')], false, { map: 2, mods: 2 }, false);
         if (host.querySelector('#wrh-lobby') !== panel) problems.push('the lobby panel was replaced by an update');
         if (host.querySelector('.wrh-prev') !== stage) problems.push('the preview was rebuilt by an update');
         if (panel.scrollTop !== before) problems.push(`the scroll position moved from ${before} to ${panel.scrollTop}`);

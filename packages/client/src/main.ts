@@ -287,7 +287,7 @@ const ui = new Ui(
     onJoin: (name, code, server, password) => connect(name, server, code, password),
     onRejoin: () => {
       const r = loadRejoin();
-      if (r) connect(ui.name(), r.server, r.code, '', r.token);
+      if (r) connect(ui.screens.name(), r.server, r.code, '', r.token);
     },
     onLook: (acc, color, cls) => session?.setLook(acc, color, cls),
     getBindings: () => input.bindings,
@@ -362,7 +362,7 @@ audio.setWeaponLookup((s) => (world && world.pActive[s] ? WEAPON_IDS[world.pWeap
 audio.setSlotLookup((s) => (world && world.pActive[s] ? { x: world.pX[s]!, y: world.pY[s]! } : undefined));
 window.addEventListener('pointerdown', () => audio.unlock());
 window.addEventListener('keydown', () => audio.unlock());
-ui.weapon = startWeapon;
+ui.choices.weapon = startWeapon;
 applySettings();
 
 // ---- characters ----
@@ -372,12 +372,12 @@ const loading = new Set<number>();
 /** Accessory index of a slot: the lobby choice online, the profile for the local player, otherwise by slot. */
 function accFor(s: number): number {
   if (session) return session.players.find((p) => p.slot === s)?.acc ?? s;
-  return s === localSlot ? ui.acc : s;
+  return s === localSlot ? ui.choices.acc : s;
 }
 
 /** Vest colour of a slot: the lobby choice online, the profile colour for the local player, otherwise by slot. */
 function colorFor(s: number): string {
-  const idx = session ? (session.players.find((p) => p.slot === s)?.color ?? -1) : s === localSlot ? ui.color : -1;
+  const idx = session ? (session.players.find((p) => p.slot === s)?.color ?? -1) : s === localSlot ? ui.choices.color : -1;
   const i = (idx >= 0 ? idx : s) % PLAYER_COLORS.length;
   return (settings.colorblind ? COLORBLIND_COLORS : PLAYER_COLORS)[i]!;
 }
@@ -719,7 +719,7 @@ function handleEvent(e: SimEvent): void {
         const rec = world && !playback ? { ...recordGame(world.wave, world.kills, runScore(world).final), ach: recordAchievements(world, localSlot) } : undefined;
         clearRejoin();
         ui.playerNames = names;
-        setTimeout(() => world && ui.showGameOver(world, rec, { clicks: runClicks, keys: runKeys, bestCombo }, false, localSlot), 1800);
+        setTimeout(() => world && ui.screens.showGameOver(world, rec, { clicks: runClicks, keys: runKeys, bestCombo }, false, localSlot), 1800);
       }
       break;
     default:
@@ -735,8 +735,8 @@ function setPaused(p: boolean): void {
   }
   paused = p;
   input.enabled = !p;
-  if (p) ui.showPause();
-  else ui.clearScreen();
+  if (p) ui.screens.showPause();
+  else ui.screens.clearScreen();
 }
 window.addEventListener('keydown', (e) => {
   if (input.bindings.pause.includes(e.code) && (e.target as HTMLElement).tagName !== 'INPUT') setPaused(!paused);
@@ -844,7 +844,7 @@ function beginPlaying(w: World, slot: number): void {
   climb.props.setNight(stage.night);
   world = w;
   localSlot = slot;
-  ui.clearScreen();
+  ui.screens.clearScreen();
   input.enabled = true;
   for (let s = 0; s < MAX_PLAYERS; s++) {
     if (!w.pActive[s]) continue;
@@ -857,13 +857,13 @@ function beginPlaying(w: World, slot: number): void {
 
 function startSolo(name: string): void {
   mode = 'solo';
-  const players: { slot: number; weapon: WeaponId; cls: number }[] = [{ slot: 0, weapon: startWeapon, cls: ui.cls }];
+  const players: { slot: number; weapon: WeaponId; cls: number }[] = [{ slot: 0, weapon: startWeapon, cls: ui.choices.cls }];
   names = [name];
   for (let b = 1; b <= dev.bots; b++) {
     players.push({ slot: b, weapon: b % 2 ? 'smg' : 'ar', cls: b % 7 });
     names[b] = 'Bot ' + b;
   }
-  const opts = withOptions({ map: ui.map, mods: ui.mods }, { map: numberParam('map'), mods: numberParam('mods') });
+  const opts = withOptions({ map: ui.choices.map, mods: ui.choices.mods }, { map: numberParam('map'), mods: numberParam('mods') });
   const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map: resolveMap(opts.map), mods: opts.mods };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
@@ -899,7 +899,7 @@ function connect(name: string, rawServer: string, code: string | null, password 
   const server = normalizeServer(rawServer);
   lastServer = server;
   if (!server) {
-    ui.showMenu(ui.tr('noServer'));
+    ui.screens.showMenu(ui.screens.tr('noServer'));
     return;
   }
   try {
@@ -908,7 +908,7 @@ function connect(name: string, rawServer: string, code: string | null, password 
     /* ignore */
   }
   mode = 'online';
-  if (!world) ui.showConnecting();
+  if (!world) ui.screens.showConnecting();
   // a dropped game keeps its world: the new session carries on from the old one (same slot from the first frame, no replay from tick 0)
   const prev = rejoinToken && world && session && session.world === world ? session : null;
   const sock = new WebSocket(server);
@@ -924,8 +924,8 @@ function connect(name: string, rawServer: string, code: string | null, password 
     openedAt = performance.now();
     if (code) joinedLate = true;
     if (rejoinToken && code) sess.rejoin(code, rejoinToken, sess.adopted ? sess.applied : undefined);
-    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
-    else sess.create(name, startWeapon, { password, acc: ui.acc, color: ui.color, cls: ui.cls });
+    else if (code) sess.join(code, name, startWeapon, { password, acc: ui.choices.acc, color: ui.choices.color, cls: ui.choices.cls });
+    else sess.create(name, startWeapon, { password, acc: ui.choices.acc, color: ui.choices.color, cls: ui.choices.cls });
   };
   sock.onmessage = (ev) => {
     sess.onMessage(typeof ev.data === 'string' ? ev.data : new Uint8Array(ev.data as ArrayBuffer));
@@ -949,10 +949,10 @@ function connect(name: string, rawServer: string, code: string | null, password 
     session = null;
     world = null;
     ui.hud.clearHud();
-    ui.showMenu(ui.tr('connLost'));
+    ui.screens.showMenu(ui.screens.tr('connLost'));
   };
   sock.onerror = () => {
-    if (!world) ui.showMenu(`${ui.tr('noConnect')} ${server}`);
+    if (!world) ui.screens.showMenu(`${ui.screens.tr('noConnect')} ${server}`);
   };
 }
 
@@ -1239,7 +1239,7 @@ function frameInner(nowMs: number): void {
         lobbySig = sig;
         names = [];
         for (const p of session.players) names[p.slot] = p.name;
-        ui.showLobby(session.code, session.players, session.players.find((p) => p.slot === sess0.slot)?.host ?? false, session.options, session.locked);
+        ui.screens.showLobby(session.code, session.players, session.players.find((p) => p.slot === sess0.slot)?.host ?? false, session.options, session.locked);
       }
     } else if (session.state === 'playing' && session.world && session.world !== world && session.slot >= 0) {
       for (const p of session.players) names[p.slot] = p.name;
@@ -1248,7 +1248,7 @@ function frameInner(nowMs: number): void {
     if (session.error && !world) {
       // the room is gone or the seat was given up: the saved way back is useless, forget it so the button does not keep failing
       if (session.errorCode === 'room_gone' || session.errorCode === 'bad_token') clearRejoin();
-      ui.showMenu(session.errorCode === 'room_gone' ? ui.tr('rejoinGone') : session.errorCode === 'bad_token' ? ui.tr('rejoinSeat') : session.error);
+      ui.screens.showMenu(session.errorCode === 'room_gone' ? ui.screens.tr('rejoinGone') : session.errorCode === 'bad_token' ? ui.screens.tr('rejoinSeat') : session.error);
       session.error = '';
       mode = 'menu';
     } else if (session.error && world && reconnecting) {
@@ -1259,9 +1259,9 @@ function frameInner(nowMs: number): void {
       session = null;
       world = null;
       reconnecting = false;
-      ui.setLoading(null);
+      ui.screens.setLoading(null);
       ui.hud.clearHud();
-      ui.showMenu(ui.tr('connLost'));
+      ui.screens.showMenu(ui.screens.tr('connLost'));
     }
   }
 
@@ -1309,17 +1309,17 @@ function frameInner(nowMs: number): void {
     const behind = session.backlog;
     if (session.catchingUp) {
       catchupPeak = Math.max(catchupPeak, behind);
-      ui.setLoading(ui.tr(joinedLate ? 'joining' : 'syncing'), 1 - behind / Math.max(1, catchupPeak));
+      ui.screens.setLoading(ui.screens.tr(joinedLate ? 'joining' : 'syncing'), 1 - behind / Math.max(1, catchupPeak));
     } else {
       catchupPeak = 0;
       joinedLate = false;
-      ui.setLoading(reconnecting ? ui.tr('reconnecting') : null);
+      ui.screens.setLoading(reconnecting ? ui.screens.tr('reconnecting') : null);
     }
     if (n && !session.catchingUp) reconnecting = false;
     catchingUp = false;
     alpha = session.catchingUp ? 0 : session.playFraction;
     for (let s = 0; s < MAX_PLAYERS; s++) if (world.pActive[s]) ensureCharacter(s);
-    if (session.desyncTicks.length) ui.hud.warn(ui.tr('desync'));
+    if (session.desyncTicks.length) ui.hud.warn(ui.screens.tr('desync'));
   }
 
   if (world) {
@@ -1592,7 +1592,7 @@ function frameInner(nowMs: number): void {
       for (const dr of pickups.drops) {
         _p.set(dr.x, 1.35, dr.z).project(stage.camera);
         if (Math.abs(_p.x) > 1 || Math.abs(_p.y) > 1) continue;
-        tags.push({ px: ((_p.x + 1) / 2) * app.clientWidth, py: ((1 - _p.y) / 2) * app.clientHeight, text: dr.kind === 3 ? ui.weaponName(WEAPON_IDS[dr.data] ?? '') : (names[dr.kind] ?? ''), color: TIER_COLORS[dr.tier]! });
+        tags.push({ px: ((_p.x + 1) / 2) * app.clientWidth, py: ((1 - _p.y) / 2) * app.clientHeight, text: dr.kind === 3 ? ui.screens.weaponName(WEAPON_IDS[dr.data] ?? '') : (names[dr.kind] ?? ''), color: TIER_COLORS[dr.tier]! });
       }
       ui.overlay.setPickupLabels(tags);
     }
@@ -1749,7 +1749,7 @@ if (replayUrl) {
 // menu or direct start for dev/measurement links
 const autoStart = !replayUrl && params.get('solo') === '1' || dev.bots > 0 || dev.auto || dev.god || dev.perf || dev.wave > 1 || params.has('weapon');
 if (autoStart) startSolo('dev');
-else if (!replayUrl) ui.showMenu();
+else if (!replayUrl) ui.screens.showMenu();
 requestAnimationFrame(frame);
 // the climb's blur composer and shaders take a few hundred milliseconds to build: do it while the menu is up, not in a fight
 setTimeout(() => stage.warmFlight(), 800);
