@@ -29,6 +29,7 @@ import { InputTimer } from './inputTimer';
 import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
+import { viewOf } from './view/worldView';
 import { recordAchievements } from './achievements';
 import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
 import { BUILD, mountVersionBadge } from './buildinfo';
@@ -1025,7 +1026,7 @@ function inputDelayTicks(): number {
  */
 function lockOn(): number | null {
   const w = world;
-  if (!w || !settings.autoAim || !w.pActive[localSlot] || w.pState[localSlot] !== PlayerState.Alive) {
+  if (!w || !settings.autoAim || !viewOf(w).alive(localSlot)) {
     targetLock.reset();
     aimTarget = null;
     return null;
@@ -1367,8 +1368,9 @@ function frameInner(nowMs: number): void {
     input.setPlaneHeight(vz[localSlot]!);
     const lifted = climb.update(w, alpha, nowSec, dt, vx, vy);
     // the local character turns the instant the aim does (no wait for the simulation or the network)
+    const wv = viewOf(w);
     let localFacing: number | null = null;
-    if (settings.autoAim && w.pActive[localSlot] && w.pState[localSlot] === PlayerState.Alive) {
+    if (settings.autoAim && wv.alive(localSlot)) {
       // the character turns to the angle that was just sent (the one the bullets use), eased between samples
       easedFacing = easedFacing === null ? input.lastShot : lerpAngle(easedFacing, input.lastShot, 1 - Math.exp(-dt * 40));
       localFacing = easedFacing;
@@ -1455,7 +1457,7 @@ function frameInner(nowMs: number): void {
     // camera follows the local player, or a living teammate when down/dead
     let target = localSlot;
     if (w.pState[target] === PlayerState.Dead) {
-      for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s] && w.pState[s] === PlayerState.Alive) { target = s; break; }
+      if (wv.aliveSlots.length) target = wv.aliveSlots[0]!;
     }
     let fx0 = vx[target]!;
     let fy0 = vy[target]!;
@@ -1483,14 +1485,14 @@ function frameInner(nowMs: number): void {
       const lx = vx[me]!;
       const ly = vy[me]!;
       const a = localFacing !== null ? localFacing : lerpAngle(prevA[me]!, curA[me]!, alpha);
-      stage.setFlashlight(lx, -ly, Math.cos(a), -Math.sin(a), w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive);
+      stage.setFlashlight(lx, -ly, Math.cos(a), -Math.sin(a), wv.alive(me));
       // ammo ring around the feet: green full, red empty, rounds left beside it
-      const alive = w.pActive[me] === 1 && w.pState[me] === PlayerState.Alive;
-      const st = BALANCE.weapons[WEAPON_IDS[w.pWeapon[me]!] ?? 'pistol']!;
-      const reloading = w.pReload[me]! > 0;
+      const alive = wv.alive(me);
+      const st = wv.weaponStats(me);
+      const reloading = wv.reloading(me);
       _p.set(lx, 0.02, -ly).project(stage.camera);
       const ppu = app.clientWidth / CAMERA.orthoWidth;
-      const frac = reloading ? 1 - w.pReload[me]! / (st.reload * w.modReload[me]!) : w.pMag[me]! / st.mag;
+      const frac = wv.ammoFraction(me);
       // where the next grenade lands
       {
         const gc = BALANCE.grenade;
@@ -1522,7 +1524,7 @@ function frameInner(nowMs: number): void {
 
     // name tags over the other players
     for (let s = 0; s < MAX_PLAYERS; s++) {
-      const show = s !== localSlot && !!w.pActive[s] && (mode === 'online' || dev.bots > 0) && w.pState[s] !== PlayerState.Dead;
+      const show = s !== localSlot && wv.inGame(s) && (mode === 'online' || dev.bots > 0);
       if (!show) {
         ui.setTag(s, '', '#000', 0, 0, false);
         continue;
@@ -1532,7 +1534,7 @@ function frameInner(nowMs: number): void {
     }
     // revive rings over downed players (red: bleeding out, green: being revived)
     for (let s = 0; s < MAX_PLAYERS; s++) {
-      const down = !!w.pActive[s] && w.pState[s] === PlayerState.Downed && !w.gameOver;
+      const down = wv.downed(s) && !w.gameOver;
       if (!down) {
         ui.setRing(s, 0, 0, 0, 0, false, false);
         continue;
@@ -1546,7 +1548,7 @@ function frameInner(nowMs: number): void {
     }
     // arrows at the screen edge for teammates who are out of view
     for (let s = 0; s < MAX_PLAYERS; s++) {
-      const far = s !== localSlot && !!w.pActive[s] && w.pState[s] !== PlayerState.Dead && (mode === 'online' || dev.bots > 0);
+      const far = s !== localSlot && wv.inGame(s) && (mode === 'online' || dev.bots > 0);
       if (!far) {
         ui.setArrow(s, '', '#000', 0, 0, 0, false);
         continue;

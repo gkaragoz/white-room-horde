@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**One place for what the HUD and the sound read from the world (client)**
+
+- A new `WorldView` (`packages/client/src/view/worldView.ts`) answers the questions the HUD, the sound and the rings around the characters kept answering separately: who is alive or downed, how hurt a player is, whether a boss is up, how far a reload has come. The hurt pulse and the heartbeat now share one threshold, and the client has its first unit tests (`pnpm test`).
+- Fix: the reload bar in the HUD ignored reload cards, so it filled slower than the ring around the character. Both now read the same value.
+
 **Difficulty in one place (internals, same game)**
 
 - The difficulty multipliers' bit mask is now handled by one module (`Difficulty` in `packages/shared/src/difficulty.ts`) instead of loops repeated in the menu, the achievements, the room and the sim. The generator `tools/cards/mods.py` now also writes the typed effects table, so a mistyped effect name no longer compiles.

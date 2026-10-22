@@ -1,4 +1,5 @@
-import { ENEMY_TYPES, MAX_ENEMIES, MAX_PLAYERS, PlayerState, WEAPON_IDS, type WeaponId } from '@wrh/shared';
+import { viewOf } from './view/worldView';
+import { ENEMY_TYPES, MAX_ENEMIES, MAX_PLAYERS, WEAPON_IDS, type WeaponId } from '@wrh/shared';
 import type { SimEvent, World } from '@wrh/sim';
 import { asset } from './assets';
 import { SCREEN_RIGHT } from './controls';
@@ -880,9 +881,8 @@ export class Audio {
 
   tick(w: World, localSlot: number, dt: number): void {
     if (!this.ctx) return;
-    let boss = false;
-    for (let i = 0; i < MAX_ENEMIES && !boss; i++) if (w.eActive[i] && w.eBoss[i]) boss = true;
-    this.setIntensity(w.enemyCount / 260 + (boss ? 0.45 : 0) + this.nightBias);
+    const wv = viewOf(w);
+    this.setIntensity(wv.enemyCount / 260 + (wv.bossUp ? 0.45 : 0) + this.nightBias);
     if (Math.abs(this.duck - this.duckTarget) > 0.01) {
       this.duck += (this.duckTarget - this.duck) * Math.min(1, dt * 2);
       this.applyMusicGain();
@@ -898,7 +898,7 @@ export class Audio {
         const dx = w.eX[i]! - this.listenerX;
         const dy = w.eY[i]! - this.listenerY;
         if (dx * dx + dy * dy > 18 * 18) continue;
-        const heavy = ENEMY_TYPES[w.eType[i]!] === 'tank' || w.eBoss[i] !== 0;
+        const heavy = wv.isHeavy(i);
         this.play('zGroan', { x: w.eX[i]!, y: w.eY[i]! });
         if (heavy) this.play('zGroan', { x: w.eX[i]!, y: w.eY[i]! });
         break;
@@ -909,7 +909,7 @@ export class Audio {
     if (this.droneTimer <= 0) {
       this.droneTimer = 1.4;
       for (let s = 0; s < MAX_PLAYERS; s++) {
-        if (!w.pActive[s] || w.pDrone[s] === 0 || w.pState[s] !== PlayerState.Alive || w.pDWarm[s]! > 0) continue;
+        if (!wv.alive(s) || w.pDrone[s] === 0 || w.pDWarm[s]! > 0) continue;
         const own = s === localSlot;
         if (w.pDrone[s] === 1 && w.dBeam[s * 4]! >= 0) this.play('droneHeal', own ? undefined : { x: w.dX[s]!, y: w.dY[s]! });
         else if (own && this.droneHumGate++ % 2 === 0) this.play('droneHum');
@@ -920,14 +920,14 @@ export class Audio {
     if (this.stepTimer <= 0) {
       this.stepTimer = 0.3;
       for (let s = 0; s < MAX_PLAYERS; s++) {
-        if (!w.pActive[s] || w.pState[s] !== PlayerState.Alive || !w.pMoving[s]) continue;
+        if (!wv.alive(s) || !w.pMoving[s]) continue;
         if (s !== localSlot && Math.random() < 0.5) continue;
         this.play('step', s === localSlot ? undefined : { x: w.pX[s]!, y: w.pY[s]! });
       }
     }
     // heartbeat when low
-    const hp = w.pActive[localSlot] && w.pState[localSlot] === PlayerState.Alive ? w.pHp[localSlot]! / w.pMaxHp[localSlot]! : 1;
-    if (hp < 0.3) {
+    const hp = wv.aliveHp(localSlot);
+    if (wv.lowHealth(localSlot)) {
       this.heartTimer -= dt;
       if (this.heartTimer <= 0) {
         this.heartTimer = 0.55 + hp * 1.6;

@@ -1,3 +1,4 @@
+import { viewOf } from './view/worldView';
 import { icon, chipIcon } from './icons';
 import { MENU_CSS, lobbyMarkup, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
@@ -2686,8 +2687,8 @@ export class Ui {
     this.lastWorld = world;
     if (!this.hudBuilt) this.buildHud();
     const hurtEl = this.hud.querySelector<HTMLElement>('#h-hurt')!;
-    const myHp = world.pActive[slot] && world.pState[slot] === PlayerState.Alive ? world.pHp[slot]! / world.pMaxHp[slot]! : 1;
-    const pulse = myHp < 0.3 ? 0.22 + 0.18 * Math.sin(now / 180) : 0;
+    const wv = viewOf(world);
+    const pulse = wv.lowHealth(slot) ? 0.22 + 0.18 * Math.sin(now / 180) : 0;
     hurtEl.style.opacity = String(Math.min(1, Math.max(hurt, pulse)));
     if (this.bannerUntil && now > this.bannerUntil) {
       this.bannerUntil = 0;
@@ -2707,7 +2708,7 @@ export class Ui {
       el.innerHTML = html;
     };
     const phase = world.misc[MISC.Phase]!;
-    const left = world.enemyCount + world.misc[MISC.Remaining]!;
+    const left = wv.enemiesLeft;
     const bossNext = world.wave % BALANCE.progression.boss.everyWaves === 0;
     const sub = phase === FloorPhase.Fight ? `${left} ${t.enemiesLeft}${bossNext ? ` &middot; <span class="wrh-low">${t.boss}!</span>` : ''}` : phase === FloorPhase.Ascend ? t.climbing : phase === FloorPhase.Cleared ? t.breather : t.getReady;
     set('h-wave', `${t.wave} ${world.wave} &middot; ${t.kills} ${world.kills} &middot; ${t.level} ${world.pLevel[slot]}<br><small style="font-weight:600;opacity:.75">${sub}</small>`);
@@ -2721,19 +2722,12 @@ export class Ui {
     (this.hud.querySelector('#h-xp') as HTMLElement).style.width = `${Math.min(100, (world.pXp[slot]! / xpForNext(world, slot)) * 100)}%`;
 
     // boss bar
-    let boss = -1;
-    for (let i = 0; i < world.eActive.length; i++) {
-      if (world.eActive[i] && world.eBoss[i]) {
-        boss = i;
-        break;
-      }
-    }
+    const boss = wv.bossIndex;
     const bb = this.hud.querySelector<HTMLElement>('#h-bossbar')!;
     const bl = this.hud.querySelector<HTMLElement>('#h-bosslabel')!;
     bb.style.display = bl.style.display = boss >= 0 ? 'block' : 'none';
     if (boss >= 0) {
-      const max = BALANCE.enemies.tank.hp * BALANCE.progression.boss.hpMul * world.hpMul;
-      (this.hud.querySelector('#h-boss') as HTMLElement).style.width = `${Math.max(0, Math.min(100, (world.eHp[boss]! / max) * 100))}%`;
+      (this.hud.querySelector('#h-boss') as HTMLElement).style.width = `${wv.bossHealthFraction * 100}%`;
       bl.textContent = t.boss;
     }
 
@@ -2743,7 +2737,7 @@ export class Ui {
       if (!world.pActive[s]) continue;
       const st = world.pState[s]!;
       const maxHp = world.pMaxHp[s]!;
-      const frac = st === PlayerState.Alive ? world.pHp[s]! / maxHp : st === PlayerState.Downed ? world.pTimer[s]! / BALANCE.player.downedSeconds : 0;
+      const frac = wv.healthFraction(s);
       const col = this.slotColor(s);
       const down = st === PlayerState.Downed;
       const num = st === PlayerState.Alive ? `${Math.ceil(world.pHp[s]!)}<small>/${Math.round(maxHp)}</small>` : down ? `${Math.ceil(world.pTimer[s]!)}s` : icon('hud_cross', 14);
@@ -2759,7 +2753,7 @@ export class Ui {
       const quad = world.pPerk[s * PERKS + PERK.Quad]!;
       if (haste > 0) chips += `<span class="chip timed" style="--c:#ffd21f"><i>${icon('chip_haste', 16)}</i>${Math.ceil(haste)}s</span>`;
       if (quad > 0) chips += `<span class="chip timed" style="--c:#b45cff"><i>${icon('chip_quad', 16)}</i>${Math.ceil(quad)}s</span>`;
-      squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${frac < 0.3 && st === PlayerState.Alive ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
+      squad += `<div class="wrh-pc${s === slot ? ' me' : ''}${wv.lowHealth(s) ? ' low' : ''}" style="--pc:${col};opacity:${st === PlayerState.Dead ? 0.45 : 1}">` +
         `<div class="top" data-tip="pc" data-s="${s}"><span class="wrh-dot" style="background:${col}"></span><b>${esc(names[s] ?? 'P' + (s + 1))}</b>${s === slot ? `<i class="you">${t.youBadge}</i>` : ''}${world.pDrone[s] ? `<span class="dr-chip">${icon('drone_' + (world.pDrone[s]! - 1), 14)}${world.pDLv[s * DRONE_TYPES.length + world.pDrone[s]! - 1]}</span>` : ''}${down ? ' ' + icon('hud_skull', 14) : ''}${world.pOffer[s * 3]! >= 0 ? `<i class="pick" title="${t.choosing}">&#9679;</i>` : ''}<span class="lv">${t.lvShort} ${world.pLevel[s]}</span><em>${num}</em></div>` +
         `<div class="bar"><i style="width:${(Math.max(0, Math.min(1, frac)) * 100).toFixed(1)}%;background:${fill}"></i>${shield > 0 ? `<s style="width:${shield}%"></s>` : ''}</div>` +
         `<div class="stats" data-tip="pc" data-s="${s}"><span>${t.dpsLabel} <b>${Math.round(this.dpsOf(world, s, now))}</b></span><span>${icon('go_kills', 14)} <b>${Math.round(world.pPerk[s * PERKS + PERK.Kills]!)}</b></span></div>` +
@@ -2772,9 +2766,7 @@ export class Ui {
 
     // local player
     if (world.pActive[slot]) {
-      const wid = WEAPON_IDS[world.pWeapon[slot]!]!;
-      const stats = BALANCE.weapons[wid];
-      const reloading = world.pReload[slot]! > 0;
+      const reloading = wv.reloading(slot);
       const dashReady = world.pDashCd[slot]! <= 0;
       const dashText = dashReady ? '' : `${Math.ceil(world.pDashCd[slot]!)}s`;
       const specReady = world.pSpecCd[slot]! <= 0;
@@ -2795,7 +2787,7 @@ export class Ui {
       this.updateRelics(world, slot);
       const bar = this.hud.querySelector<HTMLElement>('#h-reload')!;
       bar.style.display = reloading ? 'block' : 'none'; // a charge shows over the character instead
-      if (reloading) (bar.firstElementChild as HTMLElement).style.width = `${Math.max(0, Math.min(100, (1 - world.pReload[slot]! / stats.reload) * 100))}%`;
+      if (reloading) (bar.firstElementChild as HTMLElement).style.width = `${wv.reloadFraction(slot) * 100}%`;
       const st = world.pState[slot]!;
       if (st === PlayerState.Downed) {
         const sec = Math.ceil(world.pTimer[slot]!);
