@@ -20,6 +20,7 @@ import { chromium } from 'playwright';
 
 const args = process.argv.slice(2);
 const quick = args.includes('--quick');
+const wide = args.includes('--wide');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7).split(',');
 const jsonOut = args.find((a) => a.startsWith('--json='))?.slice(7);
 const root = resolve(fileURLToPath(new URL('../../packages/client/dist', import.meta.url)));
@@ -212,6 +213,8 @@ async function newPage(w, h, lang, textSize, query, profile = OLD_PROFILE) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(base + '/' + query);
+  // --wide: text about 6% wider, as the fallback fonts of a Linux machine are, to catch boxes that only just fit
+  if (wide) await page.addStyleTag({ content: '.wrh-ui,.wrh-ui *{letter-spacing:.06em !important}' });
   return { ctx, page, errors };
 }
 
