@@ -11,7 +11,7 @@ const doc = fs.readFileSync(root + 'docs/wayfinder/meta-progression/discovery-tr
 
 const MAX_LEVEL = 100;
 /** XP of one reference run (a typical run's worth); the level steps are fractions of it. */
-const R = 500;
+const R = 1000;
 /** Enemy pressure p(L) = 0.45 + 0.55 ((L-1)/59)^1.6 up to this level, 1.0 after. */
 const PRESSURE_FULL_LEVEL = 60;
 

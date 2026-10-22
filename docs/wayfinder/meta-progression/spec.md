@@ -18,7 +18,7 @@ Meta Level, Experience, Discovery, Discovery Track, Reward Bundle, Pool, Core, C
 
 ## 4. XP ve seviye
 - XP = `round(takım skoru / 10)`; her run (≥ 15 saniye) verir; replay vermez; online'da herkes aynı takım skorundan alır.
-- 100 seviye, tavanda XP birikmeye devam eder. Eşik (R cinsinden): seviye 1-10 ≈ 0,45-0,75 R, 11-50 ≈ 0,75-1,125 R, 51-100 ≈ 1,125-1,875 R; **R ≈ 500 XP** (geçici, insan oyunuyla yeniden ölçülür). Hedef yol ~117 run.
+- 100 seviye, tavanda XP birikmeye devam eder. Eşik (R cinsinden): seviye 1-10 ≈ 0,45-0,75 R, 11-50 ≈ 0,75-1,125 R, 51-100 ≈ 1,125-1,875 R; **R = 1000 XP** (Faz 6: bot ölçümüyle 500 → 1000; insan oyunuyla yeniden ölçülür, bkz. [balance.md](balance.md)). Hedef yol ~117 run.
 - Açık risk: baskı yükselirken run XP'si düşebilir; gerekirse `XP = skor/10 × f(p)`.
 
 ## 5. Düşman baskısı

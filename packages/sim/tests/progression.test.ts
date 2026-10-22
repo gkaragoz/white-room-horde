@@ -7,6 +7,7 @@ import {
   PRESSURE_PERMILLE,
   TRACK,
   XP_FOR_LEVEL,
+  XP_REFERENCE_RUN,
   levelFromXp,
   poolAt,
   pressureAt,
@@ -133,8 +134,8 @@ describe('XP and levels', () => {
   });
 
   it('keeps the climb near 117 reference runs', () => {
-    expect(XP_FOR_LEVEL[MAX_LEVEL]! / 500).toBeGreaterThan(110);
-    expect(XP_FOR_LEVEL[MAX_LEVEL]! / 500).toBeLessThan(125);
+    expect(XP_FOR_LEVEL[MAX_LEVEL]! / XP_REFERENCE_RUN).toBeGreaterThan(110);
+    expect(XP_FOR_LEVEL[MAX_LEVEL]! / XP_REFERENCE_RUN).toBeLessThan(125);
   });
 
   it('turns XP into a level and back', () => {
@@ -152,7 +153,7 @@ describe('XP and levels', () => {
   });
 
   it('makes the first climbs quick: a reference run is worth more than a level on the first ten', () => {
-    expect(levelFromXp(500)).toBeGreaterThanOrEqual(2);
+    expect(levelFromXp(XP_REFERENCE_RUN)).toBeGreaterThanOrEqual(2);
     expect(levelFromXp(runXp(5000))).toBeGreaterThanOrEqual(2);
   });
 
