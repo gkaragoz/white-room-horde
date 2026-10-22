@@ -6,6 +6,8 @@ status: open
 
 # Meta ilerleme: her run'da yeni bir şey keşfet
 
+**Durum: harita kapandı (12/12 ticket). Birleşik özet: [spec.md](spec.md); seviye seviye tablo: [discovery-track.md](discovery-track.md).**
+
 ## Destination
 
 Uygulamaya hazır bir **meta ilerleme spesifikasyonu**:
@@ -43,6 +45,7 @@ Spesifikasyon bitince bir uygulama planı çıkarılır; bu harita kod yazmaz.
 - [Takvim: düşman dünyası, güç-artırıcılar, zorluk çarpanları, arayüz](tickets/08-takvim-dusman-dunyasi-ve-arayuz.md): iki ardışık oynanış-öğesiz seviye yok (seviye 67-99 alternatif); güç-artırıcılar shield 4, haste 10, quad 19, freeze 35, nuke 45; elitler 7-51 (Giant 7 ... Warded 51); zorluk çarpanları 52-98 (tough 52 ... lategame 98); düşman türleri, boss'lar ve oyun arayüzü kilitsiz. Birleşik tablo: [discovery-track.md](discovery-track.md).
 - [Sim, ağ ve replay veri modeli](tickets/09-sim-ag-replay-veri-modeli.md): sim'e **meta seviye** (odada en düşük) ve oyuncu başına met silah/drone maskesi girer, havuz seviyeden sabit tablolardan türer; World şemasında `metLevel`, `pMetWeapons`, `pMetDrones` (hash'li, snapshot'lı); baskı `PRESSURE_PERMILLE` tamsayı tablosu (Math.pow yok); replay v4 (seviye + met maskeleri); `JoinOpts`/`PlayerInfo`/`start`/`joins` genişler, relay en düşük seviyeyi ve arena kesişimini hesaplar; havuz başlangıçta sabit, Codex kimin karşılaştığına bakılmadan yazılır.
 - [Veri modeli ve geçiş](tickets/10-veri-modeli-ve-gecis.md): `Profile` toplam XP ve Codex bit dizileri saklar (seviye ve açılışlar türetilir, liste yok); `v: 2`, eski profil `wrh.profile.v1`'e yedeklenir, XP/seviye/başarımlar sıfır, rekorlar kalır; seçimler yüklemede kilitlilere karşı denetlenir; eski profilde bir kez bilgilendirme (`introSeen`); seviye 100'de XP birikir; replay XP vermez; run sonunda taze okuyup toplayarak yazılır.
+- [Arayüz: seviye, Codex ve keşif anları](tickets/11-arayuz-seviye-codex-kesif.md): menü hub A "Yol" (seviye yolu, sıradaki ödüller düğümlerin altında); oyun sonu B paket açma (kapalı kartları çevirerek keşif); Codex ve kilitli kartlar B albüm (numaralı karolar, siluet, "Seviye N"/"başarım" etiketi); run içi B köşe kartı ("Albüme eklendi #006 Mp"); prototip dalı `prototype/meta-ui`.
 
 Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce verilen kararlar):
 
@@ -57,13 +60,13 @@ Bu haritayı çizerken kullanıcıyla kesinleşen çerçeve (ticket'lardan önce
 
 Frontier (engeli kapalı, atanmamış):
 
-- [Arayüz: seviye, Codex ve keşif anları](tickets/11-arayuz-seviye-codex-kesif.md) (prototype)
+- (yok)
 
 Bloklu:
 
 - (yok)
 
-Kapalı: 11 / 12 (cevapları yukarıdaki Decisions so far)
+Kapalı: 12 / 12 (cevapları yukarıdaki Decisions so far)
 
 ## Not yet specified
 

@@ -1,7 +1,7 @@
 ---
 title: Arayüz: seviye, Codex ve keşif anları
 type: wayfinder:prototype
-status: open
+status: closed
 assignee: gkaragoz
 blocked-by: 07-takvim-class-kostum-arena.md
 ---
@@ -59,3 +59,15 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "Veri modeli ve geçiş" ile netleşenler
 
 - Eski profili olan oyuncuya bir kez bilgilendirme ("her şey yeniden açılıyor, rekorların korunuyor"); rekorlar menüde görünmeye devam eder. Seviye 100'de gösterge "MAX" ve XP birikmeye devam eder. "Yeni!" rozetleri `seenNew` ile.
+
+## Resolution
+
+Çözüldü (prototype, kullanıcıyla). **Prototip:** atılabilir dal `prototype/meta-ui` (commit 52fa7b1, main'e hiç birleşmez): `packages/client/proto-ui.html` ve `src/proto/ui-proto.ts`; `pnpm --filter @wrh/client dev` ile `/proto-ui.html?variant=A|B|C&scene=hub|over|codex|locked|toast` (oklar: varyant, 1-5: sahne). Üç yapısal olarak farklı yön denendi: **A "Yol"** (seviye yolu), **B "Koleksiyon"** (çıkartma albümü), **C "Seri"** (tek sakin şerit ve halka).
+
+**Seçilenler**
+- **Menü hub: A (Yol).** Üstte seviye yolu: geçilen düğümler dolu, geçerli düğüm büyük ve altın halkalı, sıradaki düğümlerin altında o seviyenin ödülü yazılı; altında "Sonraki: ... (seviye N'e X XP)" satırı; sonra hub kartları (OYNA büyük yeşil, Codex "14/132", Silah ve Class, Zorluk, Başarımlar).
+- **Oyun sonu: B (paket açma).** "+XP" çubuğu ve "Seviye 7 → 8" üstte; seviye ödülü kapalı kartlar olarak (her ödül bir kart, 1-3 kart), tıklanınca çevrilip keşif açılır; hepsi açılınca "Albüme eklendi" ve büyük YENİ RUN.
+- **Codex ve kilitli kartlar: B (albüm).** Kategori sekmeleri (Silahlar, Dronelar, Class, Arena, ...) ilerlemeyle ("8/23"); numaralı çıkartma karoları (#001); durumlar: **keşfedildi** (renkli, altın çerçeve), **açıldı ama henüz görülmedi** (yarı soluk, "Açıldı, henüz görülmedi"), **kilitli** (siluet, "???", kesik çizgili çerçeve ve "Seviye N" ya da "başarım: ..." etiketi). Class ve kostüm kartları aynı karo dilinde.
+- **Run içi bildirim: B (köşe kartı).** Sol altta küçük bir kart uçarak gelir: "Albüme eklendi · #006 Mp · 14/132"; oyunu kesmez ama fark edilir.
+
+**Uygulama notları:** hub'daki seviye yolu seviyeden ve `discovery-track.md`'den (oynanış öğeleri + kozmetik) üretilir; paket açma ekranı o seviyedeki satırı gösterir; Codex karoları kategori başına durumu Codex deposundan ve seviyeden türetir (Ticket "Veri modeli ve geçiş"); köşe kartı ilk karşılaşma olayında bir kez çıkar (`weaponGet fresh`, `droneUnlock`, ilk elit/boss görünümü, ilk kart teklifi gibi sim olaylarından). Metinler 6 dilde (`uiStrings.ts` + `i18n.ts` EXTRA). Varlıklar: silah resimleri, class ikonları ve arena küçük resimleri mevcut; kostüm karoları için aksesuar ikonları yok (metin/3D önizleme ya da yeni ikon gerekir).
