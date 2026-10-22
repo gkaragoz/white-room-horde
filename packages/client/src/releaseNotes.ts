@@ -23,6 +23,30 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.34',
+    date: '2026-10-23',
+    text: {
+      en: {
+        title: 'Roomier screens',
+        items: [
+          'Badges, labels and buttons have more room around their text and are easier to read: the language button, levels, upgrade chips, teammate arrows, the ammo counter and loot labels.',
+          'Long names (German weapons and classes, the Turkish ability label) now wrap or fit instead of spilling out or overlapping.',
+          'On a phone held sideways the squad list shows one compact line per teammate and the settings page fits the window. Switches and option buttons are bigger on small screens.',
+          'Online rooms need everyone on this version: reload the page to join.',
+        ],
+      },
+      tr: {
+        title: 'Daha ferah ekranlar',
+        items: [
+          'Rozetlerin, etiketlerin ve düğmelerin yazıların etrafında daha çok boşluğu var ve okunması kolay: dil düğmesi, seviyeler, yükseltme çipleri, arkadaş okları, cephane sayacı ve ganimet etiketleri.',
+          'Uzun adlar (Almanca silah ve sınıf adları, Türkçe yetenek etiketi) artık taşmak ya da üst üste binmek yerine satır kırıyor ya da sığıyor.',
+          'Telefonu yan tutunca arkadaş listesi her kişi için tek satırlık sade bir görünüm alıyor ve ayarlar sayfası ekrana sığıyor. Küçük ekranlarda anahtarlar ve seçenek düğmeleri daha büyük.',
+          'Çevrimiçi odalar için herkesin bu sürümde olması gerekir: katılmak için sayfayı yenile.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.33',
     date: '2026-10-23',
     text: {
