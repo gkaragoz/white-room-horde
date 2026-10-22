@@ -2,7 +2,7 @@
 title: Sim, ağ ve replay veri modeli
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 05-takvim-silahlar-ve-dronelar.md, 06-takvim-kartlar.md, 07-takvim-class-kostum-arena.md, 08-takvim-dusman-dunyasi-ve-arayuz.md
 ---
 
