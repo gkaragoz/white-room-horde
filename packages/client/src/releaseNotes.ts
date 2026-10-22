@@ -23,6 +23,26 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.33',
+    date: '2026-10-23',
+    text: {
+      en: {
+        title: 'The menu and the HUD, tidied up',
+        items: [
+          'The menu, the room screens and the in-game HUD were rebuilt on the inside as separate parts. They look and work the same.',
+          'Online rooms need everyone on this version: reload the page to join.',
+        ],
+      },
+      tr: {
+        title: 'Menü ve HUD derlenip toparlandı',
+        items: [
+          'Menü, oda ekranları ve oyun içi HUD içeriden ayrı parçalar olarak yeniden kuruldu. Görünüş ve işleyiş aynı.',
+          'Çevrimiçi odalar için herkesin bu sürümde olması gerekir: katılmak için sayfayı yenile.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.32',
     date: '2026-10-23',
     text: {
