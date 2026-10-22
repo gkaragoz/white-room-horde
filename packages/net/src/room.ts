@@ -1,4 +1,4 @@
-import { GAME_VERSION, MOD_COUNT, Buttons, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
+import { GAME_VERSION, Difficulty, Buttons, INPUT_BYTES, MAP_COUNT, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
@@ -255,7 +255,7 @@ export class Room {
   setOptions(o: Partial<RoomOptions>): void {
     if (this.started) return;
     if (typeof o.map === 'number' && Number.isInteger(o.map) && o.map >= -1 && o.map < MAP_COUNT) this.options.map = o.map;
-    if (typeof o.mods === 'number' && Number.isInteger(o.mods) && o.mods >= 0 && o.mods < 2 ** MOD_COUNT) this.options.mods = o.mods;
+    if (Difficulty.isValid(o.mods)) this.options.mods = o.mods;
     this.broadcastRoom();
   }
 

@@ -27,3 +27,13 @@ _Avoid_: recording, demo
 **WorldSchema**:
 The single declaration of every field a World is made of, saying which are carried between ticks and which are derived and therefore left out of the World hash.
 _Avoid_: world layout, state definition
+
+## Difficulty
+
+**Multiplier**:
+One of the twenty switches that make a game harder in exchange for a higher score, such as Tough Hides or No Medkits.
+_Avoid_: mod, modifier, handicap
+
+**Difficulty**:
+The set of Multipliers a game is played with, chosen before the game starts and fixed for its whole run; the empty set is the normal game.
+_Avoid_: mods, difficulty level, easy/normal/hard

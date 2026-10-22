@@ -7,6 +7,11 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Difficulty in one place (internals, same game)**
+
+- The difficulty multipliers' bit mask is now handled by one module (`Difficulty` in `packages/shared/src/difficulty.ts`) instead of loops repeated in the menu, the achievements, the room and the sim. The generator `tools/cards/mods.py` now also writes the typed effects table, so a mistyped effect name no longer compiles.
+- The run score moved from a menu file to the sim (`runScore`). The `?mods=` test parameter ignores values the build does not understand. World hash, replays and the room protocol are unchanged.
+
 ## v0.30.0 (2026-10-22)
 
 **World state declared once (simulation internals)**

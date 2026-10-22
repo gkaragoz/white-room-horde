@@ -3,7 +3,7 @@ import { MENU_CSS, lobbyMarkup, menuMarkup } from './menu';
 import { autoOpenReleaseNotes } from './releaseNotes';
 import { droneNeed } from '@wrh/sim';
 import { POWERS } from './render/power';
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MOD_COUNT as MODS_N, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, GAME_VERSION, compatibleVersions, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, Difficulty, CLASS_IDS, MELEE_CLASSES, FloorPhase, MISC, CARD_IDS, CARD_RARITY, TEAM_CARDS, MAPS, MAX_ENEMIES, MAX_PICKUPS, MAX_PLAYERS, PLAYER_COLORS, PERK, PERKS, PlayerState, TICK_RATE, WEAPON_IDS, GAME_VERSION, compatibleVersions, WEAPON_RANK, type WeaponId, DRONE_TYPES, DRONE_MAX_LEVEL, DRONE_TIER_LEVELS } from '@wrh/shared';
 import { modFx, xpForNext, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { ACTIONS } from './input';
@@ -1707,10 +1707,10 @@ export class Ui {
     const scroll = host.scrollTop;
     host.innerHTML = modsPanel(this.lang, this.mods, true, true);
     host.querySelectorAll<HTMLElement>('.wrh-mod').forEach((b) => {
-      b.onclick = () => this.setMods(this.mods ^ (1 << Number(b.dataset.mod)));
+      b.onclick = () => this.setMods(Difficulty.toggle(this.mods, Number(b.dataset.mod)));
     });
     const all = host.querySelector<HTMLElement>('#wrh-mods-all');
-    if (all) all.onclick = () => this.setMods(2 ** MODS_N - 1);
+    if (all) all.onclick = () => this.setMods(Difficulty.ALL);
     const none = host.querySelector<HTMLElement>('#wrh-mods-none');
     if (none) none.onclick = () => this.setMods(0);
     host.scrollTop = scroll;
@@ -2275,7 +2275,7 @@ export class Ui {
         };
       });
       const all = modal.querySelector<HTMLElement>('#wrh-mods-all');
-      if (all) all.onclick = () => (set(2 ** MODS_N - 1), draw());
+      if (all) all.onclick = () => (set(Difficulty.ALL), draw());
       const none = modal.querySelector<HTMLElement>('#wrh-mods-none');
       if (none) none.onclick = () => (set(0), draw());
       modal.querySelector<HTMLElement>('#wrh-mods-close')!.onclick = close;

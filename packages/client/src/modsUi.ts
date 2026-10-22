@@ -1,5 +1,4 @@
-import { MODS, MOD_COUNT, STAT, STATS, MAX_PLAYERS, scoreMultiplier } from '@wrh/shared';
-import type { World } from '@wrh/sim';
+import { Difficulty, MODS } from '@wrh/shared';
 import { asset } from './assets';
 import type { Lang } from './ui';
 
@@ -82,20 +81,13 @@ export function modText(lang: Lang, i: number): readonly [string, string] {
 export const modIcon = (i: number): string => asset(`mods/${MODS[i]!.id}.webp`);
 
 export function multText(mods: number): string {
-  return `×${scoreMultiplier(mods).toFixed(2)}`;
-}
-
-export function countMods(mods: number): number {
-  let n = 0;
-  for (let i = 0; i < MOD_COUNT; i++) if ((mods >> i) & 1) n++;
-  return n;
+  return `×${Difficulty.scoreMultiplier(mods).toFixed(2)}`;
 }
 
 /** The one-line summary button: the chosen icons and the score multiplier. */
 export function modsRow(lang: Lang, mods: number, editable: boolean): string {
   const t = modWords(lang);
-  const icons: string[] = [];
-  for (let i = 0; i < MOD_COUNT; i++) if ((mods >> i) & 1) icons.push(`<img src="${modIcon(i)}" alt="">`);
+  const icons = Difficulty.indices(mods).map((i) => `<img src="${modIcon(i)}" alt="">`);
   const body = icons.length ? `<span class="strip">${icons.join('')}</span>` : `<span class="txt">${t.none}</span>`;
   return `<button type="button" class="wrh-modsbtn" id="wrh-mods-open" data-ed="${editable ? 1 : 0}">${body}<b>${multText(mods)}</b></button>`;
 }
@@ -103,14 +95,13 @@ export function modsRow(lang: Lang, mods: number, editable: boolean): string {
 /** "3 chosen · ×1.35" or "None chosen: the normal game" (the Difficulty card of the main menu). */
 export function modsSummary(lang: Lang, mods: number): string {
   const t = modWords(lang);
-  const n = countMods(mods);
+  const n = Difficulty.count(mods);
   return n ? `${n} ${t.chosen} · ${multText(mods)}` : t.none;
 }
 
 /** Up to three of the chosen icons (or the first one, faded, when none is chosen) for the Difficulty card. */
 export function modsCardIcon(mods: number): string {
-  const on: number[] = [];
-  for (let i = 0; i < MOD_COUNT && on.length < 3; i++) if ((mods >> i) & 1) on.push(i);
+  const on = Difficulty.indices(mods).slice(0, 3);
   if (!on.length) return `<img src="${modIcon(0)}" alt="" style="opacity:.45;filter:grayscale(.6)">`;
   return `<span class="strip">${on.map((i) => `<img src="${modIcon(i)}" alt="">`).join('')}</span>`;
 }
@@ -120,19 +111,10 @@ export function modsPanel(lang: Lang, mods: number, editable: boolean, page = fa
   const t = modWords(lang);
   const cards = MODS.map((_, i) => {
     const [name, text] = modText(lang, i);
-    const on = (mods >> i) & 1;
+    const on = Difficulty.indices(mods).includes(i);
     return `<button type="button" class="wrh-mod${on ? ' on' : ''}" data-mod="${i}" aria-pressed="${on ? 'true' : 'false'}"${editable ? '' : ' aria-disabled="true"'}><img src="${modIcon(i)}" alt=""><span>${name}</span><span class="tip">${text}</span></button>`;
   }).join('');
   const tools = editable ? `<button type="button" class="alt" id="wrh-mods-all">${t.all}</button><button type="button" class="alt" id="wrh-mods-none">${t.clear}</button>` : '';
   const done = page ? '' : `<button type="button" id="wrh-mods-close">${t.close}</button>`;
   return `<div class="wrh-modpanel">${page ? '' : `<h2>${t.title}</h2>`}<p class="hint">${t.hint}</p><div class="wrh-modgrid">${cards}</div><div class="wrh-modfoot"><span class="mult">${t.score}: <b id="wrh-mods-mult">${multText(mods)}</b></span>${tools}${done}</div></div>`;
-}
-
-/** The score of a run: floors, kills, bosses and the time alive, times the multiplier of the chosen difficulty. */
-export function runScore(world: World): { base: number; mult: number; final: number } {
-  let bosses = 0;
-  for (let s = 0; s < MAX_PLAYERS; s++) if (world.pActive[s]) bosses += world.pStat[s * STATS + STAT.BossKills]!;
-  const base = Math.round(world.wave * 500 + world.kills * 10 + bosses * 1000 + world.tick / 30);
-  const mult = scoreMultiplier(world.mods);
-  return { base, mult, final: Math.round(base * mult) };
 }

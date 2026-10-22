@@ -10,5 +10,6 @@ export { livingPlayers } from './enemies';
 export { serializeWorld, restoreWorld } from './snapshot';
 export { giveWeapon, selectWeapon, owns } from './loadout';
 export { modFx, fxOf, type ModFx } from './mods';
+export { runScore } from './score';
 export { addTelegraph, addZone, launchPlayer } from './hazards';
 export { awardDroneXp, droneNeed, droneStat, droneTier, grantDrone, droneLevelOf, HEALER, CRYO, ROCKET, GUN, TWIN, TESLA, COLLECTOR } from './drones';

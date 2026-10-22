@@ -1,4 +1,4 @@
-import { BALANCE, MODS, MOD_COUNT, TICK_RATE, scoreMultiplier, type PlayerInput } from '@wrh/shared';
+import { BALANCE, Difficulty, MODS, MOD_COUNT, TICK_RATE, type PlayerInput } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 import { addPlayer, createGame, createWorld, spawnBoss, spawnEnemy, step, type World } from '../src';
 import { modFx } from '../src/mods';
@@ -8,7 +8,7 @@ import { addTelegraph } from '../src/hazards';
 import { FloorPhase, MISC, TeleEffect, TeleShape, ENEMY_TYPES, PickupType } from '@wrh/shared';
 
 const NONE: PlayerInput = { moveX: 0, moveY: 0, aim: 0, buttons: 0 };
-const bit = (id: string): number => 1 << MODS.findIndex((m) => m.id === id);
+const bit = Difficulty.bit;
 const G = ENEMY_TYPES.indexOf('grunt');
 
 function world(mods: number, seed = 5): World {
@@ -23,14 +23,14 @@ describe('difficulty multipliers', () => {
   it('there are twenty, every one makes the game harder, and the score multiplier grows with them', () => {
     expect(MOD_COUNT).toBe(20);
     expect(new Set(MODS.map((m) => m.id)).size).toBe(20);
-    expect(scoreMultiplier(0)).toBe(1);
+    expect(Difficulty.scoreMultiplier(0)).toBe(1);
     let prev = 1;
     for (let i = 0; i < MOD_COUNT; i++) {
-      const m = scoreMultiplier(1 << i);
+      const m = Difficulty.scoreMultiplier(1 << i);
       expect(m, MODS[i]!.id).toBeGreaterThan(1);
       prev = Math.max(prev, m);
     }
-    expect(scoreMultiplier(2 ** MOD_COUNT - 1)).toBeGreaterThan(3);
+    expect(Difficulty.scoreMultiplier(Difficulty.ALL)).toBeGreaterThan(3);
     expect(modFx(0).enemyHp).toBe(1);
     expect(modFx(bit('tough')).enemyHp).toBe(1.5);
   });

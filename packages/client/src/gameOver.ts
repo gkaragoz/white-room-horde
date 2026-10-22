@@ -1,7 +1,7 @@
 import { icon as icon2 } from './icons';
 import { PERK, PERKS, STAT, STATS, WEAPON_IDS, WEAPON_SLOTS, MAX_PLAYERS } from '@wrh/shared';
-import type { World } from '@wrh/sim';
-import { multText, runScore } from './modsUi';
+import { runScore, type World } from '@wrh/sim';
+import { multText } from './modsUi';
 
 /** What the client alone knows about a run (the simulation never sees a mouse). */
 export interface RunExtras {

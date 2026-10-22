@@ -1,8 +1,7 @@
-import { ACHIEVEMENTS, CLASS_IDS, MAX_PLAYERS, MODS, MOD_COUNT, PERK, PERKS, STAT, STATS, WEAPON_IDS, WEAPON_SLOTS, type AchievementDef } from '@wrh/shared';
-import type { World } from '@wrh/sim';
+import { ACHIEVEMENTS, CLASS_IDS, Difficulty, MAX_PLAYERS, PERK, PERKS, STAT, STATS, WEAPON_IDS, WEAPON_SLOTS, type AchievementDef } from '@wrh/shared';
+import { runScore, type World } from '@wrh/sim';
 import { asset } from './assets';
 import { loadProfile, saveProfile, type AchStore } from './profile';
-import { runScore } from './modsUi';
 import type { Lang } from './ui';
 
 export type Totals = Record<string, number>;
@@ -15,8 +14,7 @@ export function runTotals(world: World, slot: number): { totals: Totals; flags: 
   let cards = 0;
   for (let i = 0; i < world.pCards.length / MAX_PLAYERS; i++) cards += world.pCards[slot * (world.pCards.length / MAX_PLAYERS) + i]!;
   const mods = world.mods;
-  let modCount = 0;
-  for (let i = 0; i < MOD_COUNT; i++) if ((mods >> i) & 1) modCount++;
+  const modCount = Difficulty.count(mods);
   const totals: Totals = {
     kills: perk(PERK.Kills),
     runKills: perk(PERK.Kills),
@@ -46,13 +44,12 @@ export function runTotals(world: World, slot: number): { totals: Totals; flags: 
   const cls = perk(PERK.Class);
   for (let c = 0; c < CLASS_IDS.length; c++) totals[`floor:${c}`] = c === cls ? world.wave : 0;
   const pistolOnly = world.pOwned[slot] === 1 << WEAPON_IDS.indexOf('pistol');
-  const fragileBit = 1 << MODS.findIndex((m) => m.id === 'fragile');
   const flags: Record<string, boolean> = {
     untouchable: world.wave >= 5 && totals.taken! <= 50,
     quickDeath: seconds < 60,
     pistolOnly: pistolOnly && world.wave >= 10,
-    fragileFloor8: (mods & fragileBit) !== 0 && world.wave >= 8,
-    allMods: mods === 2 ** MOD_COUNT - 1 && world.wave >= 5,
+    fragileFloor8: Difficulty.has(mods, 'fragile') && world.wave >= 8,
+    allMods: mods === Difficulty.ALL && world.wave >= 5,
     revive5: totals.revives! >= 5,
     barrels50: totals.barrels! >= 50,
     hourRun: seconds >= 3600,

@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { Cinematic } from './render/cinematic';
 import { GoreParts, Part } from './render/gore';
 import { GIB_COLORS } from './render/fx';
-import { GAME_VERSION, heightAt } from '@wrh/shared';
+import { Difficulty, GAME_VERSION, heightAt } from '@wrh/shared';
 import { BALANCE, nextLayer, Buttons, CAMERA, FloorPhase, MISC, PERK, PERKS, MAPS, ENEMY_TYPES, MAX_ENEMIES, MAX_BULLETS, MAX_GRENADES, MAX_SPIT, MAX_PLAYERS, PLAYER_COLORS, PlayerState, TICK_DT, WEAPON_IDS, WEAPON_RANK, CARD_IDS, TEAM_CARDS, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
+import { addTelegraph, addZone, launchPlayer, spawnEnemy, createGame, decodeReplay, hashWorld, predictPlayer, runScore, scriptedInput, setWave, spawnBoss, step, type Replay, type SimEvent, type World } from '@wrh/sim';
 import { NetSession, PredictedView } from '@wrh/net';
 import { Audio } from './audio';
 import { Input, type Action } from './input';
@@ -29,7 +29,6 @@ import { InputTimer } from './inputTimer';
 import { PowerView, strengthOf } from './render/power';
 import { pickBackend } from './render/backend';
 import { Stage } from './render/stage';
-import { runScore } from './modsUi';
 import { recordAchievements } from './achievements';
 import { ACCESSORIES, clearRejoin, loadRejoin, recordGame, saveRejoin } from './profile';
 import { BUILD, mountVersionBadge } from './buildinfo';
@@ -864,7 +863,7 @@ function startSolo(name: string): void {
     names[b] = 'Bot ' + b;
   }
   const map = params.has('map') ? Number(params.get('map')) : ui.map >= 0 ? ui.map : Math.floor(Math.random() * MAPS.length);
-  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map, mods: params.has('mods') ? Number(params.get('mods')) : ui.mods };
+  const setup = { seed: (Math.random() * 0xffffffff) >>> 0, players, map, mods: modsFromUrl(params.get('mods')) ?? ui.mods };
   const w = createGame(setup);
   if (dev.wave > 1) setWave(w, dev.wave);
   beginPlaying(w, 0);
@@ -1731,6 +1730,12 @@ function frameInner(nowMs: number): void {
     }
   }
   requestAnimationFrame(frame);
+}
+
+/** The ?mods= test parameter: a valid Difficulty mask, otherwise ignored. */
+function modsFromUrl(v: string | null): number | undefined {
+  const n = Number(v);
+  return v !== null && Difficulty.isValid(n) ? n : undefined;
 }
 
 const replayUrl = params.get('replay');
