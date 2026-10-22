@@ -1,6 +1,6 @@
 import { DEFAULT_GAME_OPTIONS, GAME_VERSION, INPUT_DELAY_TICKS, WEAPON_IDS, TICK_DT, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { CHECKPOINT_TICKS, createGame, hashWorld, joinPlayer, restoreWorld, serializeWorld, step, type World } from '@wrh/sim';
-import { Bin, decodeBundle, decodeSnapshot, encodeInputsMsg, encodeSnapshot, INPUT_REDUNDANCY, type Bundle, type ClientMsg, type JoinOpts, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
+import { Bin, DEFAULT_BOT_SKILL, decodeBundle, decodeSnapshot, encodeBotInputsMsg, encodeInputsMsg, encodeSnapshot, INPUT_REDUNDANCY, type BotInput, type BotSkill, type Bundle, type ClientMsg, type JoinOpts, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 export interface Transport {
   send(data: string | Uint8Array): void;
@@ -27,6 +27,8 @@ export class NetSession {
   /** Secret for rejoining this slot after a dropped connection (kept by the page in sessionStorage). */
   token = '';
   locked = false;
+  /** The ladder step of the room's companion bots. */
+  botSkill: BotSkill = DEFAULT_BOT_SKILL;
   world: World | null = null;
   error = '';
   /** Machine readable reason of the last error (room_gone, bad_token, version), empty when the relay gave none. */
@@ -97,6 +99,7 @@ export class NetSession {
     this.options = prev.options;
     this.token = prev.token;
     this.locked = prev.locked;
+    this.botSkill = prev.botSkill;
     this.applied = prev.applied;
     this.received = prev.applied; // bundles that never got applied are asked for again
     for (const [t, b] of prev.history) this.history.set(t, b);
@@ -124,6 +127,33 @@ export class NetSession {
 
   start(): void {
     this.sendJson({ t: 'start' });
+  }
+
+  /** Host only, in the lobby: replace the room's companion bots ([class, weapon, name] each) and set how well they play. */
+  setBots(list: readonly [number, WeaponId, string][], skill: BotSkill): void {
+    this.sendJson({ t: 'bots', list: list.map((b) => [b[0], b[1], b[2]]), skill });
+  }
+
+  /** Slots of the companion bots in this room. */
+  get botSlots(): number[] {
+    return this.players.filter((p) => p.bot).map((p) => p.slot);
+  }
+
+  /** True when this page has to drive the room's bots: it is the host (the role moves on when the host drops) and bots are in the room. */
+  get drivesBots(): boolean {
+    return this.state === 'playing' && this.players.some((p) => p.bot) && this.players.find((p) => p.slot === this.slot)?.host === true;
+  }
+
+  private botTick = -1;
+
+  /**
+   * Send the inputs of the companion bots for the tick of the input that was sent last (call right after `sendInput`, once per tick).
+   * The relay takes them from the host only.
+   */
+  sendBotInputs(list: readonly BotInput[]): void {
+    if (this.state !== 'playing' || this.paused || this.maxSent < 0 || this.maxSent === this.botTick || list.length === 0) return;
+    this.botTick = this.maxSent;
+    this.transport.send(encodeBotInputsMsg(this.maxSent, list));
   }
 
   /** Host only: pause or resume the game for everybody. */
@@ -171,6 +201,7 @@ export class NetSession {
         this.options = m.options;
         this.token = m.token;
         this.locked = m.locked;
+        if (m.botSkill) this.botSkill = m.botSkill;
         if (this.state === 'idle') this.state = m.started ? 'playing' : 'lobby';
         break;
       case 'start':
@@ -184,6 +215,7 @@ export class NetSession {
         this.applied = -1;
         this.sent.clear();
         this.maxSent = -1;
+        this.botTick = -1;
         this.state = 'playing';
         break;
       case 'desync':

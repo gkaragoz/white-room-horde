@@ -1,5 +1,5 @@
 import { DEFAULT_GAME_OPTIONS, GAME_VERSION, Buttons, INPUT_BYTES, MAP_COUNT, MAX_LEVEL, DRONE_TYPES, poolAt, withOptions, CLASS_IDS, MAX_PLAYERS, NO_INPUT, PLAYER_COLORS, TICK_RATE, WEAPON_IDS, clampInput, compatibleVersions, type PlayerInput, type WeaponId } from '@wrh/shared';
-import { Bin, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type Bundle, type StartPlayer, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
+import { BOT_SKILLS, Bin, DEFAULT_BOT_SKILL, decodeBotInputsMsg, decodeInputMsg, decodeInputsMsg, decodeSnapshot, encodeBundle, encodeSnapshot, type BotInput, type BotSkill, type Bundle, type StartPlayer, type ClientMsg, type PlayerInfo, type RoomOptions, type ServerMsg } from './protocol';
 
 /** Anything the server can write to: a WebSocket in production, a fake in tests. */
 export interface Conn {
@@ -36,6 +36,11 @@ interface Member {
   /** Messages waiting to go out (catch-up history, then the live bundles behind it), drained a few hundred per relay tick. */
   outbox?: (string | Uint8Array)[];
   outPos?: number;
+  /**
+   * A companion bot: it has no connection, takes part in the game for as long as the room lives and is never "disconnected". Its inputs
+   * are sent by the host's connection (see `botInputs`); without them it stands still like a player who went away.
+   */
+  bot?: boolean;
 }
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -104,23 +109,57 @@ export class Room {
     private readonly catchUpLimit = DEFAULT_CATCHUP_LIMIT,
   ) {}
 
+  /** The ladder step the companion bots of this room play at (the host's client reads it back to drive them). */
+  botSkill: BotSkill = DEFAULT_BOT_SKILL;
+
   private info(): PlayerInfo[] {
     const out: PlayerInfo[] = [];
-    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null, weapon: m.weapon, acc: m.acc, color: m.color, cls: m.cls, lvl: m.lvl });
+    for (const m of this.members) if (m) out.push({ slot: m.slot, name: m.name, host: m.host, connected: m.conn !== null || m.bot === true, weapon: m.weapon, acc: m.acc, color: m.color, cls: m.cls, lvl: m.lvl, ...(m.bot ? { bot: true } : {}) });
     return out;
+  }
+
+  /** The people in the room (everything but the bots). */
+  get humans(): Member[] {
+    return this.members.filter((m): m is Member => m !== null && !m.bot);
+  }
+
+  /** Slots a bot may take (empty ones) plus the ones bots hold now: what the host may fill with companions. */
+  get botCapacity(): number {
+    let n = 0;
+    for (const m of this.members) if (m === null || m.bot) n++;
+    return n;
+  }
+
+  /**
+   * Host only, lobby only: replace the companion bots by `list` ([class, weapon, name]), in the lowest free slots, as many as fit.
+   * Returns the number placed.
+   */
+  setBots(list: readonly [number, WeaponId, string][], skill: BotSkill): number {
+    if (this.started) return 0;
+    for (let s = 0; s < this.members.length; s++) if (this.members[s]?.bot) this.members[s] = null;
+    this.botSkill = BOT_SKILLS.includes(skill) ? skill : DEFAULT_BOT_SKILL;
+    let n = 0;
+    for (const [cls, weapon, name] of list) {
+      const slot = this.members.findIndex((m) => m === null);
+      if (slot < 0) break;
+      this.members[slot] = { slot, name: name.slice(0, 16) || 'bot', host: false, conn: null, weapon, acc: 0, color: -1, cls, lvl: MAX_LEVEL, metW: -1, metD: -1, token: randomToken(), joined: false, pending: new Map(), last: undefined, bot: true };
+      n++;
+    }
+    this.broadcastRoom();
+    return n;
   }
 
   broadcastRoom(): void {
     for (const m of this.members) {
       if (m?.conn) {
-        send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started, options: this.options, token: m.token, locked: this.password !== '' });
+        send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started, options: this.options, token: m.token, locked: this.password !== '', botSkill: this.botSkill });
       }
     }
   }
 
   /** The room message for one connection (its slot, token and the players): a returning page needs it before anything else. */
   private sendRoomTo(m: Member): void {
-    if (m.conn) send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started, options: this.options, token: m.token, locked: this.password !== '' });
+    if (m.conn) send(m.conn, { t: 'room', code: this.code, slot: m.slot, players: this.info(), started: this.started, options: this.options, token: m.token, locked: this.password !== '', botSkill: this.botSkill });
   }
 
   private sendStart(conn: Conn): void {
@@ -129,9 +168,19 @@ export class Room {
   }
 
   add(conn: Conn, name: string, weapon: WeaponId, acc = 0, color = -1, cls = 0, lvl = MAX_LEVEL, metW = -1, metD = -1): Member | null {
-    const slot = this.members.findIndex((m) => m === null);
+    let slot = this.members.findIndex((m) => m === null);
+    if (slot < 0 && !this.started) {
+      // a full lobby: the last companion makes room for the person
+      for (let s = this.members.length - 1; s >= 0; s--) {
+        if (this.members[s]?.bot) {
+          this.members[s] = null;
+          slot = s;
+          break;
+        }
+      }
+    }
     if (slot < 0) return null;
-    const host = this.members.every((m) => m === null);
+    const host = this.humans.length === 0;
     const m: Member = { slot, name: name.slice(0, 16) || 'player', host, conn, weapon, acc, color, cls, lvl, metW, metD, token: randomToken(), joined: false, pending: new Map(), last: undefined };
     this.members[slot] = m;
     if (this.started) {
@@ -300,12 +349,13 @@ export class Room {
     m.outPos = 0;
     this.dropJobs(slot);
     if (!this.started) {
-      // lobby: free the slot and hand the host role on
+      // lobby: free the slot and hand the host role on (to a person, never to a bot)
       this.members[slot] = null;
       if (m.host) {
-        const next = this.members.find((x) => x !== null);
+        const next = this.members.find((x) => x && !x.bot);
         if (next) next.host = true;
       }
+      if (this.humans.length === 0) for (let s = 0; s < this.members.length; s++) this.members[s] = null; // nobody left to play with
     } else if (m.host) {
       const next = this.members.find((x) => x?.conn);
       if (next) {
@@ -340,6 +390,20 @@ export class Room {
         m.pending.set(t, cleanInput(list[i]!));
         this.repairs++;
       }
+    }
+  }
+
+  /**
+   * The inputs of companion bots, sent by the host's connection: only slots that hold a bot are taken, the rest of the message is
+   * ignored. Same window and cleaning as a person's input; a bot input may also never carry the Away flag.
+   */
+  botInputs(from: number, tick: number, list: readonly BotInput[]): void {
+    if (!this.started || !this.members[from]?.host) return;
+    if (tick < this.tick || tick > this.tick + (this.paused ? PAUSED_AHEAD_TICKS : MAX_AHEAD_TICKS)) return;
+    for (const b of list) {
+      const m = Number.isInteger(b.slot) ? this.members[b.slot] : null;
+      if (!m?.bot) continue;
+      m.pending.set(tick, cleanInput(b.input));
     }
   }
 
@@ -415,7 +479,7 @@ export class Room {
     const inputs: (PlayerInput | undefined)[] = [];
     for (let s = 0; s < MAX_PLAYERS; s++) {
       const m = this.members[s];
-      if (!m || !m.joined || !m.conn) {
+      if (!m || !m.joined || (!m.conn && !m.bot)) {
         inputs.push(undefined);
         continue;
       }
@@ -425,7 +489,8 @@ export class Room {
         m.miss = 0;
       } else {
         m.miss = (m.miss ?? 0) + 1;
-        // a short gap repeats the last input (smooth); a long one means the player is gone for now: stand still, keep aim
+        // a short gap repeats the last input (smooth); a long one means the player is gone for now: stand still, keep aim.
+        // The same holds for a bot whose driver (the host's page) went away: it idles under the Away protection until it is driven again
         inp = m.last && m.miss <= 12 ? { ...m.last } : { ...NO_INPUT, aim: m.last?.aim ?? 0, buttons: Buttons.Away };
       }
       for (const t of m.pending.keys()) if (t <= this.tick) m.pending.delete(t);
@@ -532,6 +597,9 @@ export class RoomManager {
       } else if (data[0] === Bin.Inputs) {
         const d = decodeInputsMsg(data);
         if (d && Number.isFinite(d.tick)) a.room.inputs(a.slot, d.tick, d.inputs);
+      } else if (data[0] === Bin.BotInputs) {
+        const d = decodeBotInputsMsg(data);
+        if (d && Number.isFinite(d.tick)) a.room.botInputs(a.slot, d.tick, d.list);
       } else if (data[0] === Bin.Snapshot) {
         a.room.snapshot(a.slot, data);
       }
@@ -626,6 +694,16 @@ export class RoomManager {
           a.room.members[a.slot]!.color = colorOf(msg.color);
           a.room.members[a.slot]!.cls = clsOf(msg.cls);
           a.room.broadcastRoom();
+        }
+        break;
+      case 'bots':
+        if (isHost() && !a!.room.started && Array.isArray(msg.list) && msg.list.length <= MAX_PLAYERS) {
+          const list: [number, WeaponId, string][] = [];
+          for (const e of msg.list) {
+            if (!Array.isArray(e)) continue;
+            list.push([clsOf(e[0]), weaponOf(e[1]), validName(e[2]) || 'bot']);
+          }
+          a!.room.setBots(list, msg.skill);
         }
         break;
       case 'leave':
