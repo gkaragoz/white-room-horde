@@ -1,0 +1,17 @@
+---
+title: Arayüz: seviye, Codex ve keşif anları
+type: wayfinder:prototype
+status: open
+assignee:
+blocked-by: 02-xp-seviye-egrisi-ve-yol-uzunlugu.md, 07-takvim-class-kostum-arena.md
+---
+
+# Arayüz: seviye, Codex ve keşif anları
+
+Harita: [Meta ilerleme](../map.md) · Tip: **prototype** · Engelleyen: [XP, seviye eğrisi ve yolun uzunluğu](02-xp-seviye-egrisi-ve-yol-uzunlugu.md), [Takvim: class, kostüm, arena](07-takvim-class-kostum-arena.md)
+
+## Question
+
+Seviye, Codex ve keşif anları ekranda nasıl görünür?
+
+Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviye/XP çubuğu; oyun sonunda XP kazanımı ve "bu run'da keşfettiklerin" ekranı (client/src/gameOver.ts); Codex sayfası (açılmamışlar silüetli "???"); kilitli class ve kostüm kartı (hangi seviye veya başarım); "yeni!" rozetleri; run içinde "yeni silah keşfedildi" bildirimi. Prototip ticket'a bağlanır.
