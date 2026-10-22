@@ -34,6 +34,7 @@ import { droneReviveHelp, resetDrones, updateDrones } from './drones';
 import { equipLoadout, selectWeapon } from './loadout';
 import { abilityRate, abilityRateFrom, applyClass, bulletVsBarrels, damageMul, droneCredit, hooks, perk, placeBarrels, resetPerks, setPerk, speedMul, speedMulFrom, updateBarrels, updatePlayerPerks } from './features';
 import { createWorld, type World } from './state';
+import { updateDiscovery } from './discovery';
 import { fxOf } from './mods';
 
 export { createWorld, setWave, spawnBoss, spawnEnemy };
@@ -51,10 +52,18 @@ const AIM_TO_RAD = TAU / 65536;
 export interface GameSetup {
   seed: number;
   /** Players present at the start: slot and starting weapon. */
-  players: { slot: number; weapon: WeaponId; cls?: number }[];
+  players: { slot: number; weapon: WeaponId; cls?: number; metWeapons?: number; metDrones?: number }[];
   /** Arena layout index (MAPS) and the chosen difficulty multipliers (a bit mask over MODS, 0 = none). */
   map?: number;
   mods?: number;
+  /** The meta level the room plays at (the lowest of its players; default MAX_LEVEL, the full game). It sets the pool and the enemy pressure. */
+  level?: number;
+}
+
+/** Remember which weapons and drones a player has met (bit = index in WEAPON_IDS / DRONE_TYPES); the guaranteed discovery gives a new one. Default: all met. */
+export function setMet(w: World, slot: number, weapons = -1, drones = -1): void {
+  w.pMetWeapons[slot] = weapons;
+  w.pMetDrones[slot] = drones;
 }
 
 export function addPlayer(w: World, slot: number, x: number, y: number, weapon: WeaponId = 'pistol', cls = 0): void {
@@ -73,6 +82,7 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
   w.pMoving[slot] = 0;
   w.pIFrames[slot] = 0;
   w.pAway[slot] = 0;
+  setMet(w, slot);
   w.pGren[slot] = BALANCE.grenade.max;
   w.pGrenCharge[slot] = 0;
   w.pGrenCd[slot] = 0;
@@ -120,12 +130,13 @@ export function addPlayer(w: World, slot: number, x: number, y: number, weapon: 
 
 /** Deterministic game start used by every client and by replays: players spread on a ring around the centre. */
 export function createGame(setup: GameSetup): World {
-  const w = createWorld(setup.seed, setup.map ?? 0, setup.mods ?? 0);
+  const w = createWorld(setup.seed, setup.map ?? 0, setup.mods ?? 0, setup.level);
   const n = setup.players.length;
   for (let i = 0; i < n; i++) {
     const p = setup.players[i]!;
     const a = (i / (n > 0 ? n : 1)) * TAU;
     addPlayer(w, p.slot, n > 1 ? cos(a) * 2 : 0, n > 1 ? sin(a) * 2 : 0, p.weapon, p.cls ?? 0);
+    setMet(w, p.slot, p.metWeapons, p.metDrones);
   }
   useMap(w.map);
   placeBarrels(w);
@@ -133,8 +144,9 @@ export function createGame(setup: GameSetup): World {
 }
 
 /** A player joining a running game (late join): appears at the centre of the arena. */
-export function joinPlayer(w: World, slot: number, weapon: WeaponId, cls = 0): void {
+export function joinPlayer(w: World, slot: number, weapon: WeaponId, cls = 0, metWeapons = -1, metDrones = -1): void {
   addPlayer(w, slot, 0, 0, weapon, cls);
+  setMet(w, slot, metWeapons, metDrones);
   w.pIFrames[slot] = BALANCE.progression.revive.iFrames;
 }
 
@@ -679,6 +691,7 @@ export function step(w: World, inputsIn: ReadonlyArray<PlayerInput | undefined>)
     w.gameOver = 1;
     w.events.push({ type: 'gameOver', wave: w.wave, kills: w.kills });
   }
+  updateDiscovery(w);
   w.tick++;
 }
 

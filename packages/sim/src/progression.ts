@@ -5,7 +5,7 @@ import { applyUniversal } from './cardtable';
 import { addPerk, perk, setPerk } from './features';
 import { giveWeapon, nextMissing, selectWeapon } from './loadout';
 import type { World } from './state';
-import { fxOf } from './mods';
+import { fxOf, poolOf } from './mods';
 
 const CARDS = CARD_IDS.length;
 
@@ -51,9 +51,10 @@ function openOffer(w: World, slot: number): void {
   const cls = perk(w, slot, PERK.Class);
   const pool: number[] = [];
   let total = 0;
+  const open = poolOf(w).cards;
   for (let c = 0; c < CARDS; c++) {
     const id = CARD_IDS[c]!;
-    if (((CARD_CLASS[id] >> cls) & 1) === 0) continue;
+    if (!open[c] || ((CARD_CLASS[id] >> cls) & 1) === 0) continue;
     pool.push(c);
     total += RARITY_WEIGHT[CARD_RARITY[id]]!;
   }

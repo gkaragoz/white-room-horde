@@ -1,6 +1,6 @@
 import { Buttons, WEAPON_IDS, type PlayerInput, type WeaponId } from '@wrh/shared';
 import { cos, sin } from './detmath';
-import { addPlayer, createGame, hashWorld, setWave, step, type World } from './sim';
+import { addPlayer, createGame, hashWorld, setMet, setWave, step, type World } from './sim';
 import { createWorld } from './state';
 
 /**
@@ -67,8 +67,10 @@ export interface QuietOptions {
   seed?: number;
   map?: number;
   mods?: number;
+  /** The meta level (default: the full game). */
+  level?: number;
   /** Who is in the world (default: one pistol player at the origin in slot 0). */
-  players?: { slot: number; weapon?: WeaponId; x?: number; y?: number; cls?: number }[];
+  players?: { slot: number; weapon?: WeaponId; x?: number; y?: number; cls?: number; metWeapons?: number; metDrones?: number }[];
 }
 
 /**
@@ -76,10 +78,12 @@ export interface QuietOptions {
  * The one place that knows how to make a world stand still.
  */
 export function quietWorld(opts: QuietOptions = {}): World {
-  const w = createWorld(opts.seed ?? 1, opts.map ?? 0, opts.mods ?? 0);
+  const w = createWorld(opts.seed ?? 1, opts.map ?? 0, opts.mods ?? 0, opts.level);
   w.waveTick = 1e9;
   w.countMul = 0;
-  for (const p of opts.players ?? [{ slot: 0 }])
+  for (const p of opts.players ?? [{ slot: 0 }]) {
     addPlayer(w, p.slot, p.x ?? 0, p.y ?? 0, p.weapon ?? 'pistol', p.cls ?? 0);
+    setMet(w, p.slot, p.metWeapons, p.metDrones);
+  }
   return w;
 }

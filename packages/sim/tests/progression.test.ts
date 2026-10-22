@@ -15,8 +15,6 @@ import {
 } from '@wrh/shared';
 import { describe, expect, it } from 'vitest';
 
-/** The basic packs of the four classes that open by achievement: they arrive with the class, not from the track. */
-const ACHIEVEMENT_CLASS_CARDS = ['demolisher', 'ranger', 'berserker', 'hammerer'].reduce((n, c) => n + CARD_PACKS[`${c}:basic`]!.length, 0);
 const gameplay = TRACK.filter((i) => i.cat !== 'cosmetic' && !i.bundled);
 const countBits = (m: number) => m.toString(2).replace(/0/g, '').length;
 const level = (l: number) => TRACK.filter((i) => i.level === l && i.cat !== 'cosmetic' && !i.bundled);
@@ -80,7 +78,7 @@ describe('poolAt', () => {
     expect(countBits(last.elites)).toBe(11);
     expect(countBits(last.mods)).toBe(20);
     expect(countBits(last.classes)).toBe(5);
-    expect(last.cards.filter(Boolean).length).toBe(CARD_IDS.length - ACHIEVEMENT_CLASS_CARDS);
+    expect(last.cards.filter(Boolean).length).toBe(CARD_IDS.length);
   });
 
   it('clamps the level it is given', () => {

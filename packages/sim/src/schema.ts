@@ -37,7 +37,7 @@ export interface ArrayField<C extends ArrayCtor = ArrayCtor> {
 }
 
 export interface ScalarField {
-  readonly init: number | ((setup: { map: number; mods: number }) => number);
+  readonly init: number | ((setup: { map: number; mods: number; level: number }) => number);
   readonly unhashed?: string;
 }
 
@@ -82,6 +82,10 @@ export const SCALARS = {
   mods: num((s) => s.mods),
   /** The arena layout index. */
   map: num((s) => s.map),
+  /** The meta level the room plays at (the lowest in the room): it fixes the pool of weapons, drones, cards and elites and the enemy pressure. 100 is the full game. */
+  metLevel: num((s) => s.level),
+  /** 1 once the run's guaranteed discovery crate has been decided (dropped, or not needed). */
+  crateDone: num(0),
   /** Team modifier from a card that helps everybody: loot luck. All the other upgrades are per player (arrays below). */
   modLoot: num(1),
 };
@@ -135,6 +139,9 @@ export const ARRAYS = {
   pWeapon: i32(MAX_PLAYERS),
   /** Inventory: bitmask of the weapons (indices into WEAPON_IDS) a player owns for good, and the magazine / reload progress of every weapon that is not in the hands (`pMag`/`pReload` hold the one that is). Ammo itself is unlimited. */
   pOwned: i32(MAX_PLAYERS),
+  /** The weapons (bit = WEAPON_IDS index) and drones (bit = DRONE_TYPES index) each player has met before this run: the guaranteed discovery gives a new one. All met by default. */
+  pMetWeapons: i32(MAX_PLAYERS, -1),
+  pMetDrones: i32(MAX_PLAYERS, -1),
   pInvMag: i32(MAX_PLAYERS * WEAPON_IDS.length),
   pInvReload: f64(MAX_PLAYERS * WEAPON_IDS.length),
   pMoving: u8(
@@ -313,7 +320,7 @@ export const ARRAY_NAMES = Object.keys(ARRAYS) as (keyof SchemaArrays)[];
 export const SCALAR_NAMES = Object.keys(SCALARS) as (keyof SchemaScalars)[];
 
 /** Allocate every schema field at its initial value. */
-export function createFields(setup: { map: number; mods: number }): SchemaArrays & SchemaScalars {
+export function createFields(setup: { map: number; mods: number; level: number }): SchemaArrays & SchemaScalars {
   const out: Record<string, number | TypedArray> = {};
   for (const name of SCALAR_NAMES) {
     const init = SCALARS[name].init;

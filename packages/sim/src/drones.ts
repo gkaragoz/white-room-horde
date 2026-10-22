@@ -5,6 +5,7 @@ import { damageMul, droneCredit, hooks, perk, setPerk } from './features';
 import { segmentBlocked } from './obstacles';
 import { wantsPickup } from './pickups';
 import { heal } from './stats';
+import { poolOf } from './mods';
 import type { World } from './state';
 
 /**
@@ -63,16 +64,27 @@ hooks.droneXp = awardDroneXp;
 hooks.floorCleared = (w, wave) => {
   // the end of the second floor: every player gets a drone core, so nobody goes without a drone for long
   if (wave !== 2) return;
-  for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) grantDrone(w, s, -1);
+  for (let s = 0; s < MAX_PLAYERS; s++) if (w.pActive[s]) grantDrone(w, s, -1, true);
 };
 
 /** A drone joins the inventory: `kind` = type index, or -1 for a random one the player does not own. Returns the type given (-1: duplicate, turned into experience). */
-export function grantDrone(w: World, s: number, kind = -1): number {
+export function grantDrone(w: World, s: number, kind = -1, preferUnmet = false): number {
   if (!w.pActive[s]) return -1;
+  // no drone is open yet at this level: nothing to give (the draw is still made, to keep the stream)
+  if (kind < 0 && poolOf(w).drones === 0) {
+    w.rng.int(TYPES);
+    return -1;
+  }
   let type = kind;
   if (type < 0) {
-    const free: number[] = [];
-    for (let t = 0; t < TYPES; t++) if (w.pDLv[s * TYPES + t] === 0) free.push(t);
+    // only drones the room has open; the floor gift prefers one this player has never met (a discovery)
+    const open = poolOf(w).drones;
+    let free: number[] = [];
+    for (let t = 0; t < TYPES; t++) if (w.pDLv[s * TYPES + t] === 0 && ((open >> t) & 1) !== 0) free.push(t);
+    if (preferUnmet) {
+      const fresh = free.filter((t) => ((w.pMetDrones[s]! >> t) & 1) === 0);
+      if (fresh.length) free = fresh;
+    }
     // always draw, so the stream does not depend on how many drones the player already has
     const pick = w.rng.int(TYPES);
     type = free.length ? free[pick % free.length]! : -1;

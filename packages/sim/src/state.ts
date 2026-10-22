@@ -1,3 +1,4 @@
+import { MAX_LEVEL } from '@wrh/shared';
 import { FlowField } from './flowfield';
 import { applyObstacles } from './obstacles';
 import { Rng } from './rng';
@@ -80,8 +81,8 @@ export interface World extends SchemaScalars, SchemaArrays {
   grid: SpatialHash;
 }
 
-export function createWorld(seed: number, map = 0, mods = 0): World {
-  const w = createFields({ map, mods }) as World;
+export function createWorld(seed: number, map = 0, mods = 0, level = MAX_LEVEL): World {
+  const w = createFields({ map, mods, level }) as World;
   w.rng = new Rng(seed);
   w.events = [];
   w.field = new FlowField();

@@ -1,5 +1,6 @@
 import { BALANCE, RANK_INDEX, WEAPON_IDS } from '@wrh/shared';
 import type { World } from './state';
+import { poolOf } from './mods';
 
 const NW = WEAPON_IDS.length;
 const PISTOL = WEAPON_IDS.indexOf('pistol');
@@ -77,7 +78,7 @@ export function nextMissing(w: World, slot: number): number {
   const top = Math.max(...RANK_INDEX.map((idx, r) => (owns(w, slot, idx) ? r : -1)));
   for (let d = 1; d <= NW; d++) {
     const idx = RANK_INDEX[(top + d) % NW]!;
-    if (isGun(idx) && !owns(w, slot, idx)) return idx;
+    if (isGun(idx) && ((poolOf(w).weapons >> idx) & 1) !== 0 && !owns(w, slot, idx)) return idx;
   }
   return -1;
 }

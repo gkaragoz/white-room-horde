@@ -3,7 +3,7 @@ import { addStat, heal } from './stats';
 import { sqrt } from './detmath';
 import { out, pushOut } from './obstacles';
 import type { World } from './state';
-import { fxOf } from './mods';
+import { fxOf, poolOf } from './mods';
 
 /**
  * Classes, perks, elite enemies, wave modifiers, explosive barrels and the power-ups. Everything here is part of the
@@ -217,7 +217,16 @@ export function eliteChance(w: World): number {
 export function rollElite(w: World, i: number): void {
   const chance = eliteChance(w) * fxOf(w).eliteChance;
   if (chance <= 0 || w.rng.float() >= chance) return;
-  const mod = 1 + w.rng.int(11);
+  // the elites the room has met: the draw is the same size as ever, mapped onto the open ones
+  const pick = w.rng.int(11);
+  const open = poolOf(w).elites;
+  let mod = 1 + pick;
+  if (open !== 0xffe) {
+    const kinds: number[] = [];
+    for (let e = 1; e <= 11; e++) if ((open >> e) & 1) kinds.push(e);
+    if (kinds.length === 0) return;
+    mod = kinds[pick % kinds.length]!;
+  }
   w.eMod[i] = mod;
   if (mod === ELITE.Warded) w.eShield[i] = w.eHp[i]! * BALANCE.elites.wardedShield;
   if (mod === ELITE.Giant) w.eHp[i] = w.eHp[i]! * BALANCE.elites.giantHp;

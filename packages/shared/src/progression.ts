@@ -95,6 +95,9 @@ function bitOf(item: TrackItem): number {
   }
 }
 
+/** The classes that open by achievement, not by level: their basic cards come with the class, so they are never locked here. */
+const ACHIEVEMENT_CLASSES = CLASS_IDS.filter((c) => c !== 'soldier' && !TRACK.some((i) => i.cat === 'class' && i.name === c));
+
 const pools: Pool[] = [];
 function build(level: number): Pool {
   let weapons = 0;
@@ -109,6 +112,7 @@ function build(level: number): Pool {
   for (const p of CORE_PICKUPS) powerups |= 1 << p;
   const open = (ids: readonly CardId[]) => ids.forEach((id) => (cards[CARD_INDEX.get(id)!] = true));
   open(CORE_CARDS);
+  for (const c of ACHIEVEMENT_CLASSES) open(CARD_PACKS[`${c}:basic`]!);
   for (const item of TRACK) {
     if (item.level > level) continue;
     if (item.cat === 'pack') {

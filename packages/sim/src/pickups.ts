@@ -6,7 +6,7 @@ import { nuke, perk, setPerk, waveModOf } from './features';
 import { dronePickup, grantDrone } from './drones';
 import { giveWeapon, isMelee, owns } from './loadout';
 import type { World } from './state';
-import { fxOf } from './mods';
+import { fxOf, poolOf } from './mods';
 
 export function spawnPickup(w: World, kind: number, x: number, y: number, data = 0, layer = 0): void {
   for (let i = 0; i < MAX_PICKUPS; i++) {
@@ -34,8 +34,9 @@ function gunsInSquad(w: World): boolean {
 export function pickWeapon(w: World): number {
   const missing: number[] = [];
   const guns: number[] = [];
+  const open = poolOf(w).weapons;
   for (let i = 0; i < WEAPON_IDS.length; i++) {
-    if (BALANCE.weapons[WEAPON_IDS[i]!]!.melee) continue;
+    if (BALANCE.weapons[WEAPON_IDS[i]!]!.melee || ((open >> i) & 1) === 0) continue;
     guns.push(i);
     for (let s = 0; s < MAX_PLAYERS; s++) {
       if (w.pActive[s] && w.pState[s] !== PlayerState.Dead && !owns(w, s, i)) {
@@ -54,8 +55,8 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 
     const kinds: number[] = [];
     for (let i = 0; i < cfg.bossDrops.health && !fxOf(w).noHealthDrops; i++) kinds.push(PickupType.Health);
     for (let i = 0; i < cfg.bossDrops.grenade && !fxOf(w).noGrenades; i++) kinds.push(PickupType.Grenade);
-    // a boss usually leaves a drone core too (always drawn: the stream does not depend on the outcome)
-    if (w.rng.float() < cfg.bossDrops.drone) kinds.push(PickupType.Drone);
+    // a boss usually leaves a drone core too (always drawn: the stream does not depend on the outcome); before any drone is open it leaves health instead
+    if (w.rng.float() < cfg.bossDrops.drone) kinds.push(poolOf(w).drones === 0 ? PickupType.Health : PickupType.Drone);
     kinds.forEach((k, n) => {
       const a = (n / kinds.length) * 6.283185307179586;
       spawnPickup(w, k, x + cos(a) * 1.8, y + sin(a) * 1.8, 0, layer);
@@ -63,7 +64,7 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 
     return;
   }
   // an elite now and then carries a drone core
-  if (elite && w.rng.float() < cfg.eliteDrone) spawnPickup(w, PickupType.Drone, x + 0.9, y, 0, layer);
+  if (elite && w.rng.float() < cfg.eliteDrone && poolOf(w).drones !== 0) spawnPickup(w, PickupType.Drone, x + 0.9, y, 0, layer);
   // a squad of blades alone has no use for guns or bullets: those drops would only be wasted
   const guns = gunsInSquad(w);
   const r = w.rng.float();
@@ -85,10 +86,11 @@ export function dropLoot(w: World, x: number, y: number, boss: boolean, layer = 
       [PickupType.Nuke, cfg.chance.nuke],
       [PickupType.Freeze, cfg.chance.freeze],
     ];
+    const open = poolOf(w).powerups;
     for (const [kind, c] of table) {
       edge += c * luck;
       if (r < edge) {
-        spawnPickup(w, kind, x, y, 0, layer);
+        if ((open >> kind) & 1) spawnPickup(w, kind, x, y, 0, layer);
         break;
       }
     }
