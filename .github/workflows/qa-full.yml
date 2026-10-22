@@ -57,6 +57,10 @@ jobs:
           - name: rejoin
             browsers: chromium
             run: node tools/ci/rejoin-check.mjs
+          # companion bots in an online room: the host drives them, the guest sees them, the host drops and comes back
+          - name: bots-online
+            browsers: chromium
+            run: node tools/ci/bot-online-check.mjs
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
