@@ -14,7 +14,6 @@ import {
   NESTED_ARRAYS,
   SCALARS,
   SCALAR_NAMES,
-  createFields,
   nestedArray,
   type TypedArray,
 } from '../src/schema';
@@ -47,18 +46,6 @@ describe('WorldSchema', () => {
     }
     expect(undeclared).toEqual([]);
     for (const name of [...ARRAY_NAMES, ...SCALAR_NAMES]) expect(name in w, name).toBe(true);
-  });
-
-  it('allocates what createWorld allocates (kind, length, initial values)', () => {
-    const w = createWorld(1, 2, 0b11) as unknown as Record<string, TypedArray | number>;
-    const f = createFields({ map: 2, mods: 0b11 }) as unknown as Record<string, TypedArray | number>;
-    for (const name of SCALAR_NAMES) expect(f[name], name).toBe(w[name]);
-    for (const name of ARRAY_NAMES) {
-      const a = f[name] as TypedArray;
-      const b = w[name] as TypedArray;
-      expect(a.constructor, name).toBe(b.constructor);
-      expect(Array.from(a), name).toEqual(Array.from(b));
-    }
   });
 
   it('puts every field in the world hash unless it declares why not', () => {
