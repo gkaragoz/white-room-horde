@@ -1,14 +1,8 @@
 import type { WeaponId } from '@wrh/shared';
 
-/** What the game remembers about the achievements: running totals, best runs, when each was earned, which the player has looked at. */
-export interface AchStore {
-  life: Record<string, number>;
-  best: Record<string, number>;
-  got: Record<string, number>;
-  seen: Record<string, 1>;
-}
+import { emptyStore, type AchStore } from './achStore';
 
-export const emptyStore = (): AchStore => ({ life: {}, best: {}, got: {}, seen: {} });
+export { emptyStore, type AchStore };
 
 /** Everything the game remembers about the player between sessions (local only). */
 export interface Profile {

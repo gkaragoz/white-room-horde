@@ -1,99 +1,16 @@
-import { ACHIEVEMENTS, CLASS_IDS, Difficulty, MAX_PLAYERS, PERK, PERKS, STAT, STATS, WEAPON_IDS, WEAPON_SLOTS, type AchievementDef } from '@wrh/shared';
-import { runScore, type World } from '@wrh/sim';
+import type { AchievementDef } from '@wrh/shared';
+import { runSummary, type World } from '@wrh/sim';
+import { applyRun, type AchStore } from './achStore';
 import { asset } from './assets';
-import { loadProfile, saveProfile, type AchStore } from './profile';
+import { loadProfile, saveProfile } from './profile';
 import type { Lang } from './ui';
 
-export type Totals = Record<string, number>;
-
-/** The numbers of one character's run, in the keys the achievement table names. */
-export function runTotals(world: World, slot: number): { totals: Totals; flags: Record<string, boolean> } {
-  const st = (k: number): number => world.pStat[slot * STATS + k]!;
-  const perk = (k: number): number => world.pPerk[slot * PERKS + k]!;
-  const seconds = st(STAT.AliveTicks) / 30;
-  let cards = 0;
-  for (let i = 0; i < world.pCards.length / MAX_PLAYERS; i++) cards += world.pCards[slot * (world.pCards.length / MAX_PLAYERS) + i]!;
-  const mods = world.mods;
-  const modCount = Difficulty.count(mods);
-  const totals: Totals = {
-    kills: perk(PERK.Kills),
-    runKills: perk(PERK.Kills),
-    damage: perk(PERK.Damage),
-    bosses: st(STAT.BossKills),
-    floor: world.wave,
-    maxHit: st(STAT.MaxHit),
-    crits: st(STAT.Crits),
-    shots: st(STAT.Shots),
-    revives: st(STAT.Revives),
-    distance: st(STAT.Distance),
-    dashes: st(STAT.Dashes),
-    abilities: st(STAT.Abilities),
-    grenades: st(STAT.Grenades),
-    barrels: st(STAT.Barrels),
-    pickups: st(STAT.Pickups),
-    healed: st(STAT.Healed),
-    taken: st(STAT.DamageTaken),
-    games: 1,
-    seconds,
-    level: world.pLevel[slot]!,
-    cards,
-    modsFloor5: world.wave >= 5 ? modCount : 0,
-    score: runScore(world).final,
-  };
-  for (let i = 0; i < WEAPON_IDS.length; i++) totals[`wk:${WEAPON_IDS[i]}`] = world.pWpnKills[slot * WEAPON_SLOTS + i]!;
-  const cls = perk(PERK.Class);
-  for (let c = 0; c < CLASS_IDS.length; c++) totals[`floor:${c}`] = c === cls ? world.wave : 0;
-  const pistolOnly = world.pOwned[slot] === 1 << WEAPON_IDS.indexOf('pistol');
-  const flags: Record<string, boolean> = {
-    untouchable: world.wave >= 5 && totals.taken! <= 50,
-    quickDeath: seconds < 60,
-    pistolOnly: pistolOnly && world.wave >= 10,
-    fragileFloor8: Difficulty.has(mods, 'fragile') && world.wave >= 8,
-    allMods: mods === Difficulty.ALL && world.wave >= 5,
-    revive5: totals.revives! >= 5,
-    barrels50: totals.barrels! >= 50,
-    hourRun: seconds >= 3600,
-    flawlessBosses: totals.bosses! >= 3 && st(STAT.Downs) === 0,
-    cards100: cards >= 100,
-  };
-  return { totals, flags };
-}
-
-/** The value of an achievement now (a running total, a best run, or 0 / 1 for a special condition). */
-export function valueOf(def: AchievementDef, store: AchStore): number {
-  if (def.kind === 'life') return store.life[def.stat] ?? 0;
-  if (def.kind === 'best') return store.best[def.stat] ?? 0;
-  return store.got[def.id] ? 1 : 0;
-}
-
-export const isGot = (def: AchievementDef, store: AchStore): boolean => !!store.got[def.id];
-
-/** Fold a finished run in; returns the achievements it earned. The store is changed in place. */
-export function applyRun(store: AchStore, run: { totals: Totals; flags: Record<string, boolean> }, now = Date.now()): AchievementDef[] {
-  // several achievements share a stat (the tiers of one group): fold each stat in once
-  const folded = new Set<string>();
-  for (const def of ACHIEVEMENTS) {
-    const v = run.totals[def.stat];
-    if (v === undefined || def.kind === 'flag' || folded.has(def.stat)) continue;
-    folded.add(def.stat);
-    if (def.kind === 'life') store.life[def.stat] = (store.life[def.stat] ?? 0) + v;
-    else store.best[def.stat] = Math.max(store.best[def.stat] ?? 0, v);
-  }
-  const earned: AchievementDef[] = [];
-  for (const def of ACHIEVEMENTS) {
-    if (store.got[def.id]) continue;
-    const done = def.kind === 'flag' ? run.flags[def.stat] === true : valueOf(def, store) >= def.target;
-    if (!done) continue;
-    store.got[def.id] = now;
-    earned.push(def);
-  }
-  return earned;
-}
+export { applyRun, isGot, valueOf } from './achStore';
 
 /** Record a run into the saved profile; the earned achievements come back for the game over screen. */
 export function recordAchievements(world: World, slot: number): AchievementDef[] {
   const p = loadProfile();
-  const earned = applyRun(p.ach, runTotals(world, slot));
+  const earned = applyRun(p.ach, runSummary(world, slot));
   saveProfile(p);
   return earned;
 }

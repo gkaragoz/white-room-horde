@@ -7,6 +7,10 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+**Run results in the sim (internals, same game)**
+
+- What a run came to (the numbers and special conditions the achievements are checked against) is now computed by the sim (`runSummary`), and the pure part of the achievement store moved to `achStore.ts`. Both have unit tests, including one that fails if the generated achievement table asks for a number or condition the sim does not produce.
+
 ## v0.31.0 (2026-10-22)
 
 **One place for what the HUD and the sound read from the world (client)**
