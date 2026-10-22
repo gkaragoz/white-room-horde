@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.35.0 (2026-10-22)
+
 **Meta progression: discover the game, run by run (minor release: hash, protocol and replay format change, the relay must be redeployed)**
 
 - Every run earns XP (a tenth of the team score, nothing under 15 seconds, none from a replay) and every meta level (1-100) opens one to three things of the Discovery Track: weapons, drones, card packs, classes, arenas, power-ups, elites, difficulty multipliers and looks. The reference run is worth 1000 XP and the whole path is about 117 reference runs. The hub shows the level path; the game over screen opens reward packs; the Codex album lists what was met, what is open and what is locked; a corner card announces first meetings.
