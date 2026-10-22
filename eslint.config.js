@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint';
 const forbiddenMath = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'pow', 'exp', 'log', 'log2', 'log10', 'random', 'cbrt', 'hypot'];
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', '**/dist/**', 'mixamo/**', '.claude/**', 'assets-src/**', 'tools/**', 'packages/client/public/**'] },
+  { ignores: ['**/node_modules/**', '**/dist/**', 'mixamo/**', '.claude/**', 'assets-src/**', 'tools/**', 'docs/**', 'packages/client/public/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
