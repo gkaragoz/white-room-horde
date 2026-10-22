@@ -22,3 +22,7 @@ Oyuncunun düşünmediği yerler hangi sırayla ve hangi biçimde devreye girer?
 ## Ticket "Keşif kataloğu ve sınırı" ile netleşenler
 
 - Düşman türleri ve boss çeşitleri kilitlenmez (dalgaya bağlı, Codex'e karşılaşmayla); sadece **elit türleri** (11), **güç-artırıcılar** (shield, haste, quad, freeze, nuke) ve **zorluk çarpanları** (seyrek, geç) meta seviyeyle açılır. Oyun arayüzü kilitlenmez; yolun arayüzü ilk run sonunda tanıtılır. Bu ticket'ta kalan: elit/güç-artırıcı/çarpan sırası.
+
+## Ticket "Erken oyun zorluk hedefi" ile netleşenler
+
+- Düşman baskısı rampası ayrı ticket'ta ([Düşman baskısı rampası](12-dusman-baskisi-rampasi.md)); elit türlerinin açılışı bundan bağımsız bu ticket'ta.

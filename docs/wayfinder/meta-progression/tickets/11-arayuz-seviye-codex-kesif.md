@@ -23,3 +23,7 @@ Rough prototiple (UI mock veya basit kod) karşılaştır: menü hub'ında seviy
 ## Ticket "XP, seviye eğrisi ve yolun uzunluğu" ile netleşenler
 
 - Oyun sonu ekranı skor ile kazanılan XP'yi yan yana göstermeli; asgari katılım yoksa "XP yok" durumu gösterilmeli; seviye çubuğu 100 seviye tavanına kadar.
+
+## Ticket "Erken oyun zorluk hedefi" ile netleşenler
+
+- Her gerçek run (≥15 sn) XP verdiği için "XP yok" durumu yalnızca 15 saniyeden kısa run'larda görünür.

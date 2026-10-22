@@ -73,7 +73,7 @@ A themed group of about six to eight cards that unlocks as one Discovery.
 _Avoid_: card set, deck
 
 **Experience**:
-What a finished run adds to the Meta Level: a tenth of the run's team score, given only if the run reached floor 2 or lasted a minute.
+What a finished run adds to the Meta Level: a tenth of the run's team score, given for every run that lasted at least fifteen seconds.
 _Avoid_: points, score (the run score is the number it is made from)
 
 **Reference Run**:

@@ -21,3 +21,7 @@ Profile alanları ve "herkes sıfırdan başlar" kararının sınırı.
 ## Ticket "XP, seviye eğrisi ve yolun uzunluğu" ile netleşenler
 
 - Profile'a xp ve level gelir (seviye tavanı 100). Run sonu XP: `round(skor / 10)`, asgari katılım (2. kat ya da 60 saniye) yoksa 0. Online'da herkes takım skorundan aynı XP'yi alır.
+
+## Ticket "Erken oyun zorluk hedefi" ile netleşenler
+
+- XP asgari katılım şartı **15 saniye** (2. kat/60 sn şartı kalktı).

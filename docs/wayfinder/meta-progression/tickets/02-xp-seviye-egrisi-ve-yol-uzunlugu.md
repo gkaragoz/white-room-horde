@@ -31,3 +31,7 @@ Meta XP nasıl kazanılır, seviye eğrisi nasıl akar ve Keşif Yolu kaç run s
 - **Eğri şekli (Reference Run R cinsinden, R = ilk run'ın medyan XP'si):** seviye 1-10 arası her seviye ≈ 0,6-1 R (neredeyse her run bir seviye); 11-50 arası ≈ 1-1,5 R (1-2 run); 51-100 arası ≈ 1,5-2,5 R (2-3 run). Erken sık, sonra seyrek.
 - **Kötü run garantisi:** seviye 1-10 eşikleri, asgari katılımı sağlayan en düşük run XP'sinin altında tutulur; 2. kata ulaşan her run ilk 10 seviyede en az bir seviye atlatır.
 - **Kalibrasyon:** sabit XP sayıları şimdi yazılmaz. Eğri R'ye oranlarla tanımlandı; R'nin gerçek değeri **Erken oyun zorluk hedefi** ticket'ının bot ölçümünden (ilk run medyan skoru) gelir, mutlak sayılar o ticket sonrası sabitlenir.
+
+## Revizyon (ticket "Erken oyun zorluk hedefi")
+
+"Sayılan run" şartı değişti: 2. kat ya da 60 sn yerine yalnızca **en az 15 saniye**; her gerçek run XP verir ("her run bir keşif" ilkesi; prototip ölçümü botun ilk run'larının ~%48'inin eski şartı geçemediğini gösterdi). Ayrıca R geçici: ilk run kolaylaştırılacağı için gerçek R düşman baskısı rampası ticket'ından sonra ölçülür.
