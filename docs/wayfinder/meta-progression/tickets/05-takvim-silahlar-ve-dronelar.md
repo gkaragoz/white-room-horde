@@ -2,7 +2,7 @@
 title: Takvim: silahlar ve drone'lar
 type: wayfinder:grilling
 status: open
-assignee:
+assignee: gkaragoz
 blocked-by: 03-erken-oyun-zorluk-hedefi.md
 ---
 
