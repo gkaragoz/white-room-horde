@@ -146,8 +146,8 @@ export class WorldView {
   get bossHealthFraction(): number {
     const b = this.bossIndex;
     if (b < 0) return 0;
-    const max = BALANCE.enemies.tank.hp * BALANCE.progression.boss.hpMul * this.w.hpMul;
-    return Math.max(0, Math.min(1, this.w.eHp[b]! / max));
+    const max = this.w.eMaxHp[b]!;
+    return max > 0 ? Math.max(0, Math.min(1, this.w.eHp[b]! / max)) : 0;
   }
 
   /** A tank or a boss: the enemies that growl twice. */

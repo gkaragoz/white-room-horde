@@ -1,4 +1,4 @@
-import { BALANCE, MISC, PlayerState } from '@wrh/shared';
+import { Difficulty, MISC, PlayerState, BALANCE } from '@wrh/shared';
 import { addPlayer, createWorld, spawnBoss, spawnEnemy, type World } from '@wrh/sim';
 import { describe, expect, it } from 'vitest';
 import { LOW_HP, WorldView, viewOf } from '../src/view/worldView';
@@ -106,6 +106,22 @@ describe('WorldView: weapon and ammo', () => {
 });
 
 describe('WorldView: the enemy side', () => {
+  it('starts the boss bar full when titan bosses, a large squad and late floors make the boss tougher', () => {
+    const w = createWorld(3, 0, Difficulty.bit('titanboss') | Difficulty.bit('tough'));
+    w.waveTick = 1e9;
+    w.countMul = 0;
+    for (let s = 0; s < 4; s++) addPlayer(w, s, s * 2, 0, 'pistol');
+    w.wave = 15;
+    const b = spawnBoss(w);
+    const plain = createWorld(3);
+    addPlayer(plain, 0, 0, 0, 'pistol');
+    plain.wave = 15;
+    expect(w.eMaxHp[b]).toBeGreaterThan(plain.eMaxHp[spawnBoss(plain)]! * 2);
+    expect(new WorldView(w).bossHealthFraction).toBe(1);
+    w.eHp[b] = w.eHp[b]! * 0.9;
+    expect(new WorldView(w).bossHealthFraction).toBeCloseTo(0.9, 9);
+  });
+
   it('finds the boss, its health share and which enemies are heavy', () => {
     const w = world();
     let v = new WorldView(w);
@@ -117,11 +133,11 @@ describe('WorldView: the enemy side', () => {
     expect(v.bossIndex).toBe(b);
     expect(v.bossUp).toBe(true);
     expect(v.isHeavy(b)).toBe(true);
-    // the bar is measured against a tank boss at full strength for this floor
-    const max = BALANCE.enemies.tank.hp * BALANCE.progression.boss.hpMul * w.hpMul;
-    w.eHp[b] = max / 4;
+    // full is what this boss spawned with, whatever the floor, the squad size or the chosen Difficulty made of it
+    expect(v.bossHealthFraction).toBe(1);
+    w.eHp[b] = w.eMaxHp[b]! / 4;
     expect(v.bossHealthFraction).toBeCloseTo(0.25, 9);
-    w.eHp[b] = max * 10;
+    w.eHp[b] = w.eMaxHp[b]! * 10;
     expect(v.bossHealthFraction).toBe(1);
     w.eHp[b] = -5;
     expect(v.bossHealthFraction).toBe(0);

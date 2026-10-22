@@ -151,6 +151,7 @@ export function spawnEnemy(w: World, type: number, x: number, y: number, withScr
     w.eY[i] = y;
     w.eAngle[i] = 0;
     w.eHp[i] = hp;
+    w.eMaxHp[i] = hp;
     w.eCooldown[i] = INTERVAL[type]! * 0.5;
     w.enemyCount++;
     return i;
@@ -909,6 +910,7 @@ export function spawnBoss(w: World): number {
   if (i >= 0) {
     w.eBoss[i] = BOSS_ORDER[((((w.wave / BALANCE.progression.boss.everyWaves) | 0) - 1) % BOSS_ORDER.length + BOSS_ORDER.length) % BOSS_ORDER.length]!;
     w.eHp[i] = w.eHp[i]! * BALANCE.progression.boss.hpMul * fxOf(w).bossHp;
+    w.eMaxHp[i] = w.eHp[i]!;
   }
   return i;
 }

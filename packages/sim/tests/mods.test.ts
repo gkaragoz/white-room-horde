@@ -46,6 +46,10 @@ describe('difficulty multipliers', () => {
       return w.eHp[spawnBoss(w)]!;
     };
     expect(boss(bit('titanboss'))).toBeCloseTo(boss(0) * 1.5, 6);
+    // a boss remembers the health it spawned with: that is what its bar calls full
+    const w = world(bit('titanboss'));
+    const b = spawnBoss(w);
+    expect(w.eMaxHp[b]).toBe(w.eHp[b]);
   });
 
   it('brutal blows, wide danger and rushed attacks hurt more, wider and sooner', () => {
@@ -109,7 +113,8 @@ describe('difficulty multipliers', () => {
       for (let i = 0; i < 3000; i++) {
         w.kActive.fill(0);
         dropLoot(w, 10, 10, false);
-        for (let k = 0; k < w.kActive.length; k++) if (w.kActive[k] && (kind === undefined || w.kType[k] === kind)) n++;
+        for (let k = 0; k < w.kActive.length; k++)
+          if (w.kActive[k] && (kind === undefined || w.kType[k] === kind)) n++;
       }
       return n;
     };
@@ -140,7 +145,14 @@ describe('difficulty multipliers', () => {
 
   it('the same mods play out identically twice, and different mods play differently', () => {
     const run = (mods: number): number => {
-      const g = createGame({ seed: 8, players: [{ slot: 0, weapon: 'pistol', cls: 0 }, { slot: 1, weapon: 'smg', cls: 2 }], mods });
+      const g = createGame({
+        seed: 8,
+        players: [
+          { slot: 0, weapon: 'pistol', cls: 0 },
+          { slot: 1, weapon: 'smg', cls: 2 },
+        ],
+        mods,
+      });
       for (let t = 0; t < 400; t++) step(g, [NONE, NONE]);
       return g.enemyCount * 1000 + Math.round(g.pHp[0]!);
     };

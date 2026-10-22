@@ -93,6 +93,7 @@ describe('WorldSchema', () => {
     }
     expect(unhashed.sort()).toEqual([
       'countMul',
+      'eMaxHp',
       'field.cost',
       'field.dirX',
       'field.dirY',

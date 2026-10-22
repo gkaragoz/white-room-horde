@@ -169,6 +169,8 @@ export const ARRAYS = {
   eY: f64(MAX_ENEMIES),
   eAngle: f64(MAX_ENEMIES),
   eHp: f64(MAX_ENEMIES),
+  /** The health an enemy spawned with (a boss: after the boss multipliers), so the boss bar knows what full is. */
+  eMaxHp: f64(MAX_ENEMIES, 0, 'only read by the HUD; fixed at spawn from state that is hashed'),
   eBoss: u8(MAX_ENEMIES),
   /** Per-enemy scratch: boss charge ticks left. */
   eAux: f64(MAX_ENEMIES),
