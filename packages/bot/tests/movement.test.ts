@@ -180,3 +180,15 @@ describe('movement: the decks', () => {
   });
 });
 
+describe('movement: walls in the plan', () => {
+  it('does not slip round a narrow box by being pushed out of its side', () => {
+    // the courtyard's box at (-41, 18.5) is 1.5 wide; the bot stands under it with a crowd on three sides and only the box ahead
+    const w = game(1);
+    put(w, -41.43, 13.55);
+    for (const [x, y] of [[-42.3, 12.9], [-40.3, 12.4], [-41.2, 12.3], [-42.1, 12.2], [-40.8, 11.9], [-41.4, 13.0]] as const) enemy(w, x, y);
+    // heading north would be a dead stop against the box: the planner must not think it runs through
+    const m = decide(w);
+    expect(m.y).toBeLessThan(0.99);
+  });
+});
+

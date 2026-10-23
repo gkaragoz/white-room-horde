@@ -142,6 +142,20 @@ export function pushOut(g: MapGeo, x: number, y: number, r: number): boolean {
   return moved;
 }
 
+/** Does a circle of radius r at (x, y) overlap a box of the current local list (`focusBoxes`, `focusRay`)? Touching is not overlapping. */
+export function hitsLocal(x: number, y: number, r: number): boolean {
+  const s = act;
+  const rr = (r - 1e-6) * (r - 1e-6);
+  for (let i = 0, n = actN * 4; i < n; i += 4) {
+    const cx = x < s[i]! ? s[i]! : x > s[i + 2]! ? s[i + 2]! : x;
+    const cy = y < s[i + 1]! ? s[i + 1]! : y > s[i + 3]! ? s[i + 3]! : y;
+    const ex = x - cx;
+    const ey = y - cy;
+    if (ex * ex + ey * ey < rr) return true;
+  }
+  return false;
+}
+
 /** `pushOut` against the boxes chosen by `focusBoxes`. */
 export function pushOutLocal(x: number, y: number, r: number): boolean {
   let moved = false;

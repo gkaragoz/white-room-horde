@@ -1,7 +1,7 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, ENEMY_TYPES, MAPS, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
 import { owns } from '@wrh/sim';
 import { BLOW, DPS, HOLD, RANGED, STAND_OFF, T, bursts, lateScale, radiusOf, speedOf, telePain } from './danger';
-import { focusBoxes, focusRay, geoOf, movingDist2, nearRamp, segmentCovered, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
+import { focusBoxes, focusRay, geoOf, hitsLocal, movingDist2, nearRamp, segmentCovered, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
 import { NavState, computeField, fieldFresh, goalDist, goalField, goalWaypoint, territoryAt, useNav, waypoint } from './nav';
 import { engagement } from './weapons';
 import type { Ctx, MoveDecision, Percept, TeamDecision } from './types';
@@ -185,9 +185,28 @@ function stepPlayer(g: MapGeo, deck: boolean, x: number, y: number, hx: number, 
     let ny = y + hy * d;
     nx = nx < -ARENA_HALF_W + PR ? -ARENA_HALF_W + PR : nx > ARENA_HALF_W - PR ? ARENA_HALF_W - PR : nx;
     ny = ny < -ARENA_HALF_H + PR ? -ARENA_HALF_H + PR : ny > ARENA_HALF_H - PR ? ARENA_HALF_H - PR : ny;
-    if (pushOutLocal(nx, ny, PR)) {
-      nx = pushed.x;
-      ny = pushed.y;
+    if (hitsLocal(nx, ny, PR)) {
+      if (hitsLocal(x, y, PR)) {
+        // already inside something (shoved there): let the box push the bot out, as the sim does
+        if (pushOutLocal(nx, ny, PR)) {
+          nx = pushed.x;
+          ny = pushed.y;
+        }
+      } else {
+        // blocked: slide along the face (axis by axis, which is what the sim's push-out amounts to for a box)
+        const okX = !hitsLocal(nx, y, PR);
+        const okY = !hitsLocal(x, ny, PR);
+        if (okX && okY) {
+          // a corner: take the bigger part of the move
+          if (Math.abs(hx) > Math.abs(hy)) ny = y;
+          else nx = x;
+        } else if (okX) ny = y;
+        else if (okY) nx = x;
+        else {
+          nx = x;
+          ny = y;
+        }
+      }
     }
     if (deck && !onDeck(g, nx, ny)) {
       nx = x;
