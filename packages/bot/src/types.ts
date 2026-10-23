@@ -42,6 +42,8 @@ export interface Threat {
   /** Velocity estimate per tick from the previous perception (0 when unknown). */
   vx: number;
   vy: number;
+  /** 0 ground, 1 deck (see layers). */
+  layer: number;
 }
 
 /** A ground attack that is charging (a red area). */
@@ -54,6 +56,42 @@ export interface Telegraph {
   l: number;
   /** Ticks left until it lands, when known (-1 otherwise). */
   eta: number;
+  /** TeleEffect: what it does when it lands (Hurt, Half, Kill, Acid, None = only a warning, Strike = our own airstrike). */
+  effect: number;
+  /** Rotation of a rectangle (radians). */
+  angle: number;
+  /** Damage it carries: positive flat, negative a share of the victim's max health (boss attacks). */
+  amt: number;
+}
+
+/** Lingering ground damage (acid, fire). */
+export interface Zone {
+  x: number;
+  y: number;
+  r: number;
+  /** Ticks until it fades. */
+  left: number;
+  /** ZoneKind. */
+  kind: number;
+}
+
+/** An explosive barrel standing in the arena. */
+export interface Barrel {
+  x: number;
+  y: number;
+  hp: number;
+}
+
+/** A spitter's glob in the air. */
+export interface Spit {
+  x: number;
+  y: number;
+  /** Units per second. */
+  vx: number;
+  vy: number;
+  /** Seconds of flight left. */
+  life: number;
+  layer: number;
 }
 
 export interface Ally {
@@ -67,6 +105,7 @@ export interface Ally {
 }
 
 export interface Pickup {
+  layer?: number;
   id: number;
   x: number;
   y: number;
@@ -93,6 +132,12 @@ export interface Percept {
   /** Active enemies, nearest first (at most 96). */
   enemies: Threat[];
   telegraphs: Telegraph[];
+  /** Acid and fire on the ground. */
+  zones: Zone[];
+  /** Spitter globs in flight. */
+  spits: Spit[];
+  /** Explosive barrels that stand (they go off when hit: enemies near them take a blow, so do players within about 3.4 units). */
+  barrels: Barrel[];
   pickups: Pickup[];
   allies: Ally[];
   /** A card offer waits for this player (card indices), or an empty list. */
