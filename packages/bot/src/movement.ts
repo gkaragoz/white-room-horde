@@ -124,13 +124,6 @@ function addGoal(x: number, y: number, value: number, px: number, py: number): v
   goalV[at] = value;
 }
 
-/** The cost of every heading on the last decision (for tests and tuning). */
-export const lastCosts = new Float64Array(DIRS);
-/** Contact, near-contact, stand-off, range and edge terms of the last rollout (for tests and tuning). */
-export const tm = { c: 0, n: 0, o: 0, l: 0, e: 0, f: 0 };
-export const lastTerms = new Float64Array(DIRS * 8);
-/** The enemies the last decision looked at (for tests and tuning). */
-export const seen = { n: 0, ex, ey, esp, etouch, edps, erel2, ehold };
 
 /** The player's own speed in units per second. */
 function speedNow(p: Percept): number {
@@ -221,7 +214,6 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
     wy[i] = ey[i]!;
   }
   let cost = 0;
-  tm.c = tm.n = tm.o = tm.l = tm.e = tm.f = 0;
   const free = dash ? Math.max(iframes, BALANCE.dash.iFrames) : iframes;
   const meleeK = melee ? 0.35 : 1;
   // a blade has to be near what it cuts: it pays more for drifting out of reach
@@ -265,7 +257,6 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
         const fy2 = py - ny;
         if (fx2 * fx2 + fy2 * fy2 < efire2[i]! && !segmentCovered(g, nx, ny, px, py)) {
           cost += efire[i]! * tw;
-          tm.f += efire[i]! * tw;
         }
       }
       const q2 = movingDist2(ox, oy, px, py, ax, ay, nx, ny);
@@ -275,37 +266,24 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
       const gap = dmin - etouch[i]!;
       const off = eoff[i]!;
       if (gap <= 0) {
-        const cc = (eburst[i] ? eblow[i]! : edps[i]! * DT * meleeK) * tw;
-        cost += cc;
-        tm.c += cc;
+        cost += (eburst[i] ? eblow[i]! : edps[i]! * DT * meleeK) * tw;
       } else {
         const a = tuning.approachBase + esp[i]! * tuning.approachSpeed;
         if (gap < a) {
           const f = (a - gap) / a;
-          const cn = (eburst[i] ? eblow[i]! * 0.5 : edps[i]! * DT * meleeK) * f * f * tuning.nearWeight * tw;
-          cost += cn;
-          tm.n += cn;
+          cost += (eburst[i] ? eblow[i]! * 0.5 : edps[i]! * DT * meleeK) * f * f * tuning.nearWeight * tw;
         }
       }
       if (off > 0 && gap > 0 && gap < off) {
         const f = (off - gap) / off;
-        const co = (eburst[i] ? eblow[i]! : eblow[i]! * 0.5) * f * f * 0.5 * tw;
-        cost += co;
-        tm.o += co;
+        cost += (eburst[i] ? eblow[i]! : eblow[i]! * 0.5) * f * f * 0.5 * tw;
       }
     }
     // stay in shooting range of the crowd: a bot that only runs away never kills anything
     if (n > 0) {
       const nearest = Math.sqrt(nearest2);
-      if (nearest > band) {
-        const cl = Math.min(2, (nearest - band) * lagK) * DT * 3;
-        cost += cl;
-        tm.l += cl;
-      } else if (nearest < near) {
-        const cl = (near - nearest) * 0.05 * DT;
-        cost += cl;
-        tm.l += cl;
-      }
+      if (nearest > band) cost += Math.min(2, (nearest - band) * lagK) * DT * 3;
+      else if (nearest < near) cost += (near - nearest) * 0.05 * DT;
     }
     // a barrel that goes off hurts whoever stands by it: keep clear while there is a fight
     for (let b = 0; b < nBarrels; b++) {
@@ -318,7 +296,6 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
     const my = ARENA_HALF_H - Math.abs(py);
     if (mx < 4) cost += (4 - mx) * 0.06 * DT * 3;
     if (my < 4) cost += (4 - my) * 0.06 * DT * 3;
-    tm.e = cost - tm.c - tm.n - tm.o - tm.l - tm.f;
   }
   return cost;
 }
@@ -380,8 +357,6 @@ let huntGY = 0;
 let huntUX = 0;
 let huntUY = 0;
 let huntNear = false;
-/** What the last decision wanted to walk to (for tests and tuning). */
-export const lastTrip = { value: 0, start: 0, ux: 0, uy: 0 };
 
 /** What the goals (pickups, the team's pull, the middle of the arena, the enemies to hunt) are worth along the path, as a negative cost. */
 function goalGain(startX: number, startY: number, reach: number): number {
@@ -551,7 +526,6 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     if (n >= MAXE) break;
   }
 
-  seen.n = n;
   nBarrels = Math.min(24, p.barrels.length);
   for (let b = 0; b < nBarrels; b++) {
     brx[b] = p.barrels[b]!.x;
@@ -583,10 +557,6 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
       }
     }
   }
-  lastTrip.value = huntValue;
-  lastTrip.start = huntStart;
-  lastTrip.ux = huntUX;
-  lastTrip.uy = huntUY;
   // goals: pickups, the team's pull, the middle of the arena when nothing is around
   goalN = 0;
   if (n < 14) {
@@ -656,15 +626,6 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     }
     const gain = goalGain(p.x, p.y, reach);
     c -= gain;
-    lastCosts[k] = c;
-    lastTerms[k * 8] = tm.c;
-    lastTerms[k * 8 + 1] = tm.n;
-    lastTerms[k * 8 + 2] = tm.o;
-    lastTerms[k * 8 + 3] = tm.l;
-    lastTerms[k * 8 + 4] = tm.e;
-    lastTerms[k * 8 + 5] = room;
-    lastTerms[k * 8 + 6] = gain;
-    lastTerms[k * 8 + 7] = ramp;
     if (c < bestCost) {
       bestCost = c;
       bestK = k;
