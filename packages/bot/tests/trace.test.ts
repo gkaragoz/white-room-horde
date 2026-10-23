@@ -25,6 +25,8 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
     const w = createGame({ seed, level: MAX_LEVEL, map, mods: 0, players: loads.map((l) => ({ slot: l.slot, weapon: l.weapon, cls: l.cls })) });
     const squad = new Squad(loads.map((l) => l.slot), skill, seed);
     const log = (s: string): void => appendFileSync(out, s + '\n');
+    const dmgBy: Record<string, number> = {};
+    const cntBy: Record<string, number> = {};
     const prevLayer: number[] = [];
     const wasOnRamp: boolean[] = [];
     const up = { fight: 0, reloading: 0, firing: 0, idle: 0, empty: 0, deck: 0 };
@@ -62,6 +64,35 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
       for (const ev of w.events) {
         if (ev.type === 'teleHit' && Math.hypot(ev.x - w.pX[0]!, ev.y - w.pY[0]!) < ev.radius + 3) log(`   TELE landed t${w.tick} shape ${ev.shape} effect ${ev.effect} at (${ev.x.toFixed(0)},${ev.y.toFixed(0)}) r${ev.radius.toFixed(1)} player (${w.pX[0]!.toFixed(1)},${w.pY[0]!.toFixed(1)})`);
         if (ev.type === 'waveCleared') log(`FLOOR ${ev.wave} cleared at t${w.tick} (${(w.tick / 30).toFixed(0)}s) kills ${w.kills}`);
+        if (ev.type === 'playerHit' && ev.damage > 0) {
+          // classify the blow: a ground attack that landed in this step, an explosion, an enemy next to the victim, or the rest (spit, fire, acid)
+          let cause = 'other';
+          const th = w.events.find((e) => e.type === 'teleHit' && Math.hypot(e.x - ev.x, e.y - ev.y) < e.radius + 1.5);
+          if (th && th.type === 'teleHit') cause = `tele:${th.shape === 0 ? 'circle' : 'rect'}${th.radius.toFixed(0)}:e${th.effect}`;
+          else {
+            const ex = w.events.find((e) => e.type === 'explosion' && Math.hypot(e.x - ev.x, e.y - ev.y) < e.radius + 1);
+            if (ex && ex.type === 'explosion') cause = `explosion:r${ex.radius.toFixed(1)}`;
+          }
+          if (cause !== 'other') {
+            // classified
+          }
+          else {
+            let best = 1e9;
+            let bt = -1;
+            for (let i = 0; i < w.eActive.length; i++) {
+              if (!w.eActive[i]) continue;
+              const d = Math.hypot(w.eX[i]! - ev.x, w.eY[i]! - ev.y);
+              if (d < best) {
+                best = d;
+                bt = w.eType[i]!;
+              }
+            }
+            if (best < 3.2) cause = `melee:${ENEMY_TYPES[bt]}`;
+          }
+          cause = `${cause}`;
+          dmgBy[cause] = (dmgBy[cause] ?? 0) + ev.damage;
+          cntBy[cause] = (cntBy[cause] ?? 0) + 1;
+        }
         if (ev.type === 'playerHit' || ev.type === 'playerDown') {
           if (process.env.NOHITS === '1') continue;
           // nearest enemies around the hit
@@ -88,6 +119,7 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
       log(`player (${w.pX[0]!.toFixed(0)},${w.pY[0]!.toFixed(0)}) L${w.pLayer[0]} enemies left ${left.length}: ${left.slice(0, 12).join(' ')}`);
     }
     log(`uptime of slot 0 in fights: ${JSON.stringify(up)}`);
+    log(`damage by cause: ${Object.entries(dmgBy).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v.toFixed(0)}hp/${cntBy[k]}`).join(', ')}`);
     log(`end t${w.tick} floor ${w.wave} kills ${w.kills}`);
   }, 3_600_000);
 });

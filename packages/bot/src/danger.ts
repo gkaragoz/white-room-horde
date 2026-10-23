@@ -128,7 +128,7 @@ PRIORITY[T.shocker] = 1.5;
 PRIORITY[T.chopper] = 1.4;
 PRIORITY[T.shielder] = 0.7;
 // the ones whose attacks hurt most when they land
-PRIORITY[T.spiker] = 2.8;
+PRIORITY[T.spiker] = 3.4;
 PRIORITY[T.chopper] = 2.4;
 PRIORITY[T.shocker] = 2.4;
 PRIORITY[T.sledge] = 2;

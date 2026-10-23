@@ -1,7 +1,7 @@
-import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAPS, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
+import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, ENEMY_TYPES, MAPS, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
 import { owns } from '@wrh/sim';
 import { BLOW, DPS, HOLD, RANGED, STAND_OFF, T, bursts, lateScale, radiusOf, speedOf, telePain } from './danger';
-import { focusBoxes, geoOf, movingDist2, nearRamp, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
+import { focusBoxes, geoOf, movingDist2, nearRamp, segmentCovered, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
 import { computeField, goalDist, goalField, goalWaypoint, territoryAt, waypoint } from './nav';
 import { engagement } from './weapons';
 import type { Ctx, MoveDecision, Percept, TeamDecision } from './types';
@@ -49,6 +49,9 @@ const eblow = new Float64Array(MAXE);
 const ehold = new Float64Array(MAXE);
 const erel2 = new Float64Array(MAXE);
 const eburst = new Uint8Array(MAXE);
+/** For enemies that shoot a fan or a beam at whoever they see: squared range and the price per step of standing in it. */
+const efire2 = new Float64Array(MAXE);
+const efire = new Float64Array(MAXE);
 const fx = new Float64Array(96);
 const fy = new Float64Array(96);
 const wx = new Float64Array(MAXE);
@@ -56,6 +59,20 @@ const wy = new Float64Array(MAXE);
 const pathX = new Float64Array(STEPS + 1);
 const pathY = new Float64Array(STEPS + 1);
 const stepped = { x: 0, y: 0 };
+const brx = new Float64Array(24);
+const bry = new Float64Array(24);
+let nBarrels = 0;
+const BARREL_KEEP2 = 3.8 * 3.8;
+
+/** Range and price (pain per step) of standing where the enemy can fire its beams or its fan at the bot. */
+const FIRE_RANGE = new Float64Array(ENEMY_TYPES.length);
+const FIRE_RATE = new Float64Array(ENEMY_TYPES.length);
+FIRE_RANGE[T.spiker] = BALANCE.special.spiker!.range! + 1;
+FIRE_RATE[T.spiker] = 0.3;
+FIRE_RANGE[T.marksman] = BALANCE.special.marksman!.range! + 1;
+FIRE_RATE[T.marksman] = 0.12;
+FIRE_RANGE[T.chopper] = BALANCE.special.chopper!.range! + 1;
+FIRE_RATE[T.chopper] = 0.12;
 
 interface Memo {
   heading: number;
@@ -91,7 +108,7 @@ function addGoal(x: number, y: number, value: number, px: number, py: number): v
 /** The cost of every heading on the last decision (for tests and tuning). */
 export const lastCosts = new Float64Array(DIRS);
 /** Contact, near-contact, stand-off, range and edge terms of the last rollout (for tests and tuning). */
-export const tm = { c: 0, n: 0, o: 0, l: 0, e: 0 };
+export const tm = { c: 0, n: 0, o: 0, l: 0, e: 0, f: 0 };
 export const lastTerms = new Float64Array(DIRS * 8);
 /** The enemies the last decision looked at (for tests and tuning). */
 export const seen = { n: 0, ex, ey, esp, etouch, edps, erel2, ehold };
@@ -184,7 +201,7 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
     wy[i] = ey[i]!;
   }
   let cost = 0;
-  tm.c = tm.n = tm.o = tm.l = tm.e = 0;
+  tm.c = tm.n = tm.o = tm.l = tm.e = tm.f = 0;
   const free = dash ? Math.max(iframes, BALANCE.dash.iFrames) : iframes;
   const meleeK = melee ? 0.35 : 1;
   // a blade has to be near what it cuts: it pays more for drifting out of reach
@@ -222,6 +239,15 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
       const ny = ay + (dy0 / d0) * mv;
       wx[i] = nx;
       wy[i] = ny;
+      if (efire2[i]! > 0 && !safe) {
+        // in the line of fire of a spiker's fan, a marksman's beam, a chopper's axe: the longer, the likelier the blow
+        const fx2 = px - nx;
+        const fy2 = py - ny;
+        if (fx2 * fx2 + fy2 * fy2 < efire2[i]! && !segmentCovered(g, nx, ny, px, py)) {
+          cost += efire[i]! * tw;
+          tm.f += efire[i]! * tw;
+        }
+      }
       const q2 = movingDist2(ox, oy, px, py, ax, ay, nx, ny);
       if (q2 < nearest2) nearest2 = q2;
       if (safe || q2 > erel2[i]!) continue;
@@ -261,12 +287,18 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
         tm.l += cl;
       }
     }
+    // a barrel that goes off hurts whoever stands by it: keep clear while there is a fight
+    for (let b = 0; b < nBarrels; b++) {
+      const dx = px - brx[b]!;
+      const dy = py - bry[b]!;
+      if (dx * dx + dy * dy < BARREL_KEEP2) cost += 0.15 * tw;
+    }
     // edges: the arena's border is where a run ends
     const mx = ARENA_HALF_W - Math.abs(px);
     const my = ARENA_HALF_H - Math.abs(py);
     if (mx < 4) cost += (4 - mx) * 0.06 * DT * 3;
     if (my < 4) cost += (4 - my) * 0.06 * DT * 3;
-    tm.e = cost - tm.c - tm.n - tm.o - tm.l;
+    tm.e = cost - tm.c - tm.n - tm.o - tm.l - tm.f;
   }
   return cost;
 }
@@ -486,11 +518,19 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     eblow[n] = e.boss ? 6 : burst ? (typ === T.exploder ? BLOW[T.exploder]! : BALANCE.elites.volatileDamage * BALANCE.enemyDamageMul * 0.1) : BLOW[typ]! * late;
     const reach = touch + Math.max(off, 1.1 + sp * 0.4, 3) + 0.2;
     erel2[n] = reach * reach;
+    const fr = FIRE_RANGE[typ]!;
+    efire2[n] = fr * fr;
+    efire[n] = FIRE_RATE[typ]!;
     n++;
     if (n >= MAXE) break;
   }
 
   seen.n = n;
+  nBarrels = Math.min(24, p.barrels.length);
+  for (let b = 0; b < nBarrels; b++) {
+    brx[b] = p.barrels[b]!.x;
+    bry[b] = p.barrels[b]!.y;
+  }
   // nothing within shooting range: go and find the rest of the floor (up or down a ramp when they are on the other level)
   huntValue = 0;
   if (plan.go) {

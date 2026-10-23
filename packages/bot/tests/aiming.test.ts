@@ -120,4 +120,21 @@ describe('aiming: target choice', () => {
     expect(s.clear).toBe(true);
     expect(s.index).toBe(0);
   });
+
+  it('does not shoot through a barrel that stands next to the shooter or a friend', () => {
+    const target = enemy(1, 12, 0);
+    const near = percept([target]);
+    near.barrels = [{ x: 3, y: 0, hp: 30 }];
+    expect(chooseShot(near, ctx(), profileOfWeapon(SMG)).clear).toBe(false);
+    // far from everybody the barrel in the way is no danger (the shot just sets it off)
+    const far = percept([enemy(1, 22, 0, { d2: 256 })], SMG, 6, 0);
+    far.barrels = [{ x: 16, y: 0, hp: 30 }];
+    expect(chooseShot(far, ctx(), profileOfWeapon(SMG)).clear).toBe(true);
+    // a friend by the barrel
+    const friend = percept([enemy(1, 22, 0, { d2: 256 })], SMG, 6, 0);
+    friend.barrels = [{ x: 16, y: 0, hp: 30 }];
+    friend.allies = [{ slot: 1, x: 17, y: 3, state: 0, hp: 100, maxHp: 100, human: false }];
+    expect(chooseShot(friend, ctx(), profileOfWeapon(SMG)).clear).toBe(false);
+  });
 });
+

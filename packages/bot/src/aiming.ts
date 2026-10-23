@@ -102,6 +102,7 @@ export function chooseShot(p: Percept, ctx: Ctx, prof: WeaponProfile): Shot {
     if (e.layer > p.layer) continue;
     const r = radiusOf(e);
     if (segmentCovered(g, p.x, p.y, e.x, e.y)) continue;
+    if (p.barrels.length > 0 && barrelOnLine(p, e.x, e.y)) continue;
     let pr = PRIORITY[e.type]!;
     if (e.boss) pr = 1.8;
     if (e.type === T.shielder && !prof.explosive && prof.pierce < 1) pr *= 0.45;
@@ -147,6 +148,20 @@ export function chooseShot(p: Percept, ctx: Ctx, prof: WeaponProfile): Shot {
   (ctx.mem.aim ??= { id: -1 } as never);
   (ctx.mem.aim as { id: number }).id = e.id;
   return shot;
+}
+
+/**
+ * Would a bullet to (tx, ty) hit a barrel that stands close enough to the shooter or a friend to hurt them when it goes off? (A
+ * barrel far from everybody on the line is a bomb in the way, not a danger.)
+ */
+function barrelOnLine(p: Percept, tx: number, ty: number): boolean {
+  const safe = BALANCE.barrels.radius * 0.8 + 1.2;
+  for (const b of p.barrels) {
+    if (pointSegDist(b.x, b.y, p.x, p.y, tx, ty) > BALANCE.barrels.hitRadius + 0.2) continue;
+    if ((b.x - p.x) ** 2 + (b.y - p.y) ** 2 < safe * safe) return true;
+    for (const a of p.allies) if ((b.x - a.x) ** 2 + (b.y - a.y) ** 2 < safe * safe) return true;
+  }
+  return false;
 }
 
 let bombScore = 0;
