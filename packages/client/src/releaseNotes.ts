@@ -23,6 +23,68 @@ const TITLES: Record<Lang, { head: string; close: string; english: string }> = {
 
 export const NOTES: Note[] = [
   {
+    version: '0.36',
+    date: '2026-10-23',
+    text: {
+      en: {
+        title: 'Bot companions',
+        items: [
+          'Play with bots: on the Play page choose 0 to 7 companions and how well they play (Easy, Normal, Expert, Superhuman). The host of an online room can add them too.',
+          'The bots fight, dodge, aim, throw grenades, use their class ability, choose cards, weapons and drones, pick up what they need, stay near you and revive downed friends. Each one has its own class and name and a robot badge.',
+          'A run with bots earns less XP (divided by 1 + 0.25 per bot); the game over screen shows it. Achievements and your level are not affected.',
+          'If the host of an online room drops, the next player takes over the bots.',
+          'Online rooms need everyone on this version: reload the page to join.',
+        ],
+      },
+      tr: {
+        title: 'Bot arkadaşlar',
+        items: [
+          'Botlarla oyna: Oyna sayfasında 0 ile 7 arası eşlikçi ve ne kadar iyi oynadıklarını seç (Kolay, Normal, Usta, Süper). Çevrimiçi odanın sahibi de bot ekleyebilir.',
+          'Botlar savaşır, kaçar, nişan alır, bomba atar, class yeteneğini kullanır, kart, silah ve drone seçer, ihtiyaç duyduğu eşyayı alır, yanında durur ve yere düşen arkadaşlarını kaldırır. Her birinin kendi class\'ı, adı ve bir robot rozeti var.',
+          'Botlu bir run daha az XP verir (bot başına 1 + 0,25\'e bölünür); oyun sonu ekranı bunu gösterir. Başarımlar ve seviyen etkilenmez.',
+          'Çevrimiçi odanın sahibi düşerse botları sıradaki oyuncu devralır.',
+          'Çevrimiçi odalar için herkesin bu sürümde olması gerekir: katılmak için sayfayı yenile.',
+        ],
+      },
+      de: {
+        title: 'Bot-Begleiter',
+        items: [
+          'Spiele mit Bots: Wähle auf der Spielen-Seite 0 bis 7 Begleiter und ihre Stärke (Leicht, Normal, Experte, Übermenschlich). Der Host eines Online-Raums kann sie ebenfalls hinzufügen.',
+          'Die Bots kämpfen, weichen aus, zielen, werfen Granaten, nutzen ihre Klassenfähigkeit, wählen Karten, Waffen und Drohnen, bleiben in deiner Nähe und beleben gefallene Freunde.',
+          'Ein Lauf mit Bots bringt weniger XP (geteilt durch 1 + 0,25 pro Bot). Erfolge und deine Stufe bleiben unberührt.',
+          'Online-Räume: alle müssen diese Version haben, Seite neu laden.',
+        ],
+      },
+      es: {
+        title: 'Compañeros bot',
+        items: [
+          'Juega con bots: en la página Jugar elige de 0 a 7 compañeros y su nivel (Fácil, Normal, Experto, Sobrehumano). El anfitrión de una sala en línea también puede añadirlos.',
+          'Los bots luchan, esquivan, apuntan, lanzan granadas, usan su habilidad de clase, eligen cartas, armas y drones, se quedan cerca de ti y reaniman a los caídos.',
+          'Una partida con bots da menos XP (dividida por 1 + 0,25 por bot). Los logros y tu nivel no cambian.',
+          'Las salas en línea requieren esta versión: recarga la página.',
+        ],
+      },
+      fr: {
+        title: 'Compagnons bots',
+        items: [
+          'Jouez avec des bots : sur la page Jouer, choisissez 0 à 7 compagnons et leur niveau (Facile, Normal, Expert, Surhumain). L’hôte d’une salle en ligne peut aussi en ajouter.',
+          'Les bots combattent, esquivent, visent, lancent des grenades, utilisent leur capacité de classe, choisissent cartes, armes et drones, restent près de vous et réaniment les amis à terre.',
+          'Une partie avec des bots rapporte moins d’XP (divisée par 1 + 0,25 par bot). Les succès et votre niveau ne changent pas.',
+          'Les salles en ligne exigent cette version : rechargez la page.',
+        ],
+      },
+      ru: {
+        title: 'Боты-напарники',
+        items: [
+          'Играйте с ботами: на странице «Играть» выберите от 0 до 7 напарников и их уровень (Лёгкий, Обычный, Эксперт, Сверхчеловек). Хост онлайн-комнаты тоже может их добавить.',
+          'Боты сражаются, уклоняются, целятся, бросают гранаты, используют способность класса, выбирают карты, оружие и дронов, держатся рядом и поднимают упавших друзей.',
+          'Забег с ботами даёт меньше опыта (делится на 1 + 0,25 за бота). Достижения и ваш уровень не меняются.',
+          'Для онлайн-комнат у всех должна быть эта версия: перезагрузите страницу.',
+        ],
+      },
+    },
+  },
+  {
     version: '0.35',
     date: '2026-10-23',
     text: {
