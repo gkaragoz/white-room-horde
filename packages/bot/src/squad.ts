@@ -40,7 +40,10 @@ export class Squad {
   private readonly bots = new Map<number, Bot>();
 
   constructor(slots: readonly number[], skill: Skill, seed = 1, humans: ReadonlySet<number> = new Set()) {
-    for (const slot of slots) this.bots.set(slot, new Bot({ slot, skill, seed }, humans));
+    // from five players on the bots decide every second tick, from nine every third: nobody can tell, and the cost per tick stays flat
+    const total = slots.length + humans.size;
+    const minEvery = total >= 9 ? 3 : total >= 5 ? 2 : 1;
+    for (const slot of slots) this.bots.set(slot, new Bot({ slot, skill, seed }, humans, minEvery));
   }
 
   get slots(): number[] {

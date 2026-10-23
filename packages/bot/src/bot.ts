@@ -24,6 +24,8 @@ export class Bot {
   constructor(
     readonly config: BotConfig,
     private readonly humans: ReadonlySet<number> = new Set(),
+    /** The least often this bot decides (a big squad thins its decisions out so the cost per tick stays flat). */
+    private readonly minEvery = 1,
   ) {
     this.slot = config.slot;
     const mem: Memory = {};
@@ -39,8 +41,9 @@ export class Bot {
     // what the bot reacts to is a little old; where it stands and what it holds are current
     const old = this.history[0]!;
     const p: Percept = { ...old, x: now.x, y: now.y, angle: now.angle, hp: now.hp, maxHp: now.maxHp, state: now.state, layer: now.layer, mag: now.mag, weapon: now.weapon, offer: now.offer, grenades: now.grenades, tick: now.tick, wave: now.wave, phase: now.phase, allies: now.allies, world: w };
-    const every = Math.max(1, this.ctx.skill.decisionEvery);
-    if (this.last === null || now.tick - this.decided >= every) {
+    const every = Math.max(1, this.ctx.skill.decisionEvery, this.minEvery);
+    // bots decide on different ticks (by slot), so the planning of a whole squad is not done in one tick
+    if (this.last === null || (now.tick + this.slot) % every === 0 || now.tick - this.decided >= every) {
       const team = decideTeam(p, this.ctx);
       const move = decideMove(p, this.ctx, team);
       const combat = decideCombat(p, this.ctx);
