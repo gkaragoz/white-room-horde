@@ -47,8 +47,18 @@ function build(map: MapDef, layer: number, openRamps: boolean): MapGeo {
     solid.push(...b);
     if (o.cover !== false) cover.push(...b);
   }
-  if (layer === 0 && !openRamps) {
-    for (const r of map.ramps ?? []) solid.push(r.x - r.w / 2, r.y - r.h / 2, r.x + r.w / 2, r.y + r.h / 2);
+  if (layer === 0) {
+    for (const r of map.ramps ?? []) {
+      const x0 = r.x - r.w / 2;
+      const y0 = r.y - r.h / 2;
+      const x1 = r.x + r.w / 2;
+      const y1 = r.y + r.h / 2;
+      if (!openRamps) solid.push(x0, y0, x1, y1);
+      else if (r.dir === 0) solid.push(x0 + r.w * 0.75, y0, x1, y1);
+      else if (r.dir === 2) solid.push(x0, y0, x1 - r.w * 0.75, y1);
+      else if (r.dir === 1) solid.push(x0, y0 + r.h * 0.75, x1, y1);
+      else solid.push(x0, y0, x1, y1 - r.h * 0.75);
+    }
   }
   return { map, layer, open: openRamps, nSolid: solid.length / 4, solid: Float64Array.from(solid), nCover: cover.length / 4, cover: Float64Array.from(cover) };
 }
@@ -312,10 +322,21 @@ export const onDeck = (g: MapGeo, x: number, y: number): boolean => deckWalkable
 
 /** The two ends of a ramp as points a character can walk to: `top` (where it reaches the deck) and `foot` (where it meets the ground). */
 export const rampEnd = { x: 0, y: 0 };
-export function rampPoint(r: Ramp, top: boolean): void {
+export function rampPoint(r: Ramp, top: boolean, inset = 0.7): void {
   const d = rampDir(r);
-  const half = (r.dir === 0 || r.dir === 2 ? r.w : r.h) / 2 - 0.7;
+  const half = (r.dir === 0 || r.dir === 2 ? r.w : r.h) / 2 - inset;
   const sign = top ? 1 : -1;
   rampEnd.x = r.x + d[0] * half * sign;
   rampEnd.y = r.y + d[1] * half * sign;
+}
+
+/** Is the point on (or within `margin` of) a ramp footprint of the map? The sim lets a ground character walk onto one. */
+export function nearRamp(map: MapDef, x: number, y: number, margin: number): boolean {
+  const rs = map.ramps;
+  if (!rs) return false;
+  for (let i = 0; i < rs.length; i++) {
+    const r = rs[i]!;
+    if (x >= r.x - r.w / 2 - margin && x <= r.x + r.w / 2 + margin && y >= r.y - r.h / 2 - margin && y <= r.y + r.h / 2 + margin) return true;
+  }
+  return false;
 }

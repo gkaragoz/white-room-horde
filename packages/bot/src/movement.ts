@@ -1,10 +1,10 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, MAPS, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
 import { owns } from '@wrh/sim';
 import { BLOW, DPS, HOLD, RANGED, STAND_OFF, T, bursts, lateScale, radiusOf, speedOf, telePain } from './danger';
-import { focusBoxes, geoOf, movingDist2, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
-import { computeField, goalDist, goalField, territoryAt } from './nav';
+import { focusBoxes, geoOf, movingDist2, nearRamp, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
+import { computeField, goalDist, goalField, goalWaypoint, territoryAt, waypoint } from './nav';
 import { engagement } from './weapons';
-import type { Ctx, MoveDecision, Percept, TeamDecision, Threat } from './types';
+import type { Ctx, MoveDecision, Percept, TeamDecision } from './types';
 
 /**
  * Where to move and when to dash.
@@ -92,7 +92,7 @@ function addGoal(x: number, y: number, value: number, px: number, py: number): v
 export const lastCosts = new Float64Array(DIRS);
 /** Contact, near-contact, stand-off, range and edge terms of the last rollout (for tests and tuning). */
 export const tm = { c: 0, n: 0, o: 0, l: 0, e: 0 };
-export const lastTerms = new Float64Array(DIRS * 5);
+export const lastTerms = new Float64Array(DIRS * 8);
 /** The enemies the last decision looked at (for tests and tuning). */
 export const seen = { n: 0, ex, ey, esp, etouch, edps, erel2, ehold };
 
@@ -322,13 +322,25 @@ function groundCost(p: Percept, iframes: number, dash: boolean): number {
 
 let huntValue = 0;
 let huntStart = 0;
+let huntGX = 0;
+let huntGY = 0;
+let huntUX = 0;
+let huntUY = 0;
+let huntNear = false;
+/** What the last decision wanted to walk to (for tests and tuning). */
+export const lastTrip = { value: 0, start: 0, ux: 0, uy: 0 };
 
 /** What the goals (pickups, the team's pull, the middle of the arena, the enemies to hunt) are worth along the path, as a negative cost. */
 function goalGain(startX: number, startY: number, reach: number): number {
   let gain = 0;
   if (huntValue > 0) {
-    // the way to the last enemies, around the boxes
-    const progress = Math.max(0, Math.min(1, (huntStart - goalDist(pathX[STEPS]!, pathY[STEPS]!)) / reach));
+    // the way to the last enemies, around the boxes: how far the path got toward the next bend of the walking field (a path that
+    // pushes into a wall gets nowhere, one that slides along it makes the way it slides), as the crow flies in the last cells
+    const dx = pathX[STEPS]! - startX;
+    const dy = pathY[STEPS]! - startY;
+    const progress = huntNear
+      ? Math.max(0, Math.min(1, (Math.hypot(startX - huntGX, startY - huntGY) - Math.hypot(pathX[STEPS]! - huntGX, pathY[STEPS]! - huntGY)) / 3))
+      : Math.max(0, Math.min(1, (dx * huntUX + dy * huntUY) / 6));
     gain += huntValue * progress;
   }
   for (let i = 0; i < goalN; i++) {
@@ -354,77 +366,67 @@ function roomCost(): number {
   return ROOM_W * (1 - territoryAt(pathX[STEPS]!, pathY[STEPS]!)) + ROOM_W * 0.5 * (1 - territoryAt(pathX[STEPS >> 1]!, pathY[STEPS >> 1]!));
 }
 
+const RAMP_LOOK = [0.6, 1.2, 1.8, 2.4, 3.2, 4.0, 5.0, 6.0];
+
+/** Would walking this way for `dist` units put the bot on a ramp? */
+function stepsOntoRamp(p: Percept, hx: number, hy: number, dist: number): boolean {
+  const map = MAPS[p.world.map]!;
+  for (const t of RAMP_LOOK) {
+    if (t > dist) break;
+    if (nearRamp(map, p.x + hx * t, p.y + hy * t, 0.35)) return true;
+  }
+  return false;
+}
+
 /** Where the bot goes when nothing is in shooting range. */
 interface Trip {
   go: boolean;
   x: number;
   y: number;
-  /** The way leads up a ramp: the ground geometry opens its ramps. */
-  climb: boolean;
+  /** How much the trip is worth (pain). */
+  value: number;
 }
-const trip: Trip = { go: false, x: 0, y: 0, climb: false };
+const trip: Trip = { go: false, x: 0, y: 0, value: 0 };
 
 /**
- * Nothing to shoot: walk to the enemies that are left. If they are all on the other level (an enemy that is stuck on a deck the
- * squad is not on never comes down) the way goes over a ramp: up to them, or, from a deck with only ground enemies far off,
- * down. The bot keeps off the decks otherwise.
+ * Nothing to shoot: walk to the enemies that are left, around the boxes. The bot keeps off the decks: with even one player upstairs the
+ * horde's walking breaks (ground enemies jam at the foot of the ramps, and an enemy on a deck that is not the one the player stands on
+ * never comes down), so a bot that finds itself on a deck takes the nearest ramp down.
  */
 function planTrip(p: Percept, band: number): Trip {
   trip.go = false;
-  trip.climb = false;
-  const first = p.enemies[0];
-  if (first === undefined) return trip;
-  let same: Threat | undefined;
-  for (const e of p.enemies) {
-    if (e.layer === p.layer) {
-      same = e;
-      break;
-    }
-  }
-  const reach = (band + 1) * (band + 1);
-  if (same !== undefined) {
-    if (same.d2 > reach) {
+  trip.value = 0;
+  if (p.layer === 1) {
+    const ramps = MAPS[p.world.map]?.ramps;
+    if (ramps && ramps.length > 0) {
+      let best = 0;
+      let bestD = 1e9;
+      for (let i = 0; i < ramps.length; i++) {
+        rampPoint(ramps[i]!, false);
+        const d = (rampEnd.x - p.x) ** 2 + (rampEnd.y - p.y) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+      // a little beyond the foot, so that the way there leads all the way down
+      rampPoint(ramps[best]!, false, -1.8);
       trip.go = true;
-      trip.x = same.x;
-      trip.y = same.y;
+      trip.x = rampEnd.x;
+      trip.y = rampEnd.y;
+      trip.value = 5;
+      return trip;
     }
-    return trip;
   }
-  const ramps = MAPS[p.world.map]?.ramps;
-  if (!ramps || ramps.length === 0) return trip;
-  if (p.layer === 0) {
-    // all that is left stands on a deck: take the ramp whose top is nearest to the closest of them
-    let best = -1;
-    let bestD = 1e9;
-    for (let i = 0; i < ramps.length; i++) {
-      rampPoint(ramps[i]!, true);
-      const d = (rampEnd.x - first.x) ** 2 + (rampEnd.y - first.y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
+  for (const e of p.enemies) {
+    if (e.layer !== p.layer) continue;
+    if (e.d2 > (band + 1) * (band + 1)) {
+      trip.go = true;
+      trip.x = e.x;
+      trip.y = e.y;
+      trip.value = 2;
     }
-    rampPoint(ramps[best]!, true);
-    trip.go = true;
-    trip.climb = true;
-    trip.x = rampEnd.x;
-    trip.y = rampEnd.y;
-  } else if (first.d2 > 625) {
-    // on a deck, the ground enemies are far and not coming: go down the nearest ramp
-    let best = -1;
-    let bestD = 1e9;
-    for (let i = 0; i < ramps.length; i++) {
-      rampPoint(ramps[i]!, false);
-      const d = (rampEnd.x - p.x) ** 2 + (rampEnd.y - p.y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    }
-    rampPoint(ramps[best]!, false);
-    trip.go = true;
-    trip.x = rampEnd.x;
-    trip.y = rampEnd.y;
+    break;
   }
   return trip;
 }
@@ -447,10 +449,13 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   }
   if (w.pStun[s]! > 0) return out;
 
-  const speed = speedNow(p);
+  // holding the revive key next to a downed friend halves the pace and takes the dash away
+  const reviving = team.revive;
+  const speed = speedNow(p) * (reviving ? BALANCE.player.reviveMoveMul : 1);
   const weapon = engagement(p);
   const plan = planTrip(p, weapon.band);
-  const g = geoOf(w.map, p.layer, plan.climb);
+  // standing on a ramp's footprint, the walls of the plan must be the sim's (the footprint is open, only its side walls stop)
+  const g = geoOf(w.map, p.layer, p.layer === 0 && nearRamp(MAPS[w.map] ?? MAPS[0]!, p.x, p.y, 0.6));
   const deck = p.layer === 1;
   const melee = weapon.melee;
 
@@ -491,8 +496,31 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   if (plan.go) {
     goalField(g, w.map, p.layer, plan.x, plan.y);
     huntStart = goalDist(p.x, p.y);
-    if (huntStart < 1e5) huntValue = 2;
+    huntGX = plan.x;
+    huntGY = plan.y;
+    if (huntStart < 1e5) {
+      huntValue = plan.value;
+      huntNear = huntStart < 4.5;
+      goalWaypoint(p.x, p.y);
+      if (waypoint.ok) {
+        const wx2 = waypoint.x - p.x;
+        const wy2 = waypoint.y - p.y;
+        const wl = Math.hypot(wx2, wy2) + 1e-6;
+        huntUX = wx2 / wl;
+        huntUY = wy2 / wl;
+      } else {
+        const wx2 = plan.x - p.x;
+        const wy2 = plan.y - p.y;
+        const wl = Math.hypot(wx2, wy2) + 1e-6;
+        huntUX = wx2 / wl;
+        huntUY = wy2 / wl;
+      }
+    }
   }
+  lastTrip.value = huntValue;
+  lastTrip.start = huntStart;
+  lastTrip.ux = huntUX;
+  lastTrip.uy = huntUY;
   // goals: pickups, the team's pull, the middle of the arena when nothing is around
   goalN = 0;
   if (n < 14) {
@@ -507,12 +535,21 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
       if (v > 0) addGoal(k.x, k.y, v, p.x, p.y);
     }
   }
+  if (reviving) {
+    // standing at a downed friend with the key held: stay with them unless the danger says otherwise
+    for (const a of p.allies) {
+      if (a.state !== PlayerState.Downed) continue;
+      const dx = a.x - p.x;
+      const dy = a.y - p.y;
+      if (dx * dx + dy * dy < 9) addGoal(a.x, a.y, 4, p.x, p.y);
+    }
+  }
   const bl = Math.hypot(bx, by);
   if (bl > 0.05) addGoal(p.x + (bx / bl) * 12, p.y + (by / bl) * 12, 1.4 * Math.min(1, bl), p.x, p.y);
   if (n === 0 && (p.x * p.x) / (ARENA_HALF_W * ARENA_HALF_W) + (p.y * p.y) / (ARENA_HALF_H * ARENA_HALF_H) > 0.25) addGoal(0, 0, 0.6, p.x, p.y);
 
   const iframes = w.pIFrames[s]!;
-  const dashReady = w.pDashCd[s]! <= 0 && w.pDash[s]! === 0;
+  const dashReady = w.pDashCd[s]! <= 0 && w.pDash[s]! === 0 && !reviving;
   const reach = speed * HORIZON;
   const gscale = 0.3 + 0.7 * ctx.skill.dodge;
   // hurt, the bot weighs every danger more: below 70% health the price of a blow goes up to double
@@ -528,27 +565,37 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     nf++;
   }
   computeField(g, w.map, p.layer, p.x, p.y, speed, nf, fx, fy, 0.3);
+  // on the ground the ramps stay off limits: the sim would let the bot walk up them (see geoOf), the plan only treats them as walls
+  const rampsMatter = p.layer === 0 && !!MAPS[w.map]?.ramps && !nearRamp(MAPS[w.map]!, p.x, p.y, 0.2);
+  // on a trip the walking field leads (the straight line to the enemies does not see the walls in between)
+  const band = huntValue > 0 ? 1e9 : weapon.band;
   const last = memo.heading;
 
   // plain headings
   let bestK = -1;
   let bestCost = 1e18;
   for (let k = 0; k < DIRS; k++) {
-    let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, false, iframes, weapon.band, weapon.near, melee);
-    c += groundCost(p, iframes, false) * gscale + roomCost();
+    let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, false, iframes, band, weapon.near, melee);
+    const ramp = rampsMatter && stepsOntoRamp(p, DIR_X[k]!, DIR_Y[k]!, 2.4) ? 40 : 0;
+    const room = roomCost();
+    c += ramp + groundCost(p, iframes, false) * gscale + room;
     c *= risk;
     if (last >= 0) {
       // keep a course: turning around has to buy a clearly cheaper way out
       const turn = Math.abs(wrapAngle(((k - last) / DIRS) * Math.PI * 2)) / Math.PI;
       c = c * (1 + 0.3 * turn) + 0.15 * turn;
     }
-    c -= goalGain(p.x, p.y, reach);
+    const gain = goalGain(p.x, p.y, reach);
+    c -= gain;
     lastCosts[k] = c;
-    lastTerms[k * 5] = tm.c;
-    lastTerms[k * 5 + 1] = tm.n;
-    lastTerms[k * 5 + 2] = tm.o;
-    lastTerms[k * 5 + 3] = tm.l;
-    lastTerms[k * 5 + 4] = tm.e;
+    lastTerms[k * 8] = tm.c;
+    lastTerms[k * 8 + 1] = tm.n;
+    lastTerms[k * 8 + 2] = tm.o;
+    lastTerms[k * 8 + 3] = tm.l;
+    lastTerms[k * 8 + 4] = tm.e;
+    lastTerms[k * 8 + 5] = room;
+    lastTerms[k * 8 + 6] = gain;
+    lastTerms[k * 8 + 7] = ramp;
     if (c < bestCost) {
       bestCost = c;
       bestK = k;
@@ -561,7 +608,8 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     let bestDashK = -1;
     let bestDash = 1e18;
     for (let k = 0; k < DIRS; k += DASH_EVERY) {
-      let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, true, iframes, weapon.band, weapon.near, melee);
+      let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, true, iframes, band, weapon.near, melee);
+      if (rampsMatter && stepsOntoRamp(p, DIR_X[k]!, DIR_Y[k]!, 6)) c += 40;
       c += groundCost(p, iframes, true) * gscale + roomCost();
       c = c * risk + DASH_COST;
       c -= goalGain(p.x, p.y, reach);

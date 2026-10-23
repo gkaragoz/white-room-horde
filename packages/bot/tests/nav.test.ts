@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { geoOf } from '../src/geometry';
-import { computeField, territoryAt } from '../src/nav';
+import { computeField, goalDist, goalField, territoryAt } from '../src/nav';
 
 const ex = new Float64Array(64);
 const ey = new Float64Array(64);
@@ -41,3 +41,24 @@ describe('nav: room to run', () => {
     expect(lane).toBeLessThan(open * 0.6);
   });
 });
+
+describe('nav: walking distances', () => {
+  it('go around boxes and count the cells next to a wall for a bot that hugs it', () => {
+    const g = geoOf(0, 0);
+    // the shelf at (30, 9): its lower face is y = 8. The goal is straight behind it
+    goalField(g, 0, 0, 30, 14);
+    const around = goalDist(30, 5);
+    expect(around).toBeGreaterThan(12);
+    expect(around).toBeLessThan(40);
+    // standing against the shelf (y = 7.55: the cell the field keeps clear of the box) still gives a number
+    expect(goalDist(30, 7.55)).toBeLessThan(1e5);
+  });
+
+  it('say so when the goal cannot be reached', () => {
+    // the deck of the overpass seen from the ground: a goal in the middle of the solid mass is out of reach
+    const g = geoOf(6, 1);
+    goalField(g, 6, 1, 0, -20);
+    expect(goalDist(0, 17)).toBeGreaterThanOrEqual(1e5);
+  });
+});
+

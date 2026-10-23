@@ -124,11 +124,67 @@ export function goalField(g: MapGeo, mapIndex: number, layer: number, gx: number
   goalReady = true;
 }
 
-/** Walking distance in units from (x, y) to the goal of the last `goalField` (a large number when it cannot be reached). */
+/**
+ * Walking distance in units from (x, y) to the goal of the last `goalField` (a large number when it cannot be reached). A bot that
+ * hugs a wall stands in a cell the field keeps clear of walls, so the nearest cells around count as well.
+ */
 export function goalDist(x: number, y: number): number {
   if (!goalReady) return 1e6;
-  const d = goalD[cellY(y) * NX + cellX(x)]!;
-  return d >= INF ? 1e6 : (d / 10) * CELL;
+  const cx = cellX(x);
+  const cy = cellY(y);
+  let best = INF;
+  for (let dy = -1; dy <= 1; dy++) {
+    const ny = cy + dy;
+    if (ny < 0 || ny >= NY) continue;
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = cx + dx;
+      if (nx < 0 || nx >= NX) continue;
+      const d = goalD[ny * NX + nx]!;
+      if (d < best) best = d;
+    }
+  }
+  return best >= INF ? 1e6 : (best / 10) * CELL;
+}
+
+/** Result of `goalWaypoint`. */
+export const waypoint = { x: 0, y: 0, ok: false };
+
+/**
+ * A point a few cells down the walking field toward the goal of the last `goalField`: where to head to get around whatever stands
+ * between (the straight look-ahead of the planner cannot see around a corner). `ok` is false when no neighbour is nearer.
+ */
+export function goalWaypoint(x: number, y: number, cells = 3): void {
+  waypoint.ok = false;
+  if (!goalReady) return;
+  let cx = cellX(x);
+  let cy = cellY(y);
+  let cur = goalD[cy * NX + cx]!;
+  let moved = 0;
+  for (let i = 0; i < cells; i++) {
+    let best = cur;
+    let bx = cx;
+    let by = cy;
+    for (let k = 0; k < 8; k++) {
+      const nx = cx + DXs[k]!;
+      const ny = cy + DYs[k]!;
+      if (nx < 0 || ny < 0 || nx >= NX || ny >= NY) continue;
+      const d = goalD[ny * NX + nx]!;
+      if (d < best) {
+        best = d;
+        bx = nx;
+        by = ny;
+      }
+    }
+    if (best >= cur) break;
+    cur = best;
+    cx = bx;
+    cy = by;
+    moved++;
+  }
+  if (moved === 0) return;
+  waypoint.x = -ARENA_HALF_W + (cx + 0.5) * CELL;
+  waypoint.y = -ARENA_HALF_H + (cy + 0.5) * CELL;
+  waypoint.ok = true;
 }
 
 let ready = false;

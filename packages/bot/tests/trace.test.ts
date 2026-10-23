@@ -1,5 +1,6 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
-import { MAX_LEVEL, STAT, STATS } from '@wrh/shared';
+import { MAPS, MAX_LEVEL, STAT, STATS } from '@wrh/shared';
+import { nearRamp } from '../src/geometry';
 import { createGame, step } from '@wrh/sim';
 import { ENEMY_TYPES } from '@wrh/shared';
 import { describe, it } from 'vitest';
@@ -24,10 +25,22 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
     const w = createGame({ seed, level: MAX_LEVEL, map, mods: 0, players: loads.map((l) => ({ slot: l.slot, weapon: l.weapon, cls: l.cls })) });
     const squad = new Squad(loads.map((l) => l.slot), skill, seed);
     const log = (s: string): void => appendFileSync(out, s + '\n');
-    const up = { fight: 0, reloading: 0, firing: 0, idle: 0, empty: 0 };
+    const prevLayer: number[] = [];
+    const wasOnRamp: boolean[] = [];
+    const up = { fight: 0, reloading: 0, firing: 0, idle: 0, empty: 0, deck: 0 };
     while (!w.gameOver && w.tick < maxTicks) {
       const inputs = [];
       for (const [slot, input] of squad.inputs(w)) inputs[slot] = input;
+      for (const l of loads) {
+        if (w.pLayer[l.slot] === 1) up.deck++;
+        const onRamp = nearRamp(MAPS[w.map]!, w.pX[l.slot]!, w.pY[l.slot]!, 0);
+        if (onRamp && !wasOnRamp[l.slot]) log(`RAMP slot ${l.slot} entered at t${w.tick} pos (${w.pX[l.slot]!.toFixed(1)},${w.pY[l.slot]!.toFixed(1)}) layer ${w.pLayer[l.slot]} move ${inputs[l.slot]?.moveX},${inputs[l.slot]?.moveY} btn ${inputs[l.slot]?.buttons} stun ${w.pStun[l.slot]} knock ${w.pKnockX[l.slot]!.toFixed(1)},${w.pKnockY[l.slot]!.toFixed(1)} dash ${w.pDash[l.slot]} map ${w.map}`);
+        wasOnRamp[l.slot] = onRamp;
+        if (w.pLayer[l.slot] !== prevLayer[l.slot]) {
+          log(`LAYER slot ${l.slot} ${prevLayer[l.slot]} -> ${w.pLayer[l.slot]} at t${w.tick} pos (${w.pX[l.slot]!.toFixed(1)},${w.pY[l.slot]!.toFixed(1)}) move ${inputs[l.slot]?.moveX},${inputs[l.slot]?.moveY} stun ${w.pStun[l.slot]} knock ${w.pKnockX[l.slot]!.toFixed(1)},${w.pKnockY[l.slot]!.toFixed(1)} dash ${w.pDash[l.slot]} floor ${w.wave}`);
+          prevLayer[l.slot] = w.pLayer[l.slot]!;
+        }
+      }
       if (w.misc[4] === 0 && w.enemyCount > 0 && w.pState[0] === 0) {
         up.fight++;
         if (w.pReload[0]! > 0) up.reloading++;
@@ -43,7 +56,7 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
           nn++;
           nd = Math.min(nd, Math.hypot(w.eX[i]! - w.pX[0]!, w.eY[i]! - w.pY[0]!));
         }
-        log(`S t${w.tick} floor ${w.wave} map ${w.map} enemies ${nn} nearest ${nd.toFixed(0)} hp ${w.pHp[0]!.toFixed(0)} pos ${w.pX[0]!.toFixed(0)},${w.pY[0]!.toFixed(0)} shots ${w.pStat[0 * STATS + STAT.Shots]} mag ${w.pMag[0]} btn ${inputs[0]?.buttons}`);
+        log(`S t${w.tick} floor ${w.wave} map ${w.map} enemies ${nn} nearest ${nd.toFixed(0)} hp ${w.pHp[0]!.toFixed(0)} pos ${w.pX[0]!.toFixed(0)},${w.pY[0]!.toFixed(0)} shots ${w.pStat[0 * STATS + STAT.Shots]} mag ${w.pMag[0]} btn ${inputs[0]?.buttons} players ${loads.map((l) => `(${w.pX[l.slot]!.toFixed(0)},${w.pY[l.slot]!.toFixed(0)})L${w.pLayer[l.slot]}s${w.pState[l.slot]}`).join(' ')}`);
       }
       step(w, inputs);
       for (const ev of w.events) {
