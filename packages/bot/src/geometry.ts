@@ -65,6 +65,10 @@ function build(map: MapDef, layer: number, openRamps: boolean): MapGeo {
 
 const local = new Float64Array(4 * 96);
 let localN = 0;
+const ray = new Float64Array(4 * 96);
+let rayN = 0;
+let act = local;
+let actN = 0;
 
 /** Keep only the solid boxes within `radius` of (x, y) for `pushOutLocal` (the bot looks at a few seconds of running, not the whole arena). */
 export function focusBoxes(g: MapGeo, x: number, y: number, radius: number): void {
@@ -78,6 +82,31 @@ export function focusBoxes(g: MapGeo, x: number, y: number, radius: number): voi
     local[localN * 4 + 3] = s[i + 3]!;
     localN++;
   }
+  act = local;
+  actN = localN;
+}
+
+/**
+ * From the boxes chosen by `focusBoxes`, keep those a run of `len` units along (hx, hy) from (x, y) can meet (with `margin` to spare for
+ * sliding along them): the next `pushOutLocal` calls only look at those.
+ */
+export function focusRay(x: number, y: number, hx: number, hy: number, len: number, margin: number): void {
+  rayN = 0;
+  const ex = x + hx * len;
+  const ey = y + hy * len;
+  for (let i = 0; i < localN * 4; i += 4) {
+    const cx = (local[i]! + local[i + 2]!) / 2;
+    const cy = (local[i + 1]! + local[i + 3]!) / 2;
+    const r = Math.hypot(local[i + 2]! - local[i]!, local[i + 3]! - local[i + 1]!) / 2 + margin;
+    if (pointSegDist(cx, cy, x, y, ex, ey) > r) continue;
+    ray[rayN * 4] = local[i]!;
+    ray[rayN * 4 + 1] = local[i + 1]!;
+    ray[rayN * 4 + 2] = local[i + 2]!;
+    ray[rayN * 4 + 3] = local[i + 3]!;
+    rayN++;
+  }
+  act = ray;
+  actN = rayN;
 }
 
 /** Result of `pushOut`. */
@@ -116,8 +145,8 @@ export function pushOut(g: MapGeo, x: number, y: number, r: number): boolean {
 /** `pushOut` against the boxes chosen by `focusBoxes`. */
 export function pushOutLocal(x: number, y: number, r: number): boolean {
   let moved = false;
-  const s = local;
-  for (let i = 0, n = localN * 4; i < n; i += 4) {
+  const s = act;
+  for (let i = 0, n = actN * 4; i < n; i += 4) {
     const cx = x < s[i]! ? s[i]! : x > s[i + 2]! ? s[i + 2]! : x;
     const cy = y < s[i + 1]! ? s[i + 1]! : y > s[i + 3]! ? s[i + 3]! : y;
     const ex = x - cx;

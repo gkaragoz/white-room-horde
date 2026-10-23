@@ -1,8 +1,8 @@
 import { ARENA_HALF_H, ARENA_HALF_W, BALANCE, ENEMY_TYPES, MAPS, PERK, PERKS, PickupType, PlayerState, WEAPON_IDS } from '@wrh/shared';
 import { owns } from '@wrh/sim';
 import { BLOW, DPS, HOLD, RANGED, STAND_OFF, T, bursts, lateScale, radiusOf, speedOf, telePain } from './danger';
-import { focusBoxes, geoOf, movingDist2, nearRamp, segmentCovered, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
-import { computeField, goalDist, goalField, goalWaypoint, territoryAt, waypoint } from './nav';
+import { focusBoxes, focusRay, geoOf, movingDist2, nearRamp, segmentCovered, onDeck, pushOutLocal, pushed, rampEnd, rampPoint, teleDist, wrapAngle, type MapGeo } from './geometry';
+import { NavState, computeField, fieldFresh, goalDist, goalField, goalWaypoint, territoryAt, useNav, waypoint } from './nav';
 import { engagement } from './weapons';
 import type { Ctx, MoveDecision, Percept, TeamDecision } from './types';
 
@@ -27,6 +27,8 @@ const HORIZON = STEPS * DT;
 const MAXE = 40;
 const SEE2 = 26 * 26;
 const FIELD2 = 34 * 34;
+/** Ticks the room field is kept (the territory does not change much in a tenth of a second). */
+const FIELD_AGE = 3;
 const PR = BALANCE.player.radius;
 const DASH_SECONDS = Math.ceil(BALANCE.dash.seconds * 30) / 30;
 /**
@@ -177,12 +179,13 @@ function pickupValue(p: Percept, type: number, data: number): number {
   }
 }
 
-/** Longest stretch walked between two collision checks: well under the thinnest wall, as the sim moves 0.4 units a tick. */
-const SUB = 0.8;
+/** Longest stretch walked between two collision checks: the thinnest cover on the ground is 1.2 thick, a body 0.9 wide, so a step of 1.5 cannot jump a wall (the deck rails are thinner: the deck uses `SUB_DECK`). */
+const SUB = 1.5;
+const SUB_DECK = 0.8;
 
 /** Walk the player forward along (hx, hy), stopping at boxes, the arena edge and the deck edge. Result in `stepped`. */
 function stepPlayer(g: MapGeo, deck: boolean, x: number, y: number, hx: number, hy: number, dist: number): void {
-  const n = Math.ceil(dist / SUB);
+  const n = Math.ceil(dist / (deck ? SUB_DECK : SUB));
   const d = dist / n;
   for (let i = 0; i < n; i++) {
     let nx = x + hx * d;
@@ -487,6 +490,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   const w = p.world;
   const s = p.slot;
   const memo = ((ctx.mem.move as Memo | undefined) ?? (ctx.mem.move = { heading: -1 } as Memo)) as Memo;
+  useNav(((ctx.mem.nav as NavState | undefined) ?? (ctx.mem.nav = new NavState())) as NavState);
   const bx = team.bias.x;
   const by = team.bias.y;
   if (p.state !== PlayerState.Alive) {
@@ -552,7 +556,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   // nothing within shooting range: go and find the rest of the floor (up or down a ramp when they are on the other level)
   huntValue = 0;
   if (plan.go) {
-    goalField(g, w.map, p.layer, plan.x, plan.y);
+    goalField(g, w.map, p.layer, plan.x, plan.y, p.tick);
     huntStart = goalDist(p.x, p.y);
     huntGX = plan.x;
     huntGY = plan.y;
@@ -613,16 +617,18 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   // hurt, the bot weighs every danger more: below 70% health the price of a blow goes up to double
   const risk = 1 + 1.6 * Math.max(0, 0.7 - p.hp / Math.max(1, p.maxHp));
   focusBoxes(g, p.x, p.y, 36);
-  // the room field sees the whole crowd, the rollouts the nearest few
-  let nf = 0;
-  for (const e of p.enemies) {
-    if (e.d2 > FIELD2) break;
-    if (e.layer !== p.layer && e.d2 > 25) continue;
-    fx[nf] = e.x;
-    fy[nf] = e.y;
-    nf++;
+  // the room field sees the whole crowd, the rollouts the nearest few; it is kept for a few ticks
+  if (!fieldFresh(g, w.map, p.layer, p.tick, p.x, p.y, FIELD_AGE)) {
+    let nf = 0;
+    for (const e of p.enemies) {
+      if (e.d2 > FIELD2) break;
+      if (e.layer !== p.layer && e.d2 > 25) continue;
+      fx[nf] = e.x;
+      fy[nf] = e.y;
+      nf++;
+    }
+    computeField(g, w.map, p.layer, p.x, p.y, speed, nf, fx, fy, 0.3, p.tick);
   }
-  computeField(g, w.map, p.layer, p.x, p.y, speed, nf, fx, fy, 0.3);
   // on the ground the ramps stay off limits: the sim would let the bot walk up them (see geoOf), the plan only treats them as walls
   const rampsMatter = p.layer === 0 && !!MAPS[w.map]?.ramps && !nearRamp(MAPS[w.map]!, p.x, p.y, 0.2);
   // on a trip the walking field leads (the straight line to the enemies does not see the walls in between)
@@ -633,6 +639,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   let bestK = -1;
   let bestCost = 1e18;
   for (let k = 0; k < DIRS; k++) {
+    focusRay(p.x, p.y, DIR_X[k]!, DIR_Y[k]!, reach + 6, 5);
     let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, false, iframes, band, weapon.near, melee);
     const ramp = rampsMatter && stepsOntoRamp(p, DIR_X[k]!, DIR_Y[k]!, 2.4) ? 40 : 0;
     const room = roomCost();
@@ -666,6 +673,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     let bestDashK = -1;
     let bestDash = 1e18;
     for (let k = 0; k < DIRS; k += DASH_EVERY) {
+      focusRay(p.x, p.y, DIR_X[k]!, DIR_Y[k]!, reach + 6, 5);
       let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, true, iframes, band, weapon.near, melee);
       if (rampsMatter && stepsOntoRamp(p, DIR_X[k]!, DIR_Y[k]!, 6)) c += 40;
       c += groundCost(p, iframes, true) * gscale + roomCost();
