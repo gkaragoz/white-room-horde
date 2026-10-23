@@ -22,7 +22,7 @@ function world(cls: string, weapon = 'ar'): World {
 }
 
 function enemy(id: number, x: number, y: number, over: Partial<Threat> = {}): Threat {
-  return { id, x, y, d2: x * x + y * y, type: 0, boss: false, elite: 0, hp: 50, maxHp: 50, vx: 0, vy: 0, ...over };
+  return { id, x, y, d2: x * x + y * y, type: 0, boss: false, elite: 0, hp: 50, maxHp: 50, vx: 0, vy: 0, layer: 0, ...over };
 }
 
 describe('card scoring', () => {
