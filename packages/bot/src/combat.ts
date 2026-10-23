@@ -55,6 +55,21 @@ function bestSwing(p: Percept, prof: WeaponProfile): void {
   }
 }
 
+/**
+ * Would a blast at (x, y) set off a barrel whose own blast then reaches the bot or a friend? (A barrel is hit by every explosion
+ * that reaches it: the grenade radius, plus the barrel's own.)
+ */
+function barrelTrap(p: Percept, x: number, y: number): boolean {
+  const B = BALANCE.barrels;
+  const safe = B.radius * 0.8 + 1.2;
+  for (const b of p.barrels) {
+    if ((b.x - x) ** 2 + (b.y - y) ** 2 > (G.radius + 0.6) ** 2) continue;
+    if ((b.x - p.x) ** 2 + (b.y - p.y) ** 2 < safe * safe) return true;
+    for (const a of p.allies) if ((b.x - a.x) ** 2 + (b.y - a.y) ** 2 < safe * safe) return true;
+  }
+  return false;
+}
+
 /** Where a grenade should land: the point within throwing range that will have the most enemies near it when the fuse ends. */
 const gren = { x: 0, y: 0, score: 0 };
 const gpx = new Float64Array(48);
@@ -87,6 +102,7 @@ function bestGrenade(p: Percept): void {
     const dy = py[c]! - p.y;
     const d = Math.hypot(dx, dy);
     if (d < G.minRange || d > G.maxRange) continue;
+    if (barrelTrap(p, px[c]!, py[c]!)) continue;
     let s = 0;
     for (let i = 0; i < n; i++) {
       const ddx = px[i]! - px[c]!;

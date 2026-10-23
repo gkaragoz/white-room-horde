@@ -29,8 +29,25 @@ const SEE2 = 26 * 26;
 const FIELD2 = 34 * 34;
 const PR = BALANCE.player.radius;
 const DASH_SECONDS = Math.ceil(BALANCE.dash.seconds * 30) / 30;
-const DASH_COST = 0.9;
-const ROOM_W = 3;
+/**
+ * The weights of the planner. They are exposed so that tests and tuning runs can try other values; the defaults were tuned against
+ * the benchmark (damage taken per minute and floors reached).
+ */
+export const tuning = {
+  /** Price of ending the look-ahead cramped or cut off, at most. */
+  roomW: 2,
+  /** The margin around an enemy in which the approach already costs: base plus this times its speed. */
+  approachBase: 1.5,
+  approachSpeed: 0.4,
+  /** Weight of the approach cost against the cost of contact. */
+  nearWeight: 0.7,
+  /** Weight of staying in shooting range (per unit beyond the band). */
+  lagK: 0.05,
+  /** What spending the dash costs (pain). */
+  dashCost: 0.7,
+  /** Extra price of turning right around (share of the cost). */
+  turnPenalty: 0.3,
+};
 const DIR_X = new Float64Array(DIRS);
 const DIR_Y = new Float64Array(DIRS);
 for (let k = 0; k < DIRS; k++) {
@@ -205,7 +222,7 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
   const free = dash ? Math.max(iframes, BALANCE.dash.iFrames) : iframes;
   const meleeK = melee ? 0.35 : 1;
   // a blade has to be near what it cuts: it pays more for drifting out of reach
-  const lagK = melee ? 0.35 : 0.05;
+  const lagK = melee ? 0.35 : tuning.lagK;
   for (let k = 1; k <= STEPS; k++) {
     const sp = dash && k === 1 ? speed * BALANCE.dash.speedMul : speed;
     const ox = px;
@@ -259,10 +276,10 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
         cost += cc;
         tm.c += cc;
       } else {
-        const a = 1.1 + esp[i]! * 0.4;
+        const a = tuning.approachBase + esp[i]! * tuning.approachSpeed;
         if (gap < a) {
           const f = (a - gap) / a;
-          const cn = (eburst[i] ? eblow[i]! * 0.5 : edps[i]! * DT * meleeK) * f * f * 0.55 * tw;
+          const cn = (eburst[i] ? eblow[i]! * 0.5 : edps[i]! * DT * meleeK) * f * f * tuning.nearWeight * tw;
           cost += cn;
           tm.n += cn;
         }
@@ -393,9 +410,10 @@ function goalGain(startX: number, startY: number, reach: number): number {
   return gain;
 }
 
-/** Cost of ending the look-ahead somewhere cramped or about to be cut off (see nav.ts): 0 in the open, up to ROOM_W when boxed in. */
+/** Cost of ending the look-ahead somewhere cramped or about to be cut off (see nav.ts): 0 in the open, up to `tuning.roomW` when boxed in. */
 function roomCost(): number {
-  return ROOM_W * (1 - territoryAt(pathX[STEPS]!, pathY[STEPS]!)) + ROOM_W * 0.5 * (1 - territoryAt(pathX[STEPS >> 1]!, pathY[STEPS >> 1]!));
+  const w = tuning.roomW;
+  return w * (1 - territoryAt(pathX[STEPS]!, pathY[STEPS]!)) + w * 0.5 * (1 - territoryAt(pathX[STEPS >> 1]!, pathY[STEPS >> 1]!));
 }
 
 const RAMP_LOOK = [0.6, 1.2, 1.8, 2.4, 3.2, 4.0, 5.0, 6.0];
@@ -623,7 +641,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     if (last >= 0) {
       // keep a course: turning around has to buy a clearly cheaper way out
       const turn = Math.abs(wrapAngle(((k - last) / DIRS) * Math.PI * 2)) / Math.PI;
-      c = c * (1 + 0.3 * turn) + 0.15 * turn;
+      c = c * (1 + tuning.turnPenalty * turn) + 0.15 * turn;
     }
     const gain = goalGain(p.x, p.y, reach);
     c -= gain;
@@ -651,7 +669,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
       let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, true, iframes, band, weapon.near, melee);
       if (rampsMatter && stepsOntoRamp(p, DIR_X[k]!, DIR_Y[k]!, 6)) c += 40;
       c += groundCost(p, iframes, true) * gscale + roomCost();
-      c = c * risk + DASH_COST;
+      c = c * risk + tuning.dashCost;
       c -= goalGain(p.x, p.y, reach);
       if (c < bestDash) {
         bestDash = c;

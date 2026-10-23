@@ -25,6 +25,8 @@ describe.skipIf(process.env.DBG !== '1')('dbg', () => {
       if (w.tick >= from) {
         const near: string[] = [];
         const far: string[] = [];
+        const teles: string[] = [];
+        for (let t = 0; t < w.tActive.length; t++) if (w.tActive[t]) teles.push(`[sh${w.tShape[t]} ef${w.tEffect[t]} (${w.tX[t]!.toFixed(1)},${w.tY[t]!.toFixed(1)}) a${w.tA[t]!.toFixed(2)} w${w.tW[t]!.toFixed(1)} l${w.tL[t]!.toFixed(1)} left${w.tLeft[t]}]`);
         for (let i = 0; i < w.eActive.length; i++) {
           if (!w.eActive[i]) continue;
           far.push(`${w.eType[i]}@(${(w.eX[i]! - w.pX[slot]!).toFixed(0)},${(w.eY[i]! - w.pY[slot]!).toFixed(0)}) st${w.eState[i]} fr${w.eFrost[i]} L${w.eLayer[i]} hp${w.eHp[i]!.toFixed(0)}`);
@@ -35,7 +37,7 @@ describe.skipIf(process.env.DBG !== '1')('dbg', () => {
           const dy = w.eY[i]! - w.pY[slot]!;
           if (dx * dx + dy * dy < 36) near.push(`(${dx.toFixed(1)},${dy.toFixed(1)})`);
         }
-        lines.push(`t${w.tick} pos ${w.pX[slot]!.toFixed(2)},${w.pY[slot]!.toFixed(2)} hp ${w.pHp[slot]!.toFixed(0)} if ${w.pIFrames[slot]!.toFixed(2)} dashcd ${w.pDashCd[slot]!.toFixed(1)} move ${inp.moveX},${inp.moveY} btn ${inp.buttons} L${w.pLayer[slot]} trip ${lastTrip.value}/${lastTrip.start.toFixed(0)}\n   costs ${Array.from(lastCosts).map((c, k) => c.toFixed(1) + '[' + Array.from(lastTerms.slice(k * 8, k * 8 + 8)).map((v) => v.toFixed(1)).join(',') + ']').join(' ')}\n   all ${far.length}: ${far.slice(0, 16).join(' ')}\n   near ${near.join(' ')}\n   seen ${seen.n}: ${Array.from({ length: Math.min(seen.n, 8) }, (_, i) => `(${(seen.ex[i]! - w.pX[slot]!).toFixed(1)},${(seen.ey[i]! - w.pY[slot]!).toFixed(1)} sp${seen.esp[i]!.toFixed(1)} t${seen.etouch[i]!.toFixed(2)} dps${seen.edps[i]!.toFixed(2)} rel${Math.sqrt(seen.erel2[i]!).toFixed(1)} h${seen.ehold[i]})`).join(' ')}`);
+        lines.push(`t${w.tick} pos ${w.pX[slot]!.toFixed(2)},${w.pY[slot]!.toFixed(2)} hp ${w.pHp[slot]!.toFixed(0)} if ${w.pIFrames[slot]!.toFixed(2)} dashcd ${w.pDashCd[slot]!.toFixed(1)} move ${inp.moveX},${inp.moveY} btn ${inp.buttons} L${w.pLayer[slot]} trip ${lastTrip.value}/${lastTrip.start.toFixed(0)}\n   costs ${Array.from(lastCosts).map((c, k) => c.toFixed(1) + '[' + Array.from(lastTerms.slice(k * 8, k * 8 + 8)).map((v) => v.toFixed(1)).join(',') + ']').join(' ')}\n   teles ${teles.join(' ')}\n   all ${far.length}: ${far.slice(0, 16).join(' ')}\n   near ${near.join(' ')}\n   seen ${seen.n}: ${Array.from({ length: Math.min(seen.n, 8) }, (_, i) => `(${(seen.ex[i]! - w.pX[slot]!).toFixed(1)},${(seen.ey[i]! - w.pY[slot]!).toFixed(1)} sp${seen.esp[i]!.toFixed(1)} t${seen.etouch[i]!.toFixed(2)} dps${seen.edps[i]!.toFixed(2)} rel${Math.sqrt(seen.erel2[i]!).toFixed(1)} h${seen.ehold[i]})`).join(' ')}`);
       }
       step(w, inputs);
     }
