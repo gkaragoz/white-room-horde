@@ -7,6 +7,8 @@ minors), so a minor bump means: update the server and reload the page.
 
 ## Unreleased
 
+## v0.36.0 (2026-10-23)
+
 **Companion bots (minor release: relay protocol change, the relay must be redeployed)**
 
 - Add 0 to 7 bot teammates to a solo game or an online room (Play page, and the host's room) and pick how well they play: Easy, Normal, Expert or Superhuman. Bots get a class, gun and name of their own and are marked with a robot badge. A run with bots earns XP divided by 1 + 0.25 per bot, and the game over screen says so; achievements and the room's level are unchanged. Online, the host's page runs the bots; if the host drops, the next player's page takes them over. `?bots=N&botskill=...` still starts a dev game with bots. See `docs/BOTS.md`.
