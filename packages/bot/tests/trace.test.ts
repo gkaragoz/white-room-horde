@@ -89,7 +89,21 @@ describe.skipIf(process.env.TRACE !== '1')('bot trace', () => {
             }
             if (best < 3.2) cause = `melee:${ENEMY_TYPES[bt]}`;
           }
-          cause = `${cause}`;
+          if (cause.startsWith('tele:rect9')) {
+            // find which player was hit: the nearest one to the event
+            let hs = 0;
+            let hd = 1e9;
+            for (const l of loads) {
+              const d = Math.hypot(w.pX[l.slot]! - ev.x, w.pY[l.slot]! - ev.y);
+              if (d < hd) {
+                hd = d;
+                hs = l.slot;
+              }
+            }
+            let near6 = 0;
+            for (let i = 0; i < w.eActive.length; i++) if (w.eActive[i] && Math.hypot(w.eX[i]! - ev.x, w.eY[i]! - ev.y) < 6) near6++;
+            log(`SPIKE t${w.tick} slot ${hs} dashcd ${w.pDashCd[hs]!.toFixed(1)} dash ${w.pDash[hs]} iframes ${w.pIFrames[hs]!.toFixed(2)} enemies<6 ${near6} hp ${w.pHp[hs]!.toFixed(0)} cls ${w.pPerk[hs * 0]}`);
+          }
           dmgBy[cause] = (dmgBy[cause] ?? 0) + ev.damage;
           cntBy[cause] = (cntBy[cause] ?? 0) + 1;
         }

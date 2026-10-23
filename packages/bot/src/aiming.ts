@@ -38,21 +38,24 @@ const mz = { x: 0, y: 0 };
  * The aim angle that sends a bullet from the muzzle through the enemy's predicted position. `lead` (0..1) scales how much of the
  * prediction is used (lower skill leads less).
  */
-export function leadAngle(p: Percept, e: Threat, prof: WeaponProfile, lead: number): number {
-  let ang = Math.atan2(e.y - p.y, e.x - p.x);
+export function leadAngle(p: Percept, e: Threat, prof: WeaponProfile, lead: number, lag = 0): number {
+  // the picture is `lag` ticks old: where the enemy is now
+  const ex = e.x + e.vx * lag;
+  const ey = e.y + e.vy * lag;
+  let ang = Math.atan2(ey - p.y, ex - p.x);
   const vx = e.vx * 30 * lead;
   const vy = e.vy * 30 * lead;
   let tx: number;
   let ty: number;
   for (let i = 0; i < MUZZLE_ITER; i++) {
     muzzle(p, ang, mz);
-    if (prof.speed > 0 && (vx !== 0 || vy !== 0) && intercept(mz.x, mz.y, e.x, e.y, vx, vy, prof.speed)) {
+    if (prof.speed > 0 && (vx !== 0 || vy !== 0) && intercept(mz.x, mz.y, ex, ey, vx, vy, prof.speed)) {
       const t = Math.min(hit.t, 1.2);
-      tx = e.x + vx * t;
-      ty = e.y + vy * t;
+      tx = ex + vx * t;
+      ty = ey + vy * t;
     } else {
-      tx = e.x;
-      ty = e.y;
+      tx = ex;
+      ty = ey;
     }
     ang = Math.atan2(ty - mz.y, tx - mz.x);
   }
@@ -142,7 +145,7 @@ export function chooseShot(p: Percept, ctx: Ctx, prof: WeaponProfile): Shot {
   if (best < 0) return shot;
   const e = p.enemies[best]!;
   shot.index = best;
-  shot.angle = leadAngle(p, e, prof, ctx.skill.judgement);
+  shot.angle = leadAngle(p, e, prof, ctx.skill.judgement, Math.round(ctx.skill.reactionTicks * ctx.skill.judgement));
   shot.dist = Math.sqrt(e.d2);
   shot.clear = true;
   (ctx.mem.aim ??= { id: -1 } as never);

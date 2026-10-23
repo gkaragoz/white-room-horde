@@ -324,13 +324,14 @@ function rollout(p: Percept, g: MapGeo, deck: boolean, n: number, hx: number, hy
 }
 
 /** Pain from the ground attacks, acid, fire and spit along the path in `pathX/pathY`. */
-function groundCost(p: Percept, iframes: number, dash: boolean): number {
+function groundCost(p: Percept, iframes: number, dash: boolean, lag: number): number {
   const free = dash ? Math.max(iframes, BALANCE.dash.iFrames) : iframes;
   let cost = 0;
   const wave = p.wave;
   const margin = PR + 0.2;
+  const lagS = lag / 30;
   for (const t of p.telegraphs) {
-    const tl = Math.max(0, t.eta) / 30;
+    const tl = Math.max(0, t.eta - lag) / 30;
     if (tl <= free && tl <= HORIZON) continue;
     const pain = telePain(t, p.maxHp, p.hp, wave);
     if (pain <= 0) continue;
@@ -348,7 +349,7 @@ function groundCost(p: Percept, iframes: number, dash: boolean): number {
     const r = z.r + PR;
     const r2 = r * r;
     for (let k = 1; k <= STEPS; k++) {
-      if (z.left < k * DT * 30) break;
+      if (z.left - lag < k * DT * 30) break;
       if (k * DT <= free) continue;
       const dx = pathX[k]! - z.x;
       const dy = pathY[k]! - z.y;
@@ -359,10 +360,10 @@ function groundCost(p: Percept, iframes: number, dash: boolean): number {
     const rr = BALANCE.spit.radius * BALANCE.hitbox.enemyMul + PR + 0.3;
     for (let k = 1; k <= STEPS; k++) {
       const t = k * DT;
-      if (t > s.life) break;
+      if (t > s.life - lagS) break;
       if (t <= free) continue;
-      const dx = pathX[k]! - (s.x + s.vx * t);
-      const dy = pathY[k]! - (s.y + s.vy * t);
+      const dx = pathX[k]! - (s.x + s.vx * (t + lagS));
+      const dy = pathY[k]! - (s.y + s.vy * (t + lagS));
       if (dx * dx + dy * dy < rr * rr) {
         cost += BLOW[T.spitter]! * lateScale(wave) * 0.9;
         break;
@@ -507,6 +508,8 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
   const reviving = team.revive;
   const speed = speedNow(p) * (reviving ? BALANCE.player.reviveMoveMul : 1);
   const weapon = engagement(p);
+  // anticipation: how many ticks of the picture's age the bot makes up for (judgement scales it: a poor player does not)
+  const lag = Math.round(ctx.skill.reactionTicks * ctx.skill.judgement);
   const plan = planTrip(p, weapon.band);
   // standing on a ramp's footprint, the walls of the plan must be the sim's (the footprint is open, only its side walls stop)
   const g = geoOf(w.map, p.layer, p.layer === 0 && nearRamp(MAPS[w.map] ?? MAPS[0]!, p.x, p.y, 0.6));
@@ -520,8 +523,9 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     if (e.d2 > SEE2) break;
     if (e.layer !== p.layer && e.d2 > 25) continue;
     const typ = e.type;
-    ex[n] = e.x;
-    ey[n] = e.y;
+    // the bot reacts to a picture that is `lag` ticks old: it moves what it sees on by what it knows of its speed
+    ex[n] = e.x + e.vx * lag;
+    ey[n] = e.y + e.vy * lag;
     let sp = speedOf(e);
     if (typ === T.leaper || typ === T.pouncer || typ === T.blinker) sp *= 1.7;
     // measured speed catches floor effects (swift floors, auras)
@@ -643,7 +647,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
     let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, false, iframes, band, weapon.near, melee);
     const ramp = rampsMatter && stepsOntoRamp(p, DIR_X[k]!, DIR_Y[k]!, 2.4) ? 40 : 0;
     const room = roomCost();
-    c += ramp + groundCost(p, iframes, false) * gscale + room;
+    c += ramp + groundCost(p, iframes, false, lag) * gscale + room;
     c *= risk;
     if (last >= 0) {
       // keep a course: turning around has to buy a clearly cheaper way out
@@ -676,7 +680,7 @@ export function decideMove(p: Percept, ctx: Ctx, team: TeamDecision): MoveDecisi
       focusRay(p.x, p.y, DIR_X[k]!, DIR_Y[k]!, reach + 6, 5);
       let c = rollout(p, g, deck, n, DIR_X[k]!, DIR_Y[k]!, speed, true, iframes, band, weapon.near, melee);
       if (rampsMatter && stepsOntoRamp(p, DIR_X[k]!, DIR_Y[k]!, 6)) c += 40;
-      c += groundCost(p, iframes, true) * gscale + roomCost();
+      c += groundCost(p, iframes, true, lag) * gscale + roomCost();
       c = c * risk + tuning.dashCost;
       c -= goalGain(p.x, p.y, reach);
       if (c < bestDash) {
